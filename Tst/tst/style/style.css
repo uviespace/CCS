@@ -1,0 +1,129 @@
+/*{
+    font: "Helvetica Bold Italic";
+    font-family: Helvetica, arial, sans-serif;
+    font-size: 10px;
+
+    color: #81d742;
+    background: #2d1340;
+
+}
+.notebook,
+.button,
+.frame,
+.entry{
+    border-radius: 5px;
+    border-style: solid;
+    border-width: 2px;
+}
+.button {
+    padding: 5px;
+    border-right-width: 5px;
+    border-bottom-width: 5px;
+    box-shadow: 0 5px #999;
+}
+.button:active {
+    border-top-width: 5px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    background: #4671fe;
+    box-shadow: 0 2px #666;
+    transition: 0s;
+}
+*//*
+.tst-css{
+    background-color: #dcdcdc;
+}
+.tst-css textview{
+    border-radius: 3px;
+    padding-left: 10px;
+}
+.tst-css entry{
+    border-radius: 3px;
+    padding-left: 10px;
+}
+.tst-css label{
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+.tst-css frame{
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.step-widget{
+    background-color: #a3a3a3;
+    border-radius: 5px;
+}
+.step-widget label {
+    font-weight: bold;
+    color: #0063A6;
+}
+.step-widget border{
+    border-style: solid;
+    border-width: 5px;
+    border-color: #666666;
+}
+.step-widget scrolledwindow{
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.step-widget label {
+    font-weight: bold;
+}
+*/
+.step-widget label {
+    font-weight: bold;
+}
+.step-widget border{
+    border-style: solid;
+    border-width: 3px;
+    border-radius: 3px;
+    border-color: @fg_color;
+}
+.step-widget frame{
+    padding-left: 10px;
+    padding-right: 10px;
+    /*border-top: 5px solid @bg_color;
+    border-bottom: 1px solid @bg_color;*/
+    border-top: 1px solid green;
+    border-bottom: 1px solid green;
+    border-left: 1px solid green;
+    border-right: 1px solid green;
+    /* padding-top: 0px; */
+    /* padding-bottom: 0px; */
+}
+.step-detail-box {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-top: 1px solid red;
+    border-bottom: 1px solid red;
+    border-left: 1px solid red;
+    border-right: 1px solid red;
+}
+.highlight_top_border frame{
+    border-top: 5px solid @fg_color;
+}
+.highlight_bottom_border frame {
+    border-bottom: 5px solid @fg_color;
+}
+.inter-step-widget {
+    border-style: solid;
+    border-width: 2px;
+    /*border-color: @bg_color;*/
+    border-color: yellow;
+}
+.highlight frame border{
+    border-color: @fg_color;
+}
+.highlight {
+    border-color: @fg_color;
+}
+.highlight-2 {
+    border-color: red;
+}

@@ -1,0 +1,13 @@
+.tst-css{
+    background-color: #dcdcdc;
+}
+.tst-css label{
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.tst-css frame{
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+}

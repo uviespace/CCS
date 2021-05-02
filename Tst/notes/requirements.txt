@@ -1,0 +1,78 @@
+# https://pygobject.readthedocs.io/en/latest/getting_started.html
+sudo apt install python-gi python-gi-cairo python3-gi python3-gi-cairo gir1.2-gtk-3.0
+
+Pycharm -> File -> Settings -> Projet: <yourproject> -> Project Interpreter -> Add (Button) -> install PyGObject
+
+
+Problem:
+The 'Gtk' is an 'unresolved reference' (from gi.repository import Gtk)
+Go to Code -> Inspect Code then either select Whole project or Selected files and click OK.
+4. After the code cleanup is completed, find the Unresolved Reference issue in the analysis results. (Under Inspection results -> Project Name -> Python -> Unresolved references)
+5. In the Error explanation box click on Generate stubs for binary module
+This did not work:
+Pyhcarm -> Edit Custom Properties -> add "idea.max.intellisense.filesize=10000"
+
+
+----------------------------------------------------------------------------------------------------------
+for the documentation:
+apt-get install python-sphinx
+pip install sphinx_rtd_theme
+
+----------------------------------------------------------------------------------------------------------
+upgrade to GTK3+ 3.20/3.22:
+sudo add-apt-repository ppa:gnome3-team/gnome3-staging
+sudo add-apt-repository ppa:gnome3-team/gnome3
+sudo apt update
+sudo apt dist-upgrade
+
+OLD etc/apt/sources.list:
+{
+# deb cdrom:[Xubuntu 16.04.1 LTS _Xenial Xerus_ - Release amd64 (20160719)]/ xenial main multiverse restricted universe
+
+# See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
+# newer versions of the distribution.
+deb http://at.archive.ubuntu.com/ubuntu/ xenial main restricted
+deb-src http://at.archive.ubuntu.com/ubuntu/ xenial main multiverse restricted universe #Added by software-properties
+
+## Major bug fix updates produced after the final release of the
+## distribution.
+deb http://at.archive.ubuntu.com/ubuntu/ xenial-updates main restricted
+deb-src http://at.archive.ubuntu.com/ubuntu/ xenial-updates main multiverse restricted universe #Added by software-properties
+
+## N.B. software from this repository is ENTIRELY UNSUPPORTED by the Ubuntu
+## team, and may not be under a free licence. Please satisfy yourself as to
+## your rights to use the software. Also, please note that software in
+## universe WILL NOT receive any review or updates from the Ubuntu security
+## team.
+deb http://at.archive.ubuntu.com/ubuntu/ xenial universe
+deb http://at.archive.ubuntu.com/ubuntu/ xenial-updates universe
+
+## N.B. software from this repository is ENTIRELY UNSUPPORTED by the Ubuntu
+## team, and may not be under a free licence. Please satisfy yourself as to
+## your rights to use the software. Also, please note that software in
+## multiverse WILL NOT receive any review or updates from the Ubuntu
+## security team.
+deb http://at.archive.ubuntu.com/ubuntu/ xenial multiverse
+deb http://at.archive.ubuntu.com/ubuntu/ xenial-updates multiverse
+
+## N.B. software from this repository may not have been tested as
+## extensively as that contained in the main release, although it includes
+## newer versions of some applications which may provide useful features.
+## Also, please note that software in backports WILL NOT receive any review
+## or updates from the Ubuntu security team.
+deb http://at.archive.ubuntu.com/ubuntu/ xenial-backports main restricted universe multiverse
+deb-src http://at.archive.ubuntu.com/ubuntu/ xenial-backports main restricted universe multiverse
+
+## Uncomment the following two lines to add software from Canonical's
+## 'partner' repository.
+## This software is not part of Ubuntu, but is offered by Canonical and the
+## respective vendors as a service to Ubuntu users.
+# deb http://archive.canonical.com/ubuntu xenial partner
+# deb-src http://archive.canonical.com/ubuntu xenial partner
+
+deb http://security.ubuntu.com/ubuntu xenial-security main restricted
+deb-src http://security.ubuntu.com/ubuntu xenial-security main multiverse restricted universe #Added by software-properties
+deb http://security.ubuntu.com/ubuntu xenial-security universe
+deb http://security.ubuntu.com/ubuntu xenial-security multiverse
+}
+----------------------------------------------------------------------------------------------------------

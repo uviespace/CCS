@@ -1,0 +1,122 @@
+{
+  "_name": "",
+  "_description": "",
+  "_version": "",
+  "_primary_counter_locked": false,
+  "sequences": [
+    {
+      "_sequence_number": 0,
+      "_name": "",
+      "_description": "",
+      "_version": "",
+      "_primary_counter_locked": false,
+      "steps": [
+        {
+          "_sequence": 0,
+          "_primary_counter": 1,
+          "_secondary_counter": 0,
+          "_step_number": "1.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        },
+        {
+          "_sequence": 0,
+          "_primary_counter": 2,
+          "_secondary_counter": 0,
+          "_step_number": "2.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        },
+        {
+          "_sequence": 0,
+          "_primary_counter": 3,
+          "_secondary_counter": 0,
+          "_step_number": "3.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        }
+      ]
+    },
+    {
+      "_sequence_number": 0,
+      "_name": "",
+      "_description": "",
+      "_version": "",
+      "_primary_counter_locked": false,
+      "steps": [
+        {
+          "_sequence": 0,
+          "_primary_counter": 1,
+          "_secondary_counter": 0,
+          "_step_number": "1.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        },
+        {
+          "_sequence": 0,
+          "_primary_counter": 2,
+          "_secondary_counter": 0,
+          "_step_number": "2.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        },
+        {
+          "_sequence": 0,
+          "_primary_counter": 3,
+          "_secondary_counter": 0,
+          "_step_number": "3.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        },
+        {
+          "_sequence": 0,
+          "_primary_counter": 4,
+          "_secondary_counter": 0,
+          "_step_number": "4.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        },
+        {
+          "_sequence": 0,
+          "_primary_counter": 5,
+          "_secondary_counter": 0,
+          "_step_number": "5.0",
+          "_description": "",
+          "_comment": "",
+          "_command_code": "",
+          "_verification_code": "",
+          "_is_active": true,
+          "_verified_item": []
+        }
+      ]
+    }
+  ]
+}

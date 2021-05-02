@@ -1,0 +1,10 @@
+The requirement to execute steps parallel led to the consideration to implement the parallel tasks as a GTK application.
+A test is still a sequence of steps which are executed one after another. This steps are run within a GTK application.
+Parallel steps will be a separate test and also implemented as GTK application.
+The first test will invoke the second one.
+The design of a test as GTK application gives the benefit to use the Signal-feature.
+This will it make possible to catch events or progress and thus control the flow of a test.
+The communication between both applications is done via DBus.
+Together with Signals it will be possible to create test scenarios where two or more parallel task can be executed and moreover the execution of steps be timed.
+
+How to abort a step?

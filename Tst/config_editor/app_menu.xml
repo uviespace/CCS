@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <menu id="app-menu">
+        <submenu>
+            <attribute name="label">File</attribute>
+            <section>
+            <item>
+                <attribute name="label" translatable="yes">Open...</attribute>
+                <attribute name="action">win.open</attribute>
+            </item>
+            <item>
+                <attribute name="label" translatable="yes">Save...</attribute>
+                <attribute name="action">win.save</attribute>
+                <attribute name="accel">&lt;Primary&gt;s</attribute>
+            </item>
+            <item>
+                <attribute name="label" translatable="yes">Save as...</attribute>
+                <attribute name="action">win.save_as</attribute>
+            </item>
+        </section>
+        <section>
+            <item>
+                <attribute name="label" translatable="yes">Quit</attribute>
+                <attribute name="action">app.quit</attribute>
+                <attribute name="accel">&lt;Primary&gt;q</attribute>
+            </item>
+        </section>
+        </submenu>
+        <submenu>
+            <attribute name="label">View</attribute>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">Show interpolated values</attribute>
+                    <attribute name="action">win.show_interpol_val</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Show merged configs page</attribute>
+                    <attribute name="action">win.show_merge_page</attribute>
+                </item>
+            </section>
+        </submenu>
+        <submenu>
+            <attribute name="label">Help</attribute>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">Documentation</attribute>
+                    <attribute name="action">app.open_doc</attribute>
+                </item>
+            </section>
+        </submenu>
+    </menu>
+</interface>

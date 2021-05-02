@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <menu id="app-menu">
+        <submenu>
+            <attribute name="label">Menu</attribute>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">New</attribute>
+                    <attribute name="action">win.make_new_test</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Open</attribute>
+                    <attribute name="action">win.open</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Save</attribute>
+                    <attribute name="action">win.save</attribute>
+                    <attribute name="accel">&lt;Primary&gt;s</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Save as</attribute>
+                    <attribute name="action">win.save_as</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Close</attribute>
+                    <attribute name="action">win.close</attribute>
+                </item>
+            </section>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">Quit</attribute>
+                    <attribute name="action">app.quit</attribute>
+                    <attribute name="accel">&lt;Primary&gt;q</attribute>
+                </item>
+            </section>
+        </submenu>
+        <submenu>
+            <attribute name="label">Modules</attribute>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">CCS Editor</attribute>
+                    <attribute name="action">app.start_ccs_editor</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Poolviewer</attribute>
+                    <attribute name="action">app.start_poolviewer</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Poolmanager</attribute>
+                    <attribute name="action">app.start_poolmanager</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Plotter</attribute>
+                    <attribute name="action">app.start_plotter</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Monitor</attribute>
+                    <attribute name="action">app.start_monitor</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Configuration Editor</attribute>
+                    <attribute name="action">app.start_config_editor</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Log File Viewer</attribute>
+                    <attribute name="action">app.start_log_viewer</attribute>
+                </item>
+            </section>
+        </submenu>
+        <submenu>
+            <attribute name="label">View</attribute>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">Show JSON of the model</attribute>
+                    <attribute name="action">win.model_viewer_toggle_hide</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Apply CSS</attribute>
+                    <attribute name="action">win.apply_css</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">About</attribute>
+                    <attribute name="action">win.about_us</attribute>
+                </item>
+            </section>
+        </submenu>
+    </menu>
+</interface>

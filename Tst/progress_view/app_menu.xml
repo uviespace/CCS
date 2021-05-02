@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <menu id="app-menu">
+        <section>
+            <item>
+                <attribute name="label" translatable="yes">Open</attribute>
+                <attribute name="action">win.open</attribute>
+            </item>
+            <item>
+                <attribute name="label" translatable="yes">Apply CSS</attribute>
+                <attribute name="action">app.apply-css</attribute>
+                <attribute name="accel">&lt;Primary&gt;f</attribute>
+            </item>
+        </section>
+        <section>
+            <item>
+                <attribute name="label" translatable="yes">Quit</attribute>
+                <attribute name="action">app.quit</attribute>
+                <attribute name="accel">&lt;Primary&gt;q</attribute>
+            </item>
+        </section>
+    </menu>
+</interface>

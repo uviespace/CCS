@@ -1,0 +1,48 @@
+{
+ "name": "x1",
+ "description": "first try",
+ "version": "0.4",
+ "pre_condition": {
+  "step_number": null,
+  "name": "",
+  "description": "",
+  "comment": "",
+  "command_code": "",
+  "verification_code": "",
+  "is_active": true,
+  "verified_item": []
+ },
+ "post_condition": {
+  "step_number": null,
+  "name": "",
+  "description": "",
+  "comment": "",
+  "command_code": "",
+  "verification_code": "",
+  "is_active": true,
+  "verified_item": []
+ },
+ "has_parallel_thread": false,
+ "steps_dict": {
+  "1": {
+   "step_number": 1,
+   "name": "",
+   "description": "send a TC and verify that all three acknowledgements are received",
+   "comment": "",
+   "command_code": "# sending a TC(3,6) to disable IFSW_HK housekeeping\ntc_dis = ccs.Tcsend_DB('DPU_IFSW_DIS_HK_DR_GEN', 1, ack='0b1011', pool_name=pool_name)\ntc_id = tcid.TcId(st=3, sst=6, apid=tc_dis[0], ssc=tc_dis[1], timestamp=tc_dis[2])",
+   "verification_code": "tc_dis = tc_id.tc_id_tuple()\n# check if the TC was successful\nresult = tm.check_acknowledgement(ccs=ccs, pool_name=pool_name, tc_identifier=tc_dis)",
+   "is_active": true,
+   "verified_item": []
+  },
+  "2": {
+   "step_number": 2,
+   "name": "",
+   "description": "another step",
+   "comment": "",
+   "command_code": "tc_dis = ccs.Tcsend_DB('DPU_IFSW_DIS_HK_DR_GEN', 1, ack='0b1011', pool_name=pool_name)",
+   "verification_code": "",
+   "is_active": true,
+   "verified_item": []
+  }
+ }
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <menu id="menu-bar">
+        <submenu>
+            <attribute name="label">Menu</attribute>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">Open</attribute>
+                    <attribute name="action">win.open</attribute>
+                </item>
+                <item>
+                    <attribute name="label" translatable="yes">Close</attribute>
+                    <attribute name="action">win.close</attribute>
+                </item>
+            </section>
+            <section>
+                <item>
+                    <attribute name="label" translatable="yes">Quit</attribute>
+                    <attribute name="action">app.quit</attribute>
+                    <attribute name="accel">&lt;Primary&gt;q</attribute>
+                </item>
+            </section>
+        </submenu>
+    </menu>
+</interface>

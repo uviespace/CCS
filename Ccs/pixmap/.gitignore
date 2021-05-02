@@ -1,0 +1,5 @@
+**/*pyc
+database/.coverage
+tags
+database/htmlcov
+database/.cache

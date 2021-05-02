@@ -1,0 +1,113 @@
+/*
+@define-color bg_color #212121;
+@define-color bg_color #212121;
+@define-color fg_color #BDBDBD;
+@define-color base_color #2C2C2C;
+@define-color text_color #BDBDBD;
+@define-color selected_fg_color #FFA203;
+@define-color selected_bg_color #3C3C3C;
+
+@define-color tooltip_bg_color #444444;
+@define-color tooltip_fg_color #FFFFFF;
+
+@define-color button_toggled_text #BA7D14;
+
+@define-color link_color #B4913F;
+@define-color visited_link_color #B4913F;
+
+@define-color progressbar_fill #BA7D14;
+@define-color switch_fill #BA7D14;
+@define-color spinner #BA7D14;
+
+@define-color scrollbar_slider #60491F;
+@define-color scrollbar_slider_prelight #6E5120;
+
+@define-color infobar_info_bg #51AE45;
+@define-color infobar_warning_bg #B4913F;
+@define-color infobar_question_bg #4551AE;
+@define-color infobar_error_bg #AE4551;
+
+@define-color transparent alpha (#FFF, 0.00);
+*/
+
+/***************************/
+/** Extended Color Scheme **/
+/***************************/
+/*
+@define-color fg_normal @fg_color;
+@define-color fg_active  @fg_color;
+@define-color fg_insensitive mix (@fg_color, shade (@bg_color, 0.85), 0.4);
+@define-color fg_prelight @selected_fg_color;
+@define-color fg_selected @selected_fg_color;
+
+@define-color bg_normal @bg_color;
+@define-color bg_active shade (@bg_color, 0.9);
+@define-color bg_insensitive shade (@bg_color, 0.95);
+@define-color bg_prelight @selected_bg_color;
+@define-color bg_selected @selected_bg_color;
+
+@define-color base_normal @base_color;
+@define-color base_active @selected_bg_color;
+@define-color base_insensitive shade (@base_color, 0.95);
+@define-color base_prelight @bg_color;
+@define-color base_selected @selected_bg_color;
+
+@define-color text_normal @text_color;
+@define-color text_active @text_color;
+@define-color text_insensitive shade (mix (@text_color, @base_color, 0.5), 0.74);
+@define-color text_prelight @text_color;
+@define-color text_selected @selected_fg_color;
+
+@define-color border_normal shade (@bg_normal, 0.67);
+@define-color border_active shade (@bg_normal, 0.57);
+@define-color border_insensitive shade (@bg_normal, 0.81);
+@define-color border_prelight shade (@bg_prelight, 0.71);
+
+@define-color lightborder_normal shade (@bg_normal, 1.2);
+@define-color lightborder_active shade (@bg_active, 1.2);
+@define-color lightborder_insensitive shade (@bg_insensitive, 1.2);
+@define-color lightborder_prelight shade (@bg_prelight, 1.2);
+@define-color lightborder_selected shade (@bg_selected, 1.2);
+
+
+
+
+
+.button{
+  padding: 1px;
+}
+
+.button {
+	border-style: solid;
+    border-width: 1px;
+    border-radius: 2px;
+    background-color:         @bg_normal;
+    border-color: @border_normal;
+    -unico-inner-stroke-color: @lightborder_normal;
+    -unico-inner-stroke-width: 1px 1px 0 1px;
+}
+
+.button:hover:active,
+.button:hover {
+	color: @fg_prelight;
+    background-color: @bg_prelight;
+    border-color: @border_prelight;
+    -unico-inner-stroke-color: @lightborder_prelight;
+}
+
+.button:active {
+    background-color: @bg_active;
+    border-color: @border_active;
+    -unico-inner-stroke-width: 0;
+}
+
+.button GtkLabel:active {
+    color: @button_toggled_text;
+}
+
+
+.GtkTreeView {
+    even-row-color: @bg_color
+    odd-row-color: @fg_color
+}
+*/

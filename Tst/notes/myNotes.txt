@@ -1,0 +1,34 @@
+
+sketch desk features:
+    * multiple threads (currently 2, the parallel thread is started only before/after a step -> graphical representation trough shifting)
+    * drag and drop of new/existing steps
+    * ToThink: How to generate JSON, especially the timing when parallel threads are started.
+    * Structure of the JSON, how to depict the the parallelism
+    * How to control the timings and interaction of the main and parallel thread. Event triggering?
+    * To keep it simple are parallel threads limited to be started and stopped. No interaction while running.
+    * possibility to move the parallel thread steps relative to the main thread steps (to position the parallel thread)
+    * a simple loop mechanism for steps
+    * treeview for commands (as standalone application)
+
+
+Open questions:
+
+Start of the parallel thread:
+How the start of a parallel thread should be implemented in the program?
+Should it be possible to start the thread anywhere in the command or verification code?
+Should the start of the parallel thread be a own step, thus only can be started between two steps?
+How is it depicted in the JSON?
+
+Storing the current data in the program:
+How the data of the current work should be stored?
+Structure of the data?
+Should a history be implemented?
+
+Manipulation of the current data:
+Should a central function handle all events which would change the current data?
+How all changes are detected and none overlooked?
+Is a function necessary which checks the integrity of the data?
+Retrieving data: Should always all data of all steps be retrieved or only the changed data?
+
+
+gtk3-icon-browser

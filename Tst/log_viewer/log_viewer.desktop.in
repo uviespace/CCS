@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=LogViewer
+Comment=Display log files which were written using the Python logging module.
+Exec=@libexecdir@/log_viewer.py
+Icon=@libexecdir@/log_viewer.png
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=GNOME;GTK;Viewer;

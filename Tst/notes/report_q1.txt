@@ -1,0 +1,25 @@
+sketch files Stefan Winkler 08.04.19 10:35
+Further improvement of the ConfigurationEditor. Removed the default path to a configuration file. Now the initially opened config file has to be passed as argument while a instance of the class is created. Stefan Winkler 18.03.19 11:51
+renamed folders and made a Python package out of the modules for testing Stefan Winkler 11.03.19 22:09
+added directories to gitignore Stefan Winkler 11.03.19 22:05
+test script generator: logging the traceback of exceptions Stefan Winkler 04.03.19 10:05
+cells in the result column have the background color green if passed and red if failed Stefan Winkler 28.02.19 11:24
+fix: default path of the config file leads to exception, if started from another dir. Solution: set the default path to None (now the user needs to open it using the menu) Stefan Winkler 28.02.19 11:22
+current development of the progress view Stefan Winkler 13.02.19 13:21
+overhaul of the tree view columns Stefan Winkler 29.01.19 14:51
+current dev Stefan Winkler 21.01.19 11:14
+fixed bug: if an exception occours in a step function, while running all steps, in the 'finally' block the variable 'res' were not defined Stefan Winkler 10.01.19 11:17
+the Class TcId got a function to print the used 'TC(x,y)' format Stefan Winkler 10.01.19 10:42
+analyse the command script log: implemented a function to get a list of steps and associated TCs Stefan Winkler 10.01.19 10:41
+TST uses dbus to open the generated scripts in CSS Stefan Winkler 10.01.19 10:39
+current state of the test progress view Stefan Winkler 10.01.19 10:39
+added one 'version' to the command and verification scripts Stefan Winkler 10.01.19 10:38
+added a function to log exceptions in the command and verification code execution Stefan Winkler 10.01.19 10:36
+
+* TST uses DBus to open generated scripts in CSS
+* test script execution: logging machine readable JSON data for analysis and presentation
+* implemented functions to analyse the command script log file
+* new application 'Progress View' shows the state of a test script and the progress of running it
+* improvements to the 'ConfigurationEditor' application
+* converted the 'testing' modules to a Python package which can be installed by PIP
+* current topic: executing test steps parallel

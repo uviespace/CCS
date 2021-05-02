@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=Tst
+Comment=TestScriptTool
+Exec=@libexecdir@/tst.py
+Icon=@libexecdir@/style/tst.png
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=GNOME;GTK;Viewer;

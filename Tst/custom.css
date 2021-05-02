@@ -1,0 +1,24 @@
+/*
+You can type here any CSS rule recognized by GTK+.
+You can temporarily disable this custom CSS by clicking on the “Pause” button above.
+
+Changes are applied instantly and globally, for the whole application.
+
+.notebook {
+	background: #fe4671;
+}
+.button {
+	background: #11711e;
+}
+GtkButton:hover {
+	background: #92abfe;
+}
+GtkNotebook tab {
+	background: #92abfe;
+}
+GtkTreeView column-header .button {
+	background: #11711e;
+}*/
+GtkTreeView rubberband {
+	background: #92abfe;
+}

@@ -1,0 +1,58 @@
+{
+ "_name": "Simple Example",
+ "_description": "Test the basic functionality of TST X",
+ "_version": "0.5.2",
+ "has_parallel_thread": false,
+ "steps_dict": {
+  "1": {
+   "step_number": 1,
+   "name": "",
+   "description": "Use TC(3,6) to disable the generation of the IFSW_HK housekeeping report and verify that generation of this report stops x",
+   "comment": "",
+   "command_code": "# sending a TC(3,6) to disable IFSW_HK housekeeping\ntc_dis = ccs.Tcsend_DB('DPU_IFSW_DIS_HK_DR_GEN', 1, ack='0b1011', pool_name=pool_name)\ntc_id = tcid.TcId(st=3, sst=6, apid=tc_dis[0], ssc=tc_dis[1], timestamp=tc_dis[2])\n",
+   "verification_code": "tc_dis = tc_id.tc_id_tuple()\n# check if the TC was successful\nsucc = tm.check_acknowledgement(ccs=ccs, pool_name=pool_name, tc_identifier=tc_dis)\n\n# verify that the generation has stopped by following criteria:\n# -> all CUC timestamps of found IFSW_HK packets need to be smaller than the CUC of the acknowledgement\n# -> the time interval were this is checked is [t_tc_dis-3s, t_tc_dis+10s]\nt_tc_dis = tm.time_tc_accepted(ccs=ccs, pool_name=pool_name, tc_identifier=tc_dis)\nif t_tc_dis is not None:\n    logger.info('CUC-TS of the TM(1,1) = {}'.format(t_tc_dis))\n    hk_reps = tm.get_hk_tm(ccs=ccs, pool_name=pool_name, hk_name='IFSW_HK', t_from=t_tc_dis - 3, t_to=t_tc_dis + 10)\n    stopped = False\n    if len(hk_reps) > 0:\n        logger.info('CUC-TS of the found IFSW_HK reports in the time interval [TM(1,1)-3s, TM(1,1)+10s]:')\n        for i in range(len(hk_reps)):\n            packet_cuc_time = ccs.get_cuctime(hk_reps[i])\n            logger.info(packet_cuc_time)\n            if packet_cuc_time <= t_tc_dis:\n                stopped = True\n            else:\n                logger.warning('A heartbeat telemetry packet with a timestamp, greater as the timestamp of the '\n                            'telecommand acknowledgement, was received. Step {} failed!'.format(param['step_no']))\n                stopped = False\n                break\n    elif len(hk_reps) == 0:\n        stopped = True\n\n    if succ and stopped:\n        result = True",
+   "is_active": true,
+   "verified_item": []
+  },
+  "2": {
+   "step_number": 2,
+   "name": "",
+   "description": "Enable the HK again and set its period to 4 seconds",
+   "comment": "",
+   "command_code": "# send TC(3,5)\nccs.Tcsend_DB('DPU_IFSW_ENB_HK_DR_GEN', 1, ack='0b1011', pool_name=pool_name)\n# send TC(3,131)\nccs.Tcsend_DB('DPU_IFSW_SET_HK_REP_FREQ', 1, 8*4, ack='0b1011', pool_name=pool_name)\n",
+   "verification_code": "# check if the TC was successful\nsucc = tm.check_acknowledgement(ccs=ccs, pool_name=pool_name, tc_identifier=tc)\nif succ:\n    result = True",
+   "is_active": true,
+   "verified_item": []
+  },
+  "3": {
+   "step_number": 3,
+   "name": "",
+   "description": "This step should create an exception.",
+   "comment": "",
+   "command_code": "raise Exception('This exception is intentionally.')",
+   "verification_code": "raise Exception('This exception is intentionally.')",
+   "is_active": true,
+   "verified_item": []
+  },
+  "4": {
+   "step_number": 4,
+   "name": "",
+   "description": "No Command code",
+   "comment": "",
+   "command_code": "",
+   "verification_code": "result = True",
+   "is_active": true,
+   "verified_item": []
+  },
+  "5": {
+   "step_number": 5,
+   "name": "",
+   "description": "No verification code",
+   "comment": "",
+   "command_code": "tc_dis = ccs.Tcsend_DB('DPU_IFSW_DIS_HK_DR_GEN', 1, ack='0b1011', pool_name=pool_name)",
+   "verification_code": "",
+   "is_active": true,
+   "verified_item": []
+  }
+ }
+}
