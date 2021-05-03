@@ -1,7 +1,9 @@
 #! /usr/bin/env python3
 
 import io
-import struct
+import sys
+sys.path.insert(0, '..')
+
 from database.tm_db import connect_to_db
 
 dbcon = connect_to_db()

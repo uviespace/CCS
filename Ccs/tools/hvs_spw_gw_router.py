@@ -5,6 +5,8 @@ Routing packets from and to HVS SpW gateway
 """
 
 import sys
+sys.path.insert(0, '..')
+
 from ccs_function_lib import setup_gw_spw_routing
 
 if __name__ == "__main__":
