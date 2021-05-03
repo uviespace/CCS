@@ -1,4 +1,25 @@
+/Tst/log_viewer/Makefile
+/Tst/log_viewer/Makefile.in
+/Tst/log_viewer/aclocal.m4
+/Tst/log_viewer/autom4te.cache/
+/Tst/log_viewer/config.status
+/Tst/log_viewer/configure
+/Tst/log_viewer/install-sh
+/Tst/log_viewer/log_viewer.desktop
+/Tst/log_viewer/missing
+/Tst/tst/Makefile
+/Tst/tst/Makefile.in
+/Tst/tst/aclocal.m4
+/Tst/tst/autom4te.cache/
+/Tst/tst/config.status
+/Tst/tst/configure
+/Tst/tst/install-sh
+/Tst/tst/missing
+/Tst/tst/tst.desktop
+
 ### Example user template
+!.gitkeep
+
 # IntelliJ project files
 .idea
 
@@ -142,3 +163,4 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+/Tst/confignator/doc/source/_apidocfiles/
