@@ -1109,7 +1109,7 @@ class PlotViewer(Gtk.Window):
                     nr = self.my_bus_name[-1]
                     if nr == str(1):
                         nr = ''
-                    editor.Functions('_to_console', 'del(paramplot' + str(nr) + ')')
+                    editor.Functions('_to_console_via_socket', 'del(paramplot' + str(nr) + ')')
 
         self.update_all_connections_quit()
         Gtk.main_quit()
@@ -1197,14 +1197,14 @@ class PlotViewer(Gtk.Window):
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     editor = cfl.dbus_connection('editor', service[-1])
-                    editor.Functions('_to_console', "paramplot = dbus.SessionBus().get_object('" +
+                    editor.Functions('_to_console_via_socket', "paramplot = dbus.SessionBus().get_object('" +
                                      str(My_Bus_Name) + "', '/MessageListener')")
 
         else:
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     editor = cfl.dbus_connection('editor', service[-1])
-                    editor.Functions('_to_console', "paramplot" + str(Count) +
+                    editor.Functions('_to_console_via_socket', "paramplot" + str(Count) +
                                      " = dbus.SessionBus().get_object('" + str(My_Bus_Name) +
                                      "', '/MessageListener')")
 

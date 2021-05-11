@@ -5,9 +5,17 @@ Tools
 """
 import logging
 import os
+import sys
 import configparser
 import math
+import confignator
 from confignator import config
+
+ccs_path = confignator.get_option('paths', 'ccs')
+sys.path.append(ccs_path)
+
+import ccs_function_lib as cfl
+
 
 # create a logger
 logger = logging.getLogger(__name__)
@@ -79,9 +87,10 @@ def read_config_file():
 # read the path for the logging files from the configuration file egse.cfg.
 # if the directory does not exist it is created.
 #     @param self Reference to the current instance of CCScom
-def get_path_for_testing_logs(ccs):
+def get_path_for_testing_logs():
     # fetch the path from the project config file
-    path = ccs.cfg.get('LOGGING', 'test_run')
+    path = confignator.get_option('tst-logging', 'test_run')
+    #path = ccs.cfg.get('LOGGING', 'test_run')
     # create the directory for the logging files if it does not exist
     os.makedirs(path, mode=0o777, exist_ok=True)
     return path
@@ -215,11 +224,11 @@ def print_apids():
 #   @param value1: <float> or <tmpacket>
 #   @param value2: <float> or <tmpacket>
 #   @return: <float>
-def get_cuc_diff(ccs, value1, value2):
+def get_cuc_diff(value1, value2):
     if not isinstance(value1, float):  # if value1 is a TM packet
-        value1 = ccs.get_cuctime(value1)
+        value1 = cfl.get_cuctime(value1)
     if not isinstance(value2, float):  # if value2 is a TM packet
-        value2 = ccs.get_cuctime(value2)
+        value2 = cfl.get_cuctime(value2)
     difference = math.fabs(value2-value1)
     return difference
 

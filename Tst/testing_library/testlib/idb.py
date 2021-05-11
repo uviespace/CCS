@@ -4,6 +4,13 @@ Functions to use the instrument database
 ========================================
 """
 import logging
+import sys
+
+import confignator
+ccs_path = confignator.get_option('paths', 'ccs')
+sys.path.append(ccs_path)
+
+import ccs_function_lib as cfl
 
 # create a logger
 logger = logging.getLogger(__name__)
@@ -14,10 +21,9 @@ logger = logging.getLogger(__name__)
 #   @param ccs: instance of the CCScom class
 #   @param sid: sid of housekeepings <str>
 #   @return: sid <int>
-def convert_hk_sid(ccs, sid):
+def convert_hk_sid(sid):
     """ Convert the SID of housekeeping reports in both ways: int to str and str to int
-    
-    :param ccs: packets.CCScom: instance of the class CCScom
+
     :param sid: int or str: SID of a housekeeping as string or as integer
     
     :return: str or int: SID of the housekeeping as string or integer
@@ -25,13 +31,15 @@ def convert_hk_sid(ccs, sid):
     assert isinstance(sid, int) or isinstance(sid, str), logger.error('convert_hk_sid: argument sid has to be a integer or string')
     result = None
     if isinstance(sid, str):
-        query = ccs.dbcon.execute('SELECT txp_from FROM txp WHERE txp_altxt="{}"'.format(sid))
+        #query = ccs.dbcon.execute('SELECT txp_from FROM txp WHERE txp_altxt="{}"'.format(sid))
+        query = cfl.scoped_session_idb.execute('SELECT txp_from FROM txp WHERE txp_altxt="{}"'.format(sid))
         fetch = query.fetchall()
         if len(fetch) != 0:
             result = int(fetch[0][0])
     if isinstance(sid, int):
         # ToDo: replace hardcoded DPKT7030
-        query = ccs.dbcon.execute('SELECT txp_altxt FROM txp WHERE txp_numbr="DPKT7030" AND txp_from="{}"'.format(sid))
+        #query = ccs.dbcon.execute('SELECT txp_altxt FROM txp WHERE txp_numbr="DPKT7030" AND txp_from="{}"'.format(sid))
+        query = cfl.scoped_session_idb.execute('SELECT txp_altxt FROM txp WHERE txp_numbr="DPKT7030" AND txp_from="{}"'.format(sid))
         fetch = query.fetchall()
         if len(fetch) != 0:
             result = str(fetch[0][0])
@@ -71,22 +79,20 @@ class DataPoolParameter:
         }
         self.possible_values.append(entry)
 
-    def assign_value(self, ccs, value):
-        self.value = ccs.get_calibrated(pcf_name=self.name, rawval=value)
+    def assign_value(self, value):
+        self.value = cfl.get_calibrated(pcf_name=self.name, rawval=value)
 
     def log_par(self):
         logger.info('name = {}; width = {}'.format(self.name, self.width))
 
 
-def get_info_of_data_pool_parameter(ccs, name):
+def get_info_of_data_pool_parameter(name):
     """
     from testlib import idb
     x = idb.get_info_of_data_pool_parameter(ccs=ccs, name='sdu2State')
 
     Fetching all information from the instrument database about data pool parameter names.
     Knowing only the name of the parameter, all other information should be collected by database queries.
-    :param ccs: packets.CCScom
-        Instance of the class packets.CCScom
     :param name: str
         Name of the parameter.
     :return: idb.data_pool_parameter
@@ -96,7 +102,8 @@ def get_info_of_data_pool_parameter(ccs, name):
 
     # get information from pcf
     query = 'SELECT * from pcf where pcf_descr="{}"'.format(name)
-    dbres = ccs.dbcon.execute(query)
+    #dbres = ccs.dbcon.execute(query)
+    dbres = cfl.scoped_session_idb.execute(query)
     result = dbres.fetchall()
 
     if len(result) == 1:
@@ -110,7 +117,8 @@ def get_info_of_data_pool_parameter(ccs, name):
         if txp_number is not None:
             # get the possible values
             query = 'SELECT * from txp where txp_numbr="{}"'.format(txp_number)
-            dbres = ccs.dbcon.execute(query)
+            #dbres = ccs.dbcon.execute(query)
+            dbres = cfl.scoped_session_idb.execute(query)
             values = dbres.fetchall()
             if len(values) > 0:
                 for val in values:

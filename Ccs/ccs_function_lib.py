@@ -225,18 +225,21 @@ def start_tst(console=False, *args):
     directory = confignator.get_option('paths', 'tst')
     file_path = os.path.join(directory, 'tst/main.py')
     start_app(console, file_path, directory, *args)
+    return
 
 
 def start_progress_view(console=False, *args):
     directory = confignator.get_option('paths', 'tst')
     file_path = os.path.join(directory, 'progress_view/progress_view.py')
     start_app(console, file_path, directory, *args)
+    return
 
 
 def start_log_viewer(console=False, *args):
     directory = confignator.get_option('paths', 'tst')
     file_path = os.path.join(directory, 'log_viewer/log_viewer.py')
     start_app(console, file_path, directory, *args)
+    return
 
 
 def start_config_editor(console=False, *args):
@@ -3411,6 +3414,63 @@ def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'
     gnd.close()
     tcsock.close()
     gw.close()
+
+
+##
+#  Save pool
+#
+#  Dump content of data pool _pname_ to file _fname_, either as a concatenated binary sequence or in hexadecimal
+#  representation and one packet per line. Selective saving (by service type) possible.
+#  @param fname     File name for the dump
+#  @param pname     Name of pool to be saved
+#  @param mode      Type of the saved file. _binary_ or _hex_
+#  @param st_filter Packets of that service type will be saved
+def savepool(filename, pool_name, mode='binary', st_filter=None):
+    # get new session for saving process
+    logger.info('Saving pool content to disk...')
+    tmlist = list(get_packets_from_pool(pool_name))
+
+    Tmdump(filename, tmlist, mode=mode, st_filter=st_filter, crccheck=False)
+    logger.info('Pool {} saved as {} in {} mode'.format(pool_name, filename, mode.upper()))
+
+    return
+
+def get_packets_from_pool(pool_name, indices=[], st=None, sst=None, apid=None, dbsession=None):
+    """
+
+    @param pool_name:
+    @param indices:
+    @param st:
+    @param sst:
+    @param apid:
+    @return:
+    """
+    new_session = scoped_session_storage
+
+    rows = new_session.query(
+        DbTelemetry
+    ).join(
+        DbTelemetryPool,
+        DbTelemetry.pool_id == DbTelemetryPool.iid
+    ).filter(
+        DbTelemetryPool.pool_name == pool_name
+    )
+
+    if len(indices) != 0:
+        rows = rows.filter(
+            DbTelemetry.idx.in_(indices)
+        )
+
+    if st is not None:
+        rows = rows.filter(DbTelemetry.stc == st)
+    if sst is not None:
+        rows = rows.filter(DbTelemetry.sst == sst)
+    if apid is not None:
+        rows = rows.filter(DbTelemetry.apid == apid)
+
+    ret = [row.raw for row in rows.yield_per(1000)]
+    new_session.close()
+    return ret
 
 
 class TestReport:

@@ -679,7 +679,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                     # add the TC's
                     tcs_str = ''
                     for telecommand in item['tcs']:
-                        if tcs_str is not '':
+                        if tcs_str != '':
                             tcs_str += ', '
                         tcs_str += telecommand.tc_kind()
                     self.build_row_list(row=new_row,

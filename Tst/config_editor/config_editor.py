@@ -169,6 +169,7 @@ class ConfigurationEditor(Gtk.ApplicationWindow):
         self.tabs = []
         self.merge_cfg = None
         self.merge_page = None
+        self.page_widget = None
         # loads all configuration files listed in file_path & at least the configuration file of the confignator
         self.load_configuration(file_path=file_path)
 
@@ -306,12 +307,14 @@ class ConfigurationEditor(Gtk.ApplicationWindow):
             self.logger.debug('created merge page with index {} for: {}'.format(merge_page_idx, self.merge_cfg.files))
 
     def new_page(self, cfg=None, file_path=None):
-        page_widget = PageWidget(window=self, file_path=file_path, cfg=cfg)
+        self.page_widget = PageWidget(window=self, file_path=file_path, cfg=cfg)
         # create page label
         if file_path is not None:
             label_text = os.path.basename(file_path)
+            self.create_new_merge = False
         else:
             label_text = 'Merge'
+            self.create_new_merge = True
         label_box = Gtk.Box()
         label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         label = Gtk.Label()
@@ -322,12 +325,15 @@ class ConfigurationEditor(Gtk.ApplicationWindow):
         label_box.pack_start(label_btn_close, True, True, 0)
         label_box.show_all()
         # append notebook page
-        page_index = self.notebook.append_page(child=page_widget, tab_label=label_box)
+        if self.create_new_merge:
+            page_index = self.notebook.insert_page(child=self.page_widget, tab_label=label_box, position=0)
+        else:
+            page_index = self.notebook.append_page(child=self.page_widget, tab_label=label_box)
         # connect the tab close button
-        label_btn_close.connect('clicked', self.on_close_notebook_page, page_widget)
+        label_btn_close.connect('clicked', self.on_close_notebook_page, self.page_widget)
         self.show_all()
         self.notebook.set_current_page(page_index)
-        return page_widget, page_index
+        return self.page_widget, page_index
 
     def on_close_notebook_page(self, button, page_widget):
         # remove the page from the notebook
@@ -355,8 +361,10 @@ class ConfigurationEditor(Gtk.ApplicationWindow):
             page_idx = self.notebook.get_current_page()
         page_widget = self.notebook.get_nth_page(page_idx)
         page_widget.update_option_data(except_section=except_section, except_option=except_option)
-        if self.show_merge_page:
+        if self.show_merge_page and not self.create_new_merge:
             self.set_merge_page()
+        if self.create_new_merge:
+            self.create_new_merge = False
 
     def on_reload(self, *args):
         for idx in range(0, self.notebook.get_n_pages()):

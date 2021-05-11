@@ -7,9 +7,17 @@ gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, GtkSource
 # -------------------------------------------
 import data_model
+import generator
 import dnd_data_parser
 import toolbox
 import cairo
+import sys
+
+import confignator
+ccs_path = confignator.get_option('paths', 'ccs')
+sys.path.append(ccs_path)
+
+import ccs_function_lib as cfl
 
 lm = GtkSource.LanguageManager()
 lngg = lm.get_language('python')
@@ -65,7 +73,7 @@ class Board(Gtk.Box):
         * a instance of a grid is added
         * drag and drop is set up
         """
-        assert isinstance(model, data_model.TestSpecification)
+        #assert isinstance(model, data_model.TestSpecification)
         self.model = model
         self.app = app
         self._filename = filename
@@ -83,6 +91,10 @@ class Board(Gtk.Box):
         self.test_meta_data_labels.set_orientation(Gtk.Orientation.VERTICAL)
         self.test_meta_data_entries = Gtk.Box()
         self.test_meta_data_entries.set_orientation(Gtk.Orientation.VERTICAL)
+        self.test_meta_data_pre_post_con = Gtk.Box()
+        self.test_meta_data_pre_post_con.set_orientation(Gtk.Orientation.VERTICAL)
+        self.test_meta_data_pre_post_con_edit = Gtk.Box()
+        self.test_meta_data_pre_post_con_edit.set_orientation(Gtk.Orientation.VERTICAL)
         # name of the test
         self.test_meta_data_name_label = Gtk.Label()
         self.test_meta_data_name_label.set_text('Name of the test:')
@@ -95,7 +107,7 @@ class Board(Gtk.Box):
         self.test_meta_data_desc_label.set_text('Description of the test:')
         self.test_meta_data_labels.pack_start(self.test_meta_data_desc_label, True, True, 0)
         self.test_meta_data_desc = Gtk.Entry()
-        self.test_meta_data_name.set_placeholder_text('< description of the test>')
+        self.test_meta_data_desc.set_placeholder_text('< description of the test>')
         self.test_meta_data_entries.pack_start(self.test_meta_data_desc, True, True, 0)
         # version
         self.test_meta_data_version_label = Gtk.Label()
@@ -111,9 +123,41 @@ class Board(Gtk.Box):
         self.text_meta_data_test_is_locked = Gtk.CheckButton()
         self.test_meta_data_entries.pack_start(self.text_meta_data_test_is_locked, True, True, 0)
 
+        # Add pre post condition selections
+        # Pre conditions
+        self.precon_selection_label = Gtk.Label()
+        self.precon_selection_label.set_text('Pre-Conditions:')
+        self.precon_selection = Gtk.ComboBoxText()
+        self.set_precon_model()
+        self.precon_selection.connect("changed", self.on_precon_changed)
+        # Post conditions
+        self.postcon_selection_label = Gtk.Label()
+        self.postcon_selection_label.set_text('Post-Conditions:')
+        self.postcon_selection = Gtk.ComboBoxText()
+        self.set_postcon_model()
+        self.postcon_selection.connect("changed", self.on_postcon_changed)
+
+        # add to pre post box
+        self.test_meta_data_pre_post_con.pack_start(self.precon_selection_label, False, True, 0)
+        self.test_meta_data_pre_post_con.pack_start(self.precon_selection, False, True, 0)
+        self.test_meta_data_pre_post_con.pack_start(self.postcon_selection_label, False, True, 0)
+        self.test_meta_data_pre_post_con.pack_start(self.postcon_selection, False, True, 0)
+        self.test_meta_data_box.set_spacing(20)
+
+        # Add Edit Buttons
+        self.precon_edit_button = Gtk.Button.new_with_label('Edit')
+        self.precon_edit_button.connect("clicked", self.precon_edit_clicked)
+        self.postcon_edit_button = Gtk.Button.new_with_label('Edit')
+        self.postcon_edit_button.connect("clicked", self.postcon_edit_clicked)
+
+        self.test_meta_data_pre_post_con_edit.pack_start(self.precon_edit_button, False, True, 17)
+        self.test_meta_data_pre_post_con_edit.pack_start(self.postcon_edit_button, False, True, 0)
+
         # add the meta data
         self.test_meta_data_box.pack_start(self.test_meta_data_labels, False, True, 0)
         self.test_meta_data_box.pack_start(self.test_meta_data_entries, False, True, 0)
+        self.test_meta_data_box.pack_start(self.test_meta_data_pre_post_con, False, True, 0)
+        self.test_meta_data_box.pack_start(self.test_meta_data_pre_post_con_edit, False, True, 0)
         self.pack_start(self.test_meta_data_box, False, True, 0)
 
         # making the toolbar
@@ -242,6 +286,56 @@ class Board(Gtk.Box):
         # update the view
         self.update_widget_data()
         self.app.update_model_viewer()
+
+    def set_precon_model(self):
+        section_dict = generator.get_precon_sections()
+        for section_name in section_dict.keys():
+            self.precon_selection.append_text(section_name)
+        self.precon_selection.set_active(0)
+        self.on_precon_changed(self.precon_selection)
+        return
+
+    def on_precon_changed(self, widget):
+        # get the name out of the widget
+        precon_name = widget.get_active_text()
+        # update the model
+        self.model.precon = precon_name
+        # update the data model viewer
+        self.app.update_model_viewer()
+        return
+
+    def set_postcon_model(self):
+        section_dict = generator.get_postcon_sections()
+        for section_name in section_dict.keys():
+            self.postcon_selection.append_text(section_name)
+        self.postcon_selection.set_active(0)
+        self.on_postcon_changed(self.postcon_selection)
+        return
+
+    def on_postcon_changed(self, widget):
+        # get the name out of the widget
+        postcon_name = widget.get_active_text()
+        # update the model
+        self.model.postcon = postcon_name
+        # update the data model viewer
+        self.app.update_model_viewer()
+        return
+
+    def precon_edit_clicked(self, widget):
+        dialog = Edit_Pre_Post_Con_Dialog(self, 'pre')
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            dialog.destroy()
+        elif response == Gtk.ResponseType.CANCEL:
+            dialog.destroy()
+
+    def postcon_edit_clicked(self, widget):
+        dialog = Edit_Pre_Post_Con_Dialog(self, 'post')
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            dialog.destroy()
+        elif response == Gtk.ResponseType.CANCEL:
+            dialog.destroy()
 
     def on_test_name_change(self, widget):
         """ if the name of test specification is changed update the model and the model viewer
@@ -917,10 +1011,19 @@ class StepWidget(Gtk.EventBox):
 
     def on_exec_commands(self, button):
         # get the code of the commands out of the buffer of the widget
-        commands = self.get_commands_from_widget()
-        import editor
-        x = editor.CcsEditor()
-        x._to_console_via_socket(commands)
+        commands = str(self.get_commands_from_widget())
+        #Check if CCS is open
+        if not cfl.is_open('editor'):
+            print('CCS-Editor has to be started first')
+            logger.info('CCS-Editor has to be running if a step should be executed')
+            return
+
+        # Connect to the editor and send the commands to the terminal via D-Bus
+        ed = cfl.dbus_connection('editor')
+        cfl.Functions(ed, '_to_console_via_socket', commands)
+        #import editor
+        #x = editor.CcsEditor()
+        #x._to_console_via_socket(commands)
 
     def on_exec_verification(self, button):
         # get the code of the commands out of the buffer of the widget
@@ -929,7 +1032,14 @@ class StepWidget(Gtk.EventBox):
         #print(ack)
 
     def on_execute_step(self, *args):
-        print('on_execute_step')
+        if not cfl.is_open('editor'):
+            print('CCS-Editor has to be started first')
+            logger.info('CCS-Editor has to be running if a step should be executed')
+            return
+
+        commands = str(self.get_commands_from_widget())
+        ed = cfl.dbus_connection('editor')
+        cfl.Functions(ed, '_to_console_via_socket', commands)
 
     def on_toggle_detail(self, toolbutton, *args):
         """
@@ -1232,3 +1342,158 @@ class StepRightClickMenu(Gtk.Menu):
         step_clicked_on = step_widget.step_number
         step_widget.model.get_sequence(step_widget.sequence).add_step_below(reference_step_position=step_clicked_on)
         self.step_widget.board.update_widget_data()
+
+class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
+    def __init__(self, parent, pre_post):
+        #Gtk.Dialog.__init__(self, title='PRE-Conditions', transient_for=parent, flags=0)
+        Gtk.Dialog.__init__(self, title=pre_post.upper() + ' -Conditions')
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+        self.set_default_size(200, 200)
+        self.win = parent
+        self.file_path = os.path.join(confignator.get_option('paths', 'tst'),
+                                      'tst/generator_templates/co_'+pre_post+'_condition_entry.py')
+
+        if pre_post == 'pre':
+            self.section_dict = generator.get_precon_sections()
+        else:
+            self.section_dict = generator.get_postcon_sections()
+
+        self.view()
+
+        self.show_all()
+
+    def view(self):
+        self.main_box = Gtk.Box()
+        self.main_box.set_orientation(Gtk.Orientation.VERTICAL)
+
+        self.selection_box = Gtk.Box()
+        self.selection_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+
+        self.make_text_viewer()
+
+        self.selection = Gtk.ComboBox.new_with_model_and_entry(self.get_con_sections_model())
+        self.selection.connect("changed", self.on_name_combo_changed)
+        self.selection.set_entry_text_column(0)
+
+        self.save_button = Gtk.Button.new_with_label('Save')
+        self.save_button.connect("clicked", self.save_button_clicked)
+
+        self.selection_box.pack_start(self.selection, False, True, 0)
+        self.selection_box.pack_start(self.save_button, False, True, 0)
+
+        box = self.get_content_area()
+        box.pack_start(self.selection_box, True, True, 0)
+        box.pack_start(self.scrolled_window, True, True, 0)
+
+
+    def get_con_sections_model(self):
+        data_model = Gtk.ListStore(str, int, int)
+        for section_name in self.section_dict.keys():
+
+            data_model.append([section_name, self.section_dict[section_name][0], self.section_dict[section_name][1]])
+
+        return data_model
+
+    def on_name_combo_changed(self, widget):
+        buffer = self.textview.get_buffer()
+        tree_iter = widget.get_active_iter()
+        if tree_iter is not None:
+            model = widget.get_model()
+            name = model[tree_iter][0]
+        else:
+            #entry = widget.get_child()
+            #name = entry.get_text()
+            name = None
+        self.read_section(name)
+        buffer.set_text(self.read_section(name))
+        return
+
+    def save_button_clicked(self, widget):
+        buffer = self.textview.get_buffer()
+        tree_iter = self.selection.get_active_iter()
+        if tree_iter is not None:
+            model = self.selection.get_model()
+            name, start_line, end_line = model[tree_iter]
+            new = False
+        else:
+            entry = widget.get_child()
+            name = entry.get_text()
+            new = True
+
+        buf = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
+
+        if new:
+            with open(self.file_path, 'a') as entry_file_obj:
+                entry_file_obj.write('#####-'+name+'-#####\n')
+                entry_file_obj.write(buf + '\n')
+                entry_file_obj.close()
+        else:
+            with open(self.file_path, 'r') as entry_file_obj:
+                file_lines = entry_file_obj.readlines()
+                entry_file_obj.close()
+            file_lines[start_line:end_line-1] = buf
+
+            with open(self.file_path, 'w') as entry_file_obj:
+                file_lines = "".join(file_lines)
+                entry_file_obj.write(file_lines)
+                entry_file_obj.close()
+
+        add_lines_count = 0
+        with open(self.file_path, 'r') as entry_file_obj:
+            file_lines = entry_file_obj.readlines()
+            if file_lines[-1]:
+                add_lines_count = 2
+            elif file_lines[-2]:
+                add_lines_count = 1
+            entry_file_obj.close()
+        if add_lines_count > 0:
+            with open(self.file_path, 'a') as entry_file_obj:
+                entry_file_obj.write('\n'*add_lines_count)
+                entry_file_obj.close()
+
+
+        return
+
+    def make_text_viewer(self):
+        # a scrollbar for the child widget (that is going to be the textview)
+        self.scrolled_window = Gtk.ScrolledWindow()
+        self.scrolled_window.set_border_width(5)
+        # we scroll only if needed
+        self.scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+
+        # a text buffer (stores text)
+        buffer = Gtk.TextBuffer()
+
+        # a textview (displays the buffer)
+        self.textview = Gtk.TextView(buffer=buffer)
+        # wrap the text, if needed, breaking lines in between words
+        self.textview.set_wrap_mode(Gtk.WrapMode.WORD)
+
+        # textview is scrolled
+        self.scrolled_window.add(self.textview)
+
+        box = self.get_content_area()
+        box.add(self.selection_box)
+
+        return
+
+    def read_section(self, name=None):
+        if not name:
+            return ''
+
+        # add the condition function
+        with open(self.file_path,'r') as entry_file_obj:
+            # Get the needed section and read only those lines
+            position = self.section_dict[name]
+            entry_array = entry_file_obj.readlines()[position[0]: position[1]-1]
+            entry = ''
+            # Make a string to combine it with the co_conditions file, add tabs for the additonal lines in form of space so the CCS can read it
+            for count, line in enumerate(entry_array):
+                entry += line
+            entry_file_obj.close()
+
+        return entry
+
+

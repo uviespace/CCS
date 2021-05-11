@@ -179,6 +179,8 @@ class Step:
         self._secondary_counter = value
         self._step_number = str(self.primary_counter) + '.' + str(self.secondary_counter)
 
+    # Do not use if a test file should be generated, Output is always '1.0' and not '1_0'
+    # A Point is not supported in a function/method name in python, use 'step_number_test_format' function instead
     @property
     def step_number(self):
         return self._step_number
@@ -255,6 +257,12 @@ class Step:
     def stop_sequence(self, value: int):
         assert isinstance(value, int) or value is None
         self._stop_sequence = value
+
+    @property
+    def step_number_test_format(self):
+        primary = parse_step_number(self._step_number)[0]
+        secondary = parse_step_number(self._step_number)[1]
+        return str(primary) + '_' + str(secondary)
 
     def set_attributes_from_json(self, step):
         """
@@ -876,10 +884,6 @@ class TestSequence:
             del obj_dict['logger']
             return obj_dict
 
-class Precondition:
-    def __init__(self):
-        self.description = 'NO PRECONDITIONS'
-
 class TestSpecification:
     def __init__(self, json_data=None, logger=logger):
         self.logger = logger
@@ -887,6 +891,8 @@ class TestSpecification:
         self._description = ''
         self._version = ''
         self._primary_counter_locked = False
+        self._precon = ''
+        self._postcon = ''
         self.sequences = []
 
         if json_data is not None:
@@ -902,15 +908,6 @@ class TestSpecification:
         new_testspec.primary_counter_locked = copy.copy(self.primary_counter_locked)
 
         return new_testspec
-
-    @property
-    def sequence_steps(self):
-        steps = [step for steps in [seq.steps for seq in self.sequences] for step in steps]
-        return steps
-
-    @property
-    def pre_condition(self):
-        return Precondition()
 
     @property
     def primary_counter_locked(self):
@@ -951,6 +948,24 @@ class TestSpecification:
     def version(self, value: str):
         assert isinstance(value, str)
         self._version = value
+
+    @property
+    def precon(self):
+        return self._precon
+
+    @precon.setter
+    def precon(self, value: str):
+        assert isinstance(value, str)
+        self._precon = value
+
+    @property
+    def postcon(self):
+        return self._postcon
+
+    @postcon.setter
+    def postcon(self, value: str):
+        assert isinstance(value, str)
+        self._postcon = value
 
     def encode_to_json(self, *args):
         """

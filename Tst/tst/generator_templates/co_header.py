@@ -5,8 +5,13 @@ import os
 import time
 import importlib
 import threading
+import confignator
+ccs_path = confignator.get_option('paths', 'ccs')
+sys.path.append(ccs_path)
+sys.path.append(confignator.get_option('tst-paths', 'testing_library'))
 
-sys.path.append(os.path.realpath('test_specs'))
+import ccs_function_lib as cfl
+
 from testlib import tools
 from testlib import report
 from testlib import tm

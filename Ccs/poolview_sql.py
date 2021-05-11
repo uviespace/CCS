@@ -323,7 +323,7 @@ class TMPoolView(Gtk.Window):
                     nr = self.my_bus_name[-1]
                     if nr == str(1):
                         nr = ''
-                    editor.Functions('_to_console', 'del(pv'+str(nr)+')')
+                    editor.Functions('_to_console_via_socket', 'del(pv'+str(nr)+')')
         return
 
     def update_all_connections_quit(self):
@@ -502,14 +502,14 @@ class TMPoolView(Gtk.Window):
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     editor = cfl.dbus_connection('editor', service[-1])
-                    editor.Functions('_to_console', "pv = dbus.SessionBus().get_object('" + str(My_Bus_Name)
+                    editor.Functions('_to_console_via_socket', "pv = dbus.SessionBus().get_object('" + str(My_Bus_Name)
                                      + "', '/MessageListener')")
 
         else:
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     editor = cfl.dbus_connection('editor', service[-1])
-                    editor.Functions('_to_console', "pv" +str(Count)+ " = dbus.SessionBus().get_object('" +
+                    editor.Functions('_to_console_via_socket', "pv" +str(Count)+ " = dbus.SessionBus().get_object('" +
                                      str(My_Bus_Name) + "', '/MessageListener')")
 
         #####
@@ -684,7 +684,7 @@ class TMPoolView(Gtk.Window):
         height = self.treeview.get_allocated_height()
         cell = self.treeview.get_columns()[0].cell_get_size()[-1] + 2
         nlines = height // cell
-        self.adj.set_page_size(nlines)
+        self.adj.set_page_size(nlines-3)
         # self._scroll_treeview()
         self.reselect_rows()
 
@@ -774,9 +774,9 @@ class TMPoolView(Gtk.Window):
         #offset = 0 if offset < 0 else offset
         self.shown_lock.acquire()   # Thread lock to changes shared variables between threads
 
-        # If the offset is still in buffer range get new packages from buffer and reload the buffer in a thread
+        # If the offset is still in buffer range get new packages from buffer and reload the buffer in a thread, if autoscroll dont use buffer (makes no sense)
         #if self.shown_loaded and offset in range(self.shown_upper_limit, self.shown_offset+buffer) and not force_import:
-        if self.shown_loaded and offset in range(self.shown_all_rows[0][0], self.shown_all_rows[position][0]+1) and not force_import and not sort:
+        if self.shown_loaded and offset in range(self.shown_all_rows[0][0], self.shown_all_rows[position][0]+1) and not force_import and not sort and not self.autoscroll:
             if self.filter_rules_active and scrolled:
                 for x, row in enumerate(self.shown_all_rows, start=0):
                     if row[0] >= self.shown_offset:
@@ -795,7 +795,7 @@ class TMPoolView(Gtk.Window):
                 self.shown_diff += shown_diff   # Thread is already loading, load additional ones
             else:
                 self.shown_diff = shown_diff    # New thread knows how much should be loaded
-        elif self.shown_loaded and self.shown_offset and abs(self.shown_offset-self.offset) < buffer and sort and not force_import: # If sorted and inside buffer
+        elif self.shown_loaded and self.shown_offset and abs(self.shown_offset-self.offset) < buffer and sort and not force_import and not self.autoscroll: # If sorted and inside buffer
             shown_diff = offset - self.shown_offset
 
             if isinstance(self.shown_diff, int):
@@ -1663,7 +1663,7 @@ class TMPoolView(Gtk.Window):
         for row in model:
             if row[0] in self.currently_selected:
                 try:
-                    self.selection.select_path(model.get_path(model.get_iter(min(row[0] - self.offset - 1+2))))
+                    self.selection.select_path(model.get_path(model.get_iter(row[0] - self.offset - 1)))
                 except ValueError:
                     pass
                 except TypeError:

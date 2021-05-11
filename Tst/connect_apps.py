@@ -48,6 +48,8 @@ def connect_to_editor(logger=module_logger):
     except dbus.exceptions.DBusException as dbe:
         logger.error('Could not connect to the editor application')
         logger.exception(dbe)
+        return
+    return editor
 
 
 def connect_to_tst(logger=module_logger):
@@ -77,7 +79,7 @@ def connect_to_progress_viewer(logger=module_logger):
     actions = interface_actions.List()
     logger.debug('Available Actions for {}:'.format(bus_name))
     for item in actions:
-        logger.debug('\t{}'.format(item))
+        logger.debug('{}'.format(item))
     return interface_actions
 
 

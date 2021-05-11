@@ -20,6 +20,7 @@ import struct
 import IPython
 import confignator
 import json
+import os
 
 import dbus
 import dbus.service
@@ -34,6 +35,7 @@ from threading import Thread
 #cfl = General_Functions()
 import ccs_function_lib as cfl
 
+pixmap_folder = confignator.get_option('ccs-paths', 'pixmap')
 # from jupyter_client import find_connection_file
 
 
@@ -119,19 +121,35 @@ class IPythonTerminal(Vte.Terminal):
     # else:
     #     term = ["/usr/bin/env", "ipython3", "--gui=gtk3", "-i", ".ipyloadcfg.py", "--config", ".ipycfg.py"]
 
-    term = ["/usr/bin/env", "ipython3", "--gui=gtk3", "-i", ".ipyloadcfg.py", "--config", ".ipycfg.py"]
+    ccs_path = confignator.get_option('paths', 'ccs')
+    ipyloadcfg_path = os.path.join(ccs_path, '.ipyloadcfg.py')
+    ipycfg_path = os.path.join(ccs_path, '.ipycfg.py')
+
+    term = ["/usr/bin/env", "ipython3", "--gui=gtk3", "-i", ipyloadcfg_path, "--config", ipycfg_path]
 
     def __init__(self, scrollback_lines, *args, **kwds):
         super(IPythonTerminal, self).__init__(*args, **kwds)
         # cfile = find_connection_file()
-        self.set_scrollback_lines(scrollback_lines)
-        self.spawn_sync(Vte.PtyFlags.DEFAULT,
-                        None,
-                        self.term,
-                        [],
-                        GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-                        None,
-                        None)
+        #self.set_scrollback_lines(scrollback_lines)
+        #self.pty = self.pty_new_sync(Vte.PtyFlags.DEFAULT)
+        #self.spawn_sync(Vte.PtyFlags.DEFAULT,
+        #                None,
+        #                self.term,
+        #                [],
+        #                GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+        #                None,
+        #                None)
+        self.spawn_async(
+            Vte.PtyFlags.DEFAULT,  # Pty Flags
+            None,  # Working DIR
+            self.term,  # Command/BIN (argv)
+            None,  # Environmental Variables (envv)
+            GLib.SpawnFlags.DEFAULT,  # Spawn Flags
+            None, None, # Child Setup
+            -1,  # Timeout (-1 for indefinitely)
+            None,  # Cancellable
+            None,  # Callback
+            None)  # User Data
 
     def feed_child_compat(self, msg, msglen=None):
         """
@@ -203,11 +221,13 @@ class CcsEditor(Gtk.Window):
         size = button.get_icon_size()
         t, h, w = Gtk.IconSize.lookup(size)
         # icons are half the size of button (usually)
-        logo = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/UVIE_Logo_48.png', -1, w * 2)
+        pixmap_path = os.path.join(pixmap_folder, 'UVIE_Logo_48.png')
+        logo = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, -1, w * 2)
         img = Gtk.Image.new_from_pixbuf(logo)
         box.pack_end(img, False, False, 0)
 
-        logo = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/IfA_Logo_48.png', -1, w * 2)
+        pixmap_path = os.path.join(pixmap_folder, 'IfA_Logo_48.png')
+        logo = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, -1, w * 2)
         img = Gtk.Image.new_from_pixbuf(logo)
         box.pack_end(img, False, False, 0)
         self.grid.attach(box, 2, 1, 1, 1)
@@ -250,7 +270,7 @@ class CcsEditor(Gtk.Window):
 
         self.log_file = None    # save the shown text from the log file tab
         # Update the log-file view window every 2 seconds
-        GObject.timeout_add(2000, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
+        GLib.timeout_add(2000, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
 
         self.ipython_view.connect("size-allocate", self.console_autoscroll, self.ipython_view)
 
@@ -296,7 +316,7 @@ class CcsEditor(Gtk.Window):
 
         #Change for terminal
         if int(instance) != int(cfl.communication[application]):
-            self._to_console("cfl.communication['"+str(application)+"'] = " + str(int(instance)))
+            self._to_console_via_socket("cfl.communication['"+str(application)+"'] = " + str(int(instance)))
 
         #Local change
         cfl.communication[application] = int(instance)
@@ -355,22 +375,22 @@ class CcsEditor(Gtk.Window):
         if not cfl.communication[self.my_bus_name.split('.')[1]]:
             cfl.communication[self.my_bus_name.split('.')[1]] = int(self.my_bus_name[-1])
 
-        self._to_console("cfl.communication = " + str(cfl.communication))
+        self._to_console_via_socket("cfl.communication = " + str(cfl.communication))
 
         # Connect to the Terminal if another editor exists
         if Count == 1:
-            self._to_console(
+            self._to_console_via_socket(
                 "editor = dbus.SessionBus().get_object('" + str(My_Bus_Name) + "', '/MessageListener')")
 
         else:
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     if service == self.my_bus_name:
-                        self._to_console("editor" + str(Count) + " = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("editor" + str(Count) + " = dbus.SessionBus().get_object('" +
                                                     str(My_Bus_Name) + "', '/MessageListener')")
                     else:
                         editor = cfl.dbus_connection('editor', service[-1])
-                        editor.Functions('_to_console', "editor" + str(Count) +
+                        editor.Functions('_to_console_via_socket', "editor" + str(Count) +
                                          " = dbus.SessionBus().get_object('" + str(My_Bus_Name) +
                                          "', '/MessageListener')")
 
@@ -388,40 +408,40 @@ class CcsEditor(Gtk.Window):
                 con = cfl.dbus_connection('poolmanager', service[-1])
                 if con.Variables('main_instance') == self.main_instance:
                     if service[-1] == str(1):
-                        self._to_console("pmgr = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("pmgr = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
                     else:
-                        self._to_console("pmgr" + str(service[-1]) + " = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("pmgr" + str(service[-1]) + " = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
             # Connect to all Poolviewers
             if service.startswith(self.cfg['ccs-dbus_names']['poolviewer']):
                 con = cfl.dbus_connection('poolviewer', service[-1])
                 if con.Variables('main_instance') == self.main_instance:
                     if service[-1] == str(1):
-                        self._to_console("pv = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("pv = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
                     else:
-                        self._to_console("pv" + str(service[-1]) + " = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("pv" + str(service[-1]) + " = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
             # Connect to all Plotters
             if service.startswith(self.cfg['ccs-dbus_names']['plotter']):
                 con = cfl.dbus_connection('plotter', service[-1])
                 if con.Variables('main_instance') == self.main_instance:
                     if service[-1] == str(1):
-                        self._to_console("paramplot = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("paramplot = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
                     else:
-                        self._to_console("paramplot" + str(service[-1]) + " = dbus.SessionBus().get_object('"
+                        self._to_console_via_socket("paramplot" + str(service[-1]) + " = dbus.SessionBus().get_object('"
                                                     + str(service) + "', '/MessageListener')")
             # Connect to all Monitors
             if service.startswith(self.cfg['ccs-dbus_names']['monitor']):
                 con = cfl.dbus_connection('monitor', service[-1])
                 if con.Variables('main_instance') == self.main_instance:
                     if service[-1] == str(1):
-                        self._to_console("monitor = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("monitor = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
                     else:
-                        self._to_console("monitor" + str(service[-1]) + " = dbus.SessionBus().get_object('" +
+                        self._to_console_via_socket("monitor" + str(service[-1]) + " = dbus.SessionBus().get_object('" +
                                                     str(service) + "', '/MessageListener')")
             # Connect to all remaining editors
             if service.startswith(self.cfg['ccs-dbus_names']['editor']):
@@ -429,10 +449,10 @@ class CcsEditor(Gtk.Window):
                     con = cfl.dbus_connection('editor', service[-1])
                     if con.Variables('main_instance') == self.main_instance:
                         if service[-1] == str(1):
-                            self._to_console("editor = dbus.SessionBus().get_object('" +
+                            self._to_console_via_socket("editor = dbus.SessionBus().get_object('" +
                                                         str(service) + "', '/MessageListener')")
                         else:
-                            self._to_console("editor" + str(service[-1]) +
+                            self._to_console_via_socket("editor" + str(service[-1]) +
                                                         " = dbus.SessionBus().get_object('" + str(service) +
                                                         "', '/MessageListener')")
         return
@@ -520,7 +540,7 @@ class CcsEditor(Gtk.Window):
                             nr = self.my_bus_name[-1]
                             if nr == str(1):
                                 nr = ''
-                            editor.Functions('_to_console', 'del(editor' + str(nr) + ')')
+                            editor.Functions('_to_console_via_socket', 'del(editor' + str(nr) + ')')
 
             self.update_all_connections_quit()
             Gtk.main_quit()
@@ -584,7 +604,6 @@ class CcsEditor(Gtk.Window):
         while self.is_editor_socket_active:
             self.console_sock, addr = sock_csl.accept()
             line = self.console_sock.recv(2**16).decode()
-            #print(line)
             # if line.startswith('exec:'):
             #     exec(line.strip('exec:'))
             # elif line.startswith('get:'):
@@ -612,8 +631,6 @@ class CcsEditor(Gtk.Window):
         print(line)
         if not line.endswith('\n'):
             line += '\n'
-
-        #print(self.ipython_view. get_has_selection())
         # if line.count('\n') > 1:
         #     self.ipython_view.feed_child('%cpaste\n', len('%cpaste\n'))
         #     time.sleep(0.01)
@@ -647,19 +664,21 @@ class CcsEditor(Gtk.Window):
 
     def create_mark_attributes(self):
         self.mark_play = GtkSource.MarkAttributes()
-        icon = GdkPixbuf.Pixbuf.new_from_file('pixmap/media-playback-start-symbolic_uvie.svg')
+        pixmap_path = os.path.join(pixmap_folder, 'media-playback-start-symbolic_uvie.svg')
+        icon = GdkPixbuf.Pixbuf.new_from_file(pixmap_path)
         self.mark_play.set_pixbuf(icon)
         # self.mark_play.set_icon_name("media-playback-start-symbolic")
 
         self.mark_break = GtkSource.MarkAttributes()
-        icon = GdkPixbuf.Pixbuf.new_from_file('pixmap/process-stop-symbolic_uvie.svg')
+        pixmap_path = os.path.join(pixmap_folder, 'process-stop-symbolic_uvie.svg')
+        icon = GdkPixbuf.Pixbuf.new_from_file(pixmap_path)
         self.mark_break.set_pixbuf(icon)
         # self.mark_break.set_icon_name("process-stop-symbolic")
 
         # self.tag_found = self.textbuffer.create_tag("found", background="yellow", foreground = "black")
 
     def create_menus(self):
-        action_group = Gtk.ActionGroup("action_group")
+        action_group = Gtk.ActionGroup(name="action_group")
         self.create_file_menu(action_group)
         self.create_edit_menu(action_group)
         self.create_pool_menu(action_group)
@@ -678,110 +697,110 @@ class CcsEditor(Gtk.Window):
         return menubar
 
     def create_file_menu(self, action_group):
-        action = Gtk.Action("FileMenu", "_File", None, None)
+        action = Gtk.Action(name="FileMenu", label="_File", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action("FileNew", "_New", None, Gtk.STOCK_NEW)
+        action = Gtk.Action(name="FileNew", label="_New", tooltip=None, stock_id=Gtk.STOCK_NEW)
         action.connect("activate", self._on_menu_file_new)
         action_group.add_action_with_accel(action, "<control>N")
 
-        action = Gtk.Action("FileOpen", "_Open", None, Gtk.STOCK_OPEN)
+        action = Gtk.Action(name="FileOpen", label="_Open", tooltip=None, stock_id=Gtk.STOCK_OPEN)
         action.connect("activate", self.on_menu_file_open)
         action_group.add_action_with_accel(action, "<control>O")
 
-        action = Gtk.Action("FileSave", "_Save", None, Gtk.STOCK_SAVE)
+        action = Gtk.Action(name="FileSave", label="_Save", tooltip=None, stock_id=Gtk.STOCK_SAVE)
         action.connect("activate", self.on_menu_file_save)
         action_group.add_action_with_accel(action, "<control>S")
 
-        action = Gtk.Action("FileSaveAs", "_Save As", None, Gtk.STOCK_SAVE_AS)
+        action = Gtk.Action(name="FileSaveAs", label="_Save As", tooltip=None, stock_id=Gtk.STOCK_SAVE_AS)
         action.connect("activate", self.on_menu_file_saveas)
         action_group.add_action(action)
 
-        action = Gtk.Action("FileQuit", "_Quit", None, Gtk.STOCK_QUIT)
+        action = Gtk.Action(name="FileQuit", label="_Quit", tooltip=None, stock_id=Gtk.STOCK_QUIT)
         action.connect("activate", self.on_menu_file_quit)
         action_group.add_action_with_accel(action, "<control>Q")
 
     def create_edit_menu(self, action_group):
-        action = Gtk.Action("EditMenu", "_Edit", None, None)
+        action = Gtk.Action(name="EditMenu", label="_Edit", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action("EditUndo", "_Undo", None, Gtk.STOCK_UNDO)
+        action = Gtk.Action(name="EditUndo", label="_Undo", tooltip=None, stock_id=Gtk.STOCK_UNDO)
         action.connect("activate", self._on_undo)
         action_group.add_action_with_accel(action, "<control>Z")
 
-        action = Gtk.Action("EditRedo", "Red_o", None, Gtk.STOCK_REDO)
+        action = Gtk.Action(name="EditRedo", label="Red_o", tooltip=None, stock_id=Gtk.STOCK_REDO)
         action.connect("activate", self._on_redo)
         action_group.add_action_with_accel(action, "<control>Y")
 
-        action = Gtk.Action("EditCut", "Cu_t", None, Gtk.STOCK_CUT)
+        action = Gtk.Action(name="EditCut", label="Cu_t", tooltip=None, stock_id=Gtk.STOCK_CUT)
         action.connect("activate", self._on_cut)
         action_group.add_action_with_accel(action, "<control>X")
 
-        action = Gtk.Action("EditCopy", "_Copy", None, Gtk.STOCK_COPY)
+        action = Gtk.Action(name="EditCopy", label="_Copy", tooltip=None, stock_id=Gtk.STOCK_COPY)
         action.connect("activate", self._on_copy)
         action_group.add_action_with_accel(action, "<control>C")
 
-        action = Gtk.Action("EditPaste", "_Paste", None, Gtk.STOCK_PASTE)
+        action = Gtk.Action(name="EditPaste", label="_Paste", tooltip=None, stock_id=Gtk.STOCK_PASTE)
         action.connect("activate", self._on_paste)
         action_group.add_action_with_accel(action, "<control>V")
 
-        action = Gtk.Action("EditFind", "_Find", None, Gtk.STOCK_FIND)
+        action = Gtk.Action(name="EditFind", label="_Find", tooltip=None, stock_id=Gtk.STOCK_FIND)
         action.connect("activate", self.on_search_clicked)
         action_group.add_action_with_accel(action, "<control>F")
 
     def create_pool_menu(self, action_group):
-        action = Gtk.Action("PoolMenu", "_Pool", None, None)
+        action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action("SelectConfig", "_Select Configuration", None, None)
+        action = Gtk.Action(name="SelectConfig", label="_Select Configuration", tooltip=None, stock_id=None)
         action.connect("activate", self._on_select_pool_config)
         action_group.add_action(action)
 
-        action = Gtk.Action("EditConfig", "_Edit Configuration", None, None)
+        action = Gtk.Action(name="EditConfig", label="_Edit Configuration", tooltip=None, stock_id=None)
         action.connect("activate", self._on_edit_pool_config)
         action_group.add_action(action)
 
-        action = Gtk.Action("CreateConfig", "_Create Configuration", None, None)
+        action = Gtk.Action(name="CreateConfig", label="_Create Configuration", tooltip=None, stock_id=None)
         action.connect("activate", self._on_create_pool_config)
         action_group.add_action(action)
 
     def create_modules_menu(self, action_group):
-        action = Gtk.Action("ModulesMenu", "_Modules", None, None)
+        action = Gtk.Action(name="ModulesMenu", label="_Modules", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action("Poolviewer", "_Start Poolviewer", None,None)
+        action = Gtk.Action(name="Poolviewer", label="_Start Poolviewer", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_poolviewer)
         action_group.add_action(action)
 
-        action = Gtk.Action("Poolmanager", "_Start Poolmanager", None,None)
+        action = Gtk.Action(name="Poolmanager", label="_Start Poolmanager", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_poolmanager)
         action_group.add_action(action)
 
-        action = Gtk.Action("Plotter", "_Start Plotter", None,None)
+        action = Gtk.Action(name="Plotter", label="_Start Plotter", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_plotter)
         action_group.add_action(action)
 
-        action = Gtk.Action("Monitor", "_Start Monitor", None,None)
+        action = Gtk.Action(name="Monitor", label="_Start Monitor", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_monitor)
         action_group.add_action(action)
 
     def create_tools_menu(self, action_group):
-        action = Gtk.Action("ToolsMenu", "_Tools", None, None)
+        action = Gtk.Action(name="ToolsMenu", label="_Tools", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action("ActionButtons", "_Action Buttons Window", None, None)
+        action = Gtk.Action(name="ActionButtons", label="_Action Buttons Window", tooltip=None, stock_id=None)
         action.connect("activate", self._on_show_action_window)
         action_group.add_action(action)
 
-        action = Gtk.Action("RestartTerminal", "_Restart Terminal", None, None)
+        action = Gtk.Action(name="RestartTerminal", label="_Restart Terminal", tooltip=None, stock_id=None)
         action.connect("activate", self._on_restart_terminal)
         action_group.add_action(action)
 
     def create_help_menu(self, action_group):
-        action = Gtk.Action("HelpMenu", "_Help", None, None)
+        action = Gtk.Action(name="HelpMenu", label="_Help", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action("AboutDialog", "_About", None, Gtk.STOCK_ABOUT)
+        action = Gtk.Action(name="AboutDialog", label="_About", tooltip=None, stock_id=Gtk.STOCK_ABOUT)
         action.connect("activate", self._on_select_about_dialog)
         #action.connect("activate", cfl.about_dialog(self))
         action_group.add_action(action)
@@ -1119,7 +1138,9 @@ class CcsEditor(Gtk.Window):
 
         button_run_nextline = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/media-playback-start-symbolic_uvie.svg', 24, 24)
+
+        pixmap_path = os.path.join(pixmap_folder, 'media-playback-start-symbolic_uvie.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 24, 24)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         button_run_nextline.set_icon_widget(icon)
         button_run_nextline.set_tooltip_text('Run Line')
@@ -1129,7 +1150,8 @@ class CcsEditor(Gtk.Window):
 
         button_run_sameline = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/media-playback-start-symbolic-down_uvie.svg', 24, 24)
+        pixmap_path = os.path.join(pixmap_folder, 'media-playback-start-symbolic-down_uvie.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 24, 24)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         button_run_sameline.set_icon_widget(icon)
         button_run_sameline.set_tooltip_text('Run Line (remain in line)')
@@ -1138,7 +1160,8 @@ class CcsEditor(Gtk.Window):
 
         button_run_all = Gtk.ToolButton()
         # button_run_all.set_icon_name("media-seek-forward-symbolic")
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/media-skip-forward-symbolic_uvie.svg', 24, 24)
+        pixmap_path = os.path.join(pixmap_folder, 'media-skip-forward-symbolic_uvie.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 24, 24)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         button_run_all.set_icon_widget(icon)
         button_run_all.set_tooltip_text('Run All')
@@ -1147,7 +1170,8 @@ class CcsEditor(Gtk.Window):
 
         button_run_all_nobreak = Gtk.ToolButton()
         # button_run_all.set_icon_name("media-seek-forward-symbolic")
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/media-seek-forward-symbolic_uvie.svg', 24, 24)
+        pixmap_path = os.path.join(pixmap_folder, 'media-seek-forward-symbolic_uvie.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 24, 24)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         button_run_all_nobreak.set_icon_widget(icon)
         button_run_all_nobreak.set_tooltip_text('Run All (ignore breakmarks)')
@@ -1193,7 +1217,8 @@ class CcsEditor(Gtk.Window):
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
             except:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/action.png', 36, 36)
+                pixmap_path = os.path.join(pixmap_folder, 'action.png')
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
             icon = Gtk.Image.new_from_pixbuf(pixbuf)
             button_action.set_icon_widget(icon)
             button_action.set_name('action{}'.format(n + 1))
@@ -1508,9 +1533,11 @@ class CcsEditor(Gtk.Window):
         """ dump line into console """
         line = textbuffer.get_text(start, stop, True)
         line += str('\n\n')
+
         # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
         # self.ipython_view._processLine()
-        self._to_console(line)
+        #self._to_console(line, editor_read=True)
+        self._to_console_via_socket(line)
 
         self._set_play_mark(view, stop)
 
@@ -1531,9 +1558,11 @@ class CcsEditor(Gtk.Window):
         """ dump line into console """
         line = textbuffer.get_text(start, end, True)
         line += str('\n\n')
+
         # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
         # self.ipython_view._processLine()
-        self._to_console(line)
+        #self._to_console(line, editor_read=True)
+        self._to_console_via_socket(line)
 
         self._set_play_mark(view, end)
 
@@ -1553,7 +1582,16 @@ class CcsEditor(Gtk.Window):
         editor_sock.close()
         return ack
 
-    def _to_console(self, buf):
+    #TODO: Very interesting behaviour by the editor console if every execution is done by the '_to_console' command,
+    # at the beginnig everything works fine, run all and run line by line, if a function is executed the same is true,
+    # but not if the function is first executed by run all and than by run line per line... the console just deletes
+    # the command befor it is executed, run all is now executed via socket everything works fine, changes would just be
+    # a visual plus, and the addvatage to use the built in command to communicate with the console,
+    # #### Additionally: using python 3.8 or newer, _to_console function does not yet work... but _to_conosle_via_socket
+    # works for every version, therefore it is used as long no solution is found
+
+
+    def _to_console(self, buf, execute=True, editor_read=False):
         '''
         This function sends data to the IPython Terminal, Gtk.VteTerminal has a built in function to do this
         @param buf: String that should be sent
@@ -1570,7 +1608,7 @@ class CcsEditor(Gtk.Window):
         if len(terminal_text) > shown_length:
             saved_text = terminal_text[8:-2]
         else:
-            saved_text = None
+            saved_text = ''
 
         # If code was entered delete it, otherwise the new command would be added at the end
         while entry_length > shown_length:
@@ -1700,7 +1738,7 @@ class CcsEditor(Gtk.Window):
         try:
             # self.ipython_view.text_buffer.insert_at_cursor(cmd, len(cmd))
             # self.ipython_view._processLine()
-            self._to_console(cmd)
+            self._to_console_via_socket(cmd)
             # exec(open(action,'r').read())
             # print(action + ' executed')
         except FileNotFoundError:
@@ -1721,7 +1759,8 @@ class CcsEditor(Gtk.Window):
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(action_img, 36, 36)
             except:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/action.png', 36, 36)
+                pixmap_path = os.path.join(pixmap_folder, 'action.png')
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
             button.set_icon_widget(Gtk.Image.new_from_pixbuf(pixbuf))
         self.show_all()
         return
@@ -1730,10 +1769,10 @@ class CcsEditor(Gtk.Window):
         cmd = 'get_ipython().reset()\n\n'
         # self.ipython_view.text_buffer.insert_at_cursor(cmd, len(cmd))
         # self.ipython_view._processLine()
-        self._to_console(cmd)
+        self._to_console_via_socket(cmd)
         # self.ipython_view.updateNamespace({'cfg': self.cfg})
         # self.ipython_view.updateNamespace(globals())
-        self._to_console('import configparser\n'
+        self._to_console_via_socket('import configparser\n'
                                     'cfg = configparser.ConfigParser()\n'
                                     'cfg.read("{}")'.format(confignator.get_option('config-files', 'ccs').split('/')[-1]))
 
@@ -1792,7 +1831,8 @@ class ActionWindow(Gtk.Window):
         self.logger = editor.logger
         grid = Gtk.Grid()
         buttons = {}
-        pixbuf_default = GdkPixbuf.Pixbuf.new_from_file_at_size('pixmap/action.png', 36, 36)
+        pixmap_path = os.path.join(pixmap_folder, 'action.png')
+        pixbuf_default = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
 
         for i in range(nbuttons):
             button = Gtk.ToolButton()

@@ -110,6 +110,7 @@ class DatapoolManager:
     lock = threading.Lock()
     own_gui = None
     gui_running = False
+    main_instance = None
     windowname = ' .Pool Manager'
 
     def __init__(self, given_cfg=None, cfilters='default', max_colour_rows=8000):
@@ -1861,6 +1862,7 @@ class DatapoolManager:
         self.quit_func()
 
     def quit_func(self):
+        pv = cfl.dbus_connection('poolviewer')
         for service in dbus.SessionBus().list_names():
             if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                 editor = cfl.dbus_connection(service[0:-1].split('.')[1], service[-1])
@@ -1868,8 +1870,7 @@ class DatapoolManager:
                     nr = self.my_bus_name[-1]
                     if nr == str(1):
                         nr = ''
-                    editor.Functions('_to_console', 'del(pmgr' + str(nr) + ')')
-
+                    editor.Functions('_to_console_via_socket', 'del(pmgr' + str(nr) + ')')
         self.update_all_connections_quit()
 
         Gtk.main_quit()
@@ -1888,7 +1889,7 @@ class DatapoolManager:
                 if service == self.my_bus_name:  # If own allplication do nothing
                     continue
                 conn = cfl.dbus_connection(service.split('.')[1], service[-1])
-                if conn.Variables('main_instance') == self.main_instance:  # Check if running in same project
+                if cfl.Variables(conn,'main_instance') == self.main_instance:  # Check if running in same project
                     if service.startswith(self.my_bus_name[:-1]):  # Check if it is same application type
                         my_con.append(service)
                     else:
@@ -1898,10 +1899,10 @@ class DatapoolManager:
         our_con = our_con + my_con  # Add the instances of same application to change the main communication as well
         for service in our_con:  # Change the main communication for all applications+
             conn = cfl.dbus_connection(service.split('.')[1], service[-1])
-            comm = conn.Functions('get_communication')
+            comm = cfl.Functions(conn, 'get_communication')
             # Check if this application is the main applications otherwise do nothing
             if str(comm[self.my_bus_name.split('.')[1]]) == self.my_bus_name[-1]:
-                conn.Functions('change_communication', self.my_bus_name.split('.')[1], instance, False)
+                cfl.Functions(conn, 'change_communication', self.my_bus_name.split('.')[1], instance, False)
         return
 
     def connect_to_all(self, My_Bus_Name, Count):
@@ -1939,13 +1940,13 @@ class DatapoolManager:
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     editor = cfl.dbus_connection('editor', service[-1])
-                    editor.Functions('_to_console', "pmgr = dbus.SessionBus().get_object('" +
+                    editor.Functions('_to_console_via_socket', "pmgr = dbus.SessionBus().get_object('" +
                                      str(My_Bus_Name) + "', '/MessageListener')")
         else:
             for service in dbus.SessionBus().list_names():
                 if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                     editor = cfl.dbus_connection('editor', service[-1])
-                    editor.Functions('_to_console', "pmgr" + str(Count) +
+                    editor.Functions('_to_console_via_socket', "pmgr" + str(Count) +
                                      " = dbus.SessionBus().get_object('" + str(My_Bus_Name) + "', '/MessageListener')")
 
         return
@@ -1998,10 +1999,10 @@ class LoadInfo(Gtk.Window):
 
 class UnsavedBufferDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, msg=None):
-        Gtk.MessageDialog.__init__(self, title="Quit Pool Manager?", parent=parent, flags=0,
-                                   buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        Gtk.MessageDialog.__init__(self, title="Quit Pool Manager?", parent=parent, flags=0.,)
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                                             Gtk.STOCK_NO, Gtk.ResponseType.NO,
-                                            Gtk.STOCK_YES, Gtk.ResponseType.YES,))
+                                            Gtk.STOCK_YES, Gtk.ResponseType.YES,)
         head, message = self.get_message_area().get_children()
         if msg == None:
             head.set_text('Response NO will keep the Pool Manager running in the background and only the GUI is closed')
@@ -2085,11 +2086,11 @@ class PUSDatapoolManagerGUI(Gtk.ApplicationWindow):
         box.pack_start(optionbox, 0, 0, 0)
 
         buttonbox = Gtk.HBox()
-        connect_in = Gtk.Button('Connect')
+        connect_in = Gtk.Button.new_with_label('Connect')
         buttonbox.pack_start(connect_in, 1, 1, 0)
-        disconnect_in = Gtk.Button('Disconnect')
+        disconnect_in = Gtk.Button.new_with_label('Disconnect')
         buttonbox.pack_start(disconnect_in, 1, 1, 0)
-        display_pool = Gtk.Button('Display')
+        display_pool = Gtk.Button.new_with_label('Display')
         buttonbox.pack_start(display_pool, 1, 1, 0)
         # display_pool.tooltip_text('Select TM connection and display it in the Poolviewer')
         box.pack_start(buttonbox, 0, 0, 0)
