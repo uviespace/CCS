@@ -7,6 +7,12 @@ This module contains functions which have to do with sending telecommands.
 
 import logging
 import time
+import sys
+
+import confignator
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+
 
 from . import tm
 
@@ -14,11 +20,9 @@ from . import tm
 logger = logging.getLogger(__name__)
 
 
-def generate_stream_of_tc_6_5(ccs, pool_name, duration=300):
+def generate_stream_of_tc_6_5(pool_name, duration=300):
     """
     Generating a stream of TC(6,5). Aim to to send one TC(6,5) per cycle (one cycle lasts for 0.125ms)
-    :param ccs: packets.CCScom
-        Instance of the class CCScom
     :param pool_name: str
         Name of the pool for TM/TCs in the database
     :param duration: int
@@ -51,7 +55,7 @@ def generate_stream_of_tc_6_5(ccs, pool_name, duration=300):
 
         # send TC(6,5) and note the current time again
         current_time = time.time()
-        tc = ccs.Tcsend_DB('SES CMD_Memory_Dump',
+        tc = cfl.Tcsend_DB('SES CMD_Memory_Dump',
                            PAR_MEMORY_ID_DUMP,
                            PAR_START_ADDRESS_DUMP,
                            PAR_BLOCK_LENGTH_DUMP,
@@ -86,13 +90,11 @@ def generate_stream_of_tc_6_5(ccs, pool_name, duration=300):
     return in_time, sent_tcs
 
 
-def reset_housekeeping(ccs, pool_name, name):
+def reset_housekeeping(pool_name, name):
     """
     Reset a housekeeping. Set its generation frequency back to its default value. Set back its enable-status
     back to its default value (by default only IFSW_HK is enabled)
 
-    :param ccs: packets.CCScom
-        Instance of the class packets.CCScom
     :param pool_name: str
         Name of the pool for TM/TCs in the database
     :param name: str
@@ -153,21 +155,21 @@ def reset_housekeeping(ccs, pool_name, name):
         # set the generation frequency to back to its default value
         logger.info('set the generation frequency of {} back to its default value of {} cycles ({}Hz)'
                  .format(name, hk_freq, hk_freq/8))
-        tc_freq = ccs.TcSetHkRepFreq(sid=hk_sid, period=hk_freq)
-        set_freq, ack_freq = tm.await_tc_acknow(ccs=ccs, pool_name=pool_name, tc_identifier=tc_freq, tm_sst=7)
+        tc_freq = cfl.TcSetHkRepFreq(sid=hk_sid, period=hk_freq) #TODO: not in cfl anymore
+        set_freq, ack_freq = tm.await_tc_acknow(pool_name=pool_name, tc_identifier=tc_freq, tm_sst=7)
 
         # disable or enable the housekeeping
         if hk_enabled is True:
             # send TC(3,5) to enable the housekeeping report
             logger.info('enable the {} housekeeping report'.format(name))
-            tc_enb = ccs.Tcsend_DB('DPU_IFSW_ENB_HK_DR_GEN', hk_sid, ack='0b1011', pool_name=pool_name)
-            enabled, ack_enb = tm.await_tc_acknow(ccs=ccs, pool_name=pool_name, tc_identifier=tc_enb, tm_sst=7)
+            tc_enb = cfl.Tcsend_DB('DPU_IFSW_ENB_HK_DR_GEN', hk_sid, ack='0b1011', pool_name=pool_name)
+            enabled, ack_enb = tm.await_tc_acknow(pool_name=pool_name, tc_identifier=tc_enb, tm_sst=7)
 
         if hk_enabled is False:
             # send TC(3,5) to disable the housekeeping report
             logger.info('disable the {} housekeeping report'.format(name))
-            tc_dis = ccs.Tcsend_DB('DPU_IFSW_DIS_HK_DR_GEN', hk_sid, ack='0b1011', pool_name=pool_name)
-            disabled, ack_dis = tm.await_tc_acknow(ccs=ccs, pool_name=pool_name, tc_identifier=tc_dis, tm_sst=7)
+            tc_dis = cfl.Tcsend_DB('DPU_IFSW_DIS_HK_DR_GEN', hk_sid, ack='0b1011', pool_name=pool_name)
+            disabled, ack_dis = tm.await_tc_acknow(pool_name=pool_name, tc_identifier=tc_dis, tm_sst=7)
 
     # evaluate if the function was successful
     if set_freq:
@@ -181,13 +183,11 @@ def reset_housekeeping(ccs, pool_name, name):
     return success
 
 
-def reset_all_housekeepings(ccs, pool_name):
+def reset_all_housekeepings(pool_name):
     """
     This function resets all housekeepings. The frequencies are set to their default value. The enabled status is set
     back to its default value.
 
-    :param ccs: packets.CCScom
-        Instance of the class packets.CCScom
     :param poolname: str
         Name of the pool for TM/TCs in the database
     :return: bool
@@ -209,7 +209,7 @@ def reset_all_housekeepings(ccs, pool_name):
     # reset all housekeepings
     result = []
     for hk_name in housekeepings:
-        suc = reset_housekeeping(ccs=ccs, pool_name=pool_name, name=hk_name)
+        suc = reset_housekeeping(pool_name=pool_name, name=hk_name)
         result.append(suc)
         if suc:
             logger.debug('reset_all_housekeepings: reset of {} was successful'.format(hk_name))
@@ -229,26 +229,25 @@ def reset_all_housekeepings(ccs, pool_name):
     return success
 
 
-def stop_sem(ccs, pool_name):
+def stop_sem(pool_name):
     """
     The TC (193,4) is sent to stop the SEM. Two events are awaited EVT_IASW_TR with DestIaswSt = STANDBY and
     EVT_SEM_TR with DestSemSt = OFF.
 
-    :param ccs:
     :param pool_name:
     :return:
     """
     result = False
 
     # send TC(193,4) to stop SEM
-    tc_stop = ccs.Tcsend_DB('DPU_IFSW_STOP_SEM', ack='0b1011', pool_name=pool_name)
-    t_tc_stop = tm.time_tc_accepted(ccs=ccs, pool_name=pool_name, tc_identifier=tc_stop)
+    tc_stop = cfl.Tcsend_DB('DPU_IFSW_STOP_SEM', ack='0b1011', pool_name=pool_name)
+    t_tc_stop = tm.time_tc_accepted(pool_name=pool_name, tc_identifier=tc_stop)
     # sim.stop_sem(sem=None) ???
     entry_iasw = {'DestIaswSt': 'STANDBY'}
-    evt_iasw = tm.await_event(ccs=ccs, pool_name=pool_name, severity=1, event_id='EVT_IASW_TR', entries=entry_iasw,
+    evt_iasw = tm.await_event(pool_name=pool_name, severity=1, event_id='EVT_IASW_TR', entries=entry_iasw,
                               duration=20, t_from=t_tc_stop - 1)
     entry_sem = {'DestSemSt': 'OFF'}
-    evt_sem = tm.await_event(ccs=ccs, pool_name=pool_name, severity=1, event_id='EVT_SEM_TR', entries=entry_sem,
+    evt_sem = tm.await_event(pool_name=pool_name, severity=1, event_id='EVT_SEM_TR', entries=entry_sem,
                              duration=20, t_from=t_tc_stop - 1)
     if len(evt_iasw) > 0 and len(evt_sem) > 0:
         result = True

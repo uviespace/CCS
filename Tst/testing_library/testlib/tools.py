@@ -5,9 +5,12 @@ Tools
 """
 import logging
 import os
-import configparser
 import math
-from confignator import config
+import sys
+
+import confignator
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
 
 # create a logger
 logger = logging.getLogger(__name__)
@@ -32,56 +35,56 @@ logger = logging.getLogger(__name__)
 # ToDo: These sections should be separated in order to make unit-testing easy and a good readability and understanding.
 
 
-def read_config(file_path=None):
-    print(os.getcwd())
-    file_path = None
-    if os.path.isfile(os.path.abspath('../egse.cfg')):
-        file_path = '../egse.cfg'
-    elif os.path.isfile(os.path.abspath('egse.cfg')):
-        file_path = 'egse.cfg'
-    try:
-        #logger.info('read_config: Reading configuration file: {}'.format(os.path.abspath(file_path)))
-        config = config.Config(file_path=file_path)
-        return config
-    except Exception as exception:
-        pass
-        #logger.error('Could not find the configuration file: {}'.format(os.path.abspath(file_path)))
-        #logger.exception(exception)
+# def read_config():
+#     print(os.getcwd())
+#     file_path = None
+#     if os.path.isfile(os.path.abspath('../egse.cfg')):
+#         file_path = '../egse.cfg'
+#     elif os.path.isfile(os.path.abspath('egse.cfg')):
+#         file_path = 'egse.cfg'
+#     try:
+#         #logger.info('read_config: Reading configuration file: {}'.format(os.path.abspath(file_path)))
+#         config = config.Config(file_path=file_path)
+#         return config
+#     except Exception as exception:
+#         pass
+#         #logger.error('Could not find the configuration file: {}'.format(os.path.abspath(file_path)))
+#         #logger.exception(exception)
 
 
-def read_config_file():
-    config = None
-    # load the config file
-    configuration_file = os.path.realpath('egse.cfg')
-    if os.path.isfile(os.path.abspath(configuration_file)):
-        try:
-            config = configparser.ConfigParser()
-            config.read(configuration_file)
-            config.source = configuration_file
-        except Exception as ex:
-            logger.critical('Configuration file {} could not be read!'.format(configuration_file))
-            logger.exception(ex)
-    else:
-        configuration_file = os.path.realpath('../egse.cfg')
-        if os.path.isfile(os.path.abspath(configuration_file)):
-            try:
-                config = configparser.ConfigParser()
-                config.read(configuration_file)
-                config.source = configuration_file
-            except Exception as ex:
-                logger.critical('Configuration file {} could not be read!'.format(configuration_file))
-                logger.exception(ex)
-        else:
-            logger.error('Could not find the configuration file: {}'.format(os.path.abspath(configuration_file)))
-    return config
+# def read_config_file():
+#     config = None
+#     # load the config file
+#     configuration_file = os.path.realpath('egse.cfg')
+#     if os.path.isfile(os.path.abspath(configuration_file)):
+#         try:
+#             config = configparser.ConfigParser()
+#             config.read(configuration_file)
+#             config.source = configuration_file
+#         except Exception as ex:
+#             logger.critical('Configuration file {} could not be read!'.format(configuration_file))
+#             logger.exception(ex)
+#     else:
+#         configuration_file = os.path.realpath('../egse.cfg')
+#         if os.path.isfile(os.path.abspath(configuration_file)):
+#             try:
+#                 config = configparser.ConfigParser()
+#                 config.read(configuration_file)
+#                 config.source = configuration_file
+#             except Exception as ex:
+#                 logger.critical('Configuration file {} could not be read!'.format(configuration_file))
+#                 logger.exception(ex)
+#         else:
+#             logger.error('Could not find the configuration file: {}'.format(os.path.abspath(configuration_file)))
+#     return config
 
 
 # read the path for the logging files from the configuration file egse.cfg.
 # if the directory does not exist it is created.
-#     @param self Reference to the current instance of CCScom
-def get_path_for_testing_logs(ccs):
+def get_path_for_testing_logs():
     # fetch the path from the project config file
-    path = ccs.cfg.get('LOGGING', 'test_run')
+    # path = cfl.cfg.get('LOGGING', 'test_run')
+    path = confignator.get_config().get('tst-logging', 'test_run')
     # create the directory for the logging files if it does not exist
     os.makedirs(path, mode=0o777, exist_ok=True)
     return path
@@ -215,11 +218,11 @@ def print_apids():
 #   @param value1: <float> or <tmpacket>
 #   @param value2: <float> or <tmpacket>
 #   @return: <float>
-def get_cuc_diff(ccs, value1, value2):
+def get_cuc_diff(value1, value2):
     if not isinstance(value1, float):  # if value1 is a TM packet
-        value1 = ccs.get_cuctime(value1)
+        value1 = cfl.get_cuctime(value1)
     if not isinstance(value2, float):  # if value2 is a TM packet
-        value2 = ccs.get_cuctime(value2)
+        value2 = cfl.get_cuctime(value2)
     difference = math.fabs(value2-value1)
     return difference
 

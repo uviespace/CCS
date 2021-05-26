@@ -7,6 +7,11 @@ import datetime
 import logging
 import collections
 import json
+import sys
+
+import confignator
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
 
 # create a logger
 logger = logging.getLogger(__name__)
@@ -80,13 +85,12 @@ def parse_step_from_json_string(line, key_word):
             logger.error('parse_tc_id_from_json_string: parsing of the TC JSON string failed!')
 
 
-def command_step_begin(step_param, script_version, ccs, pool_name, step_start_cuc):
+def command_step_begin(step_param, script_version, pool_name, step_start_cuc):
     """
     Builds a string and writes it into the logging file. A keyword is set to enable a machine read out of the log file.
     All information of the step is written in a JSON string.
     :param step_param:
     :param script_version:
-    :param ccs:
     :param pool_name:
     :param step_start_cuc:
     :return:
@@ -111,7 +115,7 @@ def command_step_end(step_param, step_end_cuc):
     logger.info('{} {}\n'.format(cmd_step_keyword_done, encode_to_json_string(step_param['step_no'], step_end_cuc)))
 
 
-def verification_step_begin(step_param, script_version, ccs, pool_name, step_start_cuc):
+def verification_step_begin(step_param, script_version, pool_name, step_start_cuc):
     logger.info('{} {} {}'.format(vrc_step_keyword,
                                   step_param['step_no'],
                                   encode_to_json_string(step_number=step_param['step_no'],
@@ -152,7 +156,7 @@ class StepSummary:
 # --------------------------------------------
 
 
-def write_log_step_header(step_param, ccs, pool_name, step_start_cuc):
+def write_log_step_header(step_param, pool_name, step_start_cuc):
     logger.info('STEP {} (starting from {})'
              .format(step_param['step_no'], step_start_cuc))
     logger.info(step_param['msg'])
@@ -168,11 +172,11 @@ def write_log_step_footer(step_param, step_result):
         logger.warning('Step {} failed.'.format(step_param['step_no']))
 
 
-def write_log_test_header(test, ccs, pool_name):
+def write_log_test_header(test, pool_name):
     logger.info('-------------------------------------------------------------------------------')
     logger.info('Running test {} version {}\n\t\t\t\t\tpoolname = {}\n\t\t\t\t\tCUC-timestamp of test '
              'start = {}\n\t\t\t\t\tlocal time = {}'
-             .format(test.id, test.version, pool_name, ccs.get_last_pckt_time(pool_name=pool_name, string=False),
+             .format(test.id, test.version, pool_name, cfl.get_last_pckt_time(pool_name=pool_name, string=False),
                      datetime.datetime.now().isoformat()))
     logger.info('Description:\n\t\t\t\t\t {}'.format(test.description))
     if test.comment:
@@ -209,12 +213,12 @@ def write_log_test_footer(test):
     return successful_steps
 
 
-def print_data_tuple(ccs, tm_packets):
+def print_data_tuple(tm_packets):
     if not isinstance(tm_packets, list):
         tm_packets = [tm_packets]
     for packet in tm_packets:
         if isinstance(packet, bytes):
-            data = ccs.Tmdata(packet)[0]
+            data = cfl.Tmdata(packet)[0]
         elif isinstance(packet, tuple):
             data = packet[1][0]
         else:
@@ -227,12 +231,12 @@ def print_data_tuple(ccs, tm_packets):
                 logger.debug('{} = {}'.format(name, value))
 
 
-def print_event_data_tuple(ccs, tm_packets):
+def print_event_data_tuple(tm_packets):
     if not isinstance(tm_packets, list):
         tm_packets = [tm_packets]
     for packet in tm_packets:
         if isinstance(packet, bytes):
-            data = ccs.Tmdata(packet)[0]
+            data = cfl.Tmdata(packet)[0]
         elif isinstance(packet, tuple):
             data = packet[1][0]
         else:
