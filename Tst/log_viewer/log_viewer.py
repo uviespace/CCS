@@ -9,6 +9,10 @@ import confignator
 import logging
 import toolbox
 import dbus
+import sys
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
 
 uni_grau = '#666666'
 uni_weiss = '#ffffff'

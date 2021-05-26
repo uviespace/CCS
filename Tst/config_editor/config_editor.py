@@ -42,6 +42,9 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gio, GLib, Gdk
 import confignator
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
 
 app_name = 'Configuration Editor'
 dbus_name = 'smile.tst.configeditor'

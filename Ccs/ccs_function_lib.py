@@ -3437,7 +3437,6 @@ def savepool(filename, pool_name, mode='binary', st_filter=None):
 
 def get_packets_from_pool(pool_name, indices=[], st=None, sst=None, apid=None, dbsession=None):
     """
-
     @param pool_name:
     @param indices:
     @param st:
@@ -3472,6 +3471,27 @@ def get_packets_from_pool(pool_name, indices=[], st=None, sst=None, apid=None, d
     new_session.close()
     return ret
 
+def add_tst_import_paths():
+    """
+    Include all paths to TST files that could potentially be used.
+    """
+    # Add general tst path
+    sys.path.append(confignator.get_option('paths', 'tst'))
+    # Add all subfolders
+    sys.path.append(confignator.get_option('paths', 'tst') + '/codeblockreusefeature')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/config_editor')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/confignator')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/doc')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/icon_univie')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/images')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/log_viewer')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/notes')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/progress_view')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/sketch_desk')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/test_specs')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/testing_library')
+    sys.path.append(confignator.get_option('paths', 'tst') + '/tst')
+    return
 
 class TestReport:
 

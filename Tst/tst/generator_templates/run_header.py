@@ -57,5 +57,6 @@ if False:
 # Run the test step by step
 
 #! CCS.BREAKPOINT
-# Exectute the preconditions
-threading.Thread(target=testinstance.establish_preconditions, kwargs={'pool_name': pool_name}, daemon=True).start()
+if False:
+    # Exectute the preconditions
+    threading.Thread(target=testinstance.establish_preconditions, kwargs={'pool_name': pool_name}, daemon=True).start()

@@ -7,17 +7,18 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, Gio, GtkSource, GLib
+import confignator
+import sys
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
 import view
 import data_model
 import file_management
 import tst_logger
 import generator
-import confignator
 import codeblockreuse
 import connect_apps
-import sys
-sys.path.append(confignator.get_option('paths', 'ccs'))
-import ccs_function_lib as cfl
 import dbus
 import toolbox
 
