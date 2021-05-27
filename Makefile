@@ -4,6 +4,8 @@ all: install build-pc
 
 install: install-confignator install-testlib set-start-scripts-permissions
 
+databases: ccs-storage codeblockreusefeature
+
 build-pc: build-fw-profile build-crplm build-cria build-crfee
 
 install-confignator:
@@ -36,7 +38,7 @@ install-database-dev-env:
 	@echo "+-----------------------------------------------+"
 	@echo
 
-install-database:
+ccs-storage:
 	@echo "+----------------------------------------+"
 	@echo "| setting up the storage database schema |"
 	@echo "+----------------------------------------+"
@@ -46,7 +48,7 @@ install-database:
 	@echo "+--------------------------------------------+"
 	@echo
 
-install-codeblockreusefeature:
+codeblockreusefeature:
 	@echo "+-----------------------------------------------+"
 	@echo "| setting up the codeblockreuse database schema |"
 	@echo "+-----------------------------------------------+"
