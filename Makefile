@@ -30,10 +30,30 @@ install-database-dev-env:
 	@echo "+-----------------------------------------------+"
 	@echo "| installing Python packages for the database   |"
 	@echo "+-----------------------------------------------+"
-	    $(MAKE) install-devenv -C $(CURDIR)/Ccs/devel/database
+	    $(MAKE) install-devenv -C $(CURDIR)/Ccs/database
 	@echo "+-----------------------------------------------+"
 	@echo "| installed Python packages for the database    |"
 	@echo "+-----------------------------------------------+"
+	@echo
+
+install-database:
+	@echo "+----------------------------------------+"
+	@echo "| setting up the storage database schema |"
+	@echo "+----------------------------------------+"
+	    $(MAKE) storage -C $(CURDIR)/Ccs/database
+	@echo "+--------------------------------------------+"
+	@echo "| set up of the storage database schemas done|"
+	@echo "+--------------------------------------------+"
+	@echo
+
+install-codeblockreusefeature:
+	@echo "+-----------------------------------------------+"
+	@echo "| setting up the codeblockreuse database schema |"
+	@echo "+-----------------------------------------------+"
+	    $(MAKE) schema -C $(CURDIR)/Tst/codeblockreusefeature
+	@echo "+---------------------------------------------------+"
+	@echo "| set up of the codeblockreuse database schemas done|"
+	@echo "+---------------------------------------------------+"
 	@echo
 
 set-start-scripts-permissions:
