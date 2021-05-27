@@ -146,7 +146,7 @@ class TstApp(Gtk.Application):
 
     def _on_start_ccs_editor(self, *args):
         try:
-            cfl.start_editor(True)
+            cfl.start_editor()
         except Exception as e:
             self.logger.exception(e)
             message = 'Failed to start the CSS-Editor'
@@ -674,21 +674,23 @@ class TstAppWindow(Gtk.ApplicationWindow):
             self.logger.info('Progress Viewer started without running Test')
             print('Progress Viewer started without running Test')
             return ''
+        try:
+            current_file_name = os.path.basename(current_instance.filename)
+            path_test_specs = confignator.get_option(section='tst-paths', option='tst_products')
+            path_test_runs = confignator.get_option(section='tst-logging', option='test_run')
 
-        current_file_name = os.path.basename(current_instance.filename)
-        path_test_specs = confignator.get_option(section='tst-paths', option='tst_products')
-        path_test_runs = confignator.get_option(section='tst-logging', option='test_run')
+            json_file_path = os.path.join(path_test_specs, current_file_name)
+            paths['json_file_path'] = json_file_path
 
-        json_file_path = os.path.join(path_test_specs, current_file_name)
-        paths['json_file_path'] = json_file_path
+            name = generator.strip_file_extension(current_file_name)
+            cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
+            paths['cmd_log_file_path'] = cmd_log_file_path
 
-        name = generator.strip_file_extension(current_file_name)
-        cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
-        paths['cmd_log_file_path'] = cmd_log_file_path
-
-        vrc_log_file_path = os.path.join(path_test_runs, name + testing_logger.vrc_log_auxiliary)
-        paths['vrc_log_file_path'] = vrc_log_file_path
-
+            vrc_log_file_path = os.path.join(path_test_runs, name + testing_logger.vrc_log_auxiliary)
+            paths['vrc_log_file_path'] = vrc_log_file_path
+        except Exception as e:
+            self.logger.info('Json or Log Files could not be found')
+            return ''
         return paths
 
     def on_make_desktop_entry(self):
@@ -714,7 +716,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
     def on_start_ccs_editor(self, *args):
         try:
             self.logger.info('Starting CCS-Editor application.')
-            cfl.start_editor(False)
+            cfl.start_editor()
         except Exception as e:
             message = 'Could not start CCS-Editor. Further information probably can be found in the tst.log file.'
             self.logger.error(message)
@@ -905,6 +907,8 @@ def run():
     dbus.validate_bus_name(bus_name)
 
     applica = TstApp(bus_name, Gio.ApplicationFlags.FLAGS_NONE, logger=logger)
+    print(sys.path)
+    print(view)
     applica.run()
 
 

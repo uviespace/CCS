@@ -6,10 +6,14 @@
 
 #####-None-#####
 logger.info('No pre-conditions have been given')
-success = False
+success = True
 
 #####-Example-#####
 print('No pre-conditions have been given')
 success = True
+
+
+
+
 
 

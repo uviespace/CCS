@@ -6,13 +6,13 @@ gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk
 from gi.repository import Gio
 import confignator
-import logging
-import toolbox
-import dbus
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
+import logging
+import toolbox
+import dbus
 
 uni_grau = '#666666'
 uni_weiss = '#ffffff'

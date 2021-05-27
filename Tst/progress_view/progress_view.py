@@ -5,6 +5,11 @@ import logging
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, Gio, GLib
+import sys
+import confignator
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
 from testlib import analyse_command_log
 from testlib import analyse_verification_log
 from testlib import testing_logger
@@ -12,13 +17,7 @@ import dbus
 import time
 import data_model
 import json
-import confignator
 import toolbox
-import sys
-sys.path.append(confignator.get_option('paths', 'ccs'))
-import ccs_function_lib as cfl
-cfl.add_tst_import_paths()
-
 
 # create a logger
 log_file_path = confignator.get_option(section='progress-viewer-logging', option='log-file-path')
@@ -265,6 +264,9 @@ class TestProgressView(Gtk.ApplicationWindow):
         # expand all entries
         self.view.expand_all()
 
+        self.refresh_rate = 5
+        self.refresh_worker()
+
         # for styling the application with CSS
         context = self.get_style_context()
         Gtk.StyleContext.add_class(context, 'tst-css')
@@ -431,10 +433,20 @@ class TestProgressView(Gtk.ApplicationWindow):
     def on_collapse_all_rows(self, *args):
         self.view.collapse_all()
 
+    def refresh_worker(self):
+        GLib.timeout_add_seconds(self.refresh_rate, self.on_reload_all)
+
     def on_reload_all(self, *args):
-        self.load_json(self.path_json)
-        self.load_cmd(self.path_cmd)
-        self.load_vrc(self.path_vrc)
+        if self.path_json:
+            self.load_json(self.path_json)
+            print(1)
+        if self.path_cmd:
+            self.load_cmd(self.path_cmd)
+            print(2)
+        if self.path_vrc:
+            self.load_vrc(self.path_vrc)
+            print(3)
+
 
     def on_clear_cmd_log(self, *args):
         with open(self.path_cmd, 'w') as cmd_log:
@@ -550,7 +562,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                 data_from_file = json.loads(data)
             file.close()
             if data_from_file is not None:
-                self.test_model = data_model.TestSequence()
+                self.test_model = data_model.TestSpecification()
                 self.test_model.decode_from_json(json_data=data_from_file)
                 self.load_model_into_tree_store(self.progress_tree_store, self.test_model)
             else:
@@ -583,17 +595,22 @@ class TestProgressView(Gtk.ApplicationWindow):
         # check which step numbers are already in the tree_store
         tree_store_steps = []
         for row in tree_store:
-            step_number_tree_store = int(row[0:1][0])
+            step_number_tree_store = row[0:1][0]
             tree_store_steps.append(step_number_tree_store)
         # add drawer for each step which is not in the tree_store already
-        for key in test_model.steps_dict:
-            step_number = int(test_model.steps_dict[key].step_number)
+        # ToDo: only the first sequence is loaded, at the moment only one is supported, but if that changes, this
+        #  has to be changed as well, (Dominik)
+        for step in test_model.sequences[0].steps:
+            step_number = step.step_number_test_format
             if step_number not in tree_store_steps:
                 step_desc = 'Step ' + str(step_number)
+
                 new_drawer_row = self.build_row_list(step_number=str(step_number),
                                                      step_desc=step_desc)
+
                 tree_store.append(None, new_drawer_row)
                 tree_store_steps.append(step_number)
+
         # # remove all existing specifications
         # for row in tree_store:
         #   for item in row.iterchildren():
@@ -637,11 +654,11 @@ class TestProgressView(Gtk.ApplicationWindow):
         # check which step numbers are already in the tree_store
         tree_store_steps = []
         for row in tree_store:
-            step_number_tree_store = int(row[0:1][0])
+            step_number_tree_store = row[0:1][0]
             tree_store_steps.append(step_number_tree_store)
         # add drawer for each step which is not in the tree_store already
         for item in cmd_steps:
-            step_number = int(item['step'])
+            step_number = item['step']
             if step_number not in tree_store_steps:
                 step_desc = 'Step ' + str(step_number)
                 new_drawer_row = self.build_row_list(step_number=str(step_number),
@@ -655,9 +672,9 @@ class TestProgressView(Gtk.ApplicationWindow):
                     tree_store.remove(item.iter)
         # add rows for command
         for row in tree_store:
-            step_number_tree_store = int(row[0:1][0])
+            step_number_tree_store = row[0:1][0]
             for item in cmd_steps:
-                step_number_cmd = int(item['step'])
+                step_number_cmd = item['step']
                 if step_number_tree_store == step_number_cmd:
                     # already_exists = False
                     # for i in row.iterchildren():
@@ -697,11 +714,11 @@ class TestProgressView(Gtk.ApplicationWindow):
         # check which step numbers are already in the tree_store
         tree_store_steps = []
         for row in tree_store:
-            step_number_tree_store = int(row[0:1][0])
+            step_number_tree_store = row[0:1][0]
             tree_store_steps.append(step_number_tree_store)
         # add drawer for each step which is not in the tree_store already
         for item in vrc_steps:
-            step_number = int(item['step'])
+            step_number = item['step']
             if step_number not in tree_store_steps:
                 step_desc = 'Step ' + str(step_number)
                 new_drawer_row = self.build_row_list(step_number=str(step_number),
@@ -715,9 +732,9 @@ class TestProgressView(Gtk.ApplicationWindow):
                     tree_store.remove(item.iter)
         # add row for verification
         for row in tree_store:
-            step_number_tree_store = int(row[0:1][0])
+            step_number_tree_store = row[0:1][0]
             for item in vrc_steps:
-                step_number_vrc = int(item['step'])
+                step_number_vrc = item['step']
                 if step_number_tree_store == step_number_vrc:
                     # already_exists = False
                     # for i in row.iterchildren():

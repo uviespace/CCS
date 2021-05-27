@@ -450,7 +450,7 @@ class CBRSearch(Gtk.Box):
         self.cc_scrolled_window.add(self.cc_code_view)
 
         self.cc_box.pack_start(self.cc_label, False, False, 0)
-        self.cc_box.pack_start(self.cc_scrolled_window, False, False, 0)
+        self.cc_box.pack_start(self.cc_scrolled_window, True, True, 0)
 
         # source view for the verification code ---------------------
         self.vc_box = Gtk.Box()
@@ -467,7 +467,7 @@ class CBRSearch(Gtk.Box):
         self.vc_scrolled_window.add(self.vc_code_view)
 
         self.vc_box.pack_start(self.vc_label, False, False, 0)
-        self.vc_box.pack_start(self.vc_scrolled_window, False, False, 0)
+        self.vc_box.pack_start(self.vc_scrolled_window, True, True, 0)
 
         self.code_view_pane = Gtk.Paned()
         self.code_view_pane.set_orientation(Gtk.Orientation.VERTICAL)

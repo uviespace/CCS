@@ -839,7 +839,8 @@ class StepWidget(Gtk.EventBox):
         description = step.description
         command_code = step.command_code
         verification_code = step.verification_code
-        data_string = dnd_data_parser.create_datastring(dnd_data_parser.data_type_step,
+        data_type = dnd_data_parser.data_type_step if verification_code else dnd_data_parser.data_type_snippet
+        data_string = dnd_data_parser.create_datastring(data_type,
                                                         self.sequence,
                                                         step_number,
                                                         description,

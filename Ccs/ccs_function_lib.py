@@ -3490,7 +3490,9 @@ def add_tst_import_paths():
     sys.path.append(confignator.get_option('paths', 'tst') + '/sketch_desk')
     sys.path.append(confignator.get_option('paths', 'tst') + '/test_specs')
     sys.path.append(confignator.get_option('paths', 'tst') + '/testing_library')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/tst')
+    # insert this to import the tst view.py, not the one in .local folder
+    sys.path.insert(0, confignator.get_option('paths', 'tst') + '/tst')
+
     return
 
 class TestReport:

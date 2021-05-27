@@ -10,7 +10,7 @@ print('current working directory: {}'.format(os.getcwd()))
 import confignator
 ccs_path = confignator.get_option('paths', 'ccs')
 sys.path.append(ccs_path)
-sys.path.append(confignator.get_option('tst-paths', 'testing_library'))
+cfl.add_tst_import_paths()
 from testlib import tools
 from testlib import report
 from testlib import tm
