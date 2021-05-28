@@ -3,6 +3,9 @@
 Simulators - start/stop them
 ============================
 """
+
+# TODO: many project specific methods -- implement more general functions, if necessary
+
 import logging
 import os
 import subprocess

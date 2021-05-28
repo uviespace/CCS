@@ -56,16 +56,11 @@ import sys
 import time
 
 import bitstring
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 import confignator
-
-ccs_path = confignator.get_option('paths', 'ccs')
-sys.path.append(ccs_path)
-
+sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
-from database import config_db
+
 from database import tm_db
 
 from . import idb
@@ -110,14 +105,11 @@ def new_database_session(ccs):
     return session
 '''
 
-scoped_session_idb = cfl.scoped_session_idb  # Connection to CCS IDB
 
-
-def filter_chain(query, pool_name, is_tm=True, st=None, sst=None, apid=None, seq=None, t_from=None, t_to=None,
-                 dest_id=None, not_apid=None):
+def filter_chain(query, pool_name, is_tm=True, st=None, sst=None, apid=None, seq=None, t_from=None, t_to=None, dest_id=None, not_apid=None):
     """
     Add filter to a database query for telemetry/telecommand packets.l
-    :param query:
+    :param query: 
     :param pool_name: str
     :param is_tm: bool
         If this argument is True the query asks only for telemetry packets (TM).
@@ -128,12 +120,12 @@ def filter_chain(query, pool_name, is_tm=True, st=None, sst=None, apid=None, seq
         Sub-Service type of the packet
     :param apid: int
         Application process ID of the packet
-    :param seq:
-    :param t_from:
-    :param t_to:
-    :param dest_id:
-    :param not_apid:
-    :return:
+    :param seq: 
+    :param t_from: 
+    :param t_to: 
+    :param dest_id: 
+    :param not_apid: 
+    :return: 
     """
     if is_tm is True:
         query = query.filter(tm_db.DbTelemetry.is_tm == 0)  # ToDo: why is this entry in the DB zero when it is a TM?
@@ -158,8 +150,7 @@ def filter_chain(query, pool_name, is_tm=True, st=None, sst=None, apid=None, seq
         # ToDo database has the CUC timestamp as string. Here the timestamps are floats.
         # Does this comparison operations work?
         t_from_string = str(t_from) + 'U'  # the timestamps in the database are saved as string
-        query = query.filter(
-            tm_db.DbTelemetry.timestamp >= t_from_string)  # ToDo check if the change from > to >= breaks something!
+        query = query.filter(tm_db.DbTelemetry.timestamp >= t_from_string)  # ToDo check if the change from > to >= breaks something!
         # query = query.filter(tm_db.DbTelemetry.timestamp > t_from)  # <- comparison with float
     if t_to is not None:
         # ToDo database has the CUC timestamp as string. Here the timestamps are floats.
@@ -178,6 +169,7 @@ def highest_cuc_timestamp(tm_list):
     """
     Get the TM packet with the highest CUC timestamp of the packet list
 
+    :param list tm_list: List of TM packets
     :return: The TM packet with the highest CUC timestamp (this is the one with the smallest difference to now).
     :rtype: PUS packet || None
     """
@@ -257,7 +249,7 @@ def set_time_interval(pool_name, t_from, t_to, duration):
     * If t_to and a duration are provided, the value of t_to is stronger. The duration probably was set as a default
       value in a other function.
     * If only a duration and no t_to is provided the upper boundary = lower boundary + duration
-
+    
     :param str pool_name: name of the packet pool in the database
     :param float t_from: CUC timestamp, lower boundary for the time interval. If t_from is None the current CUC timestamp is retrieved from the database by packets.get_last_pckt_time()
     :param float t_to: CUC timestamp, upper boundary for the time interval.
@@ -308,7 +300,7 @@ def set_query_interval(t_from, t_to):
     """
     Set the frequency for doing database queries.
     If the time frame gets larger the frequency of the queries gets lower.
-
+    
     :param float t_from: lower boundary for the CUC timestamp
     :param float t_to: upget_last_pckt_timeper boundary for the CUC timestampcheck
 
@@ -391,7 +383,7 @@ def decode_tm(tm_packets):
                 decoded.append(decode_single_tm_packet(packet=row))
             else:
                 logger.debug('decode_tm: data format for the TM packet is not known! Type of the packet is {}'
-                             .format(type(tm_packets[j])))
+                          .format(type(tm_packets[j])))
             t_end = time.time()
             if len(tm_packets) > 100:
                 time_per_packet = t_end - t_start
@@ -406,8 +398,8 @@ def decode_tm(tm_packets):
             row = tm_packets.raw
             decoded.append(decode_single_tm_packet(packet=row))
         else:
-            logger.debug('decode_tm: data format for the TM packet is not known! Type of the packet is {}'.format(
-                type(tm_packets)))
+            logger.debug('decode_tm: data format for the TM packet is not known! Type of the packet is {}'
+                      .format(type(tm_packets)))
 
     return decoded
 
@@ -540,8 +532,7 @@ def fetch_packets(pool_name, is_tm=True, st=None, sst=None, apid=None, ssc=None,
         apid = tools.convert_apid_to_int(apid=apid)
 
     # make database query
-    # session = new_database_session(ccs=ccs)
-    session = scoped_session_idb
+    session = cfl.scoped_session_storage()
     query = session.query(tm_db.DbTelemetry)
     query = filter_chain(query,
                          pool_name=pool_name,
@@ -557,8 +548,8 @@ def fetch_packets(pool_name, is_tm=True, st=None, sst=None, apid=None, ssc=None,
     data = query.all()
     session.close()
     logger.debug('fetch_packets: returned {} packets; is_tm:{}, st:{}, sst:{}, apid:{}, ssc:{}, t_from:{}, t_to:{},'
-                 ' dest_id:{}, not_apid:{}, decode:{}'
-                 .format(len(data), is_tm, st, sst, apid, ssc, t_from, t_to, dest_id, not_apid, decode))
+              ' dest_id:{}, not_apid:{}, decode:{}'
+              .format(len(data), is_tm, st, sst, apid, ssc, t_from, t_to, dest_id, not_apid, decode))
 
     # get the raw data out of the query result
     for i in range(len(data)):
@@ -571,11 +562,10 @@ def fetch_packets(pool_name, is_tm=True, st=None, sst=None, apid=None, ssc=None,
     return data
 
 
-def await_tm(pool_name, st, sst=None, apid=None, ssc=None, t_from=None, t_to=None, dest_id=None, not_apid=None,
-             decode=True, duration=5, check_int=None):
+def await_tm(pool_name, st, sst=None, apid=None, ssc=None, t_from=None, t_to=None, dest_id=None, not_apid=None, decode=True, duration=5, check_int=None):
     """ Waiting for a specific TM packet, if it is received the packet is returned immediately.
     The database queries are done in regular intervals.
-
+    
     :param pool_name: str
         name of the pool in the database
     :param st: int
@@ -793,7 +783,7 @@ def get_self_def_hk_tm(pool_name, sid, format_string, t_from=None, t_to=None):
     Fetches TM(3,25) housekeeping packets for self defined housekeeping. In order to unpack the data field a
     format string is required. The packets from the pool are filtered, after unpacking, by the SID (which are the first
     two bytes in the data field).
-
+    
     Parameters
     ----------
     :param pool_name: str
@@ -808,11 +798,11 @@ def get_self_def_hk_tm(pool_name, sid, format_string, t_from=None, t_to=None):
         CUC timestamp: from this timestamp on the packets are fetched
     :param t_to: float
         CUC timestamp: up to this timestamp the packets are fetched from the pool
-
+    
     Returns
     -------
     :return: list
-        a list of TM(3,25) packets or []. All packets have matching SIDs.
+        a list of TM(3,25) packets or []. All packets have matching SIDs. 
     """
     assert isinstance(sid, int)
     assert isinstance(format_string, str)
@@ -891,10 +881,9 @@ def get_hk_entry(pool_name, hk_name, name=None, t_from=None, t_to=None, duration
                     logger.debug('get_hk_entry: UNDER CONSTRUCTION: HERE IS SOMETHING TO IMPLEMENT')
             if len(entries) < 1:
                 logger.debug('No entry with name(s) {} found in the housekeeping {} with '
-                             'CUC timestamp {}'.format(name, hk_name, cfl.get_cuctime(hk_report)))
+                          'CUC timestamp {}'.format(name, hk_name, cfl.get_cuctime(hk_report)))
         else:
-            logger.warning(
-                'The required {} housekeeping report/entry could not be found in the database.'.format(hk_name))
+            logger.warning('The required {} housekeeping report/entry could not be found in the database.'.format(hk_name))
 
     return result
 
@@ -968,13 +957,11 @@ def get_st_and_sst(pool_name, apid, ssc, is_tm=False, t_from=None):
             tc_st = header[10]
             tc_sst = header[11]
     elif len(tc_list) < 1:
-        logger.warning(
-            'get_st_and_sst: TC packet with apid {} and source sequence counter {} could not be found in the '
-            'database'.format(apid, ssc))
+        logger.warning('get_st_and_sst: TC packet with apid {} and source sequence counter {} could not be found in the '
+                    'database'.format(apid, ssc))
     elif len(tc_list) > 1:
-        logger.error(
-            'get_st_and_sst: More than one TC packet with apid {} and source sequence counter {} were found in '
-            'the database'.format(apid, ssc))
+        logger.error('get_st_and_sst: More than one TC packet with apid {} and source sequence counter {} were found in '
+                  'the database'.format(apid, ssc))
     return tc_st, tc_sst
 
 
@@ -1119,7 +1106,7 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
                                        is_tm=False,
                                        t_from=t_tc_sent)
         logger.info('Received acknowledgement TM packets for TC({},{}) apid={} ssc={}:'
-                    .format(tc_st, tc_sst, tc_apid, tc_ssc))
+                 .format(tc_st, tc_sst, tc_apid, tc_ssc))
 
         # check if there was a failure, the result becomes False if a failure occurred
         for i in range(len(ack_tms)):
@@ -1132,16 +1119,16 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
                 if head[11] == 2 or head[11] == 4 or head[11] == 8:
                     if head[11] == 2:
                         logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of acceptance check for a command.'
-                                    .format(head[10], head[11], cfl.get_cuctime(head)))
+                                 .format(head[10], head[11], cfl.get_cuctime(head)))
                         logger.debug('Data of the TM packet: {}'.format(data))
                     if head[11] == 4:
                         logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of start check for a command.'
-                                    .format(head[10], head[11], cfl.get_cuctime(head)))
+                                 .format(head[10], head[11], cfl.get_cuctime(head)))
                         logger.debug('Data of the TM packet: {}'.format(data))
                     if head[11] == 8:
                         logger.info(
                             'TM({},{}) @ {} FAILURE: Acknowledge failure of termination check for a command.'
-                                .format(head[10], head[11], cfl.get_cuctime(head)))
+                            .format(head[10], head[11], cfl.get_cuctime(head)))
                         logger.debug('Data of the TM packet: {}'.format(data))
                     result = False
 
@@ -1151,7 +1138,7 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
 def await_tc_acknow(pool_name, tc_identifier, duration=10, tm_st=1, tm_sst=None):
     """ Waiting to receive the acknowledgement packet of a sent telecommand (TC) for a given duration.
     As soon as acknowledgement packets were found the function returns.
-
+    
     :param pool_name: str
         Name of the pool in the database
     :param tc_identifier: tuple
@@ -1165,9 +1152,8 @@ def await_tc_acknow(pool_name, tc_identifier, duration=10, tm_st=1, tm_sst=None)
             False if one or all of TM(1,2), TM(1,4), TM(1,8) were found
         list:
             list of the found acknowledgement packets
-
+        
     """
-    # assert isinstance(ccs, packets.CCScom)
     assert isinstance(pool_name, str)
     assert isinstance(tc_identifier, tuple)
     tc_apid = tc_identifier[0]
@@ -1225,7 +1211,7 @@ def await_tc_acknow(pool_name, tc_identifier, duration=10, tm_st=1, tm_sst=None)
                                        is_tm=False,
                                        t_from=t_tc_sent)
         logger.warning('No acknowledgement TM packets for TC({},{}) apid={} ssc={}: found in the database'
-                       .format(tc_st, tc_sst, tc_apid, tc_ssc))
+                    .format(tc_st, tc_sst, tc_apid, tc_ssc))
     return result, ack_list
 
 
@@ -1266,7 +1252,6 @@ def check_acknowledgement(pool_name, tc_identifier, duration=10):
                 outcome = False
                 break
     return outcome
-
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -1319,8 +1304,8 @@ def condition_event_id(tmpackets, event_id, data_entries=None):
                                             break
                             else:
                                 logger.error('condition_event_id(): the provided list of TM packet data entries '
-                                             'should be a dictionary key-value pairs. But unfortunately something '
-                                             'else was given.')
+                                          'should be a dictionary key-value pairs. But unfortunately something '
+                                          'else was given.')
                         if matches is True:
                             found_packets.append(tmpackets[i])
                 else:  # no filtering for entries required, identifier match is enough
@@ -1479,7 +1464,7 @@ def extract_status_data(tm_packet):
             ('HK_STAT_DATA_ACQ_SRC', 'uint:4', 4),
             ('HK_STAT_CCD_TIMING_SCRIP', 'uint:8', 8),
             ('HK_STAT_DATA_ACQ_TIME', 'bits:48', 48),
-            ('HK_STAT_EXPOSURE_TIME', 'uint:32', 32),
+            ('HK_STAT_EXPOSURE_TIME',  'uint:32', 32),
             ('HK_STAT_TOTAL_PACKET_NUM', 'uint:16', 16),
             ('HK_STAT_CURRENT_PACKET_N', 'uint:16', 16),
             ('HK_VOLT_FEE_VOD', 'float:32', 32),

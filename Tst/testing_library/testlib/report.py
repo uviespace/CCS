@@ -10,9 +10,7 @@ import json
 import sys
 
 import confignator
-ccs_path = confignator.get_option('paths', 'ccs')
-sys.path.append(ccs_path)
-
+sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 
 # create a logger
@@ -261,14 +259,3 @@ def write_precondition_outcome(result):
         logger.info('Preconditions are fulfilled.\n')
     else:
         logger.warning('Preconditions are NOT fulfilled.\n')
-
-def write_postcondition_outcome(result):
-    """
-    Logs the outcome of the establish_postconditions function in a test script.
-    :param result: bool
-        True if all postcondition could be established successfully
-    """
-    if result is True:
-        logger.info('Postconditions are fulfilled.\n')
-    else:
-        logger.warning('Postconditions are NOT fulfilled.\n')

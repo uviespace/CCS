@@ -10,7 +10,6 @@ import confignator
 
 from . import tools
 
-
 cmd_log_auxiliary = '_command.log'
 vrc_log_auxiliary = '_verification.log'
 man_log_auxiliary = '_manually.log'
@@ -24,10 +23,10 @@ def get_path_for_logs(module_name):
     :rtype: str
     """
     # ToDo create the filename using the testing_logger.cmd_scrpt_auxiliary variable
-    #cfg = tools.read_config()
+    # cfg = tools.read_config()
     # Fetch the path from the project config file
-    #path = cfg.get('LOGGING', 'test_run')
-    path = confignator.get_option('tst-logging', 'test_run')
+    # path = cfg.get('LOGGING', 'test_run')
+    path = confignator.get_config().get('tst-logging', 'test_run')
     # Create the directory for the logging files
     os.makedirs(path, mode=0o777, exist_ok=True)
     filename = path + module_name + '.log'

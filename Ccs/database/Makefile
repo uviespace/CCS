@@ -6,7 +6,7 @@ check:
 	cd .. ; pylint -E database/test_db.py
 #	cd .. ; MYPYPATH=~/.local/lib/python3.7/site-packages/ mypy -s database/tm_db.py database/test_db.py
 
-run:
+storage:
 	cd .. ; python3 -m database.tm_db
 
 verbose:

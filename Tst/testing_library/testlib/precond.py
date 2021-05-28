@@ -6,16 +6,14 @@ Preconditions
 import logging
 import sys
 
-import confignator
-ccs_path = confignator.get_option('paths', 'ccs')
-sys.path.append(ccs_path)
-
-import ccs_function_lib as cfl
-
 from . import report
 from . import sim
 from . import tm
 from . import tools
+
+import confignator
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
 
 # create logger
 logger = logging.getLogger(__name__)
@@ -72,8 +70,7 @@ def iasw_standby(pool_name, silent=False):
             # command SEM to shut of
             switch_off_sem(pool_name=pool_name)
         # command IASW into Standby
-        #ccs.TcStopSem()
-        cfl.Tcsend_DB('DPU_IFSW_STOP_SEM')
+        cfl.TcStopSem() #TODO: project specific command -- has to be done another way
         logger.info('command IASW into STANDBY')
         # get states again
         iasw, state_sem, state_sem_oper = get_states(pool_name=pool_name)
@@ -106,7 +103,6 @@ def sem_safe_mode(pool_name):
         sem_runs = sim.sem_runs()
         if not sem_runs:
             # send TC to switch on the SEM
-            #tc_on = ccs.Tcsend_DB('DPU_IFSW_START_OFFLINE_O', ack='0b1011', pool_name=pool_name)
             tc_on = cfl.Tcsend_DB('DPU_IFSW_START_OFFLINE_O', ack='0b1011', pool_name=pool_name)
             t_tc_on = tm.time_tc_accepted(pool_name=pool_name, tc_identifier=tc_on)
             # switch on the SEM simulator
@@ -124,7 +120,6 @@ def sem_safe_mode(pool_name):
     state_sem = tm.get_hk_entry(pool_name=pool_name, hk_name='IFSW_HK', name='semState', silent=True)
     if tools.entry_is_equal(entry=state_sem, key_value={'semState': 'OPER'}):
         # send TC(192,10) command to bring SEM into SAFE
-        #tc_safe = ccs.Tcsend_DB('DPU_IFSW_GO_SAFE', ack='0b1011', pool_name=pool_name)
         tc_safe = cfl.Tcsend_DB('DPU_IFSW_GO_SAFE', ack='0b1011', pool_name=pool_name)
         t_tc_save = tm.time_tc_accepted(pool_name=pool_name, tc_identifier=tc_safe)
         # wait for the event when the SEM to enter SAFE
@@ -180,7 +175,6 @@ def switch_off_sem(pool_name):
     sem_state = None
 
     # switch off the SEM
-    #sem_off = ccs.Tcsend_DB('DPU_IFSW_SWCH_OFF_SEM', ack='0b1011', pool_name=pool_name)
     sem_off = cfl.Tcsend_DB('DPU_IFSW_SWCH_OFF_SEM', ack='0b1011', pool_name=pool_name)
     logger.info('Terminating SEM simulator process')
     sim.stop_sem(None)
@@ -194,12 +188,12 @@ def switch_off_sem(pool_name):
 
         # get event EVT_SEM_TR with
         transistion_1 = {'SrcSemSt': 'OPER', 'DestSemSt': 'SHUTDOWN'}
-        event_shutdown = tm.await_event(severity=ccs.EVENT_SEVERITY_NORMAL, event_id='EVT_SEM_TR',
+        event_shutdown = tm.await_event(severity=cfl.EVENT_SEVERITY_NORMAL, event_id='EVT_SEM_TR',# TODO: EVENT_SEVERITY has to be defined elsewhere
                                         pool_name=pool_name, t_from=t_sem_off, entries=transistion_1)
 
         # get event EVT_SEM_TR with
         transistion_2 = {'SrcSemSt': 'SHUTDOWN', 'DestSemSt': 'OFF'}
-        event_off = tm.await_event(severity=ccs.EVENT_SEVERITY_NORMAL, event_id='EVT_SEM_TR',
+        event_off = tm.await_event(severity=cfl.EVENT_SEVERITY_NORMAL, event_id='EVT_SEM_TR',# TODO: EVENT_SEVERITY has to be defined elsewhere
                                    pool_name=pool_name, t_from=t_sem_off, entries=transistion_2)
 
         if len(event_shutdown) > 0 and len(event_off) > 0:
@@ -259,8 +253,7 @@ def iasw_semoffline_semoper_standby(pool_name):
         if state_iasw != 'STANDBY':
             # command IASW into Standby
             logger.info('Command IASW into STANDBY')
-            #tc_stop = ccs.TcStopSem()
-            tc_stop = cfl.TcStopSem()
+            tc_stop = cfl.TcStopSem() # TODO: too project specific -- replace
             t_tc_stop = tm.time_tc_accepted(pool_name=pool_name, tc_identifier=tc_stop)
             # wait for the event when the IASW enters STANDBY
             trans = {'DestIaswSt': 'STANDBY'}
@@ -284,7 +277,6 @@ def iasw_semoffline_semoper_standby(pool_name):
             iasw_state = tm.get_hk_entry(pool_name=pool_name, hk_name='IFSW_HK', name=expected, silent=True)
             if tools.entry_is_equal(entry=iasw_state, key_value=expected):
                 logger.info('Command IASW into SEM_OFFLINE')
-                #tc_on = ccs.Tcsend_DB('DPU_IFSW_START_OFFLINE_O', ack='0b1011', pool_name=pool_name)
                 tc_on = cfl.Tcsend_DB('DPU_IFSW_START_OFFLINE_O', ack='0b1011', pool_name=pool_name)
                 # check that the command was successful accepted, started, terminated
                 tm.check_acknowledgement(pool_name=pool_name, tc_identifier=tc_on)
@@ -328,7 +320,6 @@ def sem_oper_go_stabilize(pool_name, await_event=True):
     success = False
     logger.info('bring SEM Operational State Machine into STABILIZE')
     # send TC(192,3) to order the SEM Operational State Machine into STABILIZE
-    #tc = ccs.Tcsend_DB('DPU_IFSW_GO_STAB', ack='0b1011', pool_name=pool_name)
     tc = cfl.Tcsend_DB('DPU_IFSW_GO_STAB', ack='0b1011', pool_name=pool_name)
     t_tc = tm.time_tc_accepted(pool_name=pool_name, tc_identifier=tc)
     # check if the command was successful by looking for acknowledgement packets
@@ -374,7 +365,6 @@ def pre_science_stabilize(pool_name):
 
     # enable SEM event forwarding
     logger.info('pre_science_stabilize: enable the SEM event forwarding')
-    #tc_for = ccs.Tcsend_DB('DPU_IFSW_UPDT_PAR_BOOL', 4,
     tc_for = cfl.Tcsend_DB('DPU_IFSW_UPDT_PAR_BOOL', 4,
                            'SEM_SERV5_1_FORWARD', 'TYPE_BOOL', 0, 1,
                            'SEM_SERV5_2_FORWARD', 'TYPE_BOOL', 0, 1,
@@ -394,9 +384,9 @@ def pre_science_stabilize(pool_name):
         sem_event_2 = 'EVT_PRG_CFG_LD'
         logger.info('pre_science_stabilize: waiting for the CrSem to boot and load the configuration (events {} and {})'
                  .format(sem_event_1, sem_event_2))
-        event_1 = tm.await_event(severity=ccs.EVENT_SEVERITY_NORMAL, event_id=sem_event_1,
+        event_1 = tm.await_event(severity=cfl.EVENT_SEVERITY_NORMAL, event_id=sem_event_1, #TODO: EVENT_SEVERITY not in cfl anymore
                                  pool_name=pool_name, duration=wait, t_from=t_sem_start)
-        event_2 = tm.await_event(severity=ccs.EVENT_SEVERITY_NORMAL, event_id=sem_event_2,
+        event_2 = tm.await_event(severity=cfl.EVENT_SEVERITY_NORMAL, event_id=sem_event_2, #TODO: EVENT_SEVERITY not in cfl anymore
                                  pool_name=pool_name, duration=wait, t_from=t_sem_start)
 
     # check if the IASW, SEM and SEM operational are in the correct states to command them into PRE_SCIENCE
@@ -420,7 +410,7 @@ def pre_science_stabilize(pool_name):
         # b) wait for the event: IASW is in state PRE_SCIENCE
         req_event_i = 'EVT_IASW_TR'
         req_state_i = {'DestIaswSt': 'PRE_SCIENCE'}
-        event_iasw = tm.await_event(severity=ccs.EVENT_SEVERITY_NORMAL, event_id=req_event_i,
+        event_iasw = tm.await_event(severity=cfl.EVENT_SEVERITY_NORMAL, event_id=req_event_i, #TODO: EVENT_SEVERITY not in cfl anymore
                                     pool_name=pool_name, duration=wait, t_from=t_tc_presci, entries=req_state_i)
         # log the event TM packet
         if len(event_iasw) > 0:
@@ -432,7 +422,7 @@ def pre_science_stabilize(pool_name):
         # c) wait for the event: SEM is in state STABILIZE
         req_event_s = 'EVT_SEMOP_TR'
         req_state_s = {'DestSemOpSt': 'STABILIZE'}
-        event_sem_op = tm.await_event(severity=ccs.EVENT_SEVERITY_NORMAL, event_id=req_event_s,
+        event_sem_op = tm.await_event(severity=cfl.EVENT_SEVERITY_NORMAL, event_id=req_event_s, #TODO: EVENT_SEVERITY not in cfl anymore
                                       pool_name=pool_name, duration=wait, t_from=t_tc_presci, entries=req_state_s)
         # log the event TM packet
         if len(event_sem_op) > 0:
@@ -447,8 +437,7 @@ def pre_science_stabilize(pool_name):
 
     # disable SEM event forwarding
     logger.info('pre_science_stabilize: disable the SEM event forwarding')
-    #tc_dis = ccs.Tcsend_DB('DPU_IFSW_UPDT_PAR_BOOL', 4,
-    tc_dis=ccs.Tcsend_DB('DPU_IFSW_UPDT_PAR_BOOL', 4,
+    tc_dis = cfl.Tcsend_DB('DPU_IFSW_UPDT_PAR_BOOL', 4,
                            'SEM_SERV5_1_FORWARD', 'TYPE_BOOL', 0, 0,
                            'SEM_SERV5_2_FORWARD', 'TYPE_BOOL', 0, 0,
                            'SEM_SERV5_3_FORWARD', 'TYPE_BOOL', 0, 0,

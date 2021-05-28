@@ -7,9 +7,7 @@ import logging
 import sys
 
 import confignator
-ccs_path = confignator.get_option('paths', 'ccs')
-sys.path.append(ccs_path)
-
+sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 
 # create a logger
@@ -31,15 +29,13 @@ def convert_hk_sid(sid):
     assert isinstance(sid, int) or isinstance(sid, str), logger.error('convert_hk_sid: argument sid has to be a integer or string')
     result = None
     if isinstance(sid, str):
-        #query = ccs.dbcon.execute('SELECT txp_from FROM txp WHERE txp_altxt="{}"'.format(sid))
-        query = cfl.scoped_session_idb.execute('SELECT txp_from FROM txp WHERE txp_altxt="{}"'.format(sid))
+        query = cfl.scoped_session_idb().execute('SELECT txp_from FROM txp WHERE txp_altxt="{}"'.format(sid))
         fetch = query.fetchall()
         if len(fetch) != 0:
             result = int(fetch[0][0])
     if isinstance(sid, int):
         # ToDo: replace hardcoded DPKT7030
-        #query = ccs.dbcon.execute('SELECT txp_altxt FROM txp WHERE txp_numbr="DPKT7030" AND txp_from="{}"'.format(sid))
-        query = cfl.scoped_session_idb.execute('SELECT txp_altxt FROM txp WHERE txp_numbr="DPKT7030" AND txp_from="{}"'.format(sid))
+        query = cfl.scoped_session_idb().execute('SELECT txp_altxt FROM txp WHERE txp_numbr="DPKT7030" AND txp_from="{}"'.format(sid))
         fetch = query.fetchall()
         if len(fetch) != 0:
             result = str(fetch[0][0])
@@ -89,7 +85,7 @@ class DataPoolParameter:
 def get_info_of_data_pool_parameter(name):
     """
     from testlib import idb
-    x = idb.get_info_of_data_pool_parameter(ccs=ccs, name='sdu2State')
+    x = idb.get_info_of_data_pool_parameter(name='sdu2State')
 
     Fetching all information from the instrument database about data pool parameter names.
     Knowing only the name of the parameter, all other information should be collected by database queries.
@@ -102,8 +98,7 @@ def get_info_of_data_pool_parameter(name):
 
     # get information from pcf
     query = 'SELECT * from pcf where pcf_descr="{}"'.format(name)
-    #dbres = ccs.dbcon.execute(query)
-    dbres = cfl.scoped_session_idb.execute(query)
+    dbres = cfl.scoped_session_idb().execute(query)
     result = dbres.fetchall()
 
     if len(result) == 1:
@@ -117,8 +112,7 @@ def get_info_of_data_pool_parameter(name):
         if txp_number is not None:
             # get the possible values
             query = 'SELECT * from txp where txp_numbr="{}"'.format(txp_number)
-            #dbres = ccs.dbcon.execute(query)
-            dbres = cfl.scoped_session_idb.execute(query)
+            dbres = cfl.scoped_session_idb().execute(query)
             values = dbres.fetchall()
             if len(values) > 0:
                 for val in values:

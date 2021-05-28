@@ -87,13 +87,19 @@ fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
            'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
 
 
-# tm_header_struct = struct.Struct('>HHHBBBBLH')
-# tc_header_struct = struct.Struct('>HHHBBBB')
-
-scoped_session_idb = scoped_session_maker('idb') # This variable passes along a session for connection to Database, same sessions can be used
+scoped_session_idb = scoped_session_maker('idb', idb_version=None)
 scoped_session_storage = scoped_session_maker('storage')
 
 Notify.init('cfl')
+
+
+def get_scoped_session_idb(idb_version=None):
+    return scoped_session_maker('idb', idb_version=idb_version)
+
+
+def get_scoped_session_storage():
+    return scoped_session_maker('storage')
+
 
 def start_app(console, file_path, wd, *args):
     # gui argument only used for poolmanager since it does not have an automatic gui

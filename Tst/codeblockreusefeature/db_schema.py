@@ -1,11 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Index, Integer, String, ForeignKey, Boolean, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Text
 from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.sql import func
 from contextlib import contextmanager
 
-mysql_connection_string = 'mysql://egse:weltraummuell@localhost'
+import confignator
+
+cfg = confignator.get_config()
+
+user = cfg.get('database', 'user')
+pw = cfg.get('database', 'password')
+
+mysql_connection_string = 'mysql://{}:{}@localhost'.format(user, pw)
 schema_name = 'codeblocks'
 
 
