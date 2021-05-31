@@ -769,8 +769,9 @@ class CBRSearch(Gtk.Box):
         Loads the data from the database. The filter properties are used to build the SQL query.
         """
         self.logger.debug('Loading data from the database')
+        self.session.commit()  # this updates the session instantiated in the class init
         if self.filter_searchstring != '':
-            self.data = db_interaction.query_using_textsearch(session=self.session, expressions=searchstring)
+            self.data = db_interaction.query_using_textsearch(session=self.session, expressions=self.filter_searchstring)
         else:
             self.data = db_interaction.query_get_all_entries(self.session)
         self.load_data_into_liststore(self.data)
