@@ -257,8 +257,9 @@ class CBRSearch(Gtk.Box):
         super().__init__(*args, **kwargs)
         self.app_win = app_win
         self.logger = logger
-        with db_schema.session_scope() as session:
-            self.session = session
+
+        # with db_schema.session_scope() as session:
+        #     self.session = session
 
         self._filter_searchstring = ''
         self._filter_type_snippet = None
@@ -769,11 +770,10 @@ class CBRSearch(Gtk.Box):
         Loads the data from the database. The filter properties are used to build the SQL query.
         """
         self.logger.debug('Loading data from the database')
-        self.session.commit()  # this updates the session instantiated in the class init
         if self.filter_searchstring != '':
-            self.data = db_interaction.query_using_textsearch(session=self.session, expressions=self.filter_searchstring)
+            self.data = db_interaction.query_using_textsearch(expressions=self.filter_searchstring)
         else:
-            self.data = db_interaction.query_get_all_entries(self.session)
+            self.data = db_interaction.query_get_all_entries()
         self.load_data_into_liststore(self.data)
 
     def reload_data(self):

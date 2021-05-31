@@ -2,8 +2,10 @@ import db_schema
 from db_schema import CodeBlock
 
 
-def query_get_all_entries(session):
-    data = session.query(CodeBlock).all()
+def query_get_all_entries():
+    with db_schema.session_scope() as session:
+        data = session.query(CodeBlock).all()
+        session.expunge_all()
     return data
 
 
@@ -27,16 +29,19 @@ def delete_db_row(id):
     return
 
 
-def query_using_textsearch(session, expressions):
-    data = session.query(CodeBlock).filter(CodeBlock.description.contains(expressions)).all()
+def query_using_textsearch(expressions):
+    with db_schema.session_scope() as session:
+        data = session.query(CodeBlock).filter(CodeBlock.description.contains(expressions)).all()
+        session.expunge_all()
     return data
 
 
-def query_code_types(session):
-    data = session.query(CodeBlock.code_type).group_by(CodeBlock.code_type).all()
+def query_code_types():
+    with db_schema.session_scope() as session:
+        data = session.query(CodeBlock.code_type).group_by(CodeBlock.code_type).all()
+        session.expunge_all()
     return data
 
 
 if __name__ == '__main__':
-    with db_schema.session_scope() as session:
-        query_code_types(session)
+    query_code_types()
