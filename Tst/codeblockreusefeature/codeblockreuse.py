@@ -594,8 +594,8 @@ class CBRSearch(Gtk.Box):
         return self._filter_searchstring
 
     @filter_searchstring.setter
-    def filter_searchstring(self, value: bool):
-        assert isinstance(value, bool)
+    def filter_searchstring(self, value: str):
+        assert isinstance(value, str)
         self._filter_searchstring = value
 
     # @property
