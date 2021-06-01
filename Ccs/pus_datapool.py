@@ -1862,7 +1862,6 @@ class DatapoolManager:
         self.quit_func()
 
     def quit_func(self):
-        pv = cfl.dbus_connection('poolviewer')
         for service in dbus.SessionBus().list_names():
             if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                 editor = cfl.dbus_connection(service[0:-1].split('.')[1], service[-1])
@@ -1871,9 +1870,19 @@ class DatapoolManager:
                     if nr == str(1):
                         nr = ''
                     editor.Functions('_to_console_via_socket', 'del(pmgr' + str(nr) + ')')
-        self.update_all_connections_quit()
 
-        Gtk.main_quit()
+        if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
+            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            # Ignore_reply = True not recommended, but it is checked here that it is working
+            pv.Functions('stop_all_recording', ignore_reply=True)  # Tell poolviewer that pool is no longer live
+            time.sleep(1)
+
+        try:
+            self.update_all_connections_quit()
+        except:
+            self.logger.warning('Communication Variable could not be changed for all running applicaitons')
+        finally:
+            Gtk.main_quit()
         return True
 
     def update_all_connections_quit(self):
@@ -1882,12 +1891,14 @@ class DatapoolManager:
         available
         :return:
         '''
-        our_con = []  # All connections to running applications without communicions form the same applications as this
+
+        our_con = []  # All connections to running applications without communications from the same applications as this
         my_con = []  # All connections to same applications as this
         for service in dbus.SessionBus().list_names():
             if service.split('.')[1] in self.cfg['ccs-dbus_names']:  # Check if connection belongs to CCS
                 if service == self.my_bus_name:  # If own allplication do nothing
                     continue
+                self.logger.debug(type(service))
                 conn = cfl.dbus_connection(service.split('.')[1], service[-1])
                 if cfl.Variables(conn,'main_instance') == self.main_instance:  # Check if running in same project
                     if service.startswith(self.my_bus_name[:-1]):  # Check if it is same application type

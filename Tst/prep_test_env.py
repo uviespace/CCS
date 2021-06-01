@@ -40,6 +40,8 @@ def run(pool_name):
     logger.info('2) ------------------- Start the PoolManager -------------------')
     if not cfl.is_open('poolmanager'):
         cfl.start_pmgr()
+    else:
+        time.sleep(2)
     pm = connect_apps.connect_to_app('poolmanager', logger=logger)
     logger.info('4) ------------------- Connect the Poolmanager to OBC & TMpool database-------------------')
     if pm is not False:
@@ -53,6 +55,8 @@ def run(pool_name):
         logger.info('3) ------------------- Start the PoolViewer -------------------')
         if not cfl.is_open('poolviewer'):
             cfl.start_pv()
+        else:
+            time.sleep(2)
         pv = connect_apps.connect_to_app('poolviewer', logger=logger)
 
         if pv is not False:
