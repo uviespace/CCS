@@ -1,0 +1,43 @@
+This file documents the required steps to get the SMILE SXI EGSE up and running on a freshly installed linux system.
+
+manjaro-xfce-21.0.5 linux5.10 VBOX
+
+1) install MySQL/MariaDB and set it up
+    - mariadb
+    - mysql-workbench (optional)
+
+    $> sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+    $> sudo systemctl enable --now mariadb
+    $> sudo mariadb-secure-installation
+    mysql> CREATE USER 'egse'@'localhost' IDENTIFIED BY 'xrayvision';
+    mysql> GRANT ALL PRIVILEGES ON * . * TO 'egse'@'localhost';
+    mysql> FLUSH PRIVILEGES;
+
+2) install packages/devtools
+    - gtksourceview3 [<=3.24.11-1]
+    - ipython
+    - make
+
+3) install python modules
+    - python-numpy
+    - python-scipy
+    - python-matplotlib
+    - python-cairocffi
+    - python-mysqlclient
+    - python-sqlalchemy
+    - python-wheel
+    - python-sphinx
+    - python-sphinx_rtd_theme
+    - python-astropy
+    - python-crcmod
+
+4) get EGSE repository
+    $> git clone gitlab.phaidra.org/mecinam2/CCS.git
+    
+5) In CCS, make DB schemas and Python packages
+    - first configure egse.cfg
+    
+    $> make ccs-storage
+    $> make codeblockreusefeature
+    $> make install-confignator
+    $> make install-testlib
