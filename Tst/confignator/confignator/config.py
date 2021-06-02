@@ -42,8 +42,12 @@ import logging
 import logging.handlers
 
 # hardcoded stuff
+# INFO: path to confignator_cfg, has to be "../build..." if started with pycharm and confignator is marked as root
+# directory, otherwhise it has to be only "confignator.cfg". This is because normally the config file of the installed
+# python confignator package would be used (".local/lib.../confignator"), but if marked as root in pycharm, it first
+# searches for the config file in the confignator folder, where the cfg is in the given path...
 cfg = configparser.ConfigParser()
-confignator_cfg = os.path.join(os.path.dirname(__file__), 'confignator.cfg')
+confignator_cfg = os.path.join(os.path.dirname(__file__), '../build/lib/confignator/confignator.cfg')
 cfg.read(confignator_cfg)
 basic_config = cfg.get('confignator-paths', 'basic-cfg')
 docu = cfg.get('confignator-paths', 'docu')
@@ -385,7 +389,7 @@ class Config(configparser.ConfigParser):
         # check if a interpolation syntax exists in the old value and take over into the new value
         raw_value_before = self.get(section, option, raw=True)
         found = raw_value_before.find('${')
-        if found is not -1:
+        if found != -1:
             try:
                 closing_bracket = raw_value_before.find('}')
                 inter_syntax = raw_value_before[found:closing_bracket+1]

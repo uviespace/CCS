@@ -18,6 +18,7 @@ import time
 import data_model
 import json
 import toolbox
+import generator
 
 # create a logger
 log_file_path = confignator.get_option(section='progress-viewer-logging', option='log-file-path')
@@ -264,7 +265,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         # expand all entries
         self.view.expand_all()
 
-        self.refresh_rate = 5
+        self.refresh_rate = 1
         self.refresh_worker()
 
         # for styling the application with CSS
@@ -303,29 +304,62 @@ class TestProgressView(Gtk.ApplicationWindow):
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
             # ToDo: get the path for all 3 (json, cmd, vrc) and load them
+            self.open_test_files(None, self.get_log_file_paths_from_json_file_name(file_selected))
         elif response == Gtk.ResponseType.CANCEL:
             pass
         dialog.destroy()
 
+    def get_log_file_paths_from_json_file_name(self, filename):
+        from testlib import testing_logger
+        paths = {}
+        try:
+            current_file_name = os.path.basename(filename)
+            path_test_specs = confignator.get_option(section='tst-paths', option='tst_products')
+            path_test_runs = confignator.get_option(section='tst-logging', option='test_run')
+
+            json_file_path = os.path.join(path_test_specs, current_file_name)
+            paths['json_file_path'] = json_file_path
+
+            name = generator.strip_file_extension(current_file_name)
+            cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
+            paths['cmd_log_file_path'] = cmd_log_file_path
+
+            vrc_log_file_path = os.path.join(path_test_runs, name + testing_logger.vrc_log_auxiliary)
+            paths['vrc_log_file_path'] = vrc_log_file_path
+        except Exception as e:
+            self.logger.info('Json or Log Files could not be found')
+            return ''
+        return paths
+
     def open_test_files(self, simple_action, paths, *args):
         logger.debug('Opening files... ')
-        self.path_json = paths['json_file_path']
-        self.text_path_json_btn.set_file(Gio.File.new_for_path(self.path_json))
+        try:
+            self.path_json = paths['json_file_path']
+            self.text_path_json_btn.set_file(Gio.File.new_for_path(self.path_json))
+        except:
+            logger.debug('JSon File could not be opened')
 
-        self.path_cmd = paths['cmd_log_file_path']
-        self.text_path_cmd_btn.set_file(Gio.File.new_for_path(self.path_cmd))
-        self.monitor_cmd = Gio.File.new_for_path(self.path_cmd).monitor_file(Gio.FileMonitorFlags.NONE, None)
-        self.monitor_cmd.set_rate_limit(100)
-        self.monitor_cmd.connect('changed', self.file_cmd_changed)
+        try:
+            self.path_cmd = paths['cmd_log_file_path']
+            self.text_path_cmd_btn.set_file(Gio.File.new_for_path(self.path_cmd))
+            self.monitor_cmd = Gio.File.new_for_path(self.path_cmd).monitor_file(Gio.FileMonitorFlags.NONE, None)
+            self.monitor_cmd.set_rate_limit(100)
+            self.monitor_cmd.connect('changed', self.file_cmd_changed)
+        except:
+            logger.debug('Commond log File could not be opened')
 
-        self.path_vrc = paths['vrc_log_file_path']
-        self.text_path_vrc_btn.set_file(Gio.File.new_for_path(self.path_vrc))
-        self.monitor_vrc = Gio.File.new_for_path(self.path_vrc).monitor_file(Gio.FileMonitorFlags.NONE, None)
-        self.monitor_vrc.set_rate_limit(100)
-        self.monitor_vrc.connect('changed', self.file_vrc_changed)
+        try:
+            self.path_vrc = paths['vrc_log_file_path']
+            self.text_path_vrc_btn.set_file(Gio.File.new_for_path(self.path_vrc))
+            self.monitor_vrc = Gio.File.new_for_path(self.path_vrc).monitor_file(Gio.FileMonitorFlags.NONE, None)
+            self.monitor_vrc.set_rate_limit(100)
+            self.monitor_vrc.connect('changed', self.file_vrc_changed)
+        except:
+            logger.debug('Verification log File could not be opened')
 
         self.on_reload_all()
         self.on_expand_all_rows()
+        self.refresh_worker()
 
     def add_info_bar(self, message_type, message):
         """
@@ -439,13 +473,10 @@ class TestProgressView(Gtk.ApplicationWindow):
     def on_reload_all(self, *args):
         if self.path_json:
             self.load_json(self.path_json)
-            print(1)
         if self.path_cmd:
             self.load_cmd(self.path_cmd)
-            print(2)
         if self.path_vrc:
             self.load_vrc(self.path_vrc)
-            print(3)
 
 
     def on_clear_cmd_log(self, *args):

@@ -907,8 +907,6 @@ def run():
     dbus.validate_bus_name(bus_name)
 
     applica = TstApp(bus_name, Gio.ApplicationFlags.FLAGS_NONE, logger=logger)
-    print(sys.path)
-    print(view)
     applica.run()
 
 

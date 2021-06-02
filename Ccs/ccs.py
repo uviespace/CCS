@@ -45,7 +45,7 @@ if len(sys.argv) > 1:
         if not fname.startswith('-'):
             win.open_file(fname)
 else:
-    win.open_file('getting_started.py')
+    win.open_file(os.path.join(confignator.get_option('paths', 'ccs'), 'getting_started.py'))
 
 Bus_Name = cfg.get('ccs-dbus_names', 'editor')
 

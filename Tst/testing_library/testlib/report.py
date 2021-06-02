@@ -259,3 +259,14 @@ def write_precondition_outcome(result):
         logger.info('Preconditions are fulfilled.\n')
     else:
         logger.warning('Preconditions are NOT fulfilled.\n')
+
+def write_postcondition_outcome(result):
+    """
+    Logs the outcome of the establish_postconditions function in a test script.
+    :param result: bool
+        True if all postcondition could be established successfully
+    """
+    if result is True:
+        logger.info('Postconditions are fulfilled.\n')
+    else:
+        logger.warning('Postconditions are NOT fulfilled.\n')

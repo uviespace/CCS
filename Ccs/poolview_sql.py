@@ -3224,8 +3224,8 @@ class TMPoolView(Gtk.Window):
         if pool_name != self.active_pool_info.pool_name:
             return False
 
-        if not self.active_pool_info.live:
-            return False
+        #if not self.active_pool_info.live:
+        #    return False
 
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
             poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
@@ -3234,7 +3234,7 @@ class TMPoolView(Gtk.Window):
 
         # Get value of dict connections, with key self.active... and key recording, True to get
         pool_connection_recording = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name, 'recording',
-                                                         True, ignore_reply=True)
+                                                         True)
         #pool_connection = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name)
         if pool_connection_recording:
         #if self.pool.connections[self.active_pool_info.pool_name]['recording']:
