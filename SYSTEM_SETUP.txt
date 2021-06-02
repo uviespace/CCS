@@ -30,6 +30,7 @@ manjaro-xfce-21.0.5 linux5.10 VBOX
     - python-sphinx_rtd_theme
     - python-astropy
     - python-crcmod
+    - python-psutil
 
 4) get EGSE repository
     $> git clone gitlab.phaidra.org/mecinam2/CCS.git
