@@ -498,10 +498,11 @@ class LogView(Gtk.Box):
             while len(line) < len(column_cnt)-1:
                 line.append('')
             # add element in the list for the background color
-            background = '#767d89'
+            # background = '#767d89'
             background = None
             line.append(background)
             if len(line) != len(column_cnt):
+                line=line[:len(column_cnt)] #TODO: line sometimes larger than column_cnt!?
                 raise ValueError
             # if it is a traceback make it a child, otherwise just append the line
             if line[0] == 'TRACEBACK':
