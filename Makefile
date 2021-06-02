@@ -63,15 +63,3 @@ set-start-scripts-permissions:
 	@echo "| setting permissions for the start scripts (execute) |"
 	@echo "+-----------------------------------------------------+"
 	    $(MAKE) all -C $(CURDIR)/Tst/
-
-build-fw-profile:
-	    $(MAKE) ifsw-pc -C $(CURDIR)/FwProfile
-
-build-crplm:
-	    $(MAKE) ifsw-pc -C $(CURDIR)/CrPlm
-
-build-cria:
-	    $(MAKE) ifsw-pc -C $(CURDIR)/CrIa
-
-build-crfee:
-	    $(MAKE) ifsw-pc -C $(CURDIR)/CrFee
