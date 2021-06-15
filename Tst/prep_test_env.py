@@ -29,6 +29,7 @@ logger.addHandler(hdlr=console_hdlr)
 file_hdlr = toolbox.create_file_handler(file=log_file)
 logger.addHandler(hdlr=file_hdlr)
 
+pool_name = 'new_tmtc_pool'
 
 def run(pool_name):
     logger.info('1) ------------------- Start the simulators -------------------')
@@ -73,4 +74,4 @@ def run(pool_name):
 
 
 if __name__ == '__main__':
-    run(pool_name='new_tmtc_pool')
+    run(pool_name=pool_name)

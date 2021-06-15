@@ -1663,7 +1663,7 @@ class TMPoolView(Gtk.Window):
         for row in model:
             if row[0] in self.currently_selected:
                 try:
-                    self.selection.select_path(model.get_path(model.get_iter(row[0] - self.offset - 1)))
+                    self.selection.select_path(model.get_path(model.get_iter(row[0] - self.offset)))
                 except ValueError:
                     pass
                 except TypeError:
@@ -2770,8 +2770,7 @@ class TMPoolView(Gtk.Window):
     # Whole function is now done in Poolmgr
     def load_pool(self, widget=None, filename=None, brute=False, force_db_import=False, protocol='PUS'):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
-            #poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            pass
+            poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
         else:
             cfl.start_pmgr(True, '--nogui')
             #path_pm = os.path.join(confignator.get_option('paths', 'ccs'), 'pus_datapool.py')
@@ -3140,7 +3139,13 @@ class TMPoolView(Gtk.Window):
         return
 
     def stop_recording(self, widget=None, pool_name=None):
-        poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+        if not self.active_pool_info.live:
+            return False
+
+        if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
+            poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+        else:
+            poolmgr = None
 
         if pool_name is None:
             pool_name = self.active_pool_info.pool_name
@@ -3152,7 +3157,8 @@ class TMPoolView(Gtk.Window):
 
         if self.active_pool_info.pool_name == pool_name:
             self.active_pool_info = ActivePoolInfo(pool_name, self.active_pool_info.modification_time, pool_name, False)
-            poolmgr.Functions('loaded_pools_func', pool_name, self.active_pool_info)
+            if poolmgr:
+                poolmgr.Functions('loaded_pools_func', pool_name, self.active_pool_info)
 
         else:
             # Check if the pool name does exist
@@ -3165,13 +3171,15 @@ class TMPoolView(Gtk.Window):
 
             pinfo_modification_time = int(pinfo[2])
             #poolmgr.Functions('loaded_pools_func', pool_name, ActivePoolInfo(pool_name, pinfo_modification_time, pool_name, False), ignore_reply=True)
-            poolmgr.Functions('loaded_pools_func', pool_name,
-                              ActivePoolInfo(pool_name, pinfo_modification_time, pool_name, False))
+            if poolmgr:
+                poolmgr.Functions('loaded_pools_func', pool_name,
+                                  ActivePoolInfo(pool_name, pinfo_modification_time, pool_name, False))
 
 
         # Update the Poolmanager GUI
         #poolmgr.Functions('disconnect', pool_name, ignore_reply = True)
-        poolmgr.Functions('disconnect', pool_name)
+        if poolmgr:
+            poolmgr.Functions('disconnect', pool_name)
 
         iter = self.pool_selector.get_active_iter()
         mod = self.pool_selector.get_model()
@@ -3181,20 +3189,42 @@ class TMPoolView(Gtk.Window):
 
         return
 
-    def stop_all_recording(self):
+    def stop_recording_info(self, pool_name=None):
         """
-        Poolmanager is closed and therefore all "Live" Pools become static pools
-        Functions is normally called by the poolmanager when it is closing
+        Connection is closed by the Poolmanager, Informes the Pool Viewer to stop updating or
+        Poolmanager is closed and therefore all Pools become static pools
+        Functions is normally called by the poolmanager when it is closing or disconnecting any connections
         """
-        # If active pool is live change it to static
-        if self.active_pool_info.live:
-            self.active_pool_info = ActivePoolInfo(self.active_pool_info.file_name, self.active_pool_info.modification_time, self.active_pool_info.pool_name, False)
 
-        iter = self.pool_selector.get_active_iter()
-        mod = self.pool_selector.get_model()
-        if mod is not None:
-            mod[iter][1] = self.live_signal[self.active_pool_info.live]
-            self.stop_butt.set_sensitive(False)
+        # if no pool name was specified, Change all connections to static
+        if not pool_name:
+            mod = self.pool_selector.get_model()
+            self.active_pool_info = ActivePoolInfo(self.active_pool_info.filename,
+                                                   self.active_pool_info.modification_time,
+                                                   self.active_pool_info.pool_name, False)
+            #self.active_pool_info.live = False
+            for row in mod:
+                mod[row.iter][1] = self.live_signal[self.active_pool_info.live]
+                self.stop_butt.set_sensitive(False)
+
+        # If active pool is live change it to static
+        elif self.active_pool_info.pool_name == pool_name:
+            self.active_pool_info = ActivePoolInfo(self.active_pool_info.filename, self.active_pool_info.modification_time, self.active_pool_info.pool_name, False)
+
+            iter = self.pool_selector.get_active_iter()
+            mod = self.pool_selector.get_model()
+            if mod is not None:
+                mod[iter][1] = self.live_signal[self.active_pool_info.live]
+                self.stop_butt.set_sensitive(False)
+
+        # Specific Pool is no longer LIVe
+        else:
+            mod = self.pool_selector.get_model()
+            for row in mod:
+                if mod[row.iter][0] == pool_name:
+                    mod[row.iter][1] = self.live_signal[self.active_pool_info.live]
+                    self.stop_butt.set_sensitive(False)
+
         return
 
     def refresh_treeview(self, pool_name):
@@ -3226,17 +3256,16 @@ class TMPoolView(Gtk.Window):
 
         #if not self.active_pool_info.live:
         #    return False
-
-        if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
-            poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        else:
-            return False
+        #if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
+        #    poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+        #else:
+        #    return False
 
         # Get value of dict connections, with key self.active... and key recording, True to get
-        pool_connection_recording = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name, 'recording',
-                                                         True)
+        #pool_connection_recording = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name, 'recording',
+        #                                                 True)
         #pool_connection = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name)
-        if pool_connection_recording:
+        if self.active_pool_info.live:
         #if self.pool.connections[self.active_pool_info.pool_name]['recording']:
             rows = self.get_current_pool_rows()
             if rows.first() is None:
@@ -3252,7 +3281,7 @@ class TMPoolView(Gtk.Window):
             else:
                 return True
         else:
-            self.stop_recording()
+            #self.stop_recording()
             return False
 
     def dbtest(self, pool_name, sleep=0.1):

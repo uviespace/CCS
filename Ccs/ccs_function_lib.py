@@ -2324,7 +2324,11 @@ def Tcsend_common(tc_bytes, apid, st, sst, sleep=0.2, pool_name='LIVE'):
     ssc = counters[int(str(apid), 0)]
     # increase the SSC counter
     counters[int(str(apid), 0)] += 1
-    logger.debug('TC(%s,%s) sent to APID %s @ %f' % (st, sst, apid, t))
+    #logger.info('TC(%s,%s) sent to APID %s @ %f' % (st, sst, apid, t))
+    # More specific Logging format that is compatible with the TST
+    log_dict = dict([('st', st),('sst', sst),('ssc', ssc),('apid', apid),('timestamp', t)])
+    json_string = '{} {}'.format('#SENT TC', json.dumps(log_dict))
+    logger.info(json_string)
     time.sleep(sleep)
     return apid, ssc, t
 

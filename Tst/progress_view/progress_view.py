@@ -208,31 +208,49 @@ class TestProgressView(Gtk.ApplicationWindow):
         renderer_number.set_property('scale', 2)
         renderer_number.set_property('single-paragraph-mode', True)
         column_number = Gtk.TreeViewColumn('Step', renderer_number, text=8)
+        column_number.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_number.set_resizable(True)
+        column_number.set_min_width(50)
         self.view.append_column(column_number)
 
         # column 2
         renderer_exec_date = Gtk.CellRendererText()
         column_exec_date = Gtk.TreeViewColumn('Execution date', renderer_exec_date, text=1, background=7)
+        column_exec_date.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_exec_date.set_resizable(True)
+        column_exec_date.set_min_width(50)
         self.view.append_column(column_exec_date)
 
         # column 3
         renderer_type = Gtk.CellRendererText()
         column_type = Gtk.TreeViewColumn('Type', renderer_type, text=2, background=7)
+        column_type.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_type.set_resizable(True)
+        column_type.set_min_width(50)
         self.view.append_column(column_type)
 
         # column 4
         renderer_cmd_version = Gtk.CellRendererText()
         column_cmd_version = Gtk.TreeViewColumn('Version', renderer_cmd_version, text=3, background=7)
+        column_cmd_version.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_cmd_version.set_resizable(True)
+        column_cmd_version.set_min_width(50)
         self.view.append_column(column_cmd_version)
 
         # column 5
         renderer_cmd_status = Gtk.CellRendererText()
         column_cmd_status = Gtk.TreeViewColumn('Status', renderer_cmd_status, text=4, background=7)
+        column_cmd_status.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_cmd_status.set_resizable(True)
+        column_cmd_status.set_min_width(50)
         self.view.append_column(column_cmd_status)
 
         # column 6
         renderer_tcs = Gtk.CellRendererText()
         column_tcs = Gtk.TreeViewColumn('TC\'s sent', renderer_tcs, text=5, background=7)
+        column_tcs.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_tcs.set_resizable(True)
+        column_tcs.set_min_width(50)
         self.view.append_column(column_tcs)
 
         # column 7
@@ -249,6 +267,9 @@ class TestProgressView(Gtk.ApplicationWindow):
         renderer_result = Gtk.CellRendererText()
         renderer_result.set_property('xalign', 0.5)
         column_result = Gtk.TreeViewColumn('Result', renderer_result, text=6, background=9)
+        column_result.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+        column_result.set_resizable(True)
+        column_result.set_min_width(50)
         # column_result.set_cell_data_func(cell_renderer=renderer_result, func=set_bkgrd_clr, func_data=None)
         self.view.append_column(column_result)
 
@@ -581,6 +602,31 @@ class TestProgressView(Gtk.ApplicationWindow):
         row[7] = entry_background
         return row
 
+    def add_detailed_row(self, inner_row_iter, tree_store):
+        detailed_info=[]
+        for count, item in enumerate(tree_store[inner_row_iter]):
+            if count in [0,7,9]:  # Stepnumber, colour, colour
+                detailed_info.append(item)
+            elif count == 1:
+                detailed_info.append('Description:')
+            elif count == 2:
+                detailed_info.append('Code')
+            elif count == 4:
+                if tree_store[inner_row_iter][2] == 'command':
+                    detailed_info.append('Command Code:')
+                elif tree_store[inner_row_iter][2] == 'verification':
+                    detailed_info.append('Verification Code:')
+                else:
+                    detailed_info.append('Error Code:')
+            elif count == 5:
+                detailed_info.append('Code')
+            elif count in [3,6,8]:
+                detailed_info.append('')
+
+        new_row_iter = tree_store.append(inner_row_iter, detailed_info)
+        new_row = tree_store[new_row_iter]
+
+
     def load_json(self, filepath):
         if not os.path.isfile(filepath):
             message = 'load_file: no file found for the path {}'.format(filepath)
@@ -634,7 +680,8 @@ class TestProgressView(Gtk.ApplicationWindow):
         for step in test_model.sequences[0].steps:
             step_number = step.step_number_test_format
             if step_number not in tree_store_steps:
-                step_desc = 'Step ' + str(step_number)
+                # Sequnece number is no longer shown as it is not necessary as long as only one sequnece is supported
+                step_desc = 'Step ' + str(step_number[:-2])
 
                 new_drawer_row = self.build_row_list(step_number=str(step_number),
                                                      step_desc=step_desc)
@@ -718,6 +765,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                                                        exec_date=item['exec_date'])
                     new_row_iter = tree_store.append(row.iter, new_row_list)
                     new_row = tree_store[new_row_iter]
+
                     # add the information if the step was executed or had an exception
                     if 'exception' in item:
                         self.build_row_list(row=new_row,
@@ -736,6 +784,9 @@ class TestProgressView(Gtk.ApplicationWindow):
                         tcs_str += telecommand.tc_kind()
                     self.build_row_list(row=new_row,
                                         tcs=tcs_str)
+
+                    self.add_detailed_row(new_row_iter, tree_store)
+
         self.restore_expanded_states(tree_store)
 
     def load_vrc_into_tree_store(self, tree_store, vrc_steps):

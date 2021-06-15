@@ -17,7 +17,7 @@ import DBus_Basic
 import dbus
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
-
+#cfl.Tcsend_DB('SASW ModHkPeriodCmd', 1, 8, pool_name='new_tmtc_pool')
 import configparser
 import confignator
 import gi
@@ -447,6 +447,12 @@ class DatapoolManager:
 
         if self.own_gui:
             self.own_gui.disconnect_incoming_via_code(param=[pool_name, None, 'TM'])  # Updates the gui
+
+        #Tell the Poolviewer to stop updating
+        if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
+            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            cfl.Functions(pv, 'stop_recording_info', str(pool_name))
+
         return
 
     def connect_tc(self, pool_name, host, port, drop_rx=True, protocol='PUS', timeout=10, is_server=False, options=''):
@@ -535,6 +541,12 @@ class DatapoolManager:
         self.tc_sock = None
         if self.own_gui:
             self.own_gui.disconnect_incoming_via_code(param=[pool_name, None, 'TC'])  # Updates the gui
+
+        #Tell the Poolviewer to stop updating
+        if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
+            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            cfl.Functions(pv, 'stop_recording_info', str(pool_name))
+
         return
 
     # Function will disconnect both TC/TM connection if they have the same name
@@ -556,6 +568,10 @@ class DatapoolManager:
         if self.own_gui:
             self.own_gui.disconnect_incoming_via_code(param=[pool_name, None, None])  # Updates the gui
 
+        #Tell the Poolviewer to stop updating
+        if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
+            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            cfl.Functions(pv, 'stop_recording_info', str(pool_name))
         return
 
     # Is used from the GUI to tell the Poolmanager which connections have been disconnected
@@ -571,6 +587,11 @@ class DatapoolManager:
             if pool_name in self.tc_connections:
                 self.tc_connections[pool_name]['socket'].close()
                 del self.tc_connections[pool_name]
+
+        #Tell the Poolviewer to stop updating
+        if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
+            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            cfl.Functions(pv, 'stop_recording_info', str(pool_name))
 
         return
 
@@ -1871,17 +1892,16 @@ class DatapoolManager:
                         nr = ''
                     editor.Functions('_to_console_via_socket', 'del(pmgr' + str(nr) + ')')
 
-        #if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
-        #    pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
-        #    # Ignore_reply = True not recommended, but it is checked here that it is working
-        #    pv.Functions('stop_all_recording', ignore_reply=True)  # Tell poolviewer that pool is no longer live
-        #    time.sleep(1)
-        for pool in self.loaded_pools.keys():
-            self.disconnect(self.loaded_pools[pool].pool_name)
-        print(self.loaded_pools)
-        print(self.connections)
+        # Tell the Poolviewer that all Pools are now static
         if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
-            self.small_refresh_function()
+            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            cfl.Functions(pv, 'stop_recording_info')  # Tell poolviewer that pool is no longer live
+            #time.sleep(1)
+        #for pool in self.loaded_pools.keys():
+        #    self.disconnect(self.loaded_pools[pool].pool_name)
+
+        #if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
+        #    self.small_refresh_function()
 
         try:
             self.update_all_connections_quit()
