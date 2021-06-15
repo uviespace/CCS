@@ -55,8 +55,6 @@ import logging
 import sys
 import time
 
-import bitstring
-
 import confignator
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
@@ -968,19 +966,12 @@ def get_st_and_sst(pool_name, apid, ssc, is_tm=False, t_from=None):
 def extract_ssc_from_psc(psc):
     """
     The Source Sequence Counter (SSC) is embedded in the Packet Sequence Control (PSC).
-    The provided integer will be transformed into bits. Then a bit mask is used with & to remove the first two bits.
-    This removes the information of the Segmentation Flags.
-    After this the bits will be converted back to an integer which is the SSC.
 
     Background information: (see CHEOPS Instrument Application SW - TM/TC ICD document for further information)
     The PSC consists out of 16 bits, where the first 2 bits are the Segmentation Flags and the other 14 bits are
     the SSC.
     For a 'stand-alone' packet the Segmentation Flags are '11' and thus the PSC with a SSC of 1 will be:
     1100 0000 0000 0001
-    Bit mask to remove the first two bits from the left:
-    0011 1111 1111 1111
-    Use the bit mask with & leads to:
-    0000 0000 0000 0001
 
     :param psc: int
         Decimal notation of the PSC
@@ -988,16 +979,7 @@ def extract_ssc_from_psc(psc):
         Source Sequence Counter (SSC) as integer
     """
     assert isinstance(psc, int)
-
-    # parse the integer into bits
-    psc_bin = bitstring.BitArray(uint=psc, length=16)
-    # the bit mask to remove the first two bits from left
-    mask = bitstring.BitArray(bin='0011 1111 1111 1111')
-    # apply the mask with the & operator
-    ssc_bin = psc_bin & mask
-
-    # get the decimal value
-    ssc = ssc_bin.int
+    ssc = psc & 0x3fff
 
     return ssc
 
@@ -1005,9 +987,6 @@ def extract_ssc_from_psc(psc):
 def extract_apid_from_packetid(packet_id):
     """
     The Application Process ID (APID) is embedded in the Packet ID.
-    The provided integer will be transformed into bits. Then a bit mask is used with & to remove the first 5 bits.
-    This removes the all other information like Version Number, Packet Type and Data Field Header Flag.
-    After this the bits will be converted back to an integer which is the APID.
 
     Background information: (see CHEOPS Instrument Application SW - TM/TC ICD document for further information)
     The Packet ID consists out of 16 bits, where
@@ -1016,25 +995,13 @@ def extract_apid_from_packetid(packet_id):
         * 1 bit for the Data Field Header Flag
         * 11 bit for the APID
 
-    Bit mask to remove the first two bits from the left:
-    0000 0111 1111 1111
-
     :param packet_id: int
         Decimal notation of the Packet ID
     :return: int
         APID in decimal notation
     """
     assert isinstance(packet_id, int)
-
-    # parse the integer into bits
-    psc_bin = bitstring.BitArray(uint=packet_id, length=16)
-    # the bit mask to remove the first 5 bits from left
-    mask = bitstring.BitArray(bin='0000 0111 1111 1111')
-    # apply the mask with the & operator
-    ssc_bin = psc_bin & mask
-
-    # get the decimal value
-    apid = ssc_bin.int
+    apid = packet_id & 0x7ff
 
     return apid
 
