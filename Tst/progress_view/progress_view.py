@@ -230,7 +230,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.view.append_column(column_type)
 
         # column 4
-        renderer_cmd_version = Gtk.CellRendererText()
+        renderer_cmd_version = Gtk.CellRendererText(xalign=0.5)
         column_cmd_version = Gtk.TreeViewColumn('Version', renderer_cmd_version, text=3, background=7)
         column_cmd_version.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         column_cmd_version.set_resizable(True)
@@ -603,6 +603,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         return row
 
     def add_detailed_row(self, inner_row_iter, tree_store):
+
         detailed_info=[]
         for count, item in enumerate(tree_store[inner_row_iter]):
             if count in [0,7,9]:  # Stepnumber, colour, colour
@@ -624,7 +625,6 @@ class TestProgressView(Gtk.ApplicationWindow):
                 detailed_info.append('')
 
         new_row_iter = tree_store.append(inner_row_iter, detailed_info)
-        new_row = tree_store[new_row_iter]
 
 
     def load_json(self, filepath):
@@ -844,6 +844,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                         else:
                             self.build_row_list(row=new_row,
                                                 result=False)
+                    self.add_detailed_row(new_row_iter, tree_store)
         self.restore_expanded_states(tree_store)
 
 

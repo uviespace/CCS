@@ -174,11 +174,11 @@ def write_log_step_footer(step_param, step_result):
 
 def write_log_test_header(test, pool_name):
     logger.info('-------------------------------------------------------------------------------')
-    logger.info('Running test {} version {}\n\t\t\t\t\tpoolname = {}\n\t\t\t\t\tCUC-timestamp of test '
+    logger.info('Running test {}\n\t\t\t\t\tversion {}\n\t\t\t\t\tpoolname = {}\n\t\t\t\t\tCUC-timestamp of test '
              'start = {}\n\t\t\t\t\tlocal time = {}'
              .format(test.id, test.version, pool_name, cfl.get_last_pckt_time(pool_name=pool_name, string=False),
                      datetime.datetime.now().isoformat()))
-    logger.info('Description:\n\t\t\t\t\t {}'.format(test.description))
+    logger.info('#Description: {} \n'.format(test.description))
     if test.comment:
         logger.info('Comment: {}'.format(test.comment))
 
@@ -206,9 +206,9 @@ def write_log_test_footer(test):
                 logger.info('{} step {} OK'.format(test.id, item.step))
     logger.info('~~~~~~~~~~~~~~~~~~~~~~~~~')
     if test.test_passed is not False and successful_steps == test.number_of_steps:
-        logger.info('Test {} OK {}/{} steps successful'.format(test.id, successful_steps, test.number_of_steps))
+        logger.info('Test {} OK {}/{} steps ran sucessfully'.format(test.id, successful_steps, test.number_of_steps))
     else:
-        logger.info('Test {} FAILED! {}/{} steps successful'.format(test.id, successful_steps, test.number_of_steps))
+        logger.info('Test {} FAILED! {}/{} steps ran sucessfully'.format(test.id, successful_steps, test.number_of_steps))
     logger.info('-------------------------------------------------------------------------------\n\n\n')
     return successful_steps
 

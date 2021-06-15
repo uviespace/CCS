@@ -137,8 +137,8 @@ def make_command_script(model, model_spec):
         cls = class_str.substitute(testSpecClassName=create_class_name(model_spec.name),
                                    testSpecFileName=create_file_name(model_spec.name),
                                    testSpecName=model_spec.name,
-                                   testSpecDescription=model.description,
-                                   testSpecVersion=model.version)
+                                   testSpecDescription=model_spec.description,
+                                   testSpecVersion=model_spec.version)
         # add the header string
         content += '\n\n' + cls
 
@@ -300,8 +300,8 @@ def make_verification_script(model, model_spec):
         cls = class_str.substitute(testSpecClassName=create_class_name(model_spec.name),
                                    testSpecFileName=create_file_name(model_spec.name),
                                    testSpecName=model_spec.name,
-                                   testSpecDescription=model.description,
-                                   testSpecVersion=model.version)
+                                   testSpecDescription=model_spec.description,
+                                   testSpecVersion=model_spec.version)
         # add the header string
         content += '\n\n' + cls
 

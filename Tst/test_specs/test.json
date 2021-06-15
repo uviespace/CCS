@@ -1,0 +1,58 @@
+{
+ "_name": "test",
+ "_description": "Testing the TST",
+ "_version": "2",
+ "_primary_counter_locked": false,
+ "_precon": "",
+ "_postcon": "",
+ "sequences": [
+  {
+   "_sequence": 0,
+   "_name": "",
+   "_description": "",
+   "_version": "",
+   "_primary_counter_locked": false,
+   "steps": [
+    {
+     "_primary_counter": 1,
+     "_secondary_counter": 0,
+     "_step_number": "1.0",
+     "_description": "Increase the HK Frequncy",
+     "_comment": "",
+     "_command_code": "cfl.Tcsend_DB('SASW ModHkPeriodCmd', 1, 8, pool_name='new_tmtc_pool')\n",
+     "_verification_code": "print('Verification')",
+     "_is_active": true,
+     "_verified_item": [],
+     "_start_sequence": null,
+     "_stop_sequence": null
+    },
+    {
+     "_primary_counter": 2,
+     "_secondary_counter": 0,
+     "_step_number": "2.0",
+     "_description": "This is supposed to be a very long text just to seeeeee how the Progress Viewer View will handle something like this, definetly do not read any further, these are just some random words, the person reading is just wasting time. Now we reached the end. Tahnks for listening",
+     "_comment": "",
+     "_command_code": "print('A Lot of code')\nprint('Just some lines')\nprint('get some lines in here')\nprint('There we go')\nprint(' This line is not needed')\nprint('senseless line')\nprint(' This is a verrrrrrrrry long line that doesnt make any sense execept to see how the progress viewer will show this, thanks for reading')\n",
+     "_verification_code": "print('Verification')\nprint('A Lot of code')\nprint('Just some lines')\nprint('get some lines in here')\nprint('There we go')\nprint(' This line is not needed')\nprint('senseless line')",
+     "_is_active": true,
+     "_verified_item": [],
+     "_start_sequence": null,
+     "_stop_sequence": null
+    },
+    {
+     "_primary_counter": 3,
+     "_secondary_counter": 0,
+     "_step_number": "3.0",
+     "_description": "Duration Test, Is Progress Viewer automatically updating?",
+     "_comment": "",
+     "_command_code": "import time\ntime.sleep(30)",
+     "_verification_code": "print('Test is working, Progress Viewer is updating')\n",
+     "_is_active": true,
+     "_verified_item": [],
+     "_start_sequence": null,
+     "_stop_sequence": null
+    }
+   ]
+  }
+ ]
+}
