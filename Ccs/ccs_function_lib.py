@@ -4,23 +4,24 @@ gi.require_version('Notify', '0.7')
 from gi.repository import Gtk, GLib, Notify, GdkPixbuf
 import subprocess
 import struct
-import configparser
+# import configparser
 import crcmod
 import datetime
 import dateutil.parser as duparser
 import io
-import itertools
+# import itertools
 import types
 import sys
-import threading
-import queue
+# import threading
+# import queue
 import select
-import traceback
+# import traceback
 import json
 import time
 import dbus
 import socket
 import os
+import glob
 import numpy as np
 import logging.handlers
 from database.tm_db import scoped_session_maker, DbTelemetry, DbTelemetryPool, RMapTelemetry, FEEDataTelemetry
@@ -29,6 +30,7 @@ from sqlalchemy.sql.expression import func
 from s2k_partypes import ptt, ptype_parameters, ptype_values
 import confignator
 import importlib
+
 #check_cfg = configparser.ConfigParser()
 #check_cfg.read('egse.cfg')
 #check_cfg.source = 'egse.cfg'
@@ -89,6 +91,8 @@ fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
 
 scoped_session_idb = scoped_session_maker('idb', idb_version=None)
 scoped_session_storage = scoped_session_maker('storage')
+
+PCPREFIX = 'packet_config_'
 
 Notify.init('cfl')
 
@@ -4282,3 +4286,77 @@ class ChangeCommunicationDialog(Gtk.Dialog):
         main_box.pack_start(self.change_button, 0, 0, 0)
 
         return main_box
+
+
+class ProjectDialog(Gtk.Dialog):
+    """
+    Dialog that pops up at CCS/TST startup to allow for project and IDB configuration
+    """
+
+    def __init__(self):
+        super(ProjectDialog, self).__init__()
+
+        self.set_title('Project configuration')
+        self.set_default_size(300, 100)
+
+        self.project_selection = self._create_project_selection()
+        self.idb_selection = self._create_idb_selection()
+
+        ca = self.get_content_area()
+        ca.set_spacing(2)
+
+        ca.add(self.project_selection)
+        ca.add(self.idb_selection)
+
+        self.add_buttons('OK', 1, 'Cancel', 2)
+
+        self.connect('response', self._write_config)
+        self.connect('delete-event', Gtk.main_quit)
+
+        self.show_all()
+
+    @staticmethod
+    def _create_project_selection():
+        project_selection = Gtk.ComboBoxText()
+
+        ccs_path = confignator.get_option('paths', 'ccs')
+        ccs_path += '/' if not ccs_path.endswith('/') else ''
+        projects = glob.glob(ccs_path + PCPREFIX + '*')
+
+        projects = [p.replace(ccs_path + PCPREFIX, '').replace('.py', '') for p in projects]
+
+        for p in projects:
+            project_selection.append(p, p)
+
+        set_as = confignator.get_option('ccs-database', 'project')
+        project_selection.set_active_id(set_as)
+
+        return project_selection
+
+    @staticmethod
+    def _create_idb_selection():
+        idb_selection = Gtk.ComboBoxText()
+
+        mibs = scoped_session_idb.execute('show databases').fetchall()
+        mibs = [mib for mib, in mibs if mib.count('mib')]
+
+        for m in mibs:
+            idb_selection.append(m, m)
+
+        set_as = confignator.get_option('ccs-database', 'idb_schema')
+        idb_selection.set_active_id(set_as)
+
+        return idb_selection
+
+    def _write_config(self, widget, data):
+        if data == 1:
+
+            confignator.save_option('ccs-database', 'project', self.project_selection.get_active_text())
+            confignator.save_option('ccs-database', 'idb_schema', self.idb_selection.get_active_text())
+
+            self.destroy()
+            Gtk.main_quit()
+
+        else:
+            self.close()
+            sys.exit()
