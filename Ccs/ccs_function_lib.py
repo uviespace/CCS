@@ -4305,8 +4305,21 @@ class ProjectDialog(Gtk.Dialog):
         ca = self.get_content_area()
         ca.set_spacing(2)
 
-        ca.add(self.project_selection)
-        ca.add(self.idb_selection)
+        project_label = Gtk.Label('Project')
+        project_label.set_size_request(80, -1)
+        project_label.set_xalign(0)
+        project_box = Gtk.Box(Gtk.Orientation.HORIZONTAL)
+        project_box.pack_start(project_label, 0, 0, 10)
+        project_box.pack_start(self.project_selection, 1, 1, 0)
+        ca.add(project_box)
+
+        idb_label = Gtk.Label('IDB schema')
+        idb_label.set_size_request(80, -1)
+        idb_label.set_xalign(0)
+        idb_box = Gtk.Box(Gtk.Orientation.HORIZONTAL)
+        idb_box.pack_start(idb_label, 0, 0, 10)
+        idb_box.pack_start(self.idb_selection, 1, 1, 0)
+        ca.add(idb_box)
 
         self.add_buttons('OK', 1, 'Cancel', 2)
 
@@ -4314,6 +4327,8 @@ class ProjectDialog(Gtk.Dialog):
         self.connect('delete-event', Gtk.main_quit)
 
         self.show_all()
+
+        self.action_area.get_children()[0].grab_focus()  # set focus to OK button
 
     @staticmethod
     def _create_project_selection():
