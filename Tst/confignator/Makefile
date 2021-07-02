@@ -9,7 +9,7 @@ DIST_DIR = $(CURDIR)/dist
 
 .PHONY: build clean-build install uninstall reinstall build-doc clean-doc-build all open-doc
 
-all: clean build install set-log-file-path build-doc open-doc
+all: clean build install build-doc open-doc
 
 doc: clean-doc-build build-doc
 
