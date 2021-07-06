@@ -2657,6 +2657,37 @@ def get_tc_list(ccf_descr=None):
 
     return cmd_dict
 
+def get_tc_calibration_and_parameters(ccf_descr=None):
+
+    if ccf_descr is None:
+        calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
+                                                  'cpc_pfc, prv_minval, prv_maxval, pas_altxt, pas_alval '
+                                                  'FROM ccf LEFT JOIN cdf ON ccf.ccf_cname=cdf.cdf_cname '
+                                                  'LEFT JOIN cpc ON cdf.cdf_pname=cpc.cpc_pname '
+                                                  'LEFT JOIN prv ON cpc.cpc_prfref=prv.prv_numbr '
+                                                  'LEFT JOIN pas ON cpc.cpc_pafref=pas.pas_numbr '
+                                                  'WHERE cpc_descr IS NOT NULL').fetchall()
+
+    else:
+        calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
+                                                  'cpc_pfc, prv_minval, prv_maxval, pas_altxt, pas_alval '
+                                                  'FROM ccf LEFT JOIN cdf ON ccf.ccf_cname=cdf.cdf_cname '
+                                                  'LEFT JOIN cpc ON cdf.cdf_pname=cpc.cpc_pname '
+                                                  'LEFT JOIN prv ON cpc.cpc_prfref=prv.prv_numbr '
+                                                  'LEFT JOIN pas ON cpc.cpc_pafref=pas.pas_numbr '
+                                                  'WHERE cpc_descr IS NOT NULL '
+                                                  'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+
+    scoped_session_idb.close()
+
+    calibrations_dict = {}
+
+    for row in calibrations:
+        calibrations_dict.setdefault(row[0:5], []).append(row[5:11])
+
+
+    return calibrations_dict
+
 
 def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True):
     try:

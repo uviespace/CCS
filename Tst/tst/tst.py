@@ -21,6 +21,7 @@ import codeblockreuse
 import connect_apps
 import dbus
 import toolbox
+import tc_management as tcm
 
 
 # creating lists for type and subtype to get rid of duplicate entries, for TC List
@@ -315,10 +316,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.feature_area.append_page(child=self.log_view, tab_label=self.label_widget_log_view)
 
         # command list tab
-        self.tc_table = TCTableClass()
-        self.label_widget_tc_table = Gtk.Label()
-        self.label_widget_tc_table.set_text('TC Table')
-        self.feature_area.append_page(child=self.tc_table, tab_label=self.label_widget_tc_table)
+        self.tcm = TCTableClass()
+        self.label_widget_tcm = Gtk.Label()
+        self.label_widget_tcm.set_text('TC Table')
+        self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
 
         self.box.pack_start(self.work_desk, True, True, 0)
 
@@ -799,6 +800,9 @@ class TCTableClass(Gtk.Grid):
         self.command_entry.set_placeholder_text("<Command Variables>")
         self.attach_next_to(self.command_entry, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 1)
 
+        self.variable_box = tcm.CommandDescriptionBox()
+        self.attach_next_to(self.variable_box, self.command_entry, Gtk.PositionType.BOTTOM, 8, 5)
+
         self.show_all()
 
     def on_type_combo_changed(self, combo):
@@ -821,13 +825,18 @@ class TCTableClass(Gtk.Grid):
         if row is not None:
             descr = model[row][2]
             self.command_entry.set_text(cfl.make_tc_template(descr, comment=False))
+            tcm.tc_type = descr
+            cpc_descr = tcm.get_cpc_descr(tcm.tc_type)
+            tcm.descr_list.clear()
+            tcm.descr_list = cpc_descr
+            self.variable_box.refresh_descr_treeview()
+            tcm.calibrations_list.clear()
+            self.variable_box.refresh_cal_treeview()
         else:
             pass
 
     def telecommand_filter_func(self, model, iter, data):
 
-        placeholder1 = 0
-        placeholder2 = 0
         if (
                 self.current_filter_telecommand is None
                 or self.current_filter_telecommand == "None"
