@@ -1,5 +1,5 @@
     # VERIFY EVERY STEP ------------------------------------------------------------------------------------------------
-    def step_verification(self, pool_name, step_start_cuc, param, summary, tc_id, ver_file, ver_class, ver_func):
+    def step_verification(self, pool_name, step_start_cuc, param, summary, tc_id, ver_file, ver_class, ver_func, step_id):
         """
         This functions does the verification for every step
         :param pool_name: str
@@ -25,7 +25,7 @@
                 ver_instance_call = getattr(ver_file, ver_class)
                 instance = ver_instance_call()
                 ver_func_call = getattr(instance, ver_func)
-                success = ver_func_call(pool_name, start_cuc=step_start_cuc, tc_id=tc_id)
+                success = ver_func_call(pool_name, start_cuc=step_start_cuc, tc_id=tc_id, run_id=self.run_id, step_id=step_id)
                 summary.result = success
             except:
                 logger.exception('Exception in the Verification for Step {}'.format(param['step_no']))
@@ -44,7 +44,7 @@
         :return: True if all conditions were successfull.
         :rtype: bool
         """
-        # testing_logger.cmd_log_handler(__name__)
+        testing_logger.cmd_log_handler(__name__)
         success = False
         logger.info('establishing postconditions started')
 

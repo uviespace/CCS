@@ -7,7 +7,7 @@
         :return: bool
             True if the preconditions are fulfilled
         """
-        #testing_logger.cmd_log_handler(__name__)
+        testing_logger.cmd_log_handler(__name__)
         success = False
         logger.info('establishing preconditions started')
 
@@ -32,10 +32,11 @@
         :return: tc_id:
         """
         testing_logger.cmd_log_handler(__name__)
+        step_id = self.check_run_and_step_id(pool_name=pool_name)
         step_start_cuc = cfl.get_last_pckt_time(pool_name=pool_name, string=False)
         report.command_step_begin(step_param=param, script_version=self.version(), pool_name=pool_name,
-                                  step_start_cuc=step_start_cuc)
+                                  step_start_cuc=step_start_cuc, run_id=self.run_id, step_id=step_id)
 
         summary = report.StepSummary(step_number=param['step_no'])
         tc_id = None
-        return step_start_cuc, summary, tc_id
+        return step_start_cuc, summary, tc_id, step_id

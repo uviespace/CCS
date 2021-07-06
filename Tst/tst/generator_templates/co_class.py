@@ -15,6 +15,7 @@ class ${testSpecClassName}:
         self.integrity = True
         self.exceptions = []
         self.do_verification = do_verification
+        self.run_id = False
 
         # some tests are depended on other tests, thus information is stored on class level
         # insert class variables here

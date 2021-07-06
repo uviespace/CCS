@@ -30,7 +30,6 @@ logger.addHandler(hdlr=console_hdlr)
 file_hdlr = toolbox.create_file_handler(file=log_file_path)
 logger.addHandler(hdlr=file_hdlr)
 
-
 menu_xml = os.path.join(os.path.dirname(__file__), 'app_menu.xml')
 css_file = os.path.join(os.path.dirname(__file__), 'style_progress_view.css')
 
@@ -106,7 +105,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         self.expander_states = []
 
-        self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str)
+        self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str, str)
 
         # monitoring the cmd and vrc log files for changes
         file_cmd = Gio.File.new_for_path(self.path_cmd)
@@ -174,7 +173,92 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.path_frame.add(self.path_box)
         self.box.pack_start(self.path_frame, True, True, 0)
 
+        self.title_box = Gtk.HBox()
+        self.test_label = Gtk.Label()
+        self.test_label.set_markup('<big>Test Title: </big>')
+        self.test_title = Gtk.Label()
+        self.set_test_title()
+
+        self.title_box.pack_start(self.test_label, False, True, 0)
+        self.title_box.pack_start(self.test_title, False, True, 0)
+        self.box.pack_start(self.title_box, False, True, 20)
+
         # buttons for the tree view (expand all, collapse all)
+        self.make_button_box()
+        self.box.pack_start(self.box_buttons, False, True, 0)
+
+        self.btn_apply_css = Gtk.Button().new_from_icon_name('media-playlist-repeat-symbolic', Gtk.IconSize.BUTTON)
+        self.btn_apply_css.set_tooltip_text('Apply CSS')
+        self.btn_apply_css.connect('clicked', self.on_apply_css)
+        # self.box_buttons.pack_start(self.btn_apply_css, False, False, 0)
+
+        # --------------- tree view ---------------
+        self.sorted_model = Gtk.TreeModelSort(model=self.progress_tree_store)
+        self.sorted_model.set_sort_column_id(1, Gtk.SortType.ASCENDING)
+        self.view = Gtk.TreeView(model=self.sorted_model)
+        self.view.set_grid_lines(True)
+        self.view.set_has_tooltip(True)
+        self.view.set_tooltip_column(10)
+        self.make_treeview()
+
+        self.view.expand_all()
+
+        self.scroll_win = Gtk.ScrolledWindow()
+        self.scroll_win.set_min_content_height(1200)
+        self.scroll_win.set_min_content_width(900)
+        self.scroll_win.add(self.view)
+        self.box.pack_start(self.scroll_win, True, True, 0)
+
+        self.connect('destroy', self.on_destroy)
+
+        # expand all entries
+        self.view.expand_all()
+
+        self.refresh_rate = 1
+        self.refresh_worker()
+
+        # for styling the application with CSS
+        context = self.get_style_context()
+        Gtk.StyleContext.add_class(context, 'tst-css')
+        self.on_apply_css()
+        self.show_all()
+        logger.debug('__init__ succeeded')
+
+    @staticmethod
+    def on_apply_css(*args):
+        logger.debug('Applying CSS')
+        style_provider = Gtk.CssProvider()
+        css = open(css_file, 'rb')  # rb needed for python 3 support
+        css_data = css.read()
+        css.close()
+        style_provider.load_from_data(css_data)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),
+                                                 style_provider,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        Gtk.StyleContext.reset_widgets(Gdk.Screen.get_default())
+
+    def on_open(self, simple_action, parameter):
+        """
+        Menu -> Open: choose a Test specification file. The command log and verification log files will be loaded
+        automatically. Using the path in the configuration file.
+        :param Gio.SimpleAction simple_action: The object which received the signal
+        :param parameter: the parameter to the activation, or None if it has no parameter
+        """
+        dialog = Gtk.FileChooserDialog('Please choose a Test Specification',
+                                       self,
+                                       Gtk.FileChooserAction.OPEN,
+                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        self.add_filters(dialog)
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            file_selected = dialog.get_filename()
+            # ToDo: get the path for all 3 (json, cmd, vrc) and load them
+            self.open_test_files(None, self.get_log_file_paths_from_json_file_name(file_selected))
+        elif response == Gtk.ResponseType.CANCEL:
+            pass
+        dialog.destroy()
+
+    def make_button_box(self):
         self.box_buttons = Gtk.Box()
         self.box_buttons.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.btn_exp_all = Gtk.Button()
@@ -189,24 +273,39 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.btn_rld_all.set_label('Reload all')
         self.btn_rld_all.connect('clicked', self.on_reload_all)
         self.box_buttons.pack_start(self.btn_rld_all, False, False, 0)
-        self.box.pack_start(self.box_buttons, False, True, 0)
 
-        self.btn_apply_css = Gtk.Button().new_from_icon_name('media-playlist-repeat-symbolic', Gtk.IconSize.BUTTON)
-        self.btn_apply_css.set_tooltip_text('Apply CSS')
-        self.btn_apply_css.connect('clicked', self.on_apply_css)
-        # self.box_buttons.pack_start(self.btn_apply_css, False, False, 0)
+        self.sort_label = Gtk.Label()
+        self.sort_label.set_text('Sort by Execution')
+        self.box_buttons.pack_end(self.sort_label, False, True, 0)
 
-        # --------------- tree view ---------------
-        self.sorted_model = Gtk.TreeModelSort(model=self.progress_tree_store)
-        self.sorted_model.set_sort_column_id(1, Gtk.SortType.ASCENDING)
-        self.view = Gtk.TreeView(model=self.sorted_model)
-        self.view.set_grid_lines(True)
+        self.sort_button = Gtk.Switch()
+        self.sort_button.connect("notify::active", self.on_remake_treeview)
+        self.sort_button.set_active(False)
+        self.box_buttons.pack_end(self.sort_button, False, True, 0)
+
+        self.sort_label2 = Gtk.Label()
+        self.sort_label2.set_text('Sort by Steps')
+        self.box_buttons.pack_end(self.sort_label2, False, True, 0)
+
+    def make_treeview(self):
         # self.view.set_enable_tree_lines(True)
+
+        if self.sort_button.get_active():  # Only if sorted by executions
+            # column 0
+            renderer_number = Gtk.CellRendererText()
+            #renderer_number.set_property('scale', 2)
+            renderer_number.set_property('single-paragraph-mode', True)
+            execution_number = Gtk.TreeViewColumn('Run ', renderer_number, text=11)
+            execution_number.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
+            execution_number.set_resizable(True)
+            execution_number.set_min_width(50)
+            self.view.append_column(execution_number)
 
         # column 1
         renderer_number = Gtk.CellRendererText()
-        renderer_number.set_property('scale', 2)
-        renderer_number.set_property('single-paragraph-mode', True)
+        if not self.sort_button.get_active():  # Only big if sorted by steps, otherwise normal size
+            renderer_number.set_property('scale', 2)
+            renderer_number.set_property('single-paragraph-mode', True)
         column_number = Gtk.TreeViewColumn('Step', renderer_number, text=8)
         column_number.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         column_number.set_resizable(True)
@@ -272,64 +371,14 @@ class TestProgressView(Gtk.ApplicationWindow):
         column_result.set_min_width(50)
         # column_result.set_cell_data_func(cell_renderer=renderer_result, func=set_bkgrd_clr, func_data=None)
         self.view.append_column(column_result)
+        return
 
-        self.view.expand_all()
-
-        self.scroll_win = Gtk.ScrolledWindow()
-        self.scroll_win.set_min_content_height(1200)
-        self.scroll_win.set_min_content_width(900)
-        self.scroll_win.add(self.view)
-        self.box.pack_start(self.scroll_win, True, True, 0)
-
-        self.connect('destroy', self.on_destroy)
-
-        # expand all entries
-        self.view.expand_all()
-
-        self.refresh_rate = 1
-        self.refresh_worker()
-
-        # for styling the application with CSS
-        context = self.get_style_context()
-        Gtk.StyleContext.add_class(context, 'tst-css')
-        self.on_apply_css()
-        self.show_all()
-        logger.debug('__init__ succeeded')
-
-    @staticmethod
-    def on_apply_css(*args):
-        logger.debug('Applying CSS')
-        style_provider = Gtk.CssProvider()
-        css = open(css_file, 'rb')  # rb needed for python 3 support
-        css_data = css.read()
-        css.close()
-        style_provider.load_from_data(css_data)
-        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),
-                                                 style_provider,
-                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        Gtk.StyleContext.reset_widgets(Gdk.Screen.get_default())
-
-    def on_open(self, simple_action, parameter):
-        """
-        Menu -> Open: choose a Test specification file. The command log and verification log files will be loaded
-        automatically. Using the path in the configuration file.
-        :param Gio.SimpleAction simple_action: The object which received the signal
-        :param parameter: the parameter to the activation, or None if it has no parameter
-        """
-        dialog = Gtk.FileChooserDialog('Please choose a Test Specification',
-                                       self,
-                                       Gtk.FileChooserAction.OPEN,
-                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
-        self.add_filters(dialog)
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            file_selected = dialog.get_filename()
-            # ToDo: get the path for all 3 (json, cmd, vrc) and load them
-            self.open_test_files(None, self.get_log_file_paths_from_json_file_name(file_selected))
-        elif response == Gtk.ResponseType.CANCEL:
-            pass
-        dialog.destroy()
-
+    def tooltip_treeview(self, widget, *args):
+        #print(widget)
+        #print(args)
+        #print(self.view.get_path_at_pos(args[0], args[1]))
+        pass
+        return True
     def get_log_file_paths_from_json_file_name(self, filename):
         from testlib import testing_logger
         paths = {}
@@ -491,6 +540,22 @@ class TestProgressView(Gtk.ApplicationWindow):
     def refresh_worker(self):
         GLib.timeout_add_seconds(self.refresh_rate, self.on_reload_all)
 
+    def on_remake_treeview(self, *args):
+        if self.sort_button.get_active():
+            self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str, str, str, str)
+        else:
+            self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str, str)
+
+        self.sorted_model = Gtk.TreeModelSort(model=self.progress_tree_store)
+        self.sorted_model.set_sort_column_id(1, Gtk.SortType.ASCENDING)
+        self.view.set_model(self.sorted_model)
+        all_columns = self.view.get_columns()
+        for column in all_columns:
+            self.view.remove_column(column)
+        self.make_treeview()
+        self.on_reload_all()
+
+
     def on_reload_all(self, *args):
         if self.path_json:
             self.load_json(self.path_json)
@@ -517,7 +582,7 @@ class TestProgressView(Gtk.ApplicationWindow):
     # ------------------- model functions ----------------------
     @staticmethod
     def build_row_list(row=None, step_number=None, exec_date=None, entry_type=None, version=None, status=None, tcs=None,
-                       result=None, step_desc=None):
+                       result=None, step_desc=None, tooltip_text=None, exec_int=None, exec_desc=None, sort_button_active=False):
         """
         Builds or updates a row of the TreeStore. For a new row, the argument 'row' is expected to be None.
         :param Gtk.TreeModelRow row: a row of the tree model
@@ -546,6 +611,8 @@ class TestProgressView(Gtk.ApplicationWindow):
             else:
                 return 'failed'
 
+        sort_adjustment = 1 if sort_button_active else 0
+
         entry_background = None
         if exec_date is not None:
             exec_date = datetime.datetime.strftime(exec_date, testing_logger.date_time_format)
@@ -558,6 +625,12 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         if row is not None:
             # update existing row
+            row[10] = 'Hello'
+            if sort_button_active:
+                if exec_int:
+                    row[12] = exec_int
+                if exec_desc:
+                    row[11] = exec_desc
             if step_number is not None:
                 row[0] = step_number
             if exec_date is not None:
@@ -577,19 +650,36 @@ class TestProgressView(Gtk.ApplicationWindow):
                 row[8] = step_desc
         else:
             # build a new row
-            row = [
-                step_number,
-                exec_date,
-                entry_type,
-                version,
-                status,
-                tcs,
-                result_value,
-                entry_background,
-                step_desc,
-                result_cell_color
-
-            ]
+            if sort_button_active:
+                row = [
+                    step_number,
+                    exec_date,
+                    entry_type,
+                    version,
+                    status,
+                    tcs,
+                    result_value,
+                    entry_background,
+                    step_desc,
+                    result_cell_color,
+                    tooltip_text,
+                    exec_desc,
+                    exec_int
+                ]
+            else:
+                row = [
+                    step_number,
+                    exec_date,
+                    entry_type,
+                    version,
+                    status,
+                    tcs,
+                    result_value,
+                    entry_background,
+                    step_desc,
+                    result_cell_color,
+                    tooltip_text
+                ]
         # set the background color of the rows
         if row[2] == 'command':
             entry_background = row_cmd_color
@@ -603,7 +693,6 @@ class TestProgressView(Gtk.ApplicationWindow):
         return row
 
     def add_detailed_row(self, inner_row_iter, tree_store):
-
         detailed_info=[]
         for count, item in enumerate(tree_store[inner_row_iter]):
             if count in [0,7,9]:  # Stepnumber, colour, colour
@@ -611,7 +700,10 @@ class TestProgressView(Gtk.ApplicationWindow):
             elif count == 1:
                 detailed_info.append('Description:')
             elif count == 2:
-                detailed_info.append('Code')
+                if self.test_model:
+                    detailed_info.append('{}'.format(self.test_model.description))
+                else:
+                    detailed_info.append('Json File has to be given')
             elif count == 4:
                 if tree_store[inner_row_iter][2] == 'command':
                     detailed_info.append('Command Code:')
@@ -623,11 +715,27 @@ class TestProgressView(Gtk.ApplicationWindow):
                 detailed_info.append('Code')
             elif count in [3,6,8]:
                 detailed_info.append('')
+            elif count == 10:
+                detailed_info.append('')
 
         new_row_iter = tree_store.append(inner_row_iter, detailed_info)
 
+    def set_test_title(self):
+        json_title = self.test_model.name if self.test_model else None
+        test_desc = self.test_model.description if self.test_model else None
+        cmd_title = self.text_path_cmd_btn.get_filename()
+        vrc_title = self.text_path_vrc_btn.get_filename()
+        if json_title:
+            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(json_title.split('/')[-1], test_desc))
+        elif cmd_title:
+            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(cmd_title.split('/')[-1], test_desc))
+        elif vrc_title:
+            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(vrc_title.split('/')[-1], test_desc))
+        else:
+            self.test_title.set_text('')
 
     def load_json(self, filepath):
+
         if not os.path.isfile(filepath):
             message = 'load_file: no file found for the path {}'.format(filepath)
             logger.warning(message)
@@ -641,9 +749,11 @@ class TestProgressView(Gtk.ApplicationWindow):
             if data_from_file is not None:
                 self.test_model = data_model.TestSpecification()
                 self.test_model.decode_from_json(json_data=data_from_file)
-                self.load_model_into_tree_store(self.progress_tree_store, self.test_model)
+                if not self.sort_button.get_active():  # Only add json steps, if sorted by steps
+                    self.load_model_into_tree_store(self.progress_tree_store, self.test_model)
             else:
                 logger.warning('load_file: could not read from the JSON test spec')
+            self.set_test_title()
 
     def load_cmd(self, filepath):
         if not os.path.isfile(filepath):
@@ -654,6 +764,7 @@ class TestProgressView(Gtk.ApplicationWindow):
             # analyse the command log
             self.cmd_steps = analyse_command_log.get_steps_and_commands(filepath)
             self.load_cmd_into_tree_store(self.progress_tree_store, self.cmd_steps)
+            self.set_test_title()
 
     def load_vrc(self, filepath):
         if not os.path.isfile(filepath):
@@ -664,6 +775,7 @@ class TestProgressView(Gtk.ApplicationWindow):
             # analyse the verification log
             self.vrc_steps = analyse_verification_log.get_verification_steps(filepath)
             self.load_vrc_into_tree_store(self.progress_tree_store, self.vrc_steps)
+            self.set_test_title()
 
     def load_model_into_tree_store(self, tree_store, test_model):
 
@@ -684,7 +796,8 @@ class TestProgressView(Gtk.ApplicationWindow):
                 step_desc = 'Step ' + str(step_number[:-2])
 
                 new_drawer_row = self.build_row_list(step_number=str(step_number),
-                                                     step_desc=step_desc)
+                                                     step_desc=step_desc,
+                                                     sort_button_active=self.sort_button.get_active())
 
                 tree_store.append(None, new_drawer_row)
                 tree_store_steps.append(step_number)
@@ -728,64 +841,164 @@ class TestProgressView(Gtk.ApplicationWindow):
         """
         # collect the information if the drawer rows are expanded, in order to restore this states
         self.gather_expanded_states(tree_store)
+        if self.sort_button.get_active():
+            # check which executions are already in the tree store
+            tree_store_exec = {}
+            for row in tree_store:
+                if row[12]:
+                    tree_store_exec[row[12]] = []
+            # check which steps are in each execution
+            for row in tree_store:
+                if row[12]:
+                    for item in row.iterchildren():
+                        if item[0]:
+                            tree_store_exec[row[12]].append(item[0])
 
-        # check which step numbers are already in the tree_store
-        tree_store_steps = []
-        for row in tree_store:
-            step_number_tree_store = row[0:1][0]
-            tree_store_steps.append(step_number_tree_store)
-        # add drawer for each step which is not in the tree_store already
-        for item in cmd_steps:
-            step_number = item['step']
-            if step_number not in tree_store_steps:
-                step_desc = 'Step ' + str(step_number)
-                new_drawer_row = self.build_row_list(step_number=str(step_number),
-                                                     step_desc=step_desc)
-                tree_store.append(None, new_drawer_row)
-                tree_store_steps.append(step_number)
-        # clear all command rows, before adding
-        for row in tree_store:
-            for item in row.iterchildren():
-                if item[2] == 'command':
-                    tree_store.remove(item.iter)
-        # add rows for command
-        for row in tree_store:
-            step_number_tree_store = row[0:1][0]
+            all_exec_numbers = {}
+            # get all executions
             for item in cmd_steps:
-                step_number_cmd = item['step']
-                if step_number_tree_store == step_number_cmd:
-                    # already_exists = False
-                    # for i in row.iterchildren():
-                    #     if datetime.datetime.strftime(item['exec_date'], testing_logger.date_time_format) == i[1]:
-                    #         already_exists = True
-                    # # add a new row
-                    # if not already_exists:
-                    new_row_list = self.build_row_list(entry_type='command',
-                                                       version=item['version'],
-                                                       exec_date=item['exec_date'])
-                    new_row_iter = tree_store.append(row.iter, new_row_list)
-                    new_row = tree_store[new_row_iter]
+                all_exec_numbers[str(item['run_id'])] = []
+            # get all steps for every execution
+            for item in cmd_steps:
+                all_exec_numbers[str(item['run_id'])].append(item['step'])
 
-                    # add the information if the step was executed or had an exception
-                    if 'exception' in item:
-                        self.build_row_list(row=new_row,
-                                            status='EXCEPTION',
-                                            result=False)
-                    else:
-                        if 'end_timestamp' in item:
+            # make execution drawers
+            for exec_num in all_exec_numbers.keys():
+                if not exec_num in tree_store_exec.keys():
+                    #exec_desc = 'Run ' + str(exec_num)
+                    exec_desc = str(exec_num)
+                    new_drawer_row = self.build_row_list(exec_int=str(exec_num),
+                                                         exec_desc=exec_desc,
+                                                         sort_button_active=self.sort_button.get_active())
+                    tree_store.append(None, new_drawer_row)
+                    tree_store_exec[exec_num] = []
+
+            # make step drawers for every execution drawer
+            for row in tree_store:
+                if row[12]:
+                    exec_num = row[12]
+                    for step_num in all_exec_numbers[exec_num]:
+                        if not step_num in tree_store_exec[exec_num]:
+                            step_desc = 'Step ' + str(step_num[:-2])
+                            new_step_row = self.build_row_list(step_number=str(step_num),
+                                                                step_desc=step_desc,
+                                                                sort_button_active=self.sort_button.get_active())
+                            new_row_iter = tree_store.append(row.iter, new_step_row)
+                            tree_store_exec[exec_num].append(step_num)
+
+            # clear all command rows, before adding
+            for row in tree_store:
+                if row[12]:
+                    for step_row in row.iterchildren():
+                        for item in step_row.iterchildren():
+                            if item[2] == 'command':
+                                tree_store.remove(item.iter)
+
+            # add rows for command
+            for row in tree_store:
+                if row[12]:
+                    exec_num = row[12]
+                    for step_row in row.iterchildren():
+                        if step_row[0]:
+                            step_num = step_row[0]
+                            for item in cmd_steps:
+                                if item['run_id'] == exec_num and item['step'] == step_num:
+                                    new_row_list = self.build_row_list(entry_type='command',
+                                                                       version=item['version'],
+                                                                       exec_date=item['exec_date'],
+                                                                       sort_button_active=self.sort_button.get_active(),
+                                                                       tooltip_text=item['descr'])
+                                    new_row_iter = tree_store.append(step_row.iter, new_row_list)
+                                    new_row = tree_store[new_row_iter]
+                                    # add the information if the step was executed or had an exception
+                                    if 'exception' in item:
+                                        self.build_row_list(row=new_row,
+                                                            status='EXCEPTION',
+                                                            result=False,
+                                                            sort_button_active=self.sort_button.get_active())
+                                    else:
+                                        if 'end_timestamp' in item:
+                                            self.build_row_list(row=new_row,
+                                                                status='executed',
+                                                                result=True,
+                                                                sort_button_active=self.sort_button.get_active())
+                                    # add the TC's
+                                    tcs_str = ''
+                                    for telecommand in item['tcs']:
+                                        if tcs_str != '':
+                                            tcs_str += ', '
+                                        tcs_str += telecommand.tc_kind()
+                                    self.build_row_list(row=new_row,
+                                                        tcs=tcs_str,
+                                                        sort_button_active=self.sort_button.get_active())
+
+                                    #self.add_detailed_row(new_row_iter, tree_store)
+
+        else:
+            # check which step numbers are already in the tree_store
+            tree_store_steps = []
+            for row in tree_store:
+                step_number_tree_store = row[0:1][0]
+                tree_store_steps.append(step_number_tree_store)
+            # add drawer for each step which is not in the tree_store already
+            for item in cmd_steps:
+                step_number = item['step']
+                if step_number not in tree_store_steps:
+                    step_desc = 'Step ' + str(step_number[:-2])
+                    new_drawer_row = self.build_row_list(step_number=str(step_number),
+                                                         step_desc=step_desc,
+                                                         sort_button_active=self.sort_button.get_active())
+                    tree_store.append(None, new_drawer_row)
+                    tree_store_steps.append(step_number)
+            # clear all command rows, before adding
+            for row in tree_store:
+                for item in row.iterchildren():
+                    if item[2] == 'command':
+                        tree_store.remove(item.iter)
+            # add rows for command
+            for row in tree_store:
+                #self.view.set_tooltip_column()
+                step_number_tree_store = row[0:1][0]
+                for item in cmd_steps:
+                    step_number_cmd = item['step']
+                    if step_number_tree_store == step_number_cmd:
+                        # already_exists = False
+                        # for i in row.iterchildren():
+                        #     if datetime.datetime.strftime(item['exec_date'], testing_logger.date_time_format) == i[1]:
+                        #         already_exists = True
+                        # # add a new row
+                        # if not already_exists:
+                        new_row_list = self.build_row_list(entry_type='command',
+                                                           version=item['version'],
+                                                           exec_date=item['exec_date'],
+                                                           sort_button_active=self.sort_button.get_active(),
+                                                           tooltip_text=item['descr'])
+                        new_row_iter = tree_store.append(row.iter, new_row_list)
+                        new_row = tree_store[new_row_iter]
+
+                        # add the information if the step was executed or had an exception
+                        if 'exception' in item:
                             self.build_row_list(row=new_row,
-                                                status='executed',
-                                                result=True)
-                    # add the TC's
-                    tcs_str = ''
-                    for telecommand in item['tcs']:
-                        if tcs_str != '':
-                            tcs_str += ', '
-                        tcs_str += telecommand.tc_kind()
-                    self.build_row_list(row=new_row,
-                                        tcs=tcs_str)
+                                                status='EXCEPTION',
+                                                result=False,
+                                                sort_button_active=self.sort_button.get_active())
+                        else:
+                            if 'end_timestamp' in item:
+                                self.build_row_list(row=new_row,
+                                                    status='executed',
+                                                    result=True,
+                                                    sort_button_active=self.sort_button.get_active())
+                        # add the TC's
+                        tcs_str = ''
+                        for telecommand in item['tcs']:
+                            if tcs_str != '':
+                                tcs_str += ', '
+                            tcs_str += telecommand.tc_kind()
+                        self.build_row_list(row=new_row,
+                                            tcs=tcs_str,
+                                            sort_button_active=self.sort_button.get_active())
 
-                    self.add_detailed_row(new_row_iter, tree_store)
+                        self.add_detailed_row(new_row_iter, tree_store)
 
         self.restore_expanded_states(tree_store)
 
@@ -793,59 +1006,157 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         # collect the information if the drawer rows are expanded, in order to restore this states
         self.gather_expanded_states(tree_store)
-        # check which step numbers are already in the tree_store
-        tree_store_steps = []
-        for row in tree_store:
-            step_number_tree_store = row[0:1][0]
-            tree_store_steps.append(step_number_tree_store)
-        # add drawer for each step which is not in the tree_store already
-        for item in vrc_steps:
-            step_number = item['step']
-            if step_number not in tree_store_steps:
-                step_desc = 'Step ' + str(step_number)
-                new_drawer_row = self.build_row_list(step_number=str(step_number),
-                                                     step_desc=step_desc)
-                tree_store.append(None, new_drawer_row)
-                tree_store_steps.append(step_number)
-        # clear all verification rows, before adding
-        for row in tree_store:
-            for item in row.iterchildren():
-                if item[2] == 'verification':
-                    tree_store.remove(item.iter)
-        # add row for verification
-        for row in tree_store:
-            step_number_tree_store = row[0:1][0]
+
+        if self.sort_button.get_active():
+            # check which executions are already in the tree store
+            tree_store_exec = {}
+            for row in tree_store:
+                if row[12]:
+                    tree_store_exec[row[12]] = []
+            # check which steps are in each execution
+            for row in tree_store:
+                if row[12]:
+                    for item in row.iterchildren():
+                        if item[0]:
+                            tree_store_exec[row[12]].append(item[0])
+
+            all_exec_numbers = {}
+            # get all executions
             for item in vrc_steps:
-                step_number_vrc = item['step']
-                if step_number_tree_store == step_number_vrc:
-                    # already_exists = False
-                    # for i in row.iterchildren():
-                    #     if datetime.datetime.strftime(item['exec_date'], testing_logger.date_time_format) == i[1]:
-                    #         already_exists = True
-                    # # add a new row
-                    # if not already_exists:
-                    new_row_list = self.build_row_list(entry_type='verification',
-                                                       version=item['version'],
-                                                       exec_date=item['exec_date'])
-                    new_row_iter = tree_store.append(row.iter, new_row_list)
-                    new_row = tree_store[new_row_iter]
-                    # add the information if the step was executed or had an exception
-                    if 'exception' in item:
-                        self.build_row_list(row=new_row,
-                                            status='EXCEPTION')
-                    else:
-                        if 'end_timestamp' in item:
+                all_exec_numbers[str(item['run_id'])] = []
+            # get all steps for every execution
+            for item in vrc_steps:
+                all_exec_numbers[str(item['run_id'])].append(item['step'])
+
+            # make execution drawers
+            for exec_num in all_exec_numbers.keys():
+                if not exec_num in tree_store_exec.keys():
+                    #exec_desc = 'Run ' + str(exec_num)
+                    exec_desc = str(exec_num)
+                    new_drawer_row = self.build_row_list(exec_int=str(exec_num),
+                                                         exec_desc=exec_desc,
+                                                         sort_button_active=self.sort_button.get_active())
+                    tree_store.append(None, new_drawer_row)
+                    tree_store_exec[exec_num] = []
+
+            # make step drawers for every execution drawer
+            for row in tree_store:
+                if row[12]:
+                    exec_num = row[12]
+                    for step_num in all_exec_numbers[exec_num]:
+                        if not step_num in tree_store_exec[exec_num]:
+                            step_desc = 'Step ' + str(step_num[:-2])
+                            new_step_row = self.build_row_list(step_number=str(step_num),
+                                                                step_desc=step_desc,
+                                                                sort_button_active=self.sort_button.get_active())
+                            new_row_iter = tree_store.append(row.iter, new_step_row)
+                            tree_store_exec[exec_num].append(step_num)
+
+            # clear all verification rows, before adding
+            for row in tree_store:
+                if row[12]:
+                    for step_row in row.iterchildren():
+                        for item in step_row.iterchildren():
+                            if item[2] == 'verification':
+                                tree_store.remove(item.iter)
+
+            # add rows for verification
+            for row in tree_store:
+                if row[12]:
+                    exec_num = row[12]
+                    for step_row in row.iterchildren():
+                        if step_row[0]:
+                            step_num = step_row[0]
+                            for item in vrc_steps:
+                                if item['run_id'] == exec_num and item['step'] == step_num:
+                                    new_row_list = self.build_row_list(entry_type='verification',
+                                                                       version=item['version'],
+                                                                       exec_date=item['exec_date'],
+                                                                       sort_button_active=self.sort_button.get_active(),
+                                                                       tooltip_text=item['descr'])
+                                    new_row_iter = tree_store.append(step_row.iter, new_row_list)
+                                    new_row = tree_store[new_row_iter]
+                                    # add the information if the step was executed or had an exception
+                                    if 'exception' in item:
+                                        self.build_row_list(row=new_row,
+                                                            status='EXCEPTION',
+                                                            sort_button_active=self.sort_button.get_active())
+                                    else:
+                                        if 'end_timestamp' in item:
+                                            self.build_row_list(row=new_row,
+                                                                status='executed',
+                                                                sort_button_active=self.sort_button.get_active())
+                                    if 'result' in item:
+                                        if item['result'] is True:
+                                            self.build_row_list(row=new_row,
+                                                                result=True,
+                                                                sort_button_active=self.sort_button.get_active())
+                                        else:
+                                            self.build_row_list(row=new_row,
+                                                                result=False,
+                                                                sort_button_active=self.sort_button.get_active())
+
+        else:
+            # check which step numbers are already in the tree_store
+            tree_store_steps = []
+            for row in tree_store:
+                step_number_tree_store = row[0:1][0]
+                tree_store_steps.append(step_number_tree_store)
+            # add drawer for each step which is not in the tree_store already
+            for item in vrc_steps:
+                step_number = item['step']
+                if step_number not in tree_store_steps:
+                    step_desc = 'Step ' + str(step_number[:-2])
+                    new_drawer_row = self.build_row_list(step_number=str(step_number),
+                                                         step_desc=step_desc,
+                                                         sort_button_active=self.sort_button.get_active())
+                    tree_store.append(None, new_drawer_row)
+                    tree_store_steps.append(step_number)
+            # clear all verification rows, before adding
+            for row in tree_store:
+                for item in row.iterchildren():
+                    if item[2] == 'verification':
+                        tree_store.remove(item.iter)
+            # add row for verification
+            for row in tree_store:
+                step_number_tree_store = row[0:1][0]
+                for item in vrc_steps:
+                    step_number_vrc = item['step']
+                    if step_number_tree_store == step_number_vrc:
+                        # already_exists = False
+                        # for i in row.iterchildren():
+                        #     if datetime.datetime.strftime(item['exec_date'], testing_logger.date_time_format) == i[1]:
+                        #         already_exists = True
+                        # # add a new row
+                        # if not already_exists:
+                        new_row_list = self.build_row_list(entry_type='verification',
+                                                           version=item['version'],
+                                                           exec_date=item['exec_date'],
+                                                           sort_button_active=self.sort_button.get_active(),
+                                                           tooltip_text=item['descr'])
+                        new_row_iter = tree_store.append(row.iter, new_row_list)
+                        new_row = tree_store[new_row_iter]
+                        # add the information if the step was executed or had an exception
+                        if 'exception' in item:
                             self.build_row_list(row=new_row,
-                                                status='executed')
-                    if 'result' in item:
-                        if item['result'] is True:
-                            self.build_row_list(row=new_row,
-                                                result=True)
+                                                status='EXCEPTION',
+                                                sort_button_active=self.sort_button.get_active())
                         else:
-                            self.build_row_list(row=new_row,
-                                                result=False)
-                    self.add_detailed_row(new_row_iter, tree_store)
-        self.restore_expanded_states(tree_store)
+                            if 'end_timestamp' in item:
+                                self.build_row_list(row=new_row,
+                                                    status='executed',
+                                                    sort_button_active=self.sort_button.get_active())
+                        if 'result' in item:
+                            if item['result'] is True:
+                                self.build_row_list(row=new_row,
+                                                    result=True,
+                                                    sort_button_active=self.sort_button.get_active())
+                            else:
+                                self.build_row_list(row=new_row,
+                                                    result=False,
+                                                    sort_button_active=self.sort_button.get_active())
+                        self.add_detailed_row(new_row_iter, tree_store)
+            self.restore_expanded_states(tree_store)
 
 
 def run():

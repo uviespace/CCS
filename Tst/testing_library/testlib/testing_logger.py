@@ -7,6 +7,7 @@ import logging.config
 import os
 import datetime
 import confignator
+#from datetime import datetime
 
 from . import tools
 
@@ -73,7 +74,12 @@ def extract_date(line):
 
 
 def my_formatter():
-    return logging.Formatter(fmt='%(levelname)s\t%(asctime)s\tlogger: %(name)s:\t%(message)s')
+    #return logging.Formatter(fmt='%(levelname)s\t%(asctime)s\t%(id_code)s\t%(name)s:\t%(message)s')
+    return logging.Formatter(fmt='%(levelname)s\t%(asctime)s\t%(name)s:\t%(message)s')
+
+#def my_formatter_vrc():
+#    return logging.Formatter(fmt='%(levelname)s\t%(asctime)s\t%(id_code)s\t%(name)s:\t%(message)s')
+    #return logging.Formatter(fmt='%(levelname)s\t%(asctime)s\t%(name)s:\t%(message)s')
 
 
 def cmd_log_handler(file_name):

@@ -15,6 +15,8 @@
         """
         testing_logger.cmd_log_handler(__name__)
 
+        self.run_id = False
+        self.check_run_and_step_id(pool_name=pool_name)
         # log the header of this test
         report.write_log_test_header(test=self, pool_name=pool_name)
 
@@ -56,6 +58,8 @@
         # save the packet pool
         self.save_pool_in_file(pool_name=pool_name, save_pool=save_pool)
 
+        self.run_id = False
+
         # log the summary of this test
         self.successful_steps = report.write_log_test_footer(test=self)
 
@@ -70,3 +74,9 @@
         if save_pool is True:
             pool_file = tools.get_path_for_testing_logs() + self.id + '.tmpool'
             cfl.savepool(filename=pool_file, pool_name=pool_name)
+
+    def check_run_and_step_id(self, pool_name=None):
+        now = datetime.now()  # current date and time
+        if not self.run_id and pool_name:
+            self.run_id = now.strftime("%Y%m%d%H%M%S")
+        return now.strftime("%Y%m%d%H%M%S%f")

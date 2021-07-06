@@ -80,18 +80,29 @@ def get_steps_and_commands(filename):
     :rtype: list of dict
     """
     steps = []
+    steps_start = []
+    steps_end = []
 
-    def new_step_template():
+    def new_step_template_start():
         return {'step': None, 'version': '', 'tcs': [], 'date': ''}
 
-    new_step = new_step_template()
+    def new_step_template_end():
+        return {'step': None, 'timestamp': '', 'step_id': ''}
+
+    new_step = new_step_template_start()
+    run_count = 1
 
     with open(filename, 'r') as fileobject:
         for line in fileobject:
+            #if report.key_word_found(line, report.cmd_test_start_keyword):
+                # Get general infos about the whole test, append to every step of this run
+                #general_step_info = report.parse_step_from_json_string(line, report.cmd_test_start_keyword)
+                #general_step_info['run_count'] = str(run_count)
+                #run_count += 1
             if report.key_word_found(line, report.cmd_step_keyword):
                 if new_step['step'] is not None:
-                    steps.append(new_step)
-                new_step = new_step_template()
+                    steps_start.append(new_step)
+                new_step = new_step_template_start()
                 # get date of the step execution
                 new_step['exec_date'] = testing_logger.extract_date(line)
                 # get the information about the step
@@ -100,6 +111,13 @@ def get_steps_and_commands(filename):
                     new_step['step'] = step_start_info['step']
                     new_step['start_timestamp'] = step_start_info['timestamp']
                     new_step['version'] = step_start_info['version']
+                    new_step['descr'] = step_start_info['descr']
+                    new_step['run_id'] = step_start_info['run_id']
+                    new_step['step_id'] = step_start_info['step_id']
+                #try:
+                #    new_step['general_run_info'] = general_step_info
+                #except:
+                #    new_step['general_run_info'] = None
             if tcid.key_word_found(line):
                 new_tc_id = tcid.TcId()
                 new_tc_id.parse_tc_id_from_json_string(line=line)
@@ -109,16 +127,29 @@ def get_steps_and_commands(filename):
             if report.key_word_found(line, report.cmd_step_keyword_done):
                 step_end_info = report.parse_step_from_json_string(line, report.cmd_step_keyword_done)
                 if step_end_info is not None:
-                    if new_step['step'] == step_end_info['step']:
-                        new_step['end_timestamp'] = step_end_info['timestamp']
-                    else:
-                        print('get_steps_and_commands: the step number in the step-end string is different than the'
-                              'step number of the last step-start string.')
+                    new_step_end = new_step_template_end()
+                    new_step_end['step'] = step_end_info['step']
+                    new_step_end['timestamp'] = step_end_info['timestamp']
+                    new_step_end['step_id'] = step_end_info['step_id']
+                    steps_end.append(new_step_end)
+                    #if new_step['step'] == step_end_info['step']:
+                    #    new_step['end_timestamp'] = step_end_info['timestamp']
+                    #else:
+                    #    print('get_steps_and_commands: the step number in the step-end string is different than the'
+                    #          'step number of the last step-start string.')
         if new_step['step'] is not None:
-            steps.append(new_step)
+            steps_start.append(new_step)
         fileobject.close()
 
-    return steps
+    if len(steps_end) > len(steps_start):
+        print('More steps ended than started, something went wrong')
+
+    for start_info in steps_start:
+        for end_info in steps_end:
+            if start_info['step_id'] == start_info['step_id']:
+                start_info['end_timestamp'] = end_info['timestamp']
+
+    return steps_start
 
 
 if __name__ == '__main__':

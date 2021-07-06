@@ -15,16 +15,23 @@ def get_verification_steps(filename):
              end timestamp (CUC) of the verification and the result of the verification for this step
     :rtype: list of dict
     """
+
     vrc_start = []
     vrc_end = []
+    id_codes = {}
     with open(filename, 'r') as fileobject:
         for line in fileobject:
             if report.key_word_found(line, report.vrc_step_keyword):
                 new_dict = report.parse_step_from_json_string(line, report.vrc_step_keyword)
                 new_dict['exec_date'] = testing_logger.extract_date(line)
+                #new_dict['id_code'] = line.split('\t')[2]
+                #id_codes[line.split('\t')[2]] = int(line.split('\t')[2])
                 vrc_start.append(new_dict)
             if report.key_word_found(line, report.vrc_step_keyword_done):
-                vrc_end.append(report.parse_step_from_json_string(line, report.vrc_step_keyword_done))
+                new_dict = report.parse_step_from_json_string(line, report.vrc_step_keyword_done)
+                #new_dict['id_code'] = line.split('\t')[2]
+                #id_codes[line.split('\t')[2]] = int(line.split('\t')[2])
+                vrc_end.append(new_dict)
         fileobject.close()
 
     # print('\nfound {} steps:'.format(len(vrc_start)))
@@ -33,6 +40,9 @@ def get_verification_steps(filename):
     #
     # for item in vrc_start:
     #     print('Verification end for Step {} @ {}'.format(item['step'], item['timestamp']))
+    #exec_count = 1
+    if len(vrc_end) > len(vrc_start):
+        print('There are more steps finished than started, something went wrong')
 
     vrc_steps = []
     for item in vrc_start:
@@ -41,8 +51,12 @@ def get_verification_steps(filename):
         new_vrc_step['start_timestamp'] = item['timestamp']
         new_vrc_step['exec_date'] = item['exec_date']
         new_vrc_step['version'] = item['version']
+        new_vrc_step['descr'] = item['descr']
+        new_vrc_step['run_id'] = item['run_id']
+        new_vrc_step['step_id'] = item['step_id']
         for element in vrc_end:
-            if element['step'] == item['step']:
+            if element['step_id'] == item['step_id']:
+                #new_vrc_step['run_count'] = id_run_count[element['id_code']]
                 new_vrc_step['end_timestamp'] = element['timestamp']
                 new_vrc_step['result'] = element['result']
         vrc_steps.append(new_vrc_step)

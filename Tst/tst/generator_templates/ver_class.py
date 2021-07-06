@@ -12,6 +12,7 @@ class ${testSpecClassName}Verification:
         self.precond_ok = False
         self.integrity = True
         self.exceptions = []
+        self.run_id = False
 
         # some tests are depended on other tests, thus information is stored on class level
         # insert class variables here
@@ -39,9 +40,22 @@ class ${testSpecClassName}Verification:
 
         # ------- analyze command log -> get step start CUC timestamps, TCid and step end CUC timestamps -------
         # ToDo
+        self.run_id = False
         steps = analyse_command_log.get_steps(filename=command_log_file)
         tcs = analyse_command_log.get_sent_tcs(filename=command_log_file)
         # ------- loop over the verification steps, show progress -------
         # ToDo
         # ------- show final result -------
         # ToDo
+
+    def vrc_step_begin(self, pool_name, param, run_id, step_id):
+        if run_id:
+            self.run_id = run_id
+        else:
+            if not self.run_id:
+                now = datetime.now()  # current date and time
+                self.run_id = now.strftime("%Y%m%d%H%M%S")
+
+        step_start_cuc = cfl.get_last_pckt_time(pool_name=pool_name, string=False)
+        report.verification_step_begin(step_param=param, script_version=self.version(), pool_name=pool_name,
+                                       step_start_cuc=step_start_cuc, run_id=self.run_id, step_id=step_id)

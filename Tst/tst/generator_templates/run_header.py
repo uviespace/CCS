@@ -10,6 +10,7 @@ print('current working directory: {}'.format(os.getcwd()))
 import confignator
 ccs_path = confignator.get_option('paths', 'ccs')
 sys.path.append(ccs_path)
+import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
 from testlib import tools
 from testlib import report
@@ -18,7 +19,7 @@ from testlib import tc
 from testlib import precond
 from testlib import testing_logger
 from testlib import sim
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 import ${testSpecFileName}_command
 import ${testSpecFileName}_verification
 

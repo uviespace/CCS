@@ -3,7 +3,7 @@
 Report - writing log entries
 ============================
 """
-import datetime
+from datetime import datetime
 import logging
 import collections
 import json
@@ -13,15 +13,23 @@ import confignator
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 
-# create a logger
+# create logger
 logger = logging.getLogger(__name__)
+#now = datetime.now()  # current date and time
+#code = now.strftime("%Y%m%d%H%M%S")
+#extra = {'id_code': code}
+#logger = logging.LoggerAdapter(logger, extra)
 
+import datetime
+
+cmd_test_start_keyword = '#START TEST'
 cmd_step_keyword = '#COMMAND STEP'
 cmd_step_exception_keyword = 'EXCEPTION IN STEP'
 cmd_step_keyword_done = '#STEP DONE'  # ATTENTION! The _done keyword must not contain the start keyword
+vrc_test_start_keyword = '#START VERIFICATION'
 vrc_step_keyword = '#VERIFICATION FOR STEP'
 vrc_step_exception_keyword = 'EXCEPTION IN STEP'
-vrc_step_keyword_done = '#VERIFICATION DONE'  # ATTENTION! The _done keyword must not contain the start keyword
+vrc_step_keyword_done = '#VERIFICATION STEP DONE'  # ATTENTION! The _done keyword must not contain the start keyword
 
 
 def key_word_found(line, key_word):
@@ -40,7 +48,7 @@ def key_word_found(line, key_word):
     return found
 
 
-def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None):
+def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None, descr=None, run_id=None, step_id=None):
     """
     Make a JSON string out of the step number and timestamp
     :param step_number: number of the step
@@ -54,9 +62,21 @@ def encode_to_json_string(step_number, timestamp, step_version=None, step_result
         od['version'] = step_version
     if step_result is not None:
         od['result'] = step_result
+    if descr is not None:
+        od['descr'] = descr
+    if run_id is not None:
+        od['run_id'] = run_id
+    if step_id is not None:
+        od['step_id'] = step_id
     json_string = json.dumps(od)
     return json_string
 
+def make_json_string(*args, **kwargs):
+    od = {}
+    for key, value in kwargs.items():
+        od[str(key)] = value
+    json_string = json.dumps(od)
+    return json_string
 
 def parse_step_from_json_string(line, key_word):
     """
@@ -85,7 +105,7 @@ def parse_step_from_json_string(line, key_word):
             logger.error('parse_tc_id_from_json_string: parsing of the TC JSON string failed!')
 
 
-def command_step_begin(step_param, script_version, pool_name, step_start_cuc):
+def command_step_begin(step_param, script_version, pool_name, step_start_cuc, run_id, step_id):
     """
     Builds a string and writes it into the logging file. A keyword is set to enable a machine read out of the log file.
     All information of the step is written in a JSON string.
@@ -95,48 +115,57 @@ def command_step_begin(step_param, script_version, pool_name, step_start_cuc):
     :param step_start_cuc:
     :return:
     """
+    #print(step_param)
     logger.info('{} {} {}'.format(cmd_step_keyword,
                                   step_param['step_no'],
                                   encode_to_json_string(step_number=step_param['step_no'],
                                                         timestamp=step_start_cuc,
-                                                        step_version=script_version)))
-    logger.info(step_param['msg'])
+                                                        step_version=script_version,
+                                                        run_id=run_id,
+                                                        step_id=step_id,
+                                                        descr=step_param['descr'])))
+    logger.info(step_param['descr'])
     if 'comment' in step_param:
         if len(step_param['comment']) > 0:
             logger.info('Comment: {}'.format(step_param['comment']))
 
 
-def command_step_exception(step_param):
-    logger.warning('{} {}'.format(cmd_step_exception_keyword,
-                                  step_param['step_no']))
+def command_step_exception(step_param, step_id=None):
+    logger.warning('{} {} {}'.format(cmd_step_exception_keyword,
+                                  step_param['step_no'], make_json_string(step_id=step_id)))
 
 
-def command_step_end(step_param, step_end_cuc):
-    logger.info('{} {}\n'.format(cmd_step_keyword_done, encode_to_json_string(step_param['step_no'], step_end_cuc)))
+def command_step_end(step_param, step_end_cuc, step_id):
+    logger.info('{} {}\n'.format(cmd_step_keyword_done, encode_to_json_string(step_param['step_no'], step_end_cuc, step_id=step_id)))
 
 
-def verification_step_begin(step_param, script_version, pool_name, step_start_cuc):
+def verification_step_begin(step_param, script_version, pool_name, step_start_cuc, run_id, step_id):
+
     logger.info('{} {} {}'.format(vrc_step_keyword,
                                   step_param['step_no'],
                                   encode_to_json_string(step_number=step_param['step_no'],
                                                         timestamp=step_start_cuc,
-                                                        step_version=script_version)))
-    logger.info(step_param['msg'])
+                                                        step_version=script_version,
+                                                        run_id=run_id,
+                                                        step_id=step_id,
+                                                        descr=step_param['descr'])))
+    logger.info(step_param['descr'])
     if 'comment' in step_param:
         if len(step_param['comment']) > 0:
             logger.info('Comment: {}'.format(step_param['comment']))
 
 
-def verification_step_exception(step_param):
-    logger.warning('{} {}'.format(vrc_step_exception_keyword,
-                                  step_param['step_no']))
+def verification_step_exception(step_param, step_id=None):
+    logger.warning('{} {} {}'.format(vrc_step_exception_keyword,
+                                  step_param['step_no'], make_json_string(step_id=step_id)))
 
 
-def verification_step_end(step_param, step_result, step_end_cuc):
+def verification_step_end(step_param, step_result, step_end_cuc, step_id):
     logger.info('{} {} {}'.format(vrc_step_keyword_done,
                                   step_param['step_no'],
                                   encode_to_json_string(step_number=step_param['step_no'],
                                                         timestamp=step_end_cuc,
+                                                        step_id=step_id,
                                                         step_result=step_result)))
     if step_result is True:
         logger.info('Verification for step {} was passed successful. +++ OK +++\n'.format(step_param['step_no']))
@@ -154,12 +183,12 @@ class StepSummary:
     def had_exception(self):
         self.has_exception = True
 # --------------------------------------------
-
+# Command log output
 
 def write_log_step_header(step_param, pool_name, step_start_cuc):
     logger.info('STEP {} (starting from {})'
              .format(step_param['step_no'], step_start_cuc))
-    logger.info(step_param['msg'])
+    logger.info(step_param['descr'])
     if 'comment' in step_param:
         if len(step_param['comment']) > 0:
             logger.info('Comment: {}'.format(step_param['comment']))
@@ -171,13 +200,20 @@ def write_log_step_footer(step_param, step_result):
     else:
         logger.warning('Step {} failed.'.format(step_param['step_no']))
 
-
-def write_log_test_header(test, pool_name):
+def write_log_test_header(test, pool_name=None):
     logger.info('-------------------------------------------------------------------------------')
-    logger.info('Running test {}\n\t\t\t\t\tversion {}\n\t\t\t\t\tpoolname = {}\n\t\t\t\t\tCUC-timestamp of test '
-             'start = {}\n\t\t\t\t\tlocal time = {}'
-             .format(test.id, test.version, pool_name, cfl.get_last_pckt_time(pool_name=pool_name, string=False),
-                     datetime.datetime.now().isoformat()))
+    #logger.info('#Start Test: {}\n\t\t\t\t\tversion {}\n\t\t\t\t\tpoolname = {}\n\t\t\t\t\tCUC-timestamp of test '
+    #         'start = {}\n\t\t\t\t\tlocal time = {}'
+    #         .format(test.id, test.version, pool_name, cfl.get_last_pckt_time(pool_name=pool_name, string=False),
+    #                 datetime.datetime.now().isoformat()))
+    date_time = datetime.datetime.now().isoformat()
+    logger.info('{} {}'.format(cmd_test_start_keyword, make_json_string(test_name=test.id,
+    #                                                    version=test.version,
+                                                        pool_name=pool_name,
+                                                        cuc_start_time=cfl.get_last_pckt_time(pool_name=pool_name, string=False),
+                                                        local_start_time=date_time,
+                                                        run_id=test.run_id)))
+
     logger.info('#Description: {} \n'.format(test.description))
     if test.comment:
         logger.info('Comment: {}'.format(test.comment))
@@ -270,3 +306,4 @@ def write_postcondition_outcome(result):
         logger.info('Postconditions are fulfilled.\n')
     else:
         logger.warning('Postconditions are NOT fulfilled.\n')
+
