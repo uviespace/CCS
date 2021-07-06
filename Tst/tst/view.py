@@ -302,6 +302,9 @@ class Board(Gtk.Box):
         self.model.precon = precon_name
         # update the data model viewer
         self.app.update_model_viewer()
+        current_model = self.app.current_model()
+        if current_model:
+            current_model.precon = precon_name
         return
 
     def set_postcon_model(self):
@@ -319,10 +322,13 @@ class Board(Gtk.Box):
         self.model.postcon = postcon_name
         # update the data model viewer
         self.app.update_model_viewer()
+        current_model = self.app.current_model()
+        if current_model:
+            current_model.postcon = postcon_name
         return
 
     def precon_edit_clicked(self, widget):
-        dialog = Edit_Pre_Post_Con_Dialog(self, 'pre')
+        dialog = Edit_Pre_Post_Con_Dialog(self, 'pre', self.precon_selection.get_active())
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             dialog.destroy()
@@ -330,7 +336,7 @@ class Board(Gtk.Box):
             dialog.destroy()
 
     def postcon_edit_clicked(self, widget):
-        dialog = Edit_Pre_Post_Con_Dialog(self, 'post')
+        dialog = Edit_Pre_Post_Con_Dialog(self, 'post', self.postcon_selection.get_active())
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             dialog.destroy()
@@ -1345,13 +1351,14 @@ class StepRightClickMenu(Gtk.Menu):
         self.step_widget.board.update_widget_data()
 
 class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
-    def __init__(self, parent, pre_post):
+    def __init__(self, parent, pre_post, selection):
         #Gtk.Dialog.__init__(self, title='PRE-Conditions', transient_for=parent, flags=0)
         Gtk.Dialog.__init__(self, title=pre_post.upper() + ' -Conditions')
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
         )
         self.set_default_size(200, 200)
+        self.first_entry = selection
         self.win = parent
         self.file_path = os.path.join(confignator.get_option('paths', 'tst'),
                                       'tst/generator_templates/co_'+pre_post+'_condition_entry.py')
@@ -1377,6 +1384,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.selection = Gtk.ComboBox.new_with_model_and_entry(self.get_con_sections_model())
         self.selection.connect("changed", self.on_name_combo_changed)
         self.selection.set_entry_text_column(0)
+        self.selection.set_active(self.first_entry)
 
         self.save_button = Gtk.Button.new_with_label('Save')
         self.save_button.connect("clicked", self.save_button_clicked)
@@ -1419,9 +1427,12 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
             name, start_line, end_line = model[tree_iter]
             new = False
         else:
-            entry = widget.get_child()
+            entry = self.selection.get_child()
             name = entry.get_text()
             new = True
+
+        if not name:
+            return
 
         buf = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
 

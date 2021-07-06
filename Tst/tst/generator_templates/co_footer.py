@@ -27,8 +27,7 @@
         # if preconditions are met, execute the steps and note the results
         if self.precond_ok:
             # define the steps array
-            steps = [$testStepsList
-            ]
+            steps = [$testStepsList]
             self.number_of_steps = len(steps)
             # execute all test steps
             for step in steps:
@@ -37,7 +36,7 @@
                     t_start = time.time()
                     res = step(pool_name=pool_name)
                     t_end = time.time()
-                    logger.debug('runtime of step: {}s\n'.format(t_end - t_start))
+                    logger.info('runtime of step: {}s\n'.format(t_end - t_start))
                 except Exception as error:
                     self.test_passed = False
                     res = report.StepSummary(step_number=step.__name__, result=False)

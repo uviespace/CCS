@@ -31,10 +31,10 @@ def save_file(file_path, test_spec, file_extension=None, logger=module_logger, *
     with open(file_path, 'w') as file:
         try:
             json.dump(test_spec, fp=file, indent=1, default=test_spec.serialize)
+            logger.info('Saved file "{}"'.format(file_path))
         except Exception as e:
             logger.exception(e)
             logger.error('Failed to json-dump the instance into a file')
-    logger.info('Saved file "{}"'.format(file_path))
 
 
 def _to_json_string(test_to_save):

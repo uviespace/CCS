@@ -12,18 +12,3 @@ success = True
 print('No pre-conditions have been given')
 success = True
 
-
-
-
-
-
-#####-Save-#####
-
-
-
-
-
-#####-Save-#####
-
-
-
