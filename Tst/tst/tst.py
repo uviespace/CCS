@@ -421,7 +421,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         label.set_text(label_text)
         btn_close = Gtk.Button.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
         btn_close.set_tooltip_text('Close')
-        btn_close.connect('clicked', self.on_close)
+        btn_close.connect('clicked', self.on_close_clicked)
         box.pack_start(label, True, True, 0)
         box.pack_start(btn_close, True, True, 0)
         box.show_all()
@@ -481,6 +481,18 @@ class TstAppWindow(Gtk.ApplicationWindow):
             # remove the page from the notebook
             self.notebook.remove_page(current_page)
         self.update_model_viewer()
+
+    def on_close_clicked(self, widget):
+        """
+        Closing the page on which was clicked
+        """
+        for i in range(0, self.notebook.get_n_pages()):  # Loop over all availabe page numbers
+            page = self.notebook.get_nth_page(i)    # Get page widget
+            if self.notebook.get_tab_label(page) == widget.get_parent():    # Check if the label widget is the same as for the given widget
+                self.notebook.remove_page(i)    # If so close the page
+                return
+
+        #self.notebook.remove_page(widget.get_parent())
 
     def on_open(self, *args):
         dialog = Gtk.FileChooserDialog('Please choose a file',

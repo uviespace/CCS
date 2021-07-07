@@ -1367,7 +1367,6 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
             self.section_dict = generator.get_precon_sections()
         else:
             self.section_dict = generator.get_postcon_sections()
-
         self.view()
 
         self.show_all()
@@ -1393,9 +1392,10 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.selection_box.pack_start(self.save_button, False, True, 0)
 
         box = self.get_content_area()
-        box.pack_start(self.selection_box, True, True, 0)
+        box.pack_start(self.selection_box, False, True, 0)
         box.pack_start(self.scrolled_window, True, True, 0)
-
+        #box.add(self.selection_box)
+        #box.pack_end(self.scrolled_window, True, True, 0)
 
     def get_con_sections_model(self):
         data_model = Gtk.ListStore(str, int, int)
@@ -1486,8 +1486,8 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         # textview is scrolled
         self.scrolled_window.add(self.textview)
 
-        box = self.get_content_area()
-        box.add(self.selection_box)
+        #box = self.get_content_area()
+        #box.add(self.selection_box)
 
         return
 
@@ -1505,7 +1505,6 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
             for count, line in enumerate(entry_array):
                 entry += line
             entry_file_obj.close()
-
         return entry
 
 
