@@ -3,8 +3,13 @@
 Analyzing the log file of the Verification Script. Get the information which Verifications were done and if they were
 successful.
 """
-from . import report
-from . import testing_logger
+import confignator
+import sys
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
+from testlib import report
+from testlib import testing_logger
 
 
 def get_verification_steps(filename):
@@ -61,9 +66,9 @@ def get_verification_steps(filename):
                 new_vrc_step['result'] = element['result']
         vrc_steps.append(new_vrc_step)
 
-    print('\nVerification steps ({} total):'.format(len(vrc_start)))
-    for item in vrc_steps:
-        print('Verification Step {}: start: {}; end: {}; result: {}'.format(item['step'], item['start_timestamp'], item['end_timestamp'], item['result']))
+    #print('\nVerification steps ({} total):'.format(len(vrc_start)))
+    #for item in vrc_steps:
+    #    print('Verification Step {}: start: {}; end: {}; result: {}'.format(item['step'], item['start_timestamp'], item['end_timestamp'], item['result']))
 
     return vrc_steps
 

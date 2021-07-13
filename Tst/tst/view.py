@@ -235,6 +235,32 @@ class Board(Gtk.Box):
         self.test_meta_data_desc.set_text(self.model.description)
         # set the version of the test specification from the data model
         self.test_meta_data_version.set_text(self.model.version)
+        # set the pre-condition name
+        if self.model.precon:
+            found = False
+            for index, precon_name in enumerate(self.precon_selection.get_model()):
+                if precon_name[0] == self.model.precon:
+                    found = True
+                    self.precon_selection.set_active(index)
+            if not found:
+                msg = 'Given Pre-Condition Name could not be found/loaded'
+                self.logger.warning(msg)
+                self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
+                self.on_precon_changed(self.precon_selection)
+
+        # set the post-condition name
+        if self.model.postcon:
+            found = False
+            for index, postcon_name in enumerate(self.postcon_selection.get_model()):
+                if postcon_name[0] == self.model.postcon:
+                    found = True
+                    self.postcon_selection.set_active(index)
+            if not found:
+                msg = 'Given Post-Condition Name could not be found/loaded'
+                self.logger.warning(msg)
+                self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
+                self.on_postcon_changed(self.precon_selection)
+
 
     def collapse_all_steps(self, button):
         """ Close all expander of the steps """
@@ -302,9 +328,9 @@ class Board(Gtk.Box):
         self.model.precon = precon_name
         # update the data model viewer
         self.app.update_model_viewer()
-        current_model = self.app.current_model()
-        if current_model:
-            current_model.precon = precon_name
+        #current_model = self.app.current_model()
+        #if current_model:
+        #    current_model.precon = precon_name
         return
 
     def set_postcon_model(self):
@@ -322,9 +348,9 @@ class Board(Gtk.Box):
         self.model.postcon = postcon_name
         # update the data model viewer
         self.app.update_model_viewer()
-        current_model = self.app.current_model()
-        if current_model:
-            current_model.postcon = postcon_name
+        #current_model = self.app.current_model()
+        #if current_model:
+        #    current_model.postcon = postcon_name
         return
 
     def precon_edit_clicked(self, widget):

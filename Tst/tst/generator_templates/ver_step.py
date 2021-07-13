@@ -1,5 +1,5 @@
     # STEP $testStepNumber --------------------------------------------------------------------------------------------------------
-    def step_$testStepNumber(self, pool_name, start_cuc=None, tc_id=None, run_id=None, step_id=None):
+    def step_$testStepNumber(self, pool_name, start_cuc=None, run_id=None, step_id=None):
         testing_logger.ver_log_handler(__name__)
         param = {
             'step_no': '$testStepNumber',

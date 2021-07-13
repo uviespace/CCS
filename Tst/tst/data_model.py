@@ -906,6 +906,8 @@ class TestSpecification:
         new_testspec.description = copy.copy(self.description)
         new_testspec.version = copy.copy(self.version)
         new_testspec.primary_counter_locked = copy.copy(self.primary_counter_locked)
+        new_testspec.precon = copy.copy(self.precon)
+        new_testspec.postcon = copy.copy(self.postcon)
 
         return new_testspec
 
@@ -984,6 +986,8 @@ class TestSpecification:
             self.description = json_data['_description']
             self.version = json_data['_version']
             self.primary_counter_locked = json_data['_primary_counter_locked']
+            self.precon = json_data['_precon']
+            self.postcon = json_data['_postcon']
         except KeyError as keyerror:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(keyerror))
 

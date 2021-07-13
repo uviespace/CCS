@@ -2,9 +2,14 @@
 """
 Analyzing the log file of the Command Script. Get the information which Steps were done and which TC were sent.
 """
-from . import report
-from . import testing_logger
-from . import tcid
+import confignator
+import sys
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
+from testlib import report
+from testlib import testing_logger
+from testlib import tcid
 
 
 def get_sent_tcs(filename):
@@ -33,7 +38,8 @@ def get_sent_tcs(filename):
 
 def get_steps(filename):
     """
-    Get all steps which could be found in the log file
+    Get all steps which could be found in the log file, deprecated version (does not use step id or run id, use
+    get_steps_and_commands function below)
     :param filename: path to the log file
     :return: list of all steps as a dictionaries of step number and step starting timestamp (CUC)
     :rtype: list of dict
@@ -74,9 +80,9 @@ def get_steps(filename):
 
 def get_steps_and_commands(filename):
     """
-    ???
+    Get all steps which could be found in the log file and identifiy step start/end by step_id
     :param filename: path to the log file
-    :return:
+    :return: all found steps
     :rtype: list of dict
     """
     steps = []
@@ -146,7 +152,7 @@ def get_steps_and_commands(filename):
 
     for start_info in steps_start:
         for end_info in steps_end:
-            if start_info['step_id'] == start_info['step_id']:
+            if start_info['step_id'] == end_info['step_id']:
                 start_info['end_timestamp'] = end_info['timestamp']
 
     return steps_start

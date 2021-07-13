@@ -29,7 +29,6 @@
             Time of the last incomming package before the step is started/ used as time of step start
         :return: summary: report.StepSummary class object
             Containes a summary of the test
-        :return: tc_id:
         """
         testing_logger.cmd_log_handler(__name__)
         step_id = self.check_run_and_step_id(pool_name=pool_name)
@@ -38,5 +37,4 @@
                                   step_start_cuc=step_start_cuc, run_id=self.run_id, step_id=step_id)
 
         summary = report.StepSummary(step_number=param['step_no'])
-        tc_id = None
-        return step_start_cuc, summary, tc_id, step_id
+        return step_start_cuc, summary, step_id
