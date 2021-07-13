@@ -77,6 +77,30 @@ def get_steps(filename):
 
     return steps
 
+def get_test_description(filename):
+    """
+    Returns the Test Description, If two are identical only one of them is returned
+    :param filename: path to the log file
+    :return: list of test descriptions
+    :rtype: list of str
+    """
+    if not filename:
+        return ''
+    descr_list = []
+    with open(filename, 'r') as fileobject:
+        for line in fileobject:
+            if report.key_word_found(line, report.cmd_test_start_keyword):
+                general_step_info = report.parse_step_from_json_string(line, report.cmd_test_start_keyword)
+                if general_step_info['descr'] not in descr_list:
+                    descr_list.append(general_step_info['descr'])
+
+    for count, descr in enumerate(descr_list):
+        if count == 0:
+            description = descr
+        else:
+            description += ' / ' + descr
+            print('More than one Description was found in the command log File')
+    return description
 
 def get_steps_and_commands(filename):
     """

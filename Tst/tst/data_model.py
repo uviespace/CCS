@@ -329,7 +329,6 @@ class TestSequence:
         self._description = ''
         self._version = ''
         self._primary_counter_locked = False
-
         self.steps = []
 
         if json_data is not None:
@@ -893,6 +892,7 @@ class TestSpecification:
         self._primary_counter_locked = False
         self._precon = ''
         self._postcon = ''
+        self._comment = ''
         self.sequences = []
 
         if json_data is not None:
@@ -908,6 +908,7 @@ class TestSpecification:
         new_testspec.primary_counter_locked = copy.copy(self.primary_counter_locked)
         new_testspec.precon = copy.copy(self.precon)
         new_testspec.postcon = copy.copy(self.postcon)
+        new_testspec.comment = copy.copy(self.comment)
 
         return new_testspec
 
@@ -969,6 +970,15 @@ class TestSpecification:
         assert isinstance(value, str)
         self._postcon = value
 
+    @property
+    def comment(self):
+        return self._comment
+
+    @comment.setter
+    def comment(self, value: str):
+        assert isinstance(value, str)
+        self._comment = value
+
     def encode_to_json(self, *args):
         """
         Makes out of the TestSequence a JSON object.
@@ -988,6 +998,7 @@ class TestSpecification:
             self.primary_counter_locked = json_data['_primary_counter_locked']
             self.precon = json_data['_precon']
             self.postcon = json_data['_postcon']
+            self.comment = json_data['_comment']
         except KeyError as keyerror:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(keyerror))
 

@@ -26,7 +26,6 @@ cmd_test_start_keyword = '#START TEST'
 cmd_step_keyword = '#COMMAND STEP'
 cmd_step_exception_keyword = 'EXCEPTION IN STEP'
 cmd_step_keyword_done = '#STEP DONE'  # ATTENTION! The _done keyword must not contain the start keyword
-vrc_test_start_keyword = '#START VERIFICATION'
 vrc_step_keyword = '#VERIFICATION FOR STEP'
 vrc_step_exception_keyword = 'EXCEPTION IN STEP'
 vrc_step_keyword_done = '#VERIFICATION STEP DONE'  # ATTENTION! The _done keyword must not contain the start keyword
@@ -48,7 +47,7 @@ def key_word_found(line, key_word):
     return found
 
 
-def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None, descr=None, run_id=None, step_id=None):
+def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None, descr=None, run_id=None, step_id=None, comment=None):
     """
     Make a JSON string out of the step number and timestamp
     :param step_number: number of the step
@@ -68,6 +67,8 @@ def encode_to_json_string(step_number, timestamp, step_version=None, step_result
         od['run_id'] = run_id
     if step_id is not None:
         od['step_id'] = step_id
+    if comment is not None:
+        od['comment'] = comment
     json_string = json.dumps(od)
     return json_string
 
@@ -123,7 +124,8 @@ def command_step_begin(step_param, script_version, pool_name, step_start_cuc, ru
                                                         step_version=script_version,
                                                         run_id=run_id,
                                                         step_id=step_id,
-                                                        descr=step_param['descr'])))
+                                                        descr=step_param['descr'],
+                                                        comment=step_param['comment'])))
     logger.info(step_param['descr'])
     if 'comment' in step_param:
         if len(step_param['comment']) > 0:
@@ -212,9 +214,12 @@ def write_log_test_header(test, pool_name=None):
                                                         pool_name=pool_name,
                                                         cuc_start_time=cfl.get_last_pckt_time(pool_name=pool_name, string=False),
                                                         local_start_time=date_time,
+                                                        descr=test.description,
+                                                        comment=test.comment,
                                                         run_id=test.run_id)))
 
-    logger.info('#Description: {} \n'.format(test.description))
+    #logger.info('#Description: {} \n'.format(test.description))
+    logger.info(test.description)
     if test.comment:
         logger.info('Comment: {}'.format(test.comment))
 

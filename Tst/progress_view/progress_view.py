@@ -103,6 +103,8 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.cmd_steps = None
         self.vrc_steps = None
 
+        self.run_count = {}
+
         self.expander_states = []
 
         self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str, str)
@@ -720,9 +722,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                     detailed_info.append('Error Code:')
             elif count == 5:
                 detailed_info.append('Code')
-            elif count in [3,6,8]:
-                detailed_info.append('')
-            elif count == 10:
+            elif count in [3, 6, 8, 10]:
                 detailed_info.append('')
 
         new_row_iter = tree_store.append(inner_row_iter, detailed_info)
@@ -730,14 +730,15 @@ class TestProgressView(Gtk.ApplicationWindow):
     def set_test_title(self):
         json_title = self.test_model.name if self.test_model else None
         test_desc = self.test_model.description if self.test_model else None
-        cmd_title = self.text_path_cmd_btn.get_filename()
-        vrc_title = self.text_path_vrc_btn.get_filename()
+        cmd_title = self.text_path_cmd_btn.get_filename() if self.text_path_cmd_btn.get_filename() else None
+        test_desc = analyse_command_log.get_test_description(self.path_cmd) if not test_desc else test_desc
+        vrc_title = self.text_path_vrc_btn.get_filename().split('_')[0] if self.text_path_vrc_btn.get_filename() else None
         if json_title:
             self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(json_title.split('/')[-1], test_desc))
         elif cmd_title:
-            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(cmd_title.split('/')[-1], test_desc))
+            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(cmd_title.split('/')[-1].split('_')[0], test_desc))
         elif vrc_title:
-            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(vrc_title.split('/')[-1], test_desc))
+            self.test_title.set_markup('<b><big>{}</big></b>\t{}'.format(vrc_title.split('/')[-1].split('_')[0], test_desc))
         else:
             self.test_title.set_text('')
 
@@ -799,8 +800,10 @@ class TestProgressView(Gtk.ApplicationWindow):
         for step in test_model.sequences[0].steps:
             step_number = step.step_number_test_format
             if step_number not in tree_store_steps:
-                # Sequnece number is no longer shown as it is not necessary as long as only one sequnece is supported
-                step_desc = 'Step ' + str(step_number[:-2])
+                # Secondary Counter is not shown if it is 0
+                step_number_primary, step_number_secondary = step_number.split('_')
+                step_number_shown = step_number_primary if int(step_number_secondary) == 0 else '{}.{}'.format(step_number_primary, step_number_secondary)
+                step_desc = 'Step ' + str(step_number_shown)
 
                 new_drawer_row = self.build_row_list(step_number=str(step_number),
                                                      step_desc=step_desc,
@@ -873,11 +876,15 @@ class TestProgressView(Gtk.ApplicationWindow):
             # make execution drawers
             for exec_num in all_exec_numbers.keys():
                 if not exec_num in tree_store_exec.keys():
-                    #exec_desc = 'Run ' + str(exec_num)
-                    exec_desc = str(exec_num)
+                    if exec_num not in self.run_count.keys():
+                        self.run_count[exec_num] = str(len(self.run_count) + 1)
+                    exec_desc = 'Run ' + self.run_count[exec_num]
+                    tooltip = '{}-{}-{} {}:{}:{}'.format(exec_num[0:4], exec_num[4:6], exec_num[6:8], exec_num[8:10],
+                                                         exec_num[10:12], exec_num[12:14])
                     new_drawer_row = self.build_row_list(exec_int=str(exec_num),
                                                          exec_desc=exec_desc,
-                                                         sort_button_active=self.sort_button.get_active())
+                                                         sort_button_active=self.sort_button.get_active(),
+                                                         tooltip_text=tooltip)
                     tree_store.append(None, new_drawer_row)
                     tree_store_exec[exec_num] = []
 
@@ -887,7 +894,12 @@ class TestProgressView(Gtk.ApplicationWindow):
                     exec_num = row[12]
                     for step in all_exec_numbers[exec_num]:
                         if not step['step'] in tree_store_exec[exec_num]:
-                            step_desc = 'Step ' + str(step['step'][:-2])
+                            # Secondary Counter is not shown if it is 0
+                            step_number_primary, step_number_secondary = step['step'].split('_')
+                            step_number_shown = step_number_primary if int(
+                                step_number_secondary) == 0 else '{}.{}'.format(step_number_primary,
+                                                                                step_number_secondary)
+                            step_desc = 'Step ' + str(step_number_shown)
                             new_step_row = self.build_row_list(step_number=str(step['step']),
                                                                step_desc=step_desc,
                                                                sort_button_active=self.sort_button.get_active(),
@@ -953,7 +965,12 @@ class TestProgressView(Gtk.ApplicationWindow):
             for item in cmd_steps:
                 step_number = item['step']
                 if step_number not in tree_store_steps:
-                    step_desc = 'Step ' + str(step_number[:-2])
+                    # Secondary Counter is not shown if it is 0
+                    step_number_primary, step_number_secondary = step_number.split('_')
+                    step_number_shown = step_number_primary if int(
+                        step_number_secondary) == 0 else '{}.{}'.format(step_number_primary,
+                                                                        step_number_secondary)
+                    step_desc = 'Step ' + str(step_number_shown)
                     new_drawer_row = self.build_row_list(step_number=str(step_number),
                                                          step_desc=step_desc,
                                                          sort_button_active=self.sort_button.get_active(),
@@ -1041,11 +1058,15 @@ class TestProgressView(Gtk.ApplicationWindow):
             # make execution drawers
             for exec_num in all_exec_numbers.keys():
                 if not exec_num in tree_store_exec.keys():
-                    #exec_desc = 'Run ' + str(exec_num)
-                    exec_desc = str(exec_num)
+                    if exec_num not in self.run_count.keys():
+                        self.run_count[exec_num] = str(len(self.run_count) + 1)
+                    exec_desc = 'Run ' + self.run_count[exec_num]
+                    tooltip = '{}-{}-{} {}:{}:{}'.format(exec_num[0:4], exec_num[4:6], exec_num[6:8], exec_num[8:10],
+                                                         exec_num[10:12], exec_num[12:14])
                     new_drawer_row = self.build_row_list(exec_int=str(exec_num),
                                                          exec_desc=exec_desc,
-                                                         sort_button_active=self.sort_button.get_active())
+                                                         sort_button_active=self.sort_button.get_active(),
+                                                         tooltip_text=tooltip)
                     tree_store.append(None, new_drawer_row)
                     tree_store_exec[exec_num] = []
 
@@ -1055,7 +1076,12 @@ class TestProgressView(Gtk.ApplicationWindow):
                     exec_num = row[12]
                     for step in all_exec_numbers[exec_num]:
                         if not step['step'] in tree_store_exec[exec_num]:
-                            step_desc = 'Step ' + str(step['step'][:-2])
+                            # Secondary Counter is not shown if it is 0
+                            step_number_primary, step_number_secondary = step['step'].split('_')
+                            step_number_shown = step_number_primary if int(
+                                step_number_secondary) == 0 else '{}.{}'.format(step_number_primary,
+                                                                                step_number_secondary)
+                            step_desc = 'Step ' + str(step_number_shown)
                             new_step_row = self.build_row_list(step_number=str(step['step']),
                                                                step_desc=step_desc,
                                                                sort_button_active=self.sort_button.get_active(),
@@ -1117,7 +1143,12 @@ class TestProgressView(Gtk.ApplicationWindow):
             for item in vrc_steps:
                 step_number = item['step']
                 if step_number not in tree_store_steps:
-                    step_desc = 'Step ' + str(step_number[:-2])
+                    # Secondary Counter is not shown if it is 0
+                    step_number_primary, step_number_secondary = step_number.split('_')
+                    step_number_shown = step_number_primary if int(
+                        step_number_secondary) == 0 else '{}.{}'.format(step_number_primary,
+                                                                        step_number_secondary)
+                    step_desc = 'Step ' + str(step_number_shown)
                     new_drawer_row = self.build_row_list(step_number=str(step_number),
                                                          step_desc=step_desc,
                                                          sort_button_active=self.sort_button.get_active(),

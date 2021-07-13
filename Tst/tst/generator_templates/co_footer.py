@@ -10,7 +10,7 @@
             Defines the log level
         :param make_new_log_file: bool
             The logging writes to a file. If this variable is set to True, a new log-file is created.
-        :return: instance of TestIASW66
+        :return: instance the Test
             A instance of this test class
         """
         testing_logger.cmd_log_handler(__name__)

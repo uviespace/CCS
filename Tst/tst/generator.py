@@ -138,7 +138,10 @@ def make_command_script(model, model_spec):
                                    testSpecFileName=create_file_name(model_spec.name),
                                    testSpecName=model_spec.name,
                                    testSpecDescription=model_spec.description,
-                                   testSpecVersion=model_spec.version)
+                                   testSpecVersion=model_spec.version,
+                                   testPreCondition=model_spec.comment,
+                                   testPostCondition=model_spec.comment,
+                                   testComment=model_spec.comment)
         # add the header string
         content += '\n\n' + cls
 
@@ -368,11 +371,13 @@ def make_documentation(model, model_spec):
 
 def make_all(model):
     paths = []
+    # TODO: Only one Sequence is supported here
     for sequence in model.sequences:
         cs_path = make_command_script(sequence, model)
         cms_path = make_command_run_script(sequence, model)
         vf_path = make_verification_script(sequence, model)
         dc_path = make_documentation(sequence, model)
+        break
 
     #cs_path = make_command_script(model)
     #cms_path = make_command_manually_steps_script(model)

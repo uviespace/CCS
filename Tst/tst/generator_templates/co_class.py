@@ -3,9 +3,9 @@ class ${testSpecClassName}:
         self.id = '${testSpecFileName}'
         self.name = '${testSpecName}'
         self.description = '${testSpecDescription}'
-        self.precondition = ''
-        self.postcondition = ''
-        self.comment = ''
+        self.precondition = '${testPreCondition}'
+        self.postcondition = '${testPostCondition}'
+        self.comment = '${testComment}'
         self.number_of_steps = None
         self.successful_steps = 0
         self.step_results = []

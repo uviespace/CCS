@@ -17,7 +17,7 @@ cfl.add_tst_import_paths()
 from testlib import analyse_verification_log
 from testlib import analyse_command_log
 
-test_name = 'test3'
+test_name = 'test'
 
 cmd_log_file_end = '_command.log'
 vrc_log_file_end = '_verification.log'
@@ -60,7 +60,9 @@ def result_as_csv(test_name, log_file_path=None, output_file_path=None):
         writer.writerow(output_file_header)
 
         # write the general info line
-        writer.writerow([test_name, 'Test Description', 'Test Spec. Version: ' + cmd_steps[0]['version'], 'Test Rep. Version: ' + f'{file_count:03d}'])  # TODO: version always same in log file?
+        description = analyse_command_log.get_test_description(cmd_log_file)
+        version = get_version(cmd_steps)
+        writer.writerow([test_name, 'Test Description', version, 'Test Rep. Version: ' + f'{file_count:03d}'])  # TODO: Multiple versions/descriptions what to do?
 
         # write date line
         date_format = '%Y-%m-%d'
@@ -79,11 +81,34 @@ def result_as_csv(test_name, log_file_path=None, output_file_path=None):
             for vrc_step in vrc_steps:
                 if step['step_id'] == vrc_step['step_id']:
                     test_result = 'VERIFIED' if vrc_step['result'] else 'FAILED'
-                    writer.writerow(['Step ' + step['step'][:-2], step['descr'], 'Probably some VRC description', test_result])  # TODO: Third coloumn is what?
+                    # Secondary Counter is not shown if it is 0
+                    step_number_primary, step_number_secondary = step['step'].split('_')
+                    step_number_shown = step_number_primary if int(
+                        step_number_secondary) == 0 else '{}.{}'.format(step_number_primary,
+                                                                        step_number_secondary)
+                    step_desc = 'Step ' + str(step_number_shown)
+                    writer.writerow([step_desc, step['descr'], 'Probably some VRC description', test_result])  # TODO: Third coloumn is what?
 
         # write Postcon line
         writer.writerow(['Postcon.', 'This has still to be solved', '', ''])  # TODO: What should be shown of the Postcon
 
+def get_version(steps):
+    """
+    Get a string of the different version that could be found
+    :param list of dicts steps: all the steps from the log file
+    :return str version_final: A string that contains all found versions
+    """
+    version_list = []
+    for step in steps:
+        if step['version'] not in version_list:
+            version_list.append()
+    for count, version in enumerate(version_list):
+        if count == 0:
+            version_final = version
+        else:
+            version_final += ' / ' + version
+            print('More than one Version was found in the command log File')
+    return version_final
 
 def show_basic_results(test_name, log_file_path=None):
     """
