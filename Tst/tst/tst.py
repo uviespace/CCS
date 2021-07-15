@@ -536,11 +536,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.save_as_file_dialog()
 
     def save_as_file_dialog(self):
+        current_name = self.current_model().name
         current_model = self.current_model()
         dialog = Gtk.FileChooserDialog('Please choose a file',
                                        self,
                                        Gtk.FileChooserAction.SAVE,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+        dialog.set_current_name(current_name+'.json')
         self.add_filters(dialog)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:

@@ -13,6 +13,7 @@ cfl.add_tst_import_paths()
 from testlib import analyse_command_log
 from testlib import analyse_verification_log
 from testlib import testing_logger
+from testlib import analyse_test_run
 import dbus
 import time
 import data_model
@@ -279,6 +280,10 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.btn_rld_all.set_label('Reload all')
         self.btn_rld_all.connect('clicked', self.on_reload_all)
         self.box_buttons.pack_start(self.btn_rld_all, False, False, 0)
+        self.btn_output = Gtk.Button()
+        self.btn_output.set_label('Generate Output File')
+        self.btn_output.connect('clicked', self.on_save_as)
+        self.box_buttons.pack_start(self.btn_output, False, False, 0)
 
         self.sort_label = Gtk.Label()
         self.sort_label.set_text('Sort by Execution')
@@ -578,6 +583,29 @@ class TestProgressView(Gtk.ApplicationWindow):
         with open(self.path_vrc, 'w') as vrc_log:
             vrc_log.write('')
             vrc_log.close()
+
+
+    def on_save_as(self, *args):
+        self.save_as_file_dialog()
+        return
+
+    def save_as_file_dialog(self):
+        dialog = Save_to_File_Dialog(parent=self)
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            folder = dialog.get_current_folder()
+            run_count = dialog.run_id_selection.get_active()
+            run = None
+            if run_count:
+                for run_id in self.run_count.keys():
+                    if self.run_count[run_id] == run_count:
+                        run = run_id
+            analyse_test_run.save_result_to_file('test', log_file_path=folder, run_id=run)
+            #confignator.save_option('tst-logging', 'output-file-path', folder)
+        elif response == Gtk.ResponseType.CANCEL:
+            pass
+        dialog.destroy()
+        return
 
     def on_destroy(self, *args):
         self.logger.info('Self-Destruct of the ProgressView Window initiated.\n')
@@ -1201,6 +1229,61 @@ class TestProgressView(Gtk.ApplicationWindow):
                         #self.add_detailed_row(new_row_iter, tree_store)
             self.restore_expanded_states(tree_store)
 
+
+class Save_to_File_Dialog(Gtk.FileChooserDialog):
+    def __init__(self, parent=None):
+        super(Save_to_File_Dialog, self).__init__(title='Please choose a Folder to save the Test Run',
+                                       parent=parent,
+                                       action=Gtk.FileChooserAction.SELECT_FOLDER)
+
+        self.win = parent
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+        self.set_current_folder(confignator.get_option(section='tst-logging', option='output-file-path'))
+
+        area = self.get_content_area()
+
+        self.savedetailes = Gtk.HBox()  # Store everything in this box
+        self.savedetailes.set_border_width(15)
+
+        run_id_label = Gtk.Label(label='Select Run ID: ')
+
+        # Select the Run ID which should be printed to the File
+        self.run_id_selection = Gtk.ComboBoxText.new()  # Make the Combobox
+        if not self.win.sort_button.get_active():  # If sorted by steps, run id is not defined
+            self.run_id_selection.append_text('Whole Log File')  # Only possible selection is to save whole file
+            self.run_id_selection.set_button_sensitivity(False)
+            self.run_id_selection.set_active(0)
+            self.run_id_selection.set_tooltip_text('If Sorted by Executions, it is possible to limit the Output File to just one Run')
+        else:  # If sorted by executions add all available run ids
+            self.run_id_selection.append('0', 'Whole Log File')  # Give also the possibility to save whole file
+            for run_id in self.win.run_count:
+                self.run_id_selection.append(run_id, 'Run ' + self.win.run_count[run_id])  # Add all Run ids
+
+            model, iter = self.win.view.get_selection().get_selected()  # Get selected treeview row
+            if iter:  # If a selection is made try to set it as active row, otherwise Whole file is active row
+                selected_step_id = model.get_value(iter, 12)  # Get the value
+                if not selected_step_id:  # Only execution rows ('Run X') have entry at coloumn 12, others dont
+                    self.run_id_selection.set_active(0)
+                else:
+                    self.run_id_selection.set_active(int(self.win.run_count[selected_step_id]))
+            else:
+                self.run_id_selection.set_active(0)
+            self.run_id_selection.set_tooltip_text('Define which Run should be saved or the whole Log File')
+
+        test_report_label = Gtk.Label(label='Test Report: ')
+
+        self.test_report_int = Gtk.Entry()
+        self.test_report_int.set_tooltip_text('Select the Test Report Number (1-999) NOTE: Prior Versions could be overwritten, If emtpy it will be automatically generated')
+
+        self.savedetailes.pack_end(self.run_id_selection, False, True, 10)
+        self.savedetailes.pack_end(run_id_label, False, True, 10)
+        self.savedetailes.pack_end(self.test_report_int, False, True, 10)
+        self.savedetailes.pack_end(test_report_label, False, True, 10)
+
+        area.pack_start(self.savedetailes, False, True, 0)
+
+        self.show_all()
+        return
 
 def run():
     bus_name = confignator.get_option('dbus_names', 'progress-view')

@@ -1879,7 +1879,7 @@ class TMPoolView(Gtk.Window):
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         rule_box = Gtk.HBox()
         rule_box.set_spacing(3)
-        rule_box.pack_start(Gtk.Label('Filters: '), 0, 0, 0)
+        rule_box.pack_start(Gtk.Label(label='Filters: '), 0, 0, 0)
         scrolled_window.add(rule_box)
 
         #scrolled_window.add(resize_view_check_button)
@@ -2012,7 +2012,7 @@ class TMPoolView(Gtk.Window):
     def context_menu(self):
         menu = Gtk.Menu()
 
-        item = Gtk.MenuItem('TEST')
+        item = Gtk.MenuItem(label='TEST')
         item.connect('activate', self.menu_test)
         menu.append(item)
         return menu
@@ -2295,7 +2295,8 @@ class TMPoolView(Gtk.Window):
         self.rawswitch.connect('toggled', self.set_tm_data_view, None, True)
         # self.sortswitch = Gtk.CheckButton.new_with_label('Sort by Name')
         # self.sortswitch.connect('toggled', self.set_tm_data_view, )
-        switchbox = Gtk.Box(Gtk.Orientation.HORIZONTAL)
+        #switchbox = Gtk.Box(Gtk.Orientation.HORIZONTAL)
+        switchbox = Gtk.HBox()
         switchbox.pack_start(self.rawswitch, 0, 0, 0)
         # switchbox.pack_end(self.sortswitch, 0, 0, 0)
 
@@ -3403,10 +3404,9 @@ class ExtractionDialog(Gtk.MessageDialog):
 
 class SavePoolDialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None):
-        super(SavePoolDialog, self).__init__(title="Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE,
-                                             buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                                      Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
-
+        super(SavePoolDialog, self).__init__(title="Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE)
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                                                      Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
         # Gtk.FileChooserDialog.__init__(self, "Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE, buttons=(
         #     Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
 

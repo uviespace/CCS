@@ -8,6 +8,8 @@ import datetime
 import os
 from os import listdir
 from os.path import isfile, join
+import os, os.path
+import errno
 
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
@@ -22,10 +24,10 @@ test_name = 'test'
 cmd_log_file_end = '_command.log'
 vrc_log_file_end = '_verification.log'
 basic_log_file_path = confignator.get_option('tst-logging', 'test_run')
-basic_output_file_path = confignator.get_option('tst-logging', 'test_run')  # TODO: Set basic output path (Dominik)
+basic_output_file_path = confignator.get_option('tst-logging', 'output-file-path')
 output_file_header = ['Item', 'Description', 'Verification', 'TestResult']
 
-def result_as_csv(test_name, log_file_path=None, output_file_path=None):
+def save_result_to_file(test_name, log_file_path=None, output_file_path=None, run_id=None):
     """
     Analyses the command and verification log file and creates a csv output table
     :param str test_name: the name of the test and of its log files
@@ -42,15 +44,35 @@ def result_as_csv(test_name, log_file_path=None, output_file_path=None):
     cmd_steps = analyse_command_log.get_steps_and_commands(cmd_log_file)
     vrc_steps = analyse_verification_log.get_verification_steps(vrc_log_file)
 
-    name_start = 'IASW-{}-TS-{}-TR-'.format(test_name, cmd_steps[0]['version'])  # TODO: Check which name should be used, version always same in log file?
+    cmd_steps_filtered = []
+    vrc_steps_filtered = []
+    # Filter for a specific run
+    if run_id:
+        for step in cmd_steps:
+            if step['run_id'] == run_id:
+                cmd_steps_filtered.append(step)
+
+        for step in vrc_steps:
+            if step['run_id'] == run_id:
+                vrc_steps_filtered.append(step)
+
+        cmd_steps = cmd_steps_filtered
+        vrc_steps = vrc_steps_filtered
+
+    name_start = '{}-TS-{}-TR-'.format(test_name, cmd_steps[0]['version'])
     file_versions = []
+    try:
+        for file_name in listdir(output_file_path):
+            if file_name.startswith(name_start):
+                file_versions.append(int(file_name.split('-')[-1].split('.')[0]))
 
-    for file_name in listdir(output_file_path):
-        if file_name.startswith(name_start):
-            file_versions.append(int(file_name.split('-')[-1].split('.')[0]))
+        file_versions.sort()
+        file_count = file_versions[-1] + 1 if file_versions else 1
+    except FileNotFoundError:
+        print('Used Folder: "{}" does not yet exist, is now created'.format(output_file_path))
+        file_count = 1
+        os.makedirs(output_file_path)
 
-    file_versions.sort()
-    file_count = file_versions[-1] + 1 if file_versions else 1
     output_file_name_path = output_file_path + name_start + f'{file_count:03d}' + '.txt'
 
     with open(output_file_name_path, 'w', encoding='UTF8', newline='') as file:
@@ -76,7 +98,7 @@ def result_as_csv(test_name, log_file_path=None, output_file_path=None):
         # write comment line
         writer.writerow(['Comment', 'This is NOT a comment, still working on it', '', ''])  # TODO: Where is the comment given?
 
-        # write comment line
+        # write step line
         for step in cmd_steps:
             for vrc_step in vrc_steps:
                 if step['step_id'] == vrc_step['step_id']:
@@ -101,7 +123,7 @@ def get_version(steps):
     version_list = []
     for step in steps:
         if step['version'] not in version_list:
-            version_list.append()
+            version_list.append(step['version'])
     for count, version in enumerate(version_list):
         if count == 0:
             version_final = version
@@ -146,5 +168,5 @@ def show_basic_results(test_name, log_file_path=None):
     return
 
 if __name__ == '__main__':
-    result_as_csv(test_name)
+    save_result_to_file(test_name, run_id='20210713140200')
     #show_basic_results(test_name)
