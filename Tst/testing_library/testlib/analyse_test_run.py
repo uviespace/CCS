@@ -10,12 +10,15 @@ from os import listdir
 from os.path import isfile, join
 import os, os.path
 import errno
+import logging
+
 
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
 
+import toolbox
 from testlib import analyse_verification_log
 from testlib import analyse_command_log
 
@@ -25,18 +28,29 @@ cmd_log_file_end = '_command.log'
 vrc_log_file_end = '_verification.log'
 basic_log_file_path = confignator.get_option('tst-logging', 'test_run')
 basic_output_file_path = confignator.get_option('tst-logging', 'output-file-path')
+basic_json_file_path = confignator.get_option('tst-paths', 'tst_products')
 output_file_header = ['Item', 'Description', 'Verification', 'TestResult']
 
-def save_result_to_file(test_name, log_file_path=None, output_file_path=None, run_id=None):
+def save_result_to_file(test_name, log_file_path=None, output_file_path=None, json_file_path=None, run_id=None, logger=False):
     """
-    Analyses the command and verification log file and creates a csv output table
+    Analyses the command and verification log file and creates a txt output table
     :param str test_name: the name of the test and of its log files
     :param str log_file_path: Path to the log files, None if basic one should be used
     """
+    # Logger is only used, if function is called from a different file (Progres Viewer), therefore a logger and a file
+    # are already set up, if file is called standalone, messages are printed
+    if logger:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(level=logging.DEBUG)
+        console_hdlr = toolbox.create_console_handler(hdlr_lvl=logging.DEBUG)
+        logger.addHandler(hdlr=console_hdlr)
+
     if not log_file_path:
         log_file_path = basic_log_file_path
     if not output_file_path:
         output_file_path = basic_output_file_path
+    if not json_file_path:
+        json_file_path = basic_json_file_path + test_name + '.json'
 
     cmd_log_file = log_file_path + test_name + cmd_log_file_end
     vrc_log_file = log_file_path + test_name + vrc_log_file_end
@@ -59,6 +73,16 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, ru
         cmd_steps = cmd_steps_filtered
         vrc_steps = vrc_steps_filtered
 
+    # Get the general run information, and the description
+    general_run_infos = analyse_command_log.get_general_run_info(cmd_log_file, run_id=run_id)
+
+    if run_id and len(general_run_infos) != 1:
+        if logger:
+            logger.error('Multiple Runs found with the same given Run ID')
+        else:
+            print('Multiple Runs found with the same given Run ID')
+        return
+
     name_start = '{}-TS-{}-TR-'.format(test_name, cmd_steps[0]['version'])
     file_versions = []
     try:
@@ -69,7 +93,10 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, ru
         file_versions.sort()
         file_count = file_versions[-1] + 1 if file_versions else 1
     except FileNotFoundError:
-        print('Used Folder: "{}" does not yet exist, is now created'.format(output_file_path))
+        if logger:
+            logger.info('Used Folder: "{}" does not yet exist, is now created'.format(output_file_path))
+        else:
+            print('Used Folder: "{}" does not yet exist, is now created'.format(output_file_path))
         file_count = 1
         os.makedirs(output_file_path)
 
@@ -81,22 +108,24 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, ru
         # write the header
         writer.writerow(output_file_header)
 
-        # write the general info line
-        description = analyse_command_log.get_test_description(cmd_log_file)
-        version = get_version(cmd_steps)
-        writer.writerow([test_name, 'Test Description', version, 'Test Rep. Version: ' + f'{file_count:03d}'])  # TODO: Multiple versions/descriptions what to do?
+        # write the general info line, if multiple descriptions/versions are found all are written to the output file
+        version = get_version(cmd_steps, logger)
+        description = get_description(general_run_infos, logger)
+        writer.writerow([test_name, description, 'Test Spec. Version: ' + version, 'Test Rep. Version: ' + f'{file_count:03d}'])
 
         # write date line
         date_format = '%Y-%m-%d'
-        exec_date = datetime.datetime.strftime(cmd_steps[0]['exec_date'], date_format)
-        time_now = datetime.datetime.strftime(datetime.datetime.now(), date_format)
-        writer.writerow(['Date', '', exec_date, time_now])  # TODO: Make sure which dates should be shown, ok to take time from first step?
+        exec_date = datetime.datetime.fromtimestamp(os.stat(json_file_path).st_mtime) if os.path.isfile() else '---'  # When was the last time the json file was changed?
+        time_now = datetime.datetime.strftime(datetime.datetime.now(), date_format)  # TODO: Check which time should be shown here
+        writer.writerow(['Date', '', exec_date, time_now])  # TODO: Make sure which dates should be shown, ok to take time from first step? Only checking left
 
         # write Precon line
         writer.writerow(['Precon.', 'This has still to be solved', '', ''])  # TODO: What should be shown of the Precon
 
-        # write comment line
-        writer.writerow(['Comment', 'This is NOT a comment, still working on it', '', ''])  # TODO: Where is the comment given?
+        # write the general comment line
+        general_comment = get_general_comment(general_run_infos, logger)
+        if general_comment:
+            writer.writerow(['Comment', general_comment, '', ''])
 
         # write step line
         for step in cmd_steps:
@@ -114,7 +143,25 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, ru
         # write Postcon line
         writer.writerow(['Postcon.', 'This has still to be solved', '', ''])  # TODO: What should be shown of the Postcon
 
-def get_version(steps):
+def get_description(general_run_infos, logger):
+    """
+    Get a string of the different description that could be found
+    :param list of dicts general_run_infos: all the general run information that were found
+    :return str description: A string that contains all found versions
+    """
+    for count, run_info in enumerate(general_run_infos):
+        if count == 0:
+            description = run_info['descr']
+        else:
+            description += ' / ' + run_info['descr']
+            if logger:
+                logger.warning('More than one Description was found in the command log File')
+            else:
+                print('More than one Description was found in the command log File')
+
+    return description
+
+def get_version(steps, logger):
     """
     Get a string of the different version that could be found
     :param list of dicts steps: all the steps from the log file
@@ -129,8 +176,29 @@ def get_version(steps):
             version_final = version
         else:
             version_final += ' / ' + version
-            print('More than one Version was found in the command log File')
+            if logger:
+                logger.warning('More than one Version was found in the command log File')
+            else:
+                print('More than one Version was found in the command log File')
     return version_final
+
+def get_general_comment(general_run_infos, logger):
+    """
+    Get a string of the different general comment that could be found
+    :param list of dicts general_run_infos: all the general run information that were found
+    :return str general_comment: A string that contains all found gerneral comments
+    """
+    for count, run_info in enumerate(general_run_infos):
+        if count == 0:
+            general_comment = run_info['comment']
+        else:
+            general_comment += ' / ' + run_info['comment']
+            if logger:
+                logger.warning('More than one General Comment was found in the command log File')
+            else:
+                print('More than one General Comment was found in the command log File')
+
+    return general_comment
 
 def show_basic_results(test_name, log_file_path=None):
     """

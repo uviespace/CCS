@@ -181,6 +181,25 @@ def get_steps_and_commands(filename):
 
     return steps_start
 
+def get_general_run_info(filename, run_id=None):
+    """
+    Get all lines with general run information, those are logged if whole test is executed, returns all found lines, or
+    only 1 if run_id is specified
+    :param filename: path to the log file
+    :return: all found general step infomations
+    :rtype: list of dict
+    """
+    general_infos = []
+    with open(filename, 'r') as fileobject:
+        for line in fileobject:
+            if report.key_word_found(line, report.cmd_test_start_keyword):
+                general_run_info = report.parse_step_from_json_string(line, report.cmd_test_start_keyword)
+                if not run_id:
+                    general_infos.append(general_run_info)
+                elif general_run_info['run_id'] == run_id:
+                    general_infos.append(general_run_info)
+
+    return general_infos
 
 if __name__ == '__main__':
     example_log_file = '../logs_test_runs/simple_example_command.log'

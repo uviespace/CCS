@@ -111,9 +111,10 @@ class Step:
         self._secondary_counter = 0
         self._step_number = ''
         self._description = ''
-        self._comment = ''
         self._command_code = ''
+        self._command_comment = ''
         self._verification_code = ''
+        self._verification_comment = ''
         self._is_active = True
         self._verified_item = []
         self._start_sequence = None
@@ -141,9 +142,10 @@ class Step:
         new_step.primary_counter = copy.copy(self.primary_counter)
         new_step.secondary_counter = copy.copy(self.secondary_counter)
         new_step.description = copy.copy(self.description)
-        new_step.comment = copy.copy(self.comment)
         new_step.command_code = copy.copy(self.command_code)
+        new_step.command_comment = copy.copy(self.command_comment)
         new_step.verification_code = copy.copy(self.verification_code)
+        new_step.verification_comment = copy.copy(self.verification_comment)
         new_step.is_active = copy.copy(self.is_active)
         new_step.start_sequence = copy.copy(self.start_sequence)
         new_step.stop_sequence = copy.copy(self.stop_sequence)
@@ -205,15 +207,6 @@ class Step:
         self._description = value
 
     @property
-    def comment(self):
-        return self._comment
-
-    @comment.setter
-    def comment(self, value: str):
-        assert isinstance(value, str)
-        self._comment = value
-
-    @property
     def command_code(self):
         return self._command_code
 
@@ -223,6 +216,15 @@ class Step:
         self._command_code = value
 
     @property
+    def command_comment(self):
+        return self._command_comment
+
+    @command_comment.setter
+    def command_comment(self, value: str):
+        assert isinstance(value, str)
+        self._command_comment = value
+
+    @property
     def verification_code(self):
         return self._verification_code
 
@@ -230,6 +232,15 @@ class Step:
     def verification_code(self, value: str):
         assert isinstance(value, str)
         self._verification_code = value
+
+    @property
+    def verification_comment(self):
+        return self._verification_comment
+
+    @verification_comment.setter
+    def verification_comment(self, value: str):
+        assert isinstance(value, str)
+        self._verification_comment = value
 
     @property
     def is_active(self):
@@ -275,9 +286,10 @@ class Step:
             self.primary_counter = step['_primary_counter']
             self.secondary_counter = step['_secondary_counter']
             self.description = step['_description']
-            self.comment = step['_comment']
             self.command_code = step['_command_code']
+            self.command_comment = step['_command_comment']
             self.verification_code = step['_verification_code']
+            self.verification_comment = step['_verification_comment']
             self.is_active = step['_is_active']
         except KeyError as error:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(error))

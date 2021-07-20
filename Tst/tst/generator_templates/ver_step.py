@@ -4,7 +4,7 @@
         param = {
             'step_no': '$testStepNumber',
             'descr': '$testStepDescription',
-            'comment': '$testStepComment'
+            'comment': '$testStepVerificationComment'
         }
         self.vrc_step_begin(pool_name=pool_name, param=param, run_id=run_id, step_id=step_id)
 

@@ -139,8 +139,8 @@ def make_command_script(model, model_spec):
                                    testSpecName=model_spec.name,
                                    testSpecDescription=model_spec.description,
                                    testSpecVersion=model_spec.version,
-                                   testPreCondition=model_spec.comment,
-                                   testPostCondition=model_spec.comment,
+                                   testPreCondition=model_spec.precon,
+                                   testPostCondition=model_spec.postcon,
                                    testComment=model_spec.comment)
         # add the header string
         content += '\n\n' + cls
@@ -181,7 +181,7 @@ def make_command_script(model, model_spec):
                 command_code_w_indents = 'pass'
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
                                        testStepDescription=step.description,
-                                       testStepComment=step.comment,
+                                       testStepCommandComment=step.command_comment,
                                        testStepCommandCode=command_code_w_indents,
                                        testSpecFileName=create_file_name(model_spec.name),
                                        testSpecClassName=create_class_name(model_spec.name))
@@ -266,8 +266,7 @@ def make_command_run_script(model, model_spec):
             #                           testStepDescription=model.steps[step].description,
             #                           testStepComment=model.steps[step].comment)
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
-                                       testStepDescription=step.description,
-                                       testStepComment=step.comment)
+                                       testStepDescription=step.description)
             # add the string for a steps
             content += '\n' + step
 
@@ -331,7 +330,7 @@ def make_verification_script(model, model_spec):
             #                           testStepVerificationCode=verification_code_w_indents)
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
                                        testStepDescription=step.description,
-                                       testStepComment=step.comment,
+                                       testStepVerificationComment=step.verification_comment,
                                        testStepVerificationCode=verification_code_w_indents)
             # add the string for a steps
             content += '\n' + step
