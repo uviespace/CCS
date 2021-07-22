@@ -544,11 +544,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                        self,
                                        Gtk.FileChooserAction.SAVE,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+        dialog.set_current_folder(confignator.get_option(section='tst-history', option='last-folder'))
         dialog.set_current_name(current_name+'.json')
         self.add_filters(dialog)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
+            confignator.save_option('tst-history', 'last-folder', os.path.dirname(file_selected))
             if '-v_' in file_selected:
                 test_name = file_selected.split('-v_')[0]
                 filename = file_selected

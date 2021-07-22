@@ -255,11 +255,12 @@ class TestProgressView(Gtk.ApplicationWindow):
                                        parent=self,
                                        action=Gtk.FileChooserAction.OPEN)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-
+        dialog.set_current_folder(confignator.get_option(section='progress-viewer-history', option='last-folder'))
         self.add_filters(dialog)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
+            confignator.save_option('progress-viewer-history', 'last-folder', os.path.dirname(file_selected))
             self.open_test_files(None, self.get_log_file_paths_from_json_file_name(file_selected))
         elif response == Gtk.ResponseType.CANCEL:
             pass
@@ -1398,6 +1399,7 @@ class File_Path_Dialog(Gtk.FileChooserDialog):
             #main_box.pack_end(label, False, True, 10)
             area.pack_start(label, False, True, 0)
         self.show_all()
+
 def run():
     bus_name = confignator.get_option('dbus_names', 'progress-view')
     dbus.validate_bus_name(bus_name)
