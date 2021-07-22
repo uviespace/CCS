@@ -292,7 +292,7 @@ def print_event_data_tuple(tm_packets):
             logger.debug('Event {}: {} -> {}'.format(event_id, src, dest))
 
 
-def write_precondition_outcome(result, step_id, precon_descr):
+def write_precondition_outcome(result, run_id, precon_descr):
     """
     Logs the outcome of the establish_preconditions function in a test script.
     :param result: bool
@@ -300,15 +300,15 @@ def write_precondition_outcome(result, step_id, precon_descr):
     """
 
     logger.info('{} {}'.format(cmd_precon_keyword, make_json_string(result=result,
-                                                                    precon_desc=precon_descr,
-                                                                    step_id=step_id)))
+                                                                    precon_descr=precon_descr,
+                                                                    run_id=run_id)))
     if result is True:
         logger.info('Preconditions are fulfilled.\n')
     else:
         logger.warning('Preconditions are NOT fulfilled.\n')
 
 
-def write_postcondition_outcome(result, step_id, postcon_descr):
+def write_postcondition_outcome(result, run_id, postcon_descr):
     """
     Logs the outcome of the establish_postconditions function in a test script.
     :param result: bool
@@ -316,8 +316,8 @@ def write_postcondition_outcome(result, step_id, postcon_descr):
     """
 
     logger.info('{} {}'.format(cmd_postcon_keyword, make_json_string(result=result,
-                                                                     postcon_desc=postcon_descr,
-                                                                     step_id=step_id)))
+                                                                     postcon_descr=postcon_descr,
+                                                                     run_id=run_id)))
     if result is True:
         logger.info('Postconditions are fulfilled.\n')
     else:

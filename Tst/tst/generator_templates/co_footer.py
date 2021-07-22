@@ -47,12 +47,13 @@
                 finally:
                     # add the summary of the step to the result array
                     self.step_results.append(res)
+
+            # postcondition of the test
+            logger.info('Postconditions: {}'.format(self.postcondition))
+            self.postcond_ok = self.post_condition(pool_name=pool_name)
+
         else:
             logger.error('Preconditions could not be established. Test steps were not executed!\n')
-
-        # postcondition of the test
-        logger.info('Postconditions: {}'.format(self.postcondition))
-        self.postcond_ok = self.post_condition(pool_name=pool_name)
 
         # save the packet pool
         self.save_pool_in_file(pool_name=pool_name, save_pool=save_pool)

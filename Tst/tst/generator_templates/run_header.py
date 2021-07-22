@@ -59,5 +59,5 @@ if False:
 
 #! CCS.BREAKPOINT
 if False:
-    # Exectute the preconditions
+    # Pre-Conditions: $TestPreconDescription
     threading.Thread(target=testinstance.establish_preconditions, kwargs={'pool_name': pool_name}, daemon=True).start()

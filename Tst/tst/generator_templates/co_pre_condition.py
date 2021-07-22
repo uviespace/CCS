@@ -8,7 +8,7 @@
             True if the preconditions are fulfilled
         """
         testing_logger.cmd_log_handler(__name__)
-        step_id = self.check_run_and_step_id(pool_name=pool_name)
+        self.check_run_and_step_id(pool_name=pool_name)
         precon_descr = '$TestPreconDescription'
         success = False
         logger.info('establishing preconditions started')
@@ -16,7 +16,7 @@
         $TestPreconEntry
 
         logger.info('establishing preconditions finished')
-        report.write_precondition_outcome(success, step_id, precon_descr)
+        report.write_precondition_outcome(success, self.run_id, precon_descr)
         return success
 
     # INITIALIZE every step --------------------------------------------------------------------------------------------

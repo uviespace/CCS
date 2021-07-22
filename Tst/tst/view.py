@@ -287,6 +287,10 @@ class Board(Gtk.Box):
         # Set the test comment
         self.test_meta_data_comment.get_buffer().set_text(self.model.comment)
 
+        # Set the Locked STep numeration
+        self.text_meta_data_test_is_locked.set_active(self.model.primary_counter_locked)
+
+
 
     def collapse_all_steps(self, button):
         """ Close all expander of the steps """
@@ -1153,7 +1157,7 @@ class StepWidget(Gtk.EventBox):
         step_in_data_model = self.model.get_sequence(self.sequence).steps[stp_ndx]
         # use the setter of the data model
         if isinstance(step_in_data_model, data_model.Step):
-            step_in_data_model.command_code = self.step_description
+            step_in_data_model.description = self.step_description
         else:
             self.logger('step with the step number {} could not be found'.format(self.step_number))
         # update the model
@@ -1581,7 +1585,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
         )
-        self.set_default_size(200, 200)
+        self.set_default_size(400, 400)
         self.first_entry = selection
         self.win = parent
         self.file_path = os.path.join(confignator.get_option('paths', 'tst'),
@@ -1718,6 +1722,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.con_lbl_box.pack_start(con_lbl, False, False, 0)
 
         self.con_scrolled_window = Gtk.ScrolledWindow()
+        self.con_scrolled_window.set_tooltip_text('Set variable "success" to True/False, to check if {}-Conditon is fulfilled'.format(self.pre_post.upper()))
         #self.commands_scrolled_window.set_size_request(50, 100)
         self.con_view = GtkSource.View()
         self.con_view.set_auto_indent(True)

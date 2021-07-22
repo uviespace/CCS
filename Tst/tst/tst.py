@@ -537,6 +537,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.save_as_file_dialog()
 
     def save_as_file_dialog(self):
+        current_test = self.current_test_instance()
         current_name = self.current_model().name
         current_model = self.current_model()
         dialog = Gtk.FileChooserDialog('Please choose a file',
@@ -548,8 +549,16 @@ class TstAppWindow(Gtk.ApplicationWindow):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
-            file_management.save_file(file_path=file_selected, test_spec=current_model, file_extension='json', logger=self.logger)
-            current_model.filename = file_selected
+            if '-v_' in file_selected:
+                test_name = file_selected.split('-v_')[0]
+                filename = file_selected
+            else:
+                test_name = file_selected.split('.json')[0]
+                filename = '{}-v_{}.json'.format(test_name, current_model.version)
+
+            file_management.save_file(file_path=filename, test_spec=current_model, file_extension='json', logger=self.logger)
+            current_test.filename = filename.split('/')[-1]
+            current_model.name = test_name.split('/')[-1]
         elif response == Gtk.ResponseType.CANCEL:
             pass
         dialog.destroy()

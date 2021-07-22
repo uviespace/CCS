@@ -187,6 +187,17 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.title_box.pack_start(self.test_title, False, True, 0)
         self.box.pack_start(self.title_box, False, True, 20)
 
+        # --------------- tree view ---------------
+        self.sorted_model = Gtk.TreeModelSort(model=self.progress_tree_store)
+        self.sorted_model.set_sort_column_id(1, Gtk.SortType.ASCENDING)
+        self.view = Gtk.TreeView(model=self.sorted_model)
+        self.view.set_grid_lines(True)
+        self.view.set_has_tooltip(True)
+        self.view.set_tooltip_column(10)
+
+        self.scroll_win = Gtk.ScrolledWindow()
+        self.scroll_win.add(self.view)
+
         # buttons for the tree view (expand all, collapse all)
         self.make_button_box()
         self.box.pack_start(self.box_buttons, False, True, 0)
@@ -196,21 +207,10 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.btn_apply_css.connect('clicked', self.on_apply_css)
         # self.box_buttons.pack_start(self.btn_apply_css, False, False, 0)
 
-        # --------------- tree view ---------------
-        self.sorted_model = Gtk.TreeModelSort(model=self.progress_tree_store)
-        self.sorted_model.set_sort_column_id(1, Gtk.SortType.ASCENDING)
-        self.view = Gtk.TreeView(model=self.sorted_model)
-        self.view.set_grid_lines(True)
-        self.view.set_has_tooltip(True)
-        self.view.set_tooltip_column(10)
         self.make_treeview()
 
         self.view.expand_all()
 
-        self.scroll_win = Gtk.ScrolledWindow()
-        #self.scroll_win.set_min_content_height(int(confignator.get_option(section='progress-viewer-window-size', option='minimum-height')))
-        #self.scroll_win.set_min_content_width(int(confignator.get_option(section='progress-viewer-window-size', option='minimum-width-step-mode')))
-        self.scroll_win.add(self.view)
         self.box.pack_start(self.scroll_win, True, True, 0)
 
         self.connect('destroy', self.on_destroy)
@@ -251,15 +251,15 @@ class TestProgressView(Gtk.ApplicationWindow):
         :param Gio.SimpleAction simple_action: The object which received the signal
         :param parameter: the parameter to the activation, or None if it has no parameter
         """
-        dialog = Gtk.FileChooserDialog('Please choose a Test Specification',
-                                       self,
-                                       Gtk.FileChooserAction.OPEN,
-                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        dialog = Gtk.FileChooserDialog(title='Please choose a Test Specification',
+                                       parent=self,
+                                       action=Gtk.FileChooserAction.OPEN)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+
         self.add_filters(dialog)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
-            # ToDo: get the path for all 3 (json, cmd, vrc) and load them
             self.open_test_files(None, self.get_log_file_paths_from_json_file_name(file_selected))
         elif response == Gtk.ResponseType.CANCEL:
             pass
@@ -291,7 +291,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         self.sort_button = Gtk.Switch()
         self.sort_button.connect("notify::active", self.on_remake_treeview)
-        self.sort_button.set_active(False)
+        self.sort_button.set_active(True)
         self.box_buttons.pack_end(self.sort_button, False, True, 0)
 
         self.sort_label2 = Gtk.Label()
@@ -590,21 +590,81 @@ class TestProgressView(Gtk.ApplicationWindow):
         return
 
     def save_as_file_dialog(self):
+        # If one log file is loaded use it as Log file path, otherwise ask for it in separate dialog
+        test_name = None
+        if self.path_cmd:
+            file_name = self.path_cmd.split('/')[-1]
+            log_file_path = self.path_cmd[:-len(file_name)]
+            test_name = file_name.split('_')[0]
+        elif self.path_vrc:
+            file_name = self.path_vrc.split('/')[-1]
+            log_file_path = self.path_vrc[:-len(file_name)]
+            test_name = file_name.split('_')[0]
+        else:
+            log_file_path=None
+
+        if not test_name and self.path_json:
+            test_name = self.path_json.split('/')[-1].split('.')[0]
+
         dialog = Save_to_File_Dialog(parent=self)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
+            if not test_name:
+                test_name = dialog.test_name.get_text()
+                if not test_name:
+                    dialog.destroy()
+                    self.logger.info('Can not create Output file without test name')
+                    return
+
             folder = dialog.get_current_folder()
             run_count = dialog.run_id_selection.get_active()
-            run = None
+            test_report = dialog.test_report_int.get_text()
+            sent_run_id = None
             if run_count:
                 for run_id in self.run_count.keys():
                     if self.run_count[run_id] == run_count:
-                        run = run_id
-            analyse_test_run.save_result_to_file('test', log_file_path=folder, run_id=run)
-            #confignator.save_option('tst-logging', 'output-file-path', folder)
+                        sent_run_id = run_id
+            if not log_file_path:
+                if not dialog.log_file_path_check.get_active():
+                    log_file_path = 'FIND'
+            if not self.path_json:
+                if dialog.log_file_path_check.get_active():
+                    json_file_path = None
+                else:
+                    json_file_path = 'FIND'
+            else:
+                json_file_path = self.path_json
+
         elif response == Gtk.ResponseType.CANCEL:
-            pass
+            dialog.destroy()
+            return
+
         dialog.destroy()
+        if log_file_path == 'FIND':
+            dialog = File_Path_Dialog(parent=self, file='Command or Verification Log File', is_json=False)
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                log_file_path = dialog.get_current_folder()
+            elif response == Gtk.ResponseType.CANCEL:
+                dialog.destroy()
+                return
+        dialog.destroy()
+
+        if json_file_path == 'FIND':
+            dialog = File_Path_Dialog(parent=self, file='the Json File', is_json=True)
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                json_file_path = dialog.get_filename()
+            elif response == Gtk.ResponseType.CANCEL:
+                dialog.destroy()
+                return
+
+        dialog.destroy()
+
+        analyse_test_run.save_result_to_file(test_name=test_name, log_file_path=log_file_path, output_file_path=folder,
+                                             json_file_path=json_file_path, run_id=sent_run_id, test_report=test_report,
+                                             logger=self.logger)
+
         return
 
     def on_destroy(self, *args):
@@ -1245,6 +1305,25 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
         self.savedetailes = Gtk.HBox()  # Store everything in this box
         self.savedetailes.set_border_width(15)
 
+        # Only shown if a name was not given (Found from Log Files or Json File in main window
+        name_label = Gtk.Label(label='Test Name: ')
+        self.test_name = Gtk.Entry()
+        self.test_name.set_tooltip_text('The name of the Test')
+
+        # Only shown if Log File path was not given (Found from loaded log File in main window)
+        log_file_path_label = Gtk.Label(label='Use Basic Log File Path: ')
+        log_file_path_label.set_tooltip_text('Basic File Path: {}'.format(confignator.get_option('tst-logging', 'test_run')))
+        self.log_file_path_check = Gtk.CheckButton()
+        self.log_file_path_check.set_active(True)
+
+        # Only shown if Json File path was not given (Found from loaded json file in main window)
+        json_file_path_label = Gtk.Label(label='Use Basic Json File Path: ')
+        json_file_path_label.set_tooltip_text(
+            'Basic File Path: {}, Also True if No Json File should be used (Specification Date in Output File will be empty)'.format(
+                confignator.get_option('tst-paths', 'tst_products')))
+        self.json_file_path_check = Gtk.CheckButton()
+        self.json_file_path_check.set_active(True)
+
         run_id_label = Gtk.Label(label='Select Run ID: ')
 
         # Select the Run ID which should be printed to the File
@@ -1280,11 +1359,45 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
         self.savedetailes.pack_end(self.test_report_int, False, True, 10)
         self.savedetailes.pack_end(test_report_label, False, True, 10)
 
+        if not self.win.path_vrc and not self.win.path_cmd:
+            self.savedetailes.pack_end(self.log_file_path_check, False, True, 10)
+            self.savedetailes.pack_end(log_file_path_label, False, True, 10)
+
+        if not self.win.path_json:
+            self.savedetailes.pack_end(self.json_file_path_check, False, True, 10)
+            self.savedetailes.pack_end(json_file_path_label, False, True, 10)
+
+        if not self.win.path_json and not self.win.path_vrc and not self.win.path_cmd:
+            self.savedetailes.pack_end(self.test_name, False, True, 10)
+            self.savedetailes.pack_end(name_label, False, True, 10)
+
+
         area.pack_start(self.savedetailes, False, True, 0)
 
         self.show_all()
         return
 
+class File_Path_Dialog(Gtk.FileChooserDialog):
+    def __init__(self, parent=None, file=None, is_json=None):
+        super(File_Path_Dialog, self).__init__(title='Please choose {}'.format(file),
+                                                  parent=parent,
+                                                  action=Gtk.FileChooserAction.OPEN)
+
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+
+        self.win = parent
+        if not is_json:
+            self.set_current_folder(confignator.get_option(section='tst-logging', option='test_run'))
+        else:
+            self.set_current_folder(confignator.get_option(section='tst-paths', option='tst_products'))
+
+        if not is_json:
+            area = self.get_content_area()
+            #main_box = Gtk.HBox()
+            label = Gtk.Label(label='It does not matter if Command or Verification Log File is choosen, both are in the same Folder')
+            #main_box.pack_end(label, False, True, 10)
+            area.pack_start(label, False, True, 0)
+        self.show_all()
 def run():
     bus_name = confignator.get_option('dbus_names', 'progress-view')
     dbus.validate_bus_name(bus_name)

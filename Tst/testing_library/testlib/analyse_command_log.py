@@ -191,6 +191,8 @@ def get_general_run_info(filename, run_id=None):
     :rtype: list of dict
     """
     general_infos = []
+    precon_infos = []
+    postcon_infos = []
     with open(filename, 'r') as fileobject:
         for line in fileobject:
             if report.key_word_found(line, report.cmd_test_start_keyword):
@@ -200,7 +202,21 @@ def get_general_run_info(filename, run_id=None):
                 elif general_run_info['run_id'] == run_id:
                     general_infos.append(general_run_info)
 
-    return general_infos
+            elif report.key_word_found(line, report.cmd_precon_keyword):
+                precon = report.parse_step_from_json_string(line, report.cmd_precon_keyword)
+                if not run_id:
+                    precon_infos.append(precon)
+                elif precon['run_id'] == run_id:
+                    precon_infos.append(precon)
+
+            elif report.key_word_found(line, report.cmd_postcon_keyword):
+                postcon = report.parse_step_from_json_string(line, report.cmd_postcon_keyword)
+                if not run_id:
+                    postcon_infos.append(postcon)
+                elif postcon['run_id'] == run_id:
+                    postcon_infos.append(postcon)
+
+    return general_infos, precon_infos, postcon_infos
 
 if __name__ == '__main__':
     example_log_file = '../logs_test_runs/simple_example_command.log'

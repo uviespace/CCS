@@ -101,6 +101,9 @@ def make_command_script(model, model_spec):
     with open(co_class_path, 'r') as class_file_obj:
         class_template_str = class_file_obj.read()
         class_file_obj.close()
+
+        test_comment_w_indent = model_spec.comment.replace('\n', " ' \\\n".format('\'') + 6 * indent + "'")
+
         class_str = string.Template(class_template_str)
         cls = class_str.substitute(testSpecClassName=create_class_name(model_spec.name),
                                    testSpecFileName=create_file_name(model_spec.name),
@@ -109,7 +112,7 @@ def make_command_script(model, model_spec):
                                    testSpecVersion=model_spec.version,
                                    testPreCondition=model_spec.precon_name,
                                    testPostCondition=model_spec.postcon_name,
-                                   testComment=model_spec.comment)
+                                   testComment=test_comment_w_indent)
         # add the header string
         content += '\n\n' + cls
 
@@ -118,9 +121,13 @@ def make_command_script(model, model_spec):
         pre_cond_template_str = pre_cond_file_obj.read()
         pre_cond_file_obj.close()
 
+        # Be sure that if it is multiline, that all have the right indent
+        pre_con_code = model_spec.precon_code.replace('\n', '\n' + 2 * indent)
+        pre_con_descr = model_spec.precon_descr.replace('\n', " ' \\\n" + 6 * indent + "'")
+
         pre_cond_template = string.Template(pre_cond_template_str)
-        pre_cond_combined = pre_cond_template.substitute(TestPreconEntry=model_spec.precon_code,
-                                                         TestPreconDescription=model_spec.precon_descr)
+        pre_cond_combined = pre_cond_template.substitute(TestPreconEntry=pre_con_code,
+                                                         TestPreconDescription=pre_con_descr)
         # add the header string
         content += '\n' + pre_cond_combined
 
@@ -132,11 +139,13 @@ def make_command_script(model, model_spec):
             step_str = string.Template(step_template_str)
             command_code = step.command_code
             command_code_w_indents = command_code.replace('\n', '\n' + 3 * indent)
+            step_comment_w_indents = step.step_comment.replace('\n', " ' \\\n" + 5 * indent + "'")
+            step_descr_w_indents = step.description.replace('\n', " ' \\\n" + 5 * indent + "'")
             if len(command_code_w_indents) == 0:
                 command_code_w_indents = 'pass'
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
-                                       testStepDescription=step.description,
-                                       testStepComment=step.step_comment,
+                                       testStepDescription=step_descr_w_indents,
+                                       testStepComment=step_comment_w_indents,
                                        testStepCommandCode=command_code_w_indents,
                                        testSpecFileName=create_file_name(model_spec.name),
                                        testSpecClassName=create_class_name(model_spec.name))
@@ -148,14 +157,20 @@ def make_command_script(model, model_spec):
         post_cond_template_str = post_cond_file_obj.read()
         post_cond_file_obj.close()
 
+        # Be sure that if it is multiline, that all have the right indent
+        post_con_code = model_spec.postcon_code.replace('\n', '\n' + 2 * indent)
+        post_con_descr = model_spec.postcon_descr.replace('\n', " ' \\\n" + 6 * indent + "'")
+
         post_cond_template = string.Template(post_cond_template_str)
-        post_cond_combined = post_cond_template.substitute(TestPostconEntry=model_spec.postcon_code,
-                                                           TestPostconDescr=model_spec.description)
+        post_cond_combined = post_cond_template.substitute(TestPostconEntry=post_con_code,
+                                                           TestPostconDescr=post_con_descr)
+
+        #post_cond_combined.replace('\n', '\n' + 3 * indent)
 
         # add the header string
         content += '\n' + post_cond_combined
 
-    # add the footer (post condition and other functions)
+    # add the footer run and other functions)
     with open(co_footer_path, 'r') as footer_file_obj:
         footer_template_str = footer_file_obj.read()
         footer_file_obj.close()
@@ -188,13 +203,17 @@ def make_command_run_script(model, model_spec):
     with open(run_header_path, 'r') as header_file_obj:
         header_template = header_file_obj.read()
         header_file_obj.close()
+
+        precon_descr_w_indent = model_spec.precon_descr.replace('\n', '\n{}#{}'.format(indent, 4*indent))
+
         # add the header string
         header_template_str = string.Template(header_template)
         #header_str = header_template_str.substitute(testSpecClassName=create_class_name(model.name),
         #                                            testSpecFileName=create_file_name(model.name),
         #                                            testPrecondDesc=model.pre_condition.description)
         header_str = header_template_str.substitute(testSpecClassName=create_class_name(model_spec.name),
-                                                    testSpecFileName=create_file_name(model_spec.name))
+                                                    testSpecFileName=create_file_name(model_spec.name),
+                                                    TestPreconDescription=precon_descr_w_indent)
 
         content += header_str
 
@@ -203,22 +222,27 @@ def make_command_run_script(model, model_spec):
         step_template_str = step_file_obj.read()
         step_file_obj.close()
         for step in model.steps:
+            step_descr_w_indent = step.description.replace('\n', '\n{}#{}'.format(indent, 3*indent))
             step_str = string.Template(step_template_str)
             #step = step_str.substitute(testStepNumber=model.steps[step].step_number,
             #                           testStepDescription=model.steps[step].description,
             #                           testStepComment=model.steps[step].comment)
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
-                                       testStepDescription=step.description)
+                                       testStepDescription=step_descr_w_indent)
             # add the string for a steps
             content += '\n' + step
 
     # add the step definitions
-    with open(run_footer_path, 'r') as step_file_obj:
-        step_template_str = step_file_obj.read()
-        step_file_obj.close()
-        header_template_str = string.Template(header_template)
+    with open(run_footer_path, 'r') as footer_file_obj:
+        footer_template_str = footer_file_obj.read()
+        footer_file_obj.close()
 
-        content += '\n' + header_template_str
+        postcon_descr_w_indent = model_spec.postcon_descr.replace('\n', '\n{}#{}'.format(indent, 4*indent))
+
+        footer_template_str = string.Template(footer_template_str)
+        footer = footer_template_str.substitute(TestPostconDescription=postcon_descr_w_indent)
+
+        content += '\n' + footer
 
     # create the new file
     file_path = create_script_path(name=model_spec.name, auxiliary=run_scrpt_auxiliary)
@@ -272,6 +296,8 @@ def make_verification_script(model, model_spec):
             step_str = string.Template(step_template_str)
             verification_code = step.verification_code
             verification_code_w_indents = verification_code.replace('\n', '\n' + 3 * indent)
+            verification_descr_w_indents = step.step_comment.replace('\n', " ' \\\n" + 6 * indent + "'")
+            step_descr_w_indents = step.description.replace('\n', " ' \\\n" + 5 * indent + "'")
             if len(verification_code_w_indents) == 0:
                 verification_code_w_indents = 'pass'
             #step = step_str.substitute(testStepNumber=model.steps[step].step_number,
@@ -279,8 +305,8 @@ def make_verification_script(model, model_spec):
             #                           testStepComment=model.steps[step].comment,
             #                           testStepVerificationCode=verification_code_w_indents)
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
-                                       testStepDescription=step.description,
-                                       testStepVerificationDescription=step.verification_description,
+                                       testStepDescription=step_descr_w_indents,
+                                       testStepVerificationDescription=verification_descr_w_indents,
                                        testStepVerificationCode=verification_code_w_indents)
             # add the string for a steps
             content += '\n' + step
