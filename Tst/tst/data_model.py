@@ -112,9 +112,9 @@ class Step:
         self._step_number = ''
         self._description = ''
         self._command_code = ''
-        self._command_comment = ''
+        self._step_comment = ''
         self._verification_code = ''
-        self._verification_comment = ''
+        self._verification_description = ''
         self._is_active = True
         self._verified_item = []
         self._start_sequence = None
@@ -143,9 +143,9 @@ class Step:
         new_step.secondary_counter = copy.copy(self.secondary_counter)
         new_step.description = copy.copy(self.description)
         new_step.command_code = copy.copy(self.command_code)
-        new_step.command_comment = copy.copy(self.command_comment)
+        new_step.step_comment = copy.copy(self.step_comment)
         new_step.verification_code = copy.copy(self.verification_code)
-        new_step.verification_comment = copy.copy(self.verification_comment)
+        new_step.verification_description = copy.copy(self.verification_description)
         new_step.is_active = copy.copy(self.is_active)
         new_step.start_sequence = copy.copy(self.start_sequence)
         new_step.stop_sequence = copy.copy(self.stop_sequence)
@@ -216,13 +216,13 @@ class Step:
         self._command_code = value
 
     @property
-    def command_comment(self):
-        return self._command_comment
+    def step_comment(self):
+        return self._step_comment
 
-    @command_comment.setter
-    def command_comment(self, value: str):
+    @step_comment.setter
+    def step_comment(self, value: str):
         assert isinstance(value, str)
-        self._command_comment = value
+        self._step_comment = value
 
     @property
     def verification_code(self):
@@ -234,13 +234,13 @@ class Step:
         self._verification_code = value
 
     @property
-    def verification_comment(self):
-        return self._verification_comment
+    def verification_description(self):
+        return self._verification_description
 
-    @verification_comment.setter
-    def verification_comment(self, value: str):
+    @verification_description.setter
+    def verification_description(self, value: str):
         assert isinstance(value, str)
-        self._verification_comment = value
+        self._verification_description = value
 
     @property
     def is_active(self):
@@ -287,9 +287,9 @@ class Step:
             self.secondary_counter = step['_secondary_counter']
             self.description = step['_description']
             self.command_code = step['_command_code']
-            self.command_comment = step['_command_comment']
+            self.step_comment = step['_step_comment']
             self.verification_code = step['_verification_code']
-            self.verification_comment = step['_verification_comment']
+            self.verification_description = step['_verification_description']
             self.is_active = step['_is_active']
         except KeyError as error:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(error))
@@ -902,8 +902,12 @@ class TestSpecification:
         self._description = ''
         self._version = ''
         self._primary_counter_locked = False
-        self._precon = ''
-        self._postcon = ''
+        self._precon_name = ''
+        self._precon_code = ''
+        self._precon_descr = ''
+        self._postcon_name = ''
+        self._postcon_code = ''
+        self._postcon_descr = ''
         self._comment = ''
         self.sequences = []
 
@@ -918,8 +922,12 @@ class TestSpecification:
         new_testspec.description = copy.copy(self.description)
         new_testspec.version = copy.copy(self.version)
         new_testspec.primary_counter_locked = copy.copy(self.primary_counter_locked)
-        new_testspec.precon = copy.copy(self.precon)
-        new_testspec.postcon = copy.copy(self.postcon)
+        new_testspec.precon_name = copy.copy(self.precon_name)
+        new_testspec.precon_code = copy.copy(self.precon_code)
+        new_testspec.precon_descr = copy.copy(self.precon_descr)
+        new_testspec.postcon_name = copy.copy(self.postcon_name)
+        new_testspec.postcon_code = copy.copy(self.postcon_code)
+        new_testspec.postcon_descr = copy.copy(self.postcon_descr)
         new_testspec.comment = copy.copy(self.comment)
 
         return new_testspec
@@ -965,22 +973,58 @@ class TestSpecification:
         self._version = value
 
     @property
-    def precon(self):
-        return self._precon
+    def precon_name(self):
+        return self._precon_name
 
-    @precon.setter
-    def precon(self, value: str):
+    @precon_name.setter
+    def precon_name(self, value: str):
         assert isinstance(value, str)
-        self._precon = value
+        self._precon_name = value
 
     @property
-    def postcon(self):
-        return self._postcon
+    def precon_code(self):
+        return self._precon_code
 
-    @postcon.setter
-    def postcon(self, value: str):
+    @precon_code.setter
+    def precon_code(self, value: str):
         assert isinstance(value, str)
-        self._postcon = value
+        self._precon_code = value
+
+    @property
+    def precon_descr(self):
+        return self._precon_descr
+
+    @precon_descr.setter
+    def precon_descr(self, value: str):
+        assert isinstance(value, str)
+        self._precon_descr = value
+
+    @property
+    def postcon_name(self):
+        return self._postcon_name
+
+    @postcon_name.setter
+    def postcon_name(self, value: str):
+        assert isinstance(value, str)
+        self._postcon_name = value
+
+    @property
+    def postcon_code(self):
+        return self._postcon_code
+
+    @postcon_code.setter
+    def postcon_code(self, value: str):
+        assert isinstance(value, str)
+        self._postcon_code = value
+
+    @property
+    def postcon_descr(self):
+        return self._postcon_descr
+
+    @postcon_descr.setter
+    def postcon_descr(self, value: str):
+        assert isinstance(value, str)
+        self._postcon_descr = value
 
     @property
     def comment(self):
@@ -1008,8 +1052,12 @@ class TestSpecification:
             self.description = json_data['_description']
             self.version = json_data['_version']
             self.primary_counter_locked = json_data['_primary_counter_locked']
-            self.precon = json_data['_precon']
-            self.postcon = json_data['_postcon']
+            self.precon_name = json_data['_precon_name']
+            self.precon_code = json_data['_precon_code']
+            self.precon_descr = json_data['_precon_descr']
+            self.postcon_name = json_data['_postcon_name']
+            self.postcon_code = json_data['_postcon_code']
+            self.postcon_descr = json_data['_postcon_descr']
             self.comment = json_data['_comment']
         except KeyError as keyerror:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(keyerror))

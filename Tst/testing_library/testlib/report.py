@@ -26,6 +26,8 @@ cmd_test_start_keyword = '#START TEST'
 cmd_step_keyword = '#COMMAND STEP'
 cmd_step_exception_keyword = 'EXCEPTION IN STEP'
 cmd_step_keyword_done = '#STEP DONE'  # ATTENTION! The _done keyword must not contain the start keyword
+cmd_precon_keyword = '#PRECONDITION'
+cmd_postcon_keyword = '#POSTCONDITION'
 vrc_step_keyword = '#VERIFICATION FOR STEP'
 vrc_step_exception_keyword = 'EXCEPTION IN STEP'
 vrc_step_keyword_done = '#VERIFICATION STEP DONE'  # ATTENTION! The _done keyword must not contain the start keyword
@@ -47,7 +49,7 @@ def key_word_found(line, key_word):
     return found
 
 
-def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None, descr=None, run_id=None, step_id=None, comment=None):
+def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None, descr=None, run_id=None, step_id=None, comment=None, vrc_descr=None):
     """
     Make a JSON string out of the step number and timestamp
     :param step_number: number of the step
@@ -61,6 +63,8 @@ def encode_to_json_string(step_number, timestamp, step_version=None, step_result
         od['version'] = step_version
     if step_result is not None:
         od['result'] = step_result
+    if vrc_descr is not None:
+        od['vrc_descr'] = vrc_descr
     if descr is not None:
         od['descr'] = descr
     if run_id is not None:
@@ -148,13 +152,11 @@ def verification_step_begin(step_param, script_version, pool_name, step_start_cu
                                   encode_to_json_string(step_number=step_param['step_no'],
                                                         timestamp=step_start_cuc,
                                                         step_version=script_version,
+                                                        vrc_descr=step_param['vrc_descr'],
                                                         run_id=run_id,
                                                         step_id=step_id,
                                                         descr=step_param['descr'])))
     logger.info(step_param['descr'])
-    if 'comment' in step_param:
-        if len(step_param['comment']) > 0:
-            logger.info('Comment: {}'.format(step_param['comment']))
 
 
 def verification_step_exception(step_param, step_id=None):
@@ -290,23 +292,32 @@ def print_event_data_tuple(tm_packets):
             logger.debug('Event {}: {} -> {}'.format(event_id, src, dest))
 
 
-def write_precondition_outcome(result):
+def write_precondition_outcome(result, step_id, precon_descr):
     """
     Logs the outcome of the establish_preconditions function in a test script.
     :param result: bool
         True if all precondition could be established successfully
     """
+
+    logger.info('{} {}'.format(cmd_precon_keyword, make_json_string(result=result,
+                                                                    precon_desc=precon_descr,
+                                                                    step_id=step_id)))
     if result is True:
         logger.info('Preconditions are fulfilled.\n')
     else:
         logger.warning('Preconditions are NOT fulfilled.\n')
 
-def write_postcondition_outcome(result):
+
+def write_postcondition_outcome(result, step_id, postcon_descr):
     """
     Logs the outcome of the establish_postconditions function in a test script.
     :param result: bool
         True if all postcondition could be established successfully
     """
+
+    logger.info('{} {}'.format(cmd_postcon_keyword, make_json_string(result=result,
+                                                                     postcon_desc=postcon_descr,
+                                                                     step_id=step_id)))
     if result is True:
         logger.info('Postconditions are fulfilled.\n')
     else:

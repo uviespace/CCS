@@ -50,7 +50,7 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
     if not output_file_path:
         output_file_path = basic_output_file_path
     if not json_file_path:
-        json_file_path = basic_json_file_path + test_name + '.json'
+        json_file_path = basic_json_file_path + '/' + test_name + '.json'
 
     cmd_log_file = log_file_path + test_name + cmd_log_file_end
     vrc_log_file = log_file_path + test_name + vrc_log_file_end
@@ -115,9 +115,9 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
 
         # write date line
         date_format = '%Y-%m-%d'
-        exec_date = datetime.datetime.fromtimestamp(os.stat(json_file_path).st_mtime) if os.path.isfile() else '---'  # When was the last time the json file was changed?
-        time_now = datetime.datetime.strftime(datetime.datetime.now(), date_format)  # TODO: Check which time should be shown here
-        writer.writerow(['Date', '', exec_date, time_now])  # TODO: Make sure which dates should be shown, ok to take time from first step? Only checking left
+        specification_date = datetime.datetime.strftime(datetime.datetime.fromtimestamp(os.stat(json_file_path).st_mtime), date_format) if os.path.isfile(json_file_path) else ''  # When was the last time the json file was changed?
+        time_execution = datetime.datetime.strftime(cmd_steps[0]['exec_date'], date_format)
+        writer.writerow(['Date', '', specification_date, time_execution])
 
         # write Precon line
         writer.writerow(['Precon.', 'This has still to be solved', '', ''])  # TODO: What should be shown of the Precon
@@ -138,7 +138,9 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
                         step_number_secondary) == 0 else '{}.{}'.format(step_number_primary,
                                                                         step_number_secondary)
                     step_desc = 'Step ' + str(step_number_shown)
-                    writer.writerow([step_desc, step['descr'], 'Probably some VRC description', test_result])  # TODO: Third coloumn is what?
+                    writer.writerow([step_desc, step['descr'], vrc_step['vrc_descr'], test_result])  # TODO: Third coloumn is what?
+                    if step['comment']:
+                        writer.writerow(['Comment', step['comment'], '', ''])
 
         # write Postcon line
         writer.writerow(['Postcon.', 'This has still to be solved', '', ''])  # TODO: What should be shown of the Postcon
@@ -236,5 +238,5 @@ def show_basic_results(test_name, log_file_path=None):
     return
 
 if __name__ == '__main__':
-    save_result_to_file(test_name, run_id='20210713140200')
+    save_result_to_file(test_name, run_id='20210721092439')
     #show_basic_results(test_name)

@@ -12,7 +12,7 @@ user = cfg.get('database', 'user')
 pw = cfg.get('database', 'password')
 
 mysql_connection_string = 'mysql://{}:{}@localhost'.format(user, pw)
-schema_name = 'codeblocks'
+schema_name = 'tst'
 
 
 def crt_ngn():
@@ -72,8 +72,10 @@ class CodeBlock(Base):
     # code_type = relationship('CodeKind')
     code_type = Column(String(20), default='')
     description = Column(Text(10000), default='')
+    comment = Column(Text(10000), default='')
     command_code = Column(Text(10000), default='')
     verification_code = Column(Text(10000), default='')
+    verification_descr = Column(Text(10000), default='')
     # TC
     # is_step
     # is_command_code_block
@@ -82,13 +84,32 @@ class CodeBlock(Base):
     # verification IDs
 
     def __repr__(self):
-        return '<CodeSnippet(code_type="{}", description="{}", command_code_block="{}", verification_code_block="{}")>'\
-            .format(self.code_type, self.description, self.command_code, self.verification_code)
+        return '<CodeSnippet(code_type="{}", description="{}", comment="{}" command_code_block="{}", verification_code_block="{}", verification_descr="{}")>'\
+            .format(self.code_type, self.description, self.comment, self.command_code, self.verification_code, self.verification_descr)
 
     def data_as_list(self):
-        return [self.id, self.code_type, self.description, self.command_code, self.verification_code]
+        return [self.id, self.code_type, self.description, self.comment, self.command_code, self.verification_code, self.verification_descr]
 
 
+class Pre_Post_Con(Base):
+    __tablename__ = 'pre-post-conditions'
+
+    id = Column(Integer, primary_key=True)
+    type = Column(String(20), default='')
+    name = Column(Text(10000), default='')
+    description = Column(Text(10000), default='')
+    condition = Column(Text(10000), default='')
+
+    def __repr__(self):
+        return '<CodeSnippet(code_type="{}", description="{}", condition="{}")>'\
+            .format(self.code_type, self.description, self.condition)
+
+    def data_as_list(self):
+        return [self.id, self.code_type, self.description, self.condition]
+
+'''
+# This was never used therefore it is no longer used, but the basic idea may be interesting in the future, therefore kept in the code
+# Basic IDEA: SAving a Test Specification (Test Description, Name, Version)
 class CodeTestSpec(Base):
     __tablename__ = 'testspecs'
 
@@ -99,17 +120,19 @@ class CodeTestSpec(Base):
     primary_counter_locked = Column(Boolean(), default=False)
     steps = relationship('CodeStep')
 
+'''
 
-class CodeStep(Base):
-    __tablename__ = 'steps'
-
-    id = Column(Integer, primary_key=True)
-
-    code_type = Column(String(20), default='')
-    description = Column(Text(10000), default='')
-    command_code = Column(Text(10000), default='')
-    verification_code = Column(Text(10000), default='')
-    test_spec = Column(ForeignKey('testspecs.id'))
+# This is no longer used, since all steps are in codeblocks data table
+#class CodeStep(Base):
+#    __tablename__ = 'steps'
+#
+#    id = Column(Integer, primary_key=True)#
+#
+#    code_type = Column(String(20), default='')
+#    description = Column(Text(10000), default='')
+#    command_code = Column(Text(10000), default='')
+#    verification_code = Column(Text(10000), default='')
+#    test_spec = Column(ForeignKey('testspecs.id'))
     # TC
     # is_step
     # is_command_code_block
@@ -117,13 +140,12 @@ class CodeStep(Base):
     # requirement IDs
     # verification IDs
 
-    def __repr__(self):
-        return '<CodeSnippet(code_type="{}", description="{}", command_code_block="{}", verification_code_block="{}")>'\
-            .format(self.code_type, self.description, self.command_code, self.verification_code)
+#    def __repr__(self):
+#        return '<CodeSnippet(code_type="{}", description="{}", command_code_block="{}", verification_code_block="{}")>'\
+#            .format(self.code_type, self.description, self.command_code, self.verification_code)
 
-    def data_as_list(self):
-        return [self.id, self.code_type, self.description, self.command_code, self.verification_code]
-
+#    def data_as_list(self):
+#        return [self.id, self.code_type, self.description, self.command_code, self.verification_code]
 
 # class CodeKind(Base):
 #     __tablename__ = 'codekinds'

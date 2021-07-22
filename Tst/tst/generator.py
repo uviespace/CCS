@@ -1,6 +1,12 @@
 import os
 import string
 import data_model
+import confignator
+import sys
+sys.path.append(confignator.get_option('paths', 'ccs'))
+import ccs_function_lib as cfl
+cfl.add_tst_import_paths()
+import db_interaction
 
 cmd_scrpt_auxiliary = '_command.py'
 vrc_scrpt_auxiliary = '_verification.py'
@@ -9,19 +15,17 @@ run_scrpt_auxiliary = '_run.py'
 co_header_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_header.py'))
 co_class_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_class.py'))
 co_pre_cond_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_pre_condition.py'))
-co_pre_cond_entry_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_pre_condition_entry.py'))
 co_step_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_step.py'))
 co_post_cond_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_post_condition.py'))
-co_post_cond_entry_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_post_condition_entry.py'))
 co_footer_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/co_footer.py'))
 
 run_header_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/run_header.py'))
 run_step_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/run_step.py'))
+run_footer_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/run_footer.py'))
 
 ver_header_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/ver_header.py'))
 ver_class_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/ver_class.py'))
 ver_step_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'generator_templates/ver_step.py'))
-
 
 def create_file_name(name):
     """
@@ -57,42 +61,6 @@ def get_product_file_paths(model_name):
     paths.append(create_script_path(name=model_name, auxiliary=vrc_scrpt_auxiliary))
     paths.append(create_script_path(name=model_name, auxiliary=run_scrpt_auxiliary))
     return paths
-
-def get_precon_sections():
-    pre_con_sections = {}  # Name of section points to beginning line and ending line
-    pre_con_number_sections = []  # Save section name and appearence line number here, to get it to pre con sections
-    with open(co_pre_cond_entry_path, 'r') as pre_con_entry_obj:
-        for count, line in enumerate(pre_con_entry_obj):
-            if line.startswith('#####-'):
-                pre_con_number_sections.append([line[6:-7], count+1])  # Save section name and line number
-        pre_con_number_sections.append(['Last line', count+1])  # Add the last line count to have an end for last section
-        pre_con_entry_obj.close()
-    for i, sections in enumerate(pre_con_number_sections):  # Format it niceline in pre con sections
-        try:
-            pre_con_sections[sections[0]] = [int(sections[1]), int(pre_con_number_sections[i+1][1])]
-        except:
-            # This just catches the last line which was only added to get end for last section
-            pass
-
-    return pre_con_sections
-
-def get_postcon_sections():
-    post_con_sections = {}  # Name of section points to beginning line and ending line
-    post_con_number_sections = []  # Save section name and appearence line number here, to get it to post con sections
-    with open(co_post_cond_entry_path, 'r') as post_con_entry_obj:
-        for count, line in enumerate(post_con_entry_obj):
-            if line.startswith('#####-'):
-                post_con_number_sections.append([line[6:-7], count+1])  # Save section name and line number
-        post_con_number_sections.append(['Last line', count+1])  # Add the last line count to have an end for last section
-        post_con_entry_obj.close()
-    for i, sections in enumerate(post_con_number_sections):  # Format it niceline in post con sections
-        try:
-            post_con_sections[sections[0]] = [int(sections[1]), int(post_con_number_sections[i+1][1])]
-        except:
-            # This just catches the last line which was only added to get end for last section
-            pass
-
-    return post_con_sections
 
 def strip_file_extension(name):
     assert type(name) is str
@@ -139,33 +107,20 @@ def make_command_script(model, model_spec):
                                    testSpecName=model_spec.name,
                                    testSpecDescription=model_spec.description,
                                    testSpecVersion=model_spec.version,
-                                   testPreCondition=model_spec.precon,
-                                   testPostCondition=model_spec.postcon,
+                                   testPreCondition=model_spec.precon_name,
+                                   testPostCondition=model_spec.postcon_name,
                                    testComment=model_spec.comment)
         # add the header string
         content += '\n\n' + cls
 
     # add the pre condition function
-    with open(co_pre_cond_path, 'r') as pre_cond_file_obj, open(co_pre_cond_entry_path, 'r') as pre_cond_entry_file_obj:
+    with open(co_pre_cond_path, 'r') as pre_cond_file_obj:
         pre_cond_template_str = pre_cond_file_obj.read()
         pre_cond_file_obj.close()
 
-        # Get the needed section and read only those lines
-        all_precon_sections = get_precon_sections()
-        precon_position = all_precon_sections[model_spec.precon]
-        pre_cond_entry_array = pre_cond_entry_file_obj.readlines()[precon_position[0]: precon_position[1]]
-        pre_cond_entry = ''
-        # Make a string to combine it with the co_pre_conditions file, add tabs for the additonal lines in form of space so the CCS can read it
-        for count, line in enumerate(pre_cond_entry_array):
-            if count > 0:
-                pre_cond_entry += ' '*8
-                pre_cond_entry += line
-            else:
-                pre_cond_entry += line
-        pre_cond_entry_file_obj.close()
-
         pre_cond_template = string.Template(pre_cond_template_str)
-        pre_cond_combined = pre_cond_template.substitute(testpreconentry=pre_cond_entry)
+        pre_cond_combined = pre_cond_template.substitute(TestPreconEntry=model_spec.precon_code,
+                                                         TestPreconDescription=model_spec.precon_descr)
         # add the header string
         content += '\n' + pre_cond_combined
 
@@ -181,7 +136,7 @@ def make_command_script(model, model_spec):
                 command_code_w_indents = 'pass'
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
                                        testStepDescription=step.description,
-                                       testStepCommandComment=step.command_comment,
+                                       testStepComment=step.step_comment,
                                        testStepCommandCode=command_code_w_indents,
                                        testSpecFileName=create_file_name(model_spec.name),
                                        testSpecClassName=create_class_name(model_spec.name))
@@ -189,26 +144,13 @@ def make_command_script(model, model_spec):
             content += '\n' + step
 
     # add the post condition function
-    with open(co_post_cond_path, 'r') as post_cond_file_obj, open(co_post_cond_entry_path, 'r') as post_cond_entry_file_obj:
+    with open(co_post_cond_path, 'r') as post_cond_file_obj:
         post_cond_template_str = post_cond_file_obj.read()
         post_cond_file_obj.close()
 
-        # Get the needed section and read only those lines
-        all_postcon_sections = get_postcon_sections()
-        postcon_position = all_postcon_sections[model_spec.postcon]
-        post_cond_entry_array = post_cond_entry_file_obj.readlines()[postcon_position[0]: postcon_position[1]]
-        post_cond_entry = ''
-        # Make a string to combine it with the co_post_conditions file, add tabs for the additonal lines in form of space so the CCS can read it
-        for count, line in enumerate(post_cond_entry_array):
-            if count > 0:
-                post_cond_entry += ' '*8
-                post_cond_entry += line
-            else:
-                post_cond_entry += line
-        post_cond_entry_file_obj.close()
-
         post_cond_template = string.Template(post_cond_template_str)
-        post_cond_combined = post_cond_template.substitute(testpostconentry=post_cond_entry)
+        post_cond_combined = post_cond_template.substitute(TestPostconEntry=model_spec.postcon_code,
+                                                           TestPostconDescr=model_spec.description)
 
         # add the header string
         content += '\n' + post_cond_combined
@@ -270,6 +212,14 @@ def make_command_run_script(model, model_spec):
             # add the string for a steps
             content += '\n' + step
 
+    # add the step definitions
+    with open(run_footer_path, 'r') as step_file_obj:
+        step_template_str = step_file_obj.read()
+        step_file_obj.close()
+        header_template_str = string.Template(header_template)
+
+        content += '\n' + header_template_str
+
     # create the new file
     file_path = create_script_path(name=model_spec.name, auxiliary=run_scrpt_auxiliary)
     with open(file_path, 'w') as command_script:
@@ -330,10 +280,18 @@ def make_verification_script(model, model_spec):
             #                           testStepVerificationCode=verification_code_w_indents)
             step = step_str.substitute(testStepNumber=step.step_number_test_format,
                                        testStepDescription=step.description,
-                                       testStepVerificationComment=step.verification_comment,
+                                       testStepVerificationDescription=step.verification_description,
                                        testStepVerificationCode=verification_code_w_indents)
             # add the string for a steps
             content += '\n' + step
+
+    # add the footer (logger_setup)
+    #with open(ver_footer_path, 'r') as footer_file_obj:
+    #    footer_template_str = footer_file_obj.read()
+    #    footer_file_obj.close()
+
+        # add the header string
+    #    content += footer_template_str
 
     # # add the post condition function
     # with open(post_cond_path, 'r') as post_cond_file_obj:

@@ -44,12 +44,14 @@
         :rtype: bool
         """
         testing_logger.cmd_log_handler(__name__)
+        step_id = self.check_run_and_step_id(pool_name=pool_name)
+        postcon_descr = '$TestPostconDescr'
         success = False
         logger.info('establishing postconditions started')
 
-        $testpostconentry
+        $TestPostconEntry
 
         logger.info('establishing postconditions finished')
-        report.write_postcondition_outcome(success)
+        report.write_postcondition_outcome(success, step_id, postcon_descr)
         return success
 

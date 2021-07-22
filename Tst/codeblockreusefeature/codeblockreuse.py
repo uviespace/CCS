@@ -396,8 +396,11 @@ class CBRSearch(Gtk.Box):
         self.input_buffer.connect('inserted-text', self.on_search_text_inserted)
         self.input_buffer.connect('deleted-text', self.on_search_text_deleted)
 
-        self.pane = Gtk.Paned()
-        self.pane.set_orientation(Gtk.Orientation.VERTICAL)
+        self.pane = Gtk.VPaned()
+
+        self.codeblocks_grid = Gtk.Grid()
+        self.codeblocks_grid.set_column_homogeneous(True)
+        self.codeblocks_grid.set_row_homogeneous(True)
 
         # tree view for the showing the log messages
         scroller = Gtk.ScrolledWindow()
@@ -436,12 +439,34 @@ class CBRSearch(Gtk.Box):
         self.lm = GtkSource.LanguageManager()
         self.style_manager = GtkSource.StyleSchemeManager.get_default()
 
+        self.comment_command_paned = Gtk.HPaned()
+        # source view for the comment ---------------------
+        self.comment_box = Gtk.VBox()
+        self.comment_label_box = Gtk.Box()
+        self.comment_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.comment_label = Gtk.Label()
+        self.comment_label.set_text(_('Comment:'))
+        self.comment_label_box.pack_start(self.comment_label, False, False, 0)
+
+        self.comment_scrolled_window = Gtk.ScrolledWindow()
+        self.comment_code_view = GtkSource.View()
+        self.comment_code_view_buffer = self.comment_code_view.get_buffer()
+        self.comment_code_view_buffer.set_language(self.lm.get_language('json'))
+        self.comment_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.comment_scrolled_window.add(self.comment_code_view)
+
+        self.comment_box.pack_start(self.comment_label_box, False, False, 0)
+        self.comment_box.pack_start(self.comment_scrolled_window, True, True, 0)
+        self.comment_command_paned.pack2(self.comment_box)
+
         # source view for the command code ---------------------
         self.cc_box = Gtk.Box()
         self.cc_box.set_orientation(Gtk.Orientation.VERTICAL)
-
+        self.cc_label_box = Gtk.Box()
+        self.cc_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.cc_label = Gtk.Label()
         self.cc_label.set_text(_('Command code:'))
+        self.cc_label_box.pack_start(self.cc_label, False, False, 0)
 
         self.cc_scrolled_window = Gtk.ScrolledWindow()
         self.cc_code_view = GtkSource.View()
@@ -450,15 +475,19 @@ class CBRSearch(Gtk.Box):
         self.cc_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
         self.cc_scrolled_window.add(self.cc_code_view)
 
-        self.cc_box.pack_start(self.cc_label, False, False, 0)
+        self.cc_box.pack_start(self.cc_label_box, False, False, 0)
         self.cc_box.pack_start(self.cc_scrolled_window, True, True, 0)
+        self.comment_command_paned.pack1(self.cc_box)
 
+        self.verification_paned = Gtk.HPaned()
         # source view for the verification code ---------------------
         self.vc_box = Gtk.Box()
         self.vc_box.set_orientation(Gtk.Orientation.VERTICAL)
-
+        self.vc_label_box = Gtk.Box()
+        self.vc_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.vc_label = Gtk.Label()
         self.vc_label.set_text(_('Verification code:'))
+        self.vc_label_box.pack_start(self.vc_label, False, False, 0)
 
         self.vc_scrolled_window = Gtk.ScrolledWindow()
         self.vc_code_view = GtkSource.View()
@@ -467,16 +496,37 @@ class CBRSearch(Gtk.Box):
         self.vc_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
         self.vc_scrolled_window.add(self.vc_code_view)
 
-        self.vc_box.pack_start(self.vc_label, False, False, 0)
+        self.vc_box.pack_start(self.vc_label_box, False, False, 0)
         self.vc_box.pack_start(self.vc_scrolled_window, True, True, 0)
+        self.verification_paned.pack1(self.vc_box)
 
-        self.code_view_pane = Gtk.Paned()
-        self.code_view_pane.set_orientation(Gtk.Orientation.VERTICAL)
-        self.code_view_pane.pack1(self.cc_box)
-        self.code_view_pane.pack2(self.vc_box)
+        # source view for the Verification Description ---------------------
+        self.vrc_descr_box = Gtk.VBox()
+        self.vrc_descr_label_box = Gtk.Box()
+        self.vrc_descr_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.vrc_descr_label = Gtk.Label()
+        self.vrc_descr_label.set_text(_('Verification Description:'))
+        self.vrc_descr_label_box.pack_start(self.vrc_descr_label, False, False, 0)
+
+        self.vrc_descr_scrolled_window = Gtk.ScrolledWindow()
+        self.vrc_descr_code_view = GtkSource.View()
+        self.vrc_descr_code_view_buffer = self.vrc_descr_code_view.get_buffer()
+        self.vrc_descr_code_view_buffer.set_language(self.lm.get_language('json'))
+        self.vrc_descr_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.vrc_descr_scrolled_window.add(self.vrc_descr_code_view)
+
+        self.vrc_descr_box.pack_start(self.vrc_descr_label_box, False, False, 0)
+        self.vrc_descr_box.pack_start(self.vrc_descr_scrolled_window, True, True, 0)
+        self.verification_paned.pack2(self.vrc_descr_box)
+
+        self.code_view_pane = Gtk.VPaned()
+        self.code_view_pane.pack1(self.comment_command_paned)
+        self.code_view_pane.pack2(self.verification_paned)
+
         self.pane.pack2(self.code_view_pane)
 
         self.pack_start(self.pane, True, True, 0)
+
         self.right_click_menu = TreeRightClickMenu(cruf=self)
 
         # set the position of the Paned widget using the configuration file
@@ -485,6 +535,9 @@ class CBRSearch(Gtk.Box):
         # set the position of the paned of the widget self.codeblockreuse
         paned_position_cc = confignator.get_option('codereuse-preferences', 'paned-position-command-code')
         self.set_code_view_pane_position(int(paned_position_cc))
+        # set teh position of the comment and vrc description windows
+        paned_position_comment = confignator.get_option('codereuse-preferences', 'paned-position-comment')
+        self.set_comment_pane_position(int(paned_position_comment))
 
         self.show_all()
 
@@ -495,14 +548,19 @@ class CBRSearch(Gtk.Box):
         drag_source_type = data['data_type']
         step_number = data['step_number']
         description = data['description']
+        comment = data['comment']
         command_code = data['command_code']
         verification_code = data['verification_code']
+        verification_descr = data['verification_descr']
         if drag_source_type == dnd_data_parser.data_type_step:
             db_interaction.write_into_db_step(description=description,
                                               command_code=command_code,
-                                              verification_code=verification_code)
+                                              comment=comment,
+                                              verification_code=verification_code,
+                                              verification_descr=verification_descr)
         if drag_source_type == dnd_data_parser.data_type_snippet:
             db_interaction.write_into_db_snippet(description=description,
+                                                 comment=comment,
                                                  code_block=command_code)
         self.reload_data()
         self.show_all()
@@ -526,9 +584,11 @@ class CBRSearch(Gtk.Box):
         path = model.get_path(my_iter)
         # retrieve the data from the tree-view row and build a string to set into the selection data object
         desc = model[path][2]
-        command_code = model[path][3]
-        verification_code = model[path][4]
-        data_string = dnd_data_parser.create_datastring(dnd_data_parser.data_type_snippet, description=desc, command_code=command_code, verification_code=verification_code, logger=self.logger)
+        comment = model[path][3]
+        command_code = model[path][4]
+        verification_code = model[path][5]
+        verification_descr = model[path][6]
+        data_string = dnd_data_parser.create_datastring(dnd_data_parser.data_type_snippet, description=desc, comment=comment, command_code=command_code, verification_code=verification_code, verification_descr=verification_descr, logger=self.logger)
         # set the data into the selection data object
         selection_data.set_text(data_string, -1)
 
@@ -559,6 +619,18 @@ class CBRSearch(Gtk.Box):
     def get_code_view_pane_position(self):
         return self.code_view_pane.get_position()
 
+    def set_comment_pane_position(self, position):
+        # set the position of Paned widget. If no position is provided, -1 (as not set) is set.
+        if position is None:
+            position = -1
+        self.verification_paned.set_position(position)
+        self.comment_command_paned.set_position(position)
+
+    def get_comment_pane_position(self):
+        return self.verification_paned.get_position()
+
+
+
     def save_panes_positions(self):
         """
         save the position of the pane widgets
@@ -567,6 +639,8 @@ class CBRSearch(Gtk.Box):
                                 str(self.get_paned_position()))
         confignator.save_option('codereuse-preferences', 'paned-position-command-code',
                                 str(self.get_code_view_pane_position()))
+        confignator.save_option('codereuse-preferences', 'paned-position-comment',
+                                str(self.get_comment_pane_position()))
 
     # @property
     # def filter_columns(self):
@@ -667,14 +741,18 @@ class CBRSearch(Gtk.Box):
         """
         tree_view_model = tree_view.get_model()
         tree_model_row = tree_view_model[path]
-        command_code = tree_model_row[3]
-        verification_code = tree_model_row[4]
+        comment = tree_model_row[3]
+        command_code = tree_model_row[4]
+        verification_code = tree_model_row[5]
+        verification_descr = tree_model_row[6]
+        self.comment_code_view_buffer.set_text(comment)
         self.cc_code_view_buffer.set_text(command_code)
         self.vc_code_view_buffer.set_text(verification_code)
+        self.vrc_descr_code_view_buffer.set_text(verification_descr)
 
     def load_data_into_liststore(self, data: list):
         # how many columns are in a row
-        column_cnt = [int, str, str, str, str]
+        column_cnt = [int, str, str, str, str, str, str]
         # column_cnt.append(str)  # for background color
 
         self.data_filtered = Gtk.TreeStore(*column_cnt)

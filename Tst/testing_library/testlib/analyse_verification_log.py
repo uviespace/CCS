@@ -56,6 +56,7 @@ def get_verification_steps(filename):
         new_vrc_step['start_timestamp'] = item['timestamp']
         new_vrc_step['exec_date'] = item['exec_date']
         new_vrc_step['version'] = item['version']
+        new_vrc_step['vrc_descr'] = item['vrc_descr']
         new_vrc_step['descr'] = item['descr']
         new_vrc_step['run_id'] = item['run_id']
         new_vrc_step['step_id'] = item['step_id']

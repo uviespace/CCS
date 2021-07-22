@@ -3,7 +3,7 @@
         param = {
             'step_no': '$testStepNumber',
             'descr': '$testStepDescription',
-            'comment': '$testStepCommandComment'
+            'comment': '$testStepComment'
         }
         step_start_cuc, summary, step_id = self.begin_steps(pool_name=pool_name, param=param)
 

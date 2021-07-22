@@ -2,6 +2,10 @@ import os
 import logging
 import gettext
 import gi
+import time
+
+import db_interaction
+
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, GtkSource
@@ -158,15 +162,15 @@ class Board(Gtk.Box):
         self.lbl_box_comment = Gtk.Box()
         self.lbl_box_comment.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.label_comment = Gtk.Label.new()
-        self.label_comment.set_text(_('Comment'))
+        self.label_comment.set_text(_('Test Comment:'))
         self.lbl_box_comment.pack_start(self.label_comment, False, False, 0)
         # Make the area where the real command is entered
         self.comment_scrolled_window = Gtk.ScrolledWindow()
-        #self.commands_comment_scrolled_window.set_size_request(200, 100)
+        #self.comment_scrolled_window.set_size_request(200, 100)
         self.test_meta_data_comment = Gtk.TextView.new()
         self.comment_scrolled_window.add(self.test_meta_data_comment)
 
-        self.test_comment_box.pack_start(self.lbl_box_comment, True, True, 0)
+        self.test_comment_box.pack_start(self.lbl_box_comment, False, False, 0)
         self.test_comment_box.pack_start(self.comment_scrolled_window, True, True, 0)
 
 
@@ -255,10 +259,10 @@ class Board(Gtk.Box):
         # set the version of the test specification from the data model
         self.test_meta_data_version.set_text(self.model.version)
         # set the pre-condition name
-        if self.model.precon:
+        if self.model.precon_name:
             found = False
             for index, precon_name in enumerate(self.precon_selection.get_model()):
-                if precon_name[0] == self.model.precon:
+                if precon_name[0] == self.model.precon_name:
                     found = True
                     self.precon_selection.set_active(index)
             if not found:
@@ -268,10 +272,10 @@ class Board(Gtk.Box):
                 self.on_precon_changed(self.precon_selection)
 
         # set the post-condition name
-        if self.model.postcon:
+        if self.model.postcon_name:
             found = False
             for index, postcon_name in enumerate(self.postcon_selection.get_model()):
-                if postcon_name[0] == self.model.postcon:
+                if postcon_name[0] == self.model.postcon_name:
                     found = True
                     self.postcon_selection.set_active(index)
             if not found:
@@ -335,11 +339,14 @@ class Board(Gtk.Box):
         self.update_widget_data()
         self.app.update_model_viewer()
 
-    def set_precon_model(self):
-        section_dict = generator.get_precon_sections()
-        for section_name in section_dict.keys():
-            self.precon_selection.append_text(section_name)
-        self.precon_selection.set_active(0)
+    def set_precon_model(self, active_name=None):
+        section_dict = db_interaction.get_pre_post_con('pre')
+        active_nbr = 0
+        for count, condition in enumerate(section_dict):
+            self.precon_selection.append_text(condition.name)
+            if active_name == condition.name:
+                active_nbr = count
+        self.precon_selection.set_active(active_nbr)
         self.on_precon_changed(self.precon_selection)
         return
 
@@ -347,7 +354,13 @@ class Board(Gtk.Box):
         # get the name out of the widget
         precon_name = widget.get_active_text()
         # update the model
-        self.model.precon = precon_name
+        self.model.precon_name = precon_name
+        # Set the Precon Description
+        section_dict = db_interaction.get_pre_post_con('pre')
+        for condition in section_dict:
+            if condition.name == precon_name:
+                self.model.precon_descr = condition.description
+                self.model.precon_code = condition.condition
         # update the data model viewer
         self.app.update_model_viewer()
         #current_model = self.app.current_model()
@@ -355,11 +368,14 @@ class Board(Gtk.Box):
         #    current_model.precon = precon_name
         return
 
-    def set_postcon_model(self):
-        section_dict = generator.get_postcon_sections()
-        for section_name in section_dict.keys():
-            self.postcon_selection.append_text(section_name)
-        self.postcon_selection.set_active(0)
+    def set_postcon_model(self, active_name=None):
+        section_dict = db_interaction.get_pre_post_con('post')
+        active_nbr = 0
+        for count, condition in enumerate(section_dict):
+            self.postcon_selection.append_text(condition.name)
+            if active_name == condition.name:
+                active_nbr = count
+        self.postcon_selection.set_active(active_nbr)
         self.on_postcon_changed(self.postcon_selection)
         return
 
@@ -367,7 +383,13 @@ class Board(Gtk.Box):
         # get the name out of the widget
         postcon_name = widget.get_active_text()
         # update the model
-        self.model.postcon = postcon_name
+        self.model.postcon_name = postcon_name
+        # Set the Postcon Description
+        section_dict = db_interaction.get_pre_post_con('post')
+        for condition in section_dict:
+            if condition.name == postcon_name:
+                self.model.postcon_descr = condition.description
+                self.model.postcon_code = condition.condition
         # update the data model viewer
         self.app.update_model_viewer()
         #current_model = self.app.current_model()
@@ -375,10 +397,14 @@ class Board(Gtk.Box):
         #    current_model.postcon = postcon_name
         return
 
+
+
     def precon_edit_clicked(self, widget):
         dialog = Edit_Pre_Post_Con_Dialog(self, 'pre', self.precon_selection.get_active())
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
+            self.precon_selection.remove_all()
+            self.set_precon_model(dialog.selection.get_active_text())
             dialog.destroy()
         elif response == Gtk.ResponseType.CANCEL:
             dialog.destroy()
@@ -387,6 +413,8 @@ class Board(Gtk.Box):
         dialog = Edit_Pre_Post_Con_Dialog(self, 'post', self.postcon_selection.get_active())
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
+            self.postcon_selection.remove_all()
+            self.set_postcon_model(dialog.selection.get_active_text())
             dialog.destroy()
         elif response == Gtk.ResponseType.CANCEL:
             dialog.destroy()
@@ -598,9 +626,12 @@ class StepWidget(Gtk.EventBox):
 
         self.set_hexpand(True)
 
+        # area for the commands
+        self.whole_description_box = Gtk.Grid()
+        self.whole_description_box.set_column_homogeneous(True)
+        #self.whole_commands_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+
         # field for the description
-        self.desc_box = Gtk.Box()
-        self.desc_box.set_orientation(Gtk.Orientation.VERTICAL)
         self.lbl_box_desc = Gtk.Box()
         self.lbl_box_desc.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.desc_label = Gtk.Label.new()
@@ -616,19 +647,35 @@ class StepWidget(Gtk.EventBox):
         self.desc_scrolled_window.add(self.desc_text_view)
         self.desc_text_buffer = self.desc_text_view.get_buffer()
 
-        self.desc_box.pack_start(self.lbl_box_desc, True, True, 0)
-        self.desc_box.pack_start(self.desc_scrolled_window, True, True, 0)
-        self.detail_box.pack_start(self.desc_box, True, True, 0)
+        # Step Comment Area
+        # Make the label, inside a own Box to show it on the left end
+        self.lbl_box_step_comment = Gtk.Box()
+        self.lbl_box_step_comment.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.step_label_comment = Gtk.Label.new()
+        self.step_label_comment.set_text(_('Step Comment'))
+        self.lbl_box_step_comment.pack_start(self.step_label_comment, False, False, 0)
+        # Make the area where the real command is entered
+        self.step_comment_scrolled_window = Gtk.ScrolledWindow()
+        #self.step_comment_scrolled_window.set_size_request(200, 100)
+        self.step_comment_view = GtkSource.View()
+        self.step_comment_view.set_show_line_numbers(False)
+        self.step_comment_scrolled_window.add(self.step_comment_view)
+        self.step_comment_buffer = self.step_comment_view.get_buffer()
+
+        #ADD everything to the whole grid
+        self.whole_description_box.set_column_spacing(10)
+        self.whole_description_box.attach(self.lbl_box_desc, 0, 0, 3, 1)
+        self.whole_description_box.attach(self.desc_scrolled_window, 0, 1, 3, 5)
+        self.whole_description_box.attach_next_to(self.lbl_box_step_comment, self.lbl_box_desc, Gtk.PositionType.RIGHT, 1, 1)
+        self.whole_description_box.attach_next_to(self.step_comment_scrolled_window, self.desc_scrolled_window, Gtk.PositionType.RIGHT, 1, 5)
+        self.detail_box.pack_start(self.whole_description_box, True, True, 0)
 
         # fields for commands and verification
         lm = GtkSource.LanguageManager()
 
-        # area for the commands
-        self.whole_commands_box = Gtk.Grid()
-        self.whole_commands_box.set_column_homogeneous(True)
-        #self.whole_commands_box.set_orientation(Gtk.Orientation.HORIZONTAL)
-
-        # Left side of the commands area, where the commands a entered
+        # Area for the commands
+        self.whole_commands_box = Gtk.Box()
+        self.whole_commands_box.set_orientation(Gtk.Orientation.VERTICAL)
         # Make the label, inside a own Box to show it on the left side
         self.lbl_box_commands = Gtk.Box()
         self.lbl_box_commands.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -654,32 +701,9 @@ class StepWidget(Gtk.EventBox):
         # self.commands_buffer.set_style_scheme(self.board.current_scheme)
         self.commands_scrolled_window.add(self.commands_view)
 
-        # Right side of the commands area, the comment box
-        # Make the label, inside a own Box to show it on the left end
-        self.lbl_box_commands_comment = Gtk.Box()
-        self.lbl_box_commands_comment.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.commands_label_comment = Gtk.Label.new()
-        self.commands_label_comment.set_text(_('Comment'))
-        self.lbl_box_commands_comment.pack_start(self.commands_label_comment, False, False, 0)
-        # Make the area where the real command is entered
-        self.commands_comment_scrolled_window = Gtk.ScrolledWindow()
-        #self.commands_comment_scrolled_window.set_size_request(200, 100)
-        self.commands_comment_view = GtkSource.View()
-        self.commands_comment_view.set_show_line_numbers(False)
-        self.commands_comment_scrolled_window.add(self.commands_comment_view)
-        self.commands_comment_buffer = self.commands_comment_view.get_buffer()
-
-        #self.commands_comment_box.pack_start(self.lbl_box_commands_comment, True, True, 0)
-        #self.commands_comment_box.pack_start(self.commands_comment_scrolled_window, True, True, 0)
-
-        #ADD everything to the whole grid
-        self.whole_commands_box.set_column_spacing(10)
-        self.whole_commands_box.attach(self.lbl_box_commands, 0, 0, 3, 1)
-        self.whole_commands_box.attach(self.commands_scrolled_window, 0, 1, 3, 5)
-        self.whole_commands_box.attach_next_to(self.lbl_box_commands_comment, self.lbl_box_commands, Gtk.PositionType.RIGHT, 1, 1)
-        self.whole_commands_box.attach_next_to(self.commands_comment_scrolled_window, self.commands_scrolled_window, Gtk.PositionType.RIGHT, 1, 5)
+        self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
+        self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)
         self.detail_box.pack_start(self.whole_commands_box, True, True, 0)
-
         # area for the verification
         self.whole_verification_box = Gtk.Grid()
         self.whole_verification_box.set_column_homogeneous(True)
@@ -711,25 +735,25 @@ class StepWidget(Gtk.EventBox):
 
         # Right side of the verification area, the comment box
         # Make the label, inside a own Box to show it on the left end
-        self.lbl_box_verification_comment = Gtk.Box()
-        self.lbl_box_verification_comment.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.verification_label_comment = Gtk.Label.new()
-        self.verification_label_comment.set_text(_('Comment'))
-        self.lbl_box_verification_comment.pack_start(self.verification_label_comment, False, False, 0)
+        self.lbl_box_verification_description = Gtk.Box()
+        self.lbl_box_verification_description.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.verification_label_description = Gtk.Label.new()
+        self.verification_label_description.set_text(_('Verification Description'))
+        self.lbl_box_verification_description.pack_start(self.verification_label_description, False, False, 0)
         # Make the area where the real command is entered
-        self.verification_comment_scrolled_window = Gtk.ScrolledWindow()
-        #self.commands_comment_scrolled_window.set_size_request(200, 100)
-        self.verification_comment_view = GtkSource.View()
-        self.verification_comment_view.set_show_line_numbers(False)
-        self.verification_comment_scrolled_window.add(self.verification_comment_view)
-        self.verification_comment_buffer = self.verification_comment_view.get_buffer()
+        self.verification_description_scrolled_window = Gtk.ScrolledWindow()
+        #self.verification_comment_scrolled_window.set_size_request(200, 100)
+        self.verification_description_view = GtkSource.View()
+        self.verification_description_view.set_show_line_numbers(False)
+        self.verification_description_scrolled_window.add(self.verification_description_view)
+        self.verification_description_buffer = self.verification_description_view.get_buffer()
 
         #ADD everything to the whole grid
         self.whole_verification_box.set_column_spacing(10)
         self.whole_verification_box.attach(self.lbl_box_verification, 0, 0, 3, 1)
         self.whole_verification_box.attach(self.verification_scrolled_window, 0, 1, 3, 5)
-        self.whole_verification_box.attach_next_to(self.lbl_box_verification_comment, self.lbl_box_verification, Gtk.PositionType.RIGHT, 1, 1)
-        self.whole_verification_box.attach_next_to(self.verification_comment_scrolled_window, self.verification_scrolled_window, Gtk.PositionType.RIGHT, 1, 5)
+        self.whole_verification_box.attach_next_to(self.lbl_box_verification_description, self.lbl_box_verification, Gtk.PositionType.RIGHT, 1, 1)
+        self.whole_verification_box.attach_next_to(self.verification_description_scrolled_window, self.verification_scrolled_window, Gtk.PositionType.RIGHT, 1, 5)
         self.detail_box.pack_start(self.whole_verification_box, True, True, 0)
 
         # fill the step with data before connecting the signals (!)
@@ -764,9 +788,9 @@ class StepWidget(Gtk.EventBox):
         # connect the signals
         self.desc_text_buffer.connect('changed', self.on_description_buffer_changed)
         self.commands_buffer.connect('changed', self.on_commands_buffer_changed)
-        self.commands_comment_buffer.connect('changed', self.on_commands_comment_buffer_changed)
+        self.step_comment_buffer.connect('changed', self.on_step_comment_buffer_changed)
         self.verification_buffer.connect('changed', self.on_verification_buffer_changed)
-        self.verification_comment_buffer.connect('changed', self.on_verification_comment_buffer_changed)
+        self.verification_description_buffer.connect('changed', self.on_verification_description_buffer_changed)
 
         Gtk.StyleContext.add_class(self.get_style_context(), 'step-widget')
 
@@ -862,9 +886,9 @@ class StepWidget(Gtk.EventBox):
         self.set_is_active_in_widget()
         self.set_description_in_widget()
         self.set_commands_in_widget()#
-        self.set_commands_comment_in_widget()
+        self.set_step_comment_in_widget()
         self.set_verification_in_widget()
-        self.set_verification_comment_in_widget()
+        self.set_verification_description_in_widget()
         self.set_start_sequence_in_widget()
         self.set_stop_sequence_in_widget()
         return
@@ -895,11 +919,11 @@ class StepWidget(Gtk.EventBox):
         self.commands_buffer.set_text(commands)
         return
 
-    def set_commands_comment_in_widget(self):
+    def set_step_comment_in_widget(self):
         """ gets the commands comment from the model and sets it in the commands comment buffer in order to display it """
         stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
-        commands_comment = self.model.get_sequence(self.sequence).steps[stp_ndx].command_comment
-        self.commands_comment_buffer.set_text(commands_comment)
+        step_comment = self.model.get_sequence(self.sequence).steps[stp_ndx].step_comment
+        self.step_comment_buffer.set_text(step_comment)
         return
 
     def set_verification_in_widget(self):
@@ -909,11 +933,11 @@ class StepWidget(Gtk.EventBox):
         self.verification_buffer.set_text(verification)
         return
 
-    def set_verification_comment_in_widget(self):
+    def set_verification_description_in_widget(self):
         """ gets the commands comment from the model and sets it in the commands comment buffer in order to display it """
         stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
-        verification_comment = self.model.get_sequence(self.sequence).steps[stp_ndx].verification_comment
-        self.verification_comment_buffer.set_text(verification_comment)
+        verification_description = self.model.get_sequence(self.sequence).steps[stp_ndx].verification_description
+        self.verification_description_buffer.set_text(verification_description)
         return
 
     def set_start_sequence_in_widget(self):
@@ -986,15 +1010,19 @@ class StepWidget(Gtk.EventBox):
         assert isinstance(step, data_model.Step)
         step_number = step.step_number
         description = step.description
+        comment = step.step_comment
         command_code = step.command_code
         verification_code = step.verification_code
+        verification_descr = step.verification_description
         data_type = dnd_data_parser.data_type_step if verification_code else dnd_data_parser.data_type_snippet
         data_string = dnd_data_parser.create_datastring(data_type,
                                                         self.sequence,
                                                         step_number,
                                                         description,
+                                                        comment,
                                                         command_code,
                                                         verification_code,
+                                                        verification_descr,
                                                         logger=self.logger)
         # set the text in the selection data object
         data.set_text(data_string, -1)
@@ -1069,7 +1097,9 @@ class StepWidget(Gtk.EventBox):
             # set the data into the test script data model
             step.description = data['description']
             step.command_code = data['command_code']
+            step.step_comment = data['comment']
             step.verification_code = data['verification_code']
+            step.verification_description = data['verification_descr']
         if drag_source_type == dnd_data_parser.data_type_step:  # a step is moved
             step_number = data['step_number']
             dragged_step_idx = self.model.get_sequence(self.sequence).get_step_index(step_number)
@@ -1151,19 +1181,19 @@ class StepWidget(Gtk.EventBox):
         # update the data model viewer
         self.app.update_model_viewer()
 
-    def on_commands_comment_buffer_changed(self, text_buffer):
+    def on_step_comment_buffer_changed(self, text_buffer):
         """
         Signal 'changed' for the commands comment buffer
         """
         # get the text of the commands comment out of the buffer of the widget
-        commands_comment = self.read_out_text_buffer(text_buffer)
+        step_comment = self.read_out_text_buffer(text_buffer)
         # Setting the commands string for a step in the data model
         # find the correct step within the data model
         stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
         step_in_data_model = self.model.get_sequence(self.sequence).steps[stp_ndx]
         # use the setter of the data model
         if isinstance(step_in_data_model, data_model.Step):
-            step_in_data_model.command_comment = commands_comment
+            step_in_data_model.step_comment = step_comment
         else:
             self.logger('step with the step number {} could not be found'.format(self.step_number))
         # update the data model viewer
@@ -1187,19 +1217,19 @@ class StepWidget(Gtk.EventBox):
         # update the data model viewer
         self.app.update_model_viewer()
 
-    def on_verification_comment_buffer_changed(self, text_buffer):
+    def on_verification_description_buffer_changed(self, text_buffer):
         """
-        Signal 'changed' for the verification comment buffer
+        Signal 'changed' for the verification description buffer
         """
         # get the code of the verification out of the buffer of the widget
-        verification_comment = self.read_out_text_buffer(text_buffer)
+        verification_description = self.read_out_text_buffer(text_buffer)
         # Setting the verification string for a step in the data model
         # find the correct step within the data model
         stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
         step_in_data_model = self.model.get_sequence(self.sequence).steps[stp_ndx]
         # use the setter of the data model
         if isinstance(step_in_data_model, data_model.Step):
-            step_in_data_model.verification_comment = verification_comment
+            step_in_data_model.verification_description = verification_description
         else:
             self.logger('step with the step number {} could not be found'.format(self.step_number))
         # update the data model viewer
@@ -1480,8 +1510,10 @@ class InterStepWidget(Gtk.Box):
                 new_step = self.model.get_sequence(self.sequence).add_step_below(reference_step_position=dest_step_above_number)
                 # set the data into the test script data model
                 new_step.description = data['description']
+                new_step.step_comment = data['comment']
                 new_step.command_code = data['command_code']
                 new_step.verification_code = data['verification_code']
+                new_step.verification_description = data['verification_descr']
         if drag_source_type == dnd_data_parser.data_type_step:  # a step is moved
             source_sequence = int(data['sequence'])
             source_step_number = data['step_number']
@@ -1502,8 +1534,10 @@ class InterStepWidget(Gtk.Box):
                     new_step = self.model.get_sequence(dest_step_above_sequence).add_step_below(reference_step_position=dest_step_above_number)
                     # set the data into the test script data model
                     new_step.description = data['description']
+                    new_step.step_comment = data['comment']
                     new_step.command_code = data['command_code']
                     new_step.verification_code = data['verification_code']
+                    new_step.verification_description = data['verification_descr']
                     # ToDo
                     # remove it from the old sequence
                     dragged_from_seq = self.model.get_sequence(source_sequence)
@@ -1552,14 +1586,18 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.win = parent
         self.file_path = os.path.join(confignator.get_option('paths', 'tst'),
                                       'tst/generator_templates/co_'+pre_post+'_condition_entry.py')
+        self.pre_post = pre_post
 
-        if pre_post == 'pre':
-            self.section_dict = generator.get_precon_sections()
-        else:
-            self.section_dict = generator.get_postcon_sections()
+        self.make_section_dict()
+
         self.view()
-
         self.show_all()
+
+    def make_section_dict(self):
+        if self.pre_post == 'pre':
+            self.section_dict = db_interaction.get_pre_post_con('pre')
+        else:
+            self.section_dict = db_interaction.get_pre_post_con('post')
 
     def view(self):
         self.main_box = Gtk.Box()
@@ -1568,133 +1606,136 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.selection_box = Gtk.Box()
         self.selection_box.set_orientation(Gtk.Orientation.HORIZONTAL)
 
+        self.make_description_viewer()
         self.make_text_viewer()
 
-        self.selection = Gtk.ComboBox.new_with_model_and_entry(self.get_con_sections_model())
+        self.selection = Gtk.ComboBoxText.new_with_entry()
+        self.make_con_sections_model()
         self.selection.connect("changed", self.on_name_combo_changed)
         self.selection.set_entry_text_column(0)
         self.selection.set_active(self.first_entry)
 
         self.save_button = Gtk.Button.new_with_label('Save')
-        self.save_button.connect("clicked", self.save_button_clicked)
+        self.save_button.connect("clicked", self.on_save_button)
+
+        self.delete_button = Gtk.Button.new_with_label('Delete')
+        self.delete_button.connect("clicked", self.on_delete_button)
 
         self.selection_box.pack_start(self.selection, False, True, 0)
         self.selection_box.pack_start(self.save_button, False, True, 0)
+        self.selection_box.pack_start(self.delete_button, False, True, 0)
 
         box = self.get_content_area()
         box.pack_start(self.selection_box, False, True, 0)
-        box.pack_start(self.scrolled_window, True, True, 0)
+        box.pack_start(self.descr_lbl_box, False, False, 0)
+        box.pack_start(self.descr_scrolled_window, False, False, 0)
+        box.pack_start(self.con_lbl_box, False, False, 0)
+        box.pack_start(self.con_scrolled_window, True, True, 0)
         #box.add(self.selection_box)
         #box.pack_end(self.scrolled_window, True, True, 0)
 
-    def get_con_sections_model(self):
-        data_model = Gtk.ListStore(str, int, int)
-        for section_name in self.section_dict.keys():
-
-            data_model.append([section_name, self.section_dict[section_name][0], self.section_dict[section_name][1]])
-
-        return data_model
-
-    def on_name_combo_changed(self, widget):
-        buffer = self.textview.get_buffer()
-        tree_iter = widget.get_active_iter()
-        if tree_iter is not None:
-            model = widget.get_model()
-            name = model[tree_iter][0]
-        else:
-            #entry = widget.get_child()
-            #name = entry.get_text()
-            name = None
-        self.read_section(name)
-        buffer.set_text(self.read_section(name))
+    def make_con_sections_model(self):
+        for condition in self.section_dict:
+            self.selection.append_text(condition.name)
         return
 
-    def save_button_clicked(self, widget):
-        buffer = self.textview.get_buffer()
-        tree_iter = self.selection.get_active_iter()
-        if tree_iter is not None:
-            model = self.selection.get_model()
-            name, start_line, end_line = model[tree_iter]
-            new = False
+    def on_name_combo_changed(self, widget):
+        name = widget.get_active_text()
+
+        if name:
+            for condition in self.section_dict:
+                if condition.name == name:
+                    self.descr_textview.get_buffer().set_text(condition.description)
+                    self.con_buffer.set_text(condition.condition)
         else:
-            entry = self.selection.get_child()
-            name = entry.get_text()
-            new = True
+            self.descr_textview.get_buffer().set_text('')
+            self.con_buffer.set_text('')
+
+        return
+
+    def on_save_button(self, widget):
+        descr_buffer = self.descr_textview.get_buffer()
+        name = self.selection.get_active_text()
 
         if not name:
             return
 
-        buf = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
+        descr = descr_buffer.get_text(descr_buffer.get_start_iter(), descr_buffer.get_end_iter(), True)
+        condition = self.con_buffer.get_text(self.con_buffer.get_start_iter(), self.con_buffer.get_end_iter(), True)
+        db_interaction.write_into_pre_post_con(code_type=self.pre_post, name=name, description=descr, code_block=condition)
 
-        if new:
-            with open(self.file_path, 'a') as entry_file_obj:
-                entry_file_obj.write('#####-'+name+'-#####\n')
-                entry_file_obj.write(buf + '\n')
-                entry_file_obj.close()
-        else:
-            with open(self.file_path, 'r') as entry_file_obj:
-                file_lines = entry_file_obj.readlines()
-                entry_file_obj.close()
-            file_lines[start_line:end_line-1] = buf
-
-            with open(self.file_path, 'w') as entry_file_obj:
-                file_lines = "".join(file_lines)
-                entry_file_obj.write(file_lines)
-                entry_file_obj.close()
-
-        add_lines_count = 0
-        with open(self.file_path, 'r') as entry_file_obj:
-            file_lines = entry_file_obj.readlines()
-            if file_lines[-1]:
-                add_lines_count = 2
-            elif file_lines[-2]:
-                add_lines_count = 1
-            entry_file_obj.close()
-        if add_lines_count > 0:
-            with open(self.file_path, 'a') as entry_file_obj:
-                entry_file_obj.write('\n'*add_lines_count)
-                entry_file_obj.close()
-
-
+        time.sleep(0.1)  # Sleep shorty so the condition can be written to the database
+        # Refresh the combo box entries
+        self.make_section_dict()
+        self.selection.remove_all()
+        self.make_con_sections_model()
         return
 
-    def make_text_viewer(self):
+    def on_delete_button(self, widget):
+        name = self.selection.get_active_text()
+
+        for con in self.section_dict:
+            if con.name == name:
+                db_interaction.delete_db_row_pre_post(con.id)
+
+        time.sleep(0.1)  # Sleep shorty so the condition can be deleted from the database
+        # Refresh the combo box entries
+        self.make_section_dict()
+        self.selection.remove_all()
+        self.make_con_sections_model()
+        self.selection.set_active(0)
+        return
+
+    def make_description_viewer(self):
+        # Label in a Box to have it on the left boarder
+        self.descr_lbl_box = Gtk.HBox()
+        descr_lbl = Gtk.Label()
+        descr_lbl.set_text('Description: ')
+        self.descr_lbl_box.pack_start(descr_lbl, False, False, 0)
+
         # a scrollbar for the child widget (that is going to be the textview)
-        self.scrolled_window = Gtk.ScrolledWindow()
-        self.scrolled_window.set_border_width(5)
+        self.descr_scrolled_window = Gtk.ScrolledWindow()
+        self.descr_scrolled_window.set_border_width(5)
         # we scroll only if needed
-        self.scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.descr_scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
 
         # a text buffer (stores text)
         buffer = Gtk.TextBuffer()
 
         # a textview (displays the buffer)
-        self.textview = Gtk.TextView(buffer=buffer)
+        self.descr_textview = Gtk.TextView(buffer=buffer)
         # wrap the text, if needed, breaking lines in between words
-        self.textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.descr_textview.set_wrap_mode(Gtk.WrapMode.WORD)
 
         # textview is scrolled
-        self.scrolled_window.add(self.textview)
+        self.descr_scrolled_window.add(self.descr_textview)
+
+    def make_text_viewer(self):
+        # Label in a Box to have it on the left boarder
+        self.con_lbl_box = Gtk.HBox()
+        con_lbl = Gtk.Label()
+        con_lbl.set_text('Condition: ')
+        self.con_lbl_box.pack_start(con_lbl, False, False, 0)
+
+        self.con_scrolled_window = Gtk.ScrolledWindow()
+        #self.commands_scrolled_window.set_size_request(50, 100)
+        self.con_view = GtkSource.View()
+        self.con_view.set_auto_indent(True)
+        self.con_view.set_show_line_numbers(False)
+        # self.commands_view.set_show_right_margin(True)
+        self.con_view.set_highlight_current_line(True)
+        self.con_view.set_indent_on_tab(True)
+        self.con_view.set_insert_spaces_instead_of_tabs(True)
+        self.con_buffer = self.con_view.get_buffer()
+        self.con_buffer.set_language(lngg)
+        # self.commands_buffer.set_style_scheme(self.board.current_scheme)
+        self.con_scrolled_window.add(self.con_view)
 
         #box = self.get_content_area()
         #box.add(self.selection_box)
 
         return
 
-    def read_section(self, name=None):
-        if not name:
-            return ''
 
-        # add the condition function
-        with open(self.file_path,'r') as entry_file_obj:
-            # Get the needed section and read only those lines
-            position = self.section_dict[name]
-            entry_array = entry_file_obj.readlines()[position[0]: position[1]-1]
-            entry = ''
-            # Make a string to combine it with the co_conditions file, add tabs for the additonal lines in form of space so the CCS can read it
-            for count, line in enumerate(entry_array):
-                entry += line
-            entry_file_obj.close()
-        return entry
 
 

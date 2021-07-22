@@ -144,6 +144,7 @@ def get_steps_and_commands(filename):
                     new_step['descr'] = step_start_info['descr']
                     new_step['run_id'] = step_start_info['run_id']
                     new_step['step_id'] = step_start_info['step_id']
+                    new_step['comment'] = step_start_info['comment']
                 #try:
                 #    new_step['general_run_info'] = general_step_info
                 #except:

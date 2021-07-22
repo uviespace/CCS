@@ -527,6 +527,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         # get the  data model of the current notebook page
         current_test = self.current_test_instance()
         current_model = self.current_model()
+        #current_model2=current_model.serialize(current_model)
         if current_model is not None and current_test.filename is None:
             self.save_as_file_dialog()
         elif current_model is not None:
