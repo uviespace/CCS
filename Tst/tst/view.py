@@ -692,7 +692,7 @@ class StepWidget(Gtk.EventBox):
         # Make the area where the real command is entered
         # self.detail_box.pack_start(self.lbl_box_commands, True, True, 0)
         self.commands_scrolled_window = Gtk.ScrolledWindow()
-        #self.commands_scrolled_window.set_size_request(50, 100)
+        self.commands_scrolled_window.set_size_request(-1, 200)
         self.commands_view = GtkSource.View()
         self.commands_view.set_auto_indent(True)
         self.commands_view.set_show_line_numbers(False)
