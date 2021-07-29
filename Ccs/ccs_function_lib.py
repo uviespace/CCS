@@ -2640,12 +2640,12 @@ def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_lin
 def get_tc_list(ccf_descr=None):
 
     if ccf_descr is None:
-        cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type,ccf_stype, ccf_npars, '
-                                          'cpc_descr, cpc_dispfmt, cdf_eltype FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+        cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
+                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname').fetchall()
     else:
-        cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type,ccf_stype, ccf_npars, '
-                                          'cpc_descr, cpc_dispfmt, cdf_eltype FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+        cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
+                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
 
     scoped_session_idb.close()
@@ -2689,16 +2689,16 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
     return calibrations_dict
 
 
-def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True):
+def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     try:
         cmd, pars = list(get_tc_list(ccf_descr).items())[0]
     except IndexError:
         raise IndexError('"{}" not found in IDB.'.format(ccf_descr))
     # print(tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=True))
-    return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment)
+    return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment, add_parcfg=add_parcfg)
 
 
-def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True):
+def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     if comment:
         commentstr = "# TC({},{}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
         newline = '\n'
@@ -2706,12 +2706,31 @@ def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='
         commentstr = ''
         newline = ''
 
+    parcfg = ''
+    if add_parcfg:
+        for par in pars:
+            if par[2] == 'E':
+                if par[4] is not None:
+                    if par[5] == 'E':
+                        parval = '"{}"'.format(par[4])
+                    elif par[6] == 'H':
+                        parval = '0x{}'.format(par[4])
+                    else:
+                        parval = par[4]
+                else:
+                    parval = par[4]
+                line = '{} = {}  # {}\n'.format(par[0], parval, par[3])
+            elif par[2] == 'F':
+                line = '# {} = {}  # {} [NOT EDITABLE]\n'.format(par[0], par[4], par[3])
+            else:
+                line = ''
+            parcfg += line
+
     parstr = ', '.join(parsinfo_to_str(pars))
-    # print(parstr)
     if len(parstr) > 0:
         parstr = ', ' + parstr
     exe = "{}('{}'{}, pool_name='{}'{})".format(preamble, cmd[1], parstr, pool_name, options)
-    return commentstr + exe + newline
+    return commentstr + parcfg + exe + newline
 
 
 def parsinfo_to_str(pars, separator=None):
