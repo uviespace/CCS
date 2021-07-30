@@ -701,9 +701,20 @@ class StepWidget(Gtk.EventBox):
         self.commands_view.set_indent_on_tab(True)
         self.commands_view.set_insert_spaces_instead_of_tabs(True)
         self.commands_buffer = self.commands_view.get_buffer()
+        # draganddrop here
+        """
+        self.commands_view.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        self.commands_view.drag_dest_set_target_list(None)
+        self.commands_view.drag_dest_add_text_targets()
+        
+        self.commands_view.connect("drag-motion", self.on_drag_motion_2)
+        self.commands_view.connect("drag-leave", self.on_drag_leave)
+        """
+
         self.commands_buffer.set_language(lngg)
         # self.commands_buffer.set_style_scheme(self.board.current_scheme)
         self.commands_scrolled_window.add(self.commands_view)
+
 
         self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
         self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)
@@ -1595,6 +1606,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.make_section_dict()
 
         self.view()
+
         self.show_all()
 
     def make_section_dict(self):
