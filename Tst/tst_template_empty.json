@@ -1,0 +1,38 @@
+{
+      "_comment": "",
+      "_description": "",
+      "_name": "",
+      "_postcon_code": "",
+      "_postcon_descr": "",
+      "_postcon_name": "",
+      "_precon_code": "",
+      "_precon_descr": "",
+      "_precon_name": "",
+      "_primary_counter_locked": false,
+      "_version": "",
+      "sequences": [
+            {
+                  "_description": "",
+                  "_name": "",
+                  "_primary_counter_locked": false,
+                  "_sequence": 0,
+                  "_version": "",
+                  "steps": [
+                        {
+                              "_command_code": "",
+                              "_description": "",
+                              "_is_active": true,
+                              "_primary_counter": 1,
+                              "_secondary_counter": 0,
+                              "_start_sequence": null,
+                              "_step_comment": "",
+                              "_step_number": "1.0",
+                              "_stop_sequence": null,
+                              "_verification_code": "",
+                              "_verification_description": "",
+                              "_verified_item": []
+                        }
+                  ]
+            }
+      ]
+}
