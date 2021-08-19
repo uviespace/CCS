@@ -18,7 +18,7 @@ class ${testSpecClassName}Verification:
         # insert class variables here
 
     @staticmethod
-    def version():
+    def spec_version():
         return '${testSpecVersion}'
 
     def verify(self, command_log_file, saved_pool_file):
@@ -57,5 +57,5 @@ class ${testSpecClassName}Verification:
                 self.run_id = now.strftime("%Y%m%d%H%M%S")
 
         step_start_cuc = cfl.get_last_pckt_time(pool_name=pool_name, string=False)
-        report.verification_step_begin(step_param=param, script_version=self.version(), pool_name=pool_name,
+        report.verification_step_begin(step_param=param, spec_version=self.spec_version(), pool_name=pool_name,
                                        step_start_cuc=step_start_cuc, run_id=self.run_id, step_id=step_id)

@@ -114,7 +114,7 @@ def get_steps_and_commands(filename):
     steps_end = []
 
     def new_step_template_start():
-        return {'step': None, 'version': '', 'tcs': [], 'date': ''}
+        return {'step': None, 'spec_version': '', 'tcs': [], 'date': ''}
 
     def new_step_template_end():
         return {'step': None, 'timestamp': '', 'step_id': ''}
@@ -140,7 +140,8 @@ def get_steps_and_commands(filename):
                 if step_start_info is not None:
                     new_step['step'] = step_start_info['step']
                     new_step['start_timestamp'] = step_start_info['timestamp']
-                    new_step['version'] = step_start_info['version']
+                    new_step['spec_version'] = step_start_info['spec_version']
+                    new_step['iasw_version'] = step_start_info['iasw_version']
                     new_step['descr'] = step_start_info['descr']
                     new_step['run_id'] = step_start_info['run_id']
                     new_step['step_id'] = step_start_info['step_id']

@@ -49,7 +49,7 @@ def key_word_found(line, key_word):
     return found
 
 
-def encode_to_json_string(step_number, timestamp, step_version=None, step_result=None, descr=None, run_id=None, step_id=None, comment=None, vrc_descr=None):
+def encode_to_json_string(step_number, timestamp, spec_version=None, iasw_version=None, step_result=None, descr=None, run_id=None, step_id=None, comment=None, vrc_descr=None):
     """
     Make a JSON string out of the step number and timestamp
     :param step_number: number of the step
@@ -59,8 +59,10 @@ def encode_to_json_string(step_number, timestamp, step_version=None, step_result
     """
     od = collections.OrderedDict([('step', step_number),
                                   ('timestamp', timestamp)])
-    if step_version is not None:
-        od['version'] = step_version
+    if spec_version is not None:
+        od['spec_version'] = spec_version
+    if iasw_version is not None:
+        od['iasw_version'] = iasw_version
     if step_result is not None:
         od['result'] = step_result
     if vrc_descr is not None:
@@ -110,12 +112,12 @@ def parse_step_from_json_string(line, key_word):
             logger.error('parse_tc_id_from_json_string: parsing of the TC JSON string failed!')
 
 
-def command_step_begin(step_param, script_version, pool_name, step_start_cuc, run_id, step_id):
+def command_step_begin(step_param, spec_version, iasw_version, pool_name, step_start_cuc, run_id, step_id):
     """
     Builds a string and writes it into the logging file. A keyword is set to enable a machine read out of the log file.
     All information of the step is written in a JSON string.
     :param step_param:
-    :param script_version:
+    :param spec__version:
     :param pool_name:
     :param step_start_cuc:
     :return:
@@ -125,7 +127,8 @@ def command_step_begin(step_param, script_version, pool_name, step_start_cuc, ru
                                   step_param['step_no'],
                                   encode_to_json_string(step_number=step_param['step_no'],
                                                         timestamp=step_start_cuc,
-                                                        step_version=script_version,
+                                                        spec_version=spec_version,
+                                                        iasw_version=iasw_version,
                                                         run_id=run_id,
                                                         step_id=step_id,
                                                         descr=step_param['descr'],
@@ -145,13 +148,13 @@ def command_step_end(step_param, step_end_cuc, step_id):
     logger.info('{} {}\n'.format(cmd_step_keyword_done, encode_to_json_string(step_param['step_no'], step_end_cuc, step_id=step_id)))
 
 
-def verification_step_begin(step_param, script_version, pool_name, step_start_cuc, run_id, step_id):
+def verification_step_begin(step_param, spec_version, pool_name, step_start_cuc, run_id, step_id):
 
     logger.info('{} {} {}'.format(vrc_step_keyword,
                                   step_param['step_no'],
                                   encode_to_json_string(step_number=step_param['step_no'],
                                                         timestamp=step_start_cuc,
-                                                        step_version=script_version,
+                                                        spec_version=spec_version,
                                                         vrc_descr=step_param['vrc_descr'],
                                                         run_id=run_id,
                                                         step_id=step_id,

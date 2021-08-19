@@ -84,6 +84,8 @@ class Board(Gtk.Box):
         self.logger = logger
 
         self._test_is_locked = None
+        # Save Button in TST clicked for first time, Always do save_as to not overwrite something, used in tst.py
+        self._ask_overwrite = True
 
         Gtk.Box.__init__(self)
         self.set_orientation(Gtk.Orientation.VERTICAL)
@@ -113,13 +115,20 @@ class Board(Gtk.Box):
         self.test_meta_data_desc = Gtk.Entry()
         self.test_meta_data_desc.set_placeholder_text('< description of the test>')
         self.test_meta_data_entries.pack_start(self.test_meta_data_desc, True, True, 0)
-        # version
-        self.test_meta_data_version_label = Gtk.Label()
-        self.test_meta_data_version_label.set_text('Version:')
-        self.test_meta_data_labels.pack_start(self.test_meta_data_version_label, True, True, 0)
-        self.test_meta_data_version = Gtk.Entry()
-        self.test_meta_data_version.set_placeholder_text('< version >')
-        self.test_meta_data_entries.pack_start(self.test_meta_data_version, True, True, 0)
+        # spec_version
+        self.test_meta_data_spec_version_label = Gtk.Label()
+        self.test_meta_data_spec_version_label.set_text('Spec Version:')
+        self.test_meta_data_labels.pack_start(self.test_meta_data_spec_version_label, True, True, 0)
+        self.test_meta_data_spec_version = Gtk.Entry()
+        self.test_meta_data_spec_version.set_placeholder_text('< spec version >')
+        self.test_meta_data_entries.pack_start(self.test_meta_data_spec_version, True, True, 0)
+        # IASW Software Version
+        self.test_meta_data_iasw_version_label = Gtk.Label()
+        self.test_meta_data_iasw_version_label.set_text('IASW Version:')
+        self.test_meta_data_labels.pack_start(self.test_meta_data_iasw_version_label, True, True, 0)
+        self.test_meta_data_iasw_version = Gtk.Entry()
+        self.test_meta_data_iasw_version.set_placeholder_text('< IASW version >')
+        self.test_meta_data_entries.pack_start(self.test_meta_data_iasw_version, True, True, 0)
         # checkbox for locking the step numbers
         self.test_is_locked_label = Gtk.Label()
         self.test_is_locked_label.set_text(_('Lock step numeration:'))
@@ -217,7 +226,8 @@ class Board(Gtk.Box):
         # connect signals
         self.test_meta_data_name.connect('changed', self.on_test_name_change)
         self.test_meta_data_desc.connect('changed', self.on_test_desc_change)
-        self.test_meta_data_version.connect('changed', self.on_test_version_change)
+        self.test_meta_data_spec_version.connect('changed', self.on_test_spec_version_change)
+        self.test_meta_data_iasw_version.connect('changed', self.on_test_iasw_version_change)
         self.text_meta_data_test_is_locked.connect('toggled', self.on_test_locked_toggled)
         self.test_meta_data_comment.get_buffer().connect('changed', self.on_comment_change)
 
@@ -238,6 +248,14 @@ class Board(Gtk.Box):
     def filename(self, value):
         self._filename = value
 
+    @property
+    def ask_overwrite(self):
+        return self._ask_overwrite
+
+    @ask_overwrite.setter
+    def ask_overwrite(self, value):
+        self._ask_overwrite = value
+
     def update_widget_data(self):
         """
         Updates the grid with the steps. All widgets of the grid are destroyed. The grid is build new from the model.
@@ -256,8 +274,10 @@ class Board(Gtk.Box):
         self.test_meta_data_name.set_text(self.model.name)
         # set the description of the test specification using the data from the model
         self.test_meta_data_desc.set_text(self.model.description)
-        # set the version of the test specification from the data model
-        self.test_meta_data_version.set_text(self.model.version)
+        # set the Specification version of the test specification from the data model
+        self.test_meta_data_spec_version.set_text(self.model.spec_version)
+        # set the Software version of the test specification from the data model
+        self.test_meta_data_iasw_version.set_text(self.model.iasw_version)
         # set the pre-condition name
         if self.model.precon_name:
             found = False
@@ -443,11 +463,19 @@ class Board(Gtk.Box):
         # update the data model viewer
         self.app.update_model_viewer()
 
-    def on_test_version_change(self, widget):
-        # get the version out of the text buffer of the widget
-        version = widget.get_text()
+    def on_test_spec_version_change(self, widget):
+        # get the Specification Version out of the text buffer of the widget
+        spec_version = widget.get_text()
         # update the model
-        self.model.version = version
+        self.model.spec_version = spec_version
+        # update the data model viewer
+        self.app.update_model_viewer()
+
+    def on_test_iasw_version_change(self, widget):
+        # get the IASW Version out of the text buffer of the widget
+        iasw_version = widget.get_text()
+        # update the model
+        self.model.iasw_version = iasw_version
         # update the data model viewer
         self.app.update_model_viewer()
 

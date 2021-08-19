@@ -87,7 +87,7 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
     general_run_infos, precon_info, postcon_info = analyse_command_log.get_general_run_info(cmd_log_file, run_id=run_id)
 
     # Give the output file its name, consits of test name, the specification nbr (version)
-    name_start = '{}-TS-{}-TR-'.format(test_name, cmd_steps[0]['version'])
+    name_start = '{}-TS-{}-TR-'.format(test_name, cmd_steps[0]['spec_version'])
 
     # Check if output folder exists otherwise make it
     if not os.path.isdir(output_file_path):
@@ -115,9 +115,9 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
         writer.writerow(output_file_header)
 
         # write the general info line, if multiple descriptions/versions are found all are written to the output file
-        version = get_version(cmd_steps, logger)
+        spec_version, iasw_version = get_version(cmd_steps, logger)
         description = get_general_run_info_info(general_run_infos, 'descr', logger)
-        writer.writerow([test_name, description, 'Test Spec. Version: ' + version, 'Test Rep. Version: ' + f'{test_report:03d}'])
+        writer.writerow([test_name, description, 'Test Spec. Version: ' + 'IASW-{}TS-{}'.format(iasw_version, spec_version), 'Test Rep. Version: ' + f'{test_report:03d}'])
 
         # write date line, first Date (Specification Date) is the last time the json file was changed or None if no json file was given
         # second Date (Execution Date), Is the execution Date of the first step
@@ -182,21 +182,37 @@ def get_version(steps, logger):
     :param list of dicts steps: all the steps from the log file
     :return str version_final: A string that contains all found versions
     """
-    version_list = []
-    version_final = ''
+    spec_version_list = []
+    spec_version_final = ''
+    iasw_version_list = []
+    iasw_version_final = ''
     for step in steps:
-        if step['version'] not in version_list:
-            version_list.append(step['version'])
-    for count, version in enumerate(version_list):
+        if step['spec_version'] not in spec_version_list:
+            spec_version_list.append(step['spec_version'])
+        if step['iasw_version'] not in iasw_version_list:
+            iasw_version_list.append(step['iasw_version'])
+
+    for count, version in enumerate(spec_version_list):
         if count == 0:
-            version_final = version
+            spec_version_final = version
         else:
-            version_final += ' / ' + version
+            spec_version_final += ' / ' + version
             if logger:
-                logger.warning('More than one Version was found in the command log File')
+                logger.warning('More than one Specification Version was found in the command log File')
             else:
-                print('More than one Version was found in the command log File')
-    return version_final
+                print('More than one Specification Version was found in the command log File')
+
+    for count, version in enumerate(iasw_version_list):
+        if count == 0:
+            iasw_version_final = version
+        else:
+            iasw_version_final += ' / ' + version
+            if logger:
+                logger.warning('More than one IASW Version was found in the command log File')
+            else:
+                print('More than one IASW Version was found in the command log File')
+
+    return spec_version_final, iasw_version_final
 
 def show_basic_results(test_name, log_file_path=None):
     """

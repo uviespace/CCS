@@ -1015,6 +1015,7 @@ class CcsEditor(Gtk.Window):
     def _check_unsaved_buffers(self):
         for page in self.editor_notebook:
             label = self.editor_notebook.get_tab_label(page).get_children()[0]
+            save_as = False
             if label.get_text()[0] == '*':
                 ask = UnsavedBufferDialog(parent=self, msg='Unsaved changes in {}. Save?'.format(label.get_text()[1:]))
                 response = ask.run()
@@ -1022,13 +1023,19 @@ class CcsEditor(Gtk.Window):
                 if response == Gtk.ResponseType.YES:
                     buf = page.get_child().get_buffer()
                     text = buf.get_text(*buf.get_bounds(), True)
-                    with open(label.get_tooltip_text(), 'w') as fdesc:
-                        fdesc.write(text)
+                    if label.get_tooltip_text():
+                        with open(label.get_tooltip_text(), 'w') as fdesc:
+                            fdesc.write(text)
+                    else:
+                        save_as = True
                 elif response == Gtk.ResponseType.CANCEL:
                     ask.destroy()
                     return False
 
                 ask.destroy()
+                if save_as:
+                    self.on_menu_file_saveas(label=label)
+
         return True
 
     """ save the buffer and reconnect the "changed" signal signal """

@@ -228,6 +228,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.resize(
             int(confignator.get_option(section='progress-viewer-window-size', option='basic-width-step-mode')),
             int(confignator.get_option(section='progress-viewer-window-size', option='basic-height')))
+        self.sort_button.set_active(True)
         self.show_all()
         logger.debug('__init__ succeeded')
 
@@ -292,7 +293,6 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         self.sort_button = Gtk.Switch()
         self.sort_button.connect("notify::active", self.on_remake_treeview)
-        self.sort_button.set_active(True)
         self.box_buttons.pack_end(self.sort_button, False, True, 0)
 
         self.sort_label2 = Gtk.Label()
@@ -341,7 +341,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         # column 4
         renderer_cmd_version = Gtk.CellRendererText(xalign=0.5)
-        column_cmd_version = Gtk.TreeViewColumn('Version', renderer_cmd_version, text=3, background=7)
+        column_cmd_version = Gtk.TreeViewColumn('Spec. Version', renderer_cmd_version, text=3, background=7)
         column_cmd_version.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         column_cmd_version.set_resizable(True)
         column_cmd_version.set_min_width(50)
@@ -607,7 +607,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         if not test_name and self.path_json:
             test_name = self.path_json.split('/')[-1].split('.')[0]
 
-        dialog = Save_to_File_Dialog(parent=self)
+        dialog = Save_to_File_Dialog(parent=self)  # Look were the output file should be saved and which files (log, json) should be used
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             if not test_name:
@@ -623,7 +623,7 @@ class TestProgressView(Gtk.ApplicationWindow):
             sent_run_id = None
             if run_count:
                 for run_id in self.run_count.keys():
-                    if self.run_count[run_id] == run_count:
+                    if self.run_count[run_id] == str(run_count):
                         sent_run_id = run_id
             if not log_file_path:
                 if not dialog.log_file_path_check.get_active():
@@ -641,7 +641,7 @@ class TestProgressView(Gtk.ApplicationWindow):
             return
 
         dialog.destroy()
-        if log_file_path == 'FIND':
+        if log_file_path == 'FIND':  # Get the log file path if they are not already given
             dialog = File_Path_Dialog(parent=self, file='Command or Verification Log File', is_json=False)
             response = dialog.run()
             if response == Gtk.ResponseType.OK:
@@ -651,7 +651,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                 return
         dialog.destroy()
 
-        if json_file_path == 'FIND':
+        if json_file_path == 'FIND':  # Get the json file if it is not already given
             dialog = File_Path_Dialog(parent=self, file='the Json File', is_json=True)
             response = dialog.run()
             if response == Gtk.ResponseType.OK:
@@ -674,7 +674,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
     # ------------------- model functions ----------------------
     @staticmethod
-    def build_row_list(row=None, step_number=None, exec_date=None, entry_type=None, version=None, status=None, tcs=None,
+    def build_row_list(row=None, step_number=None, exec_date=None, entry_type=None, spec_version=None, status=None, tcs=None,
                        result=None, step_desc=None, tooltip_text=None, exec_int=None, exec_desc=None, sort_button_active=False):
         """
         Builds or updates a row of the TreeStore. For a new row, the argument 'row' is expected to be None.
@@ -682,7 +682,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         :param str step_number:
         :param datetime.datetime exec_date:
         :param str entry_type:
-        :param str version:
+        :param str spec_version:
         :param str status:
         :param str tcs:
         :param boolean result:
@@ -729,8 +729,8 @@ class TestProgressView(Gtk.ApplicationWindow):
                 row[1] = exec_date
             if entry_type is not None:
                 row[2] = entry_type
-            if version is not None:
-                row[3] = version
+            if spec_version is not None:
+                row[3] = spec_version
             if status is not None:
                 row[4] = status
             if tcs is not None:
@@ -747,7 +747,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                     step_number,
                     exec_date,
                     entry_type,
-                    version,
+                    spec_version,
                     status,
                     tcs,
                     result_value,
@@ -763,7 +763,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                     step_number,
                     exec_date,
                     entry_type,
-                    version,
+                    spec_version,
                     status,
                     tcs,
                     result_value,
@@ -907,7 +907,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         #   for item in row.iterchildren():
         #       if item[2] == 'specification':
         #           tree_store.remove(item.iter)
-        # # add a row for (**each version of**) the step specification
+        # # add a row for (**each spec version of**) the step specification
         # for row in tree_store:
         #     step_number_tree_store = int(row[0:1][0])
         #     for key in test_model.steps_dict:
@@ -1014,7 +1014,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                             for item in cmd_steps:
                                 if item['run_id'] == exec_num and item['step'] == step_num:
                                     new_row_list = self.build_row_list(entry_type='command',
-                                                                       version=item['version'],
+                                                                       spec_version=item['spec_version'],
                                                                        exec_date=item['exec_date'],
                                                                        sort_button_active=self.sort_button.get_active(),
                                                                        tooltip_text=item['descr'])
@@ -1085,7 +1085,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                         # # add a new row
                         # if not already_exists:
                         new_row_list = self.build_row_list(entry_type='command',
-                                                           version=item['version'],
+                                                           spec_version=item['spec_version'],
                                                            exec_date=item['exec_date'],
                                                            sort_button_active=self.sort_button.get_active(),
                                                            tooltip_text=item['descr'])
@@ -1196,7 +1196,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                             for item in vrc_steps:
                                 if item['run_id'] == exec_num and item['step'] == step_num:
                                     new_row_list = self.build_row_list(entry_type='verification',
-                                                                       version=item['version'],
+                                                                       spec_version=item['spec_version'],
                                                                        exec_date=item['exec_date'],
                                                                        sort_button_active=self.sort_button.get_active(),
                                                                        tooltip_text=item['descr'])
@@ -1262,7 +1262,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                         # # add a new row
                         # if not already_exists:
                         new_row_list = self.build_row_list(entry_type='verification',
-                                                           version=item['version'],
+                                                           spec_version=item['spec_version'],
                                                            exec_date=item['exec_date'],
                                                            sort_button_active=self.sort_button.get_active(),
                                                            tooltip_text=item['descr'])
@@ -1295,11 +1295,12 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None):
         super(Save_to_File_Dialog, self).__init__(title='Please choose a Folder to save the Test Run',
                                        parent=parent,
-                                       action=Gtk.FileChooserAction.SELECT_FOLDER)
+                                       action=Gtk.FileChooserAction.OPEN_FOLDER)
 
         self.win = parent
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
         self.set_current_folder(confignator.get_option(section='tst-logging', option='output-file-path'))
+        #self.set_current_name('{}-IASW-{}TS-{}TR-{}'.format())
 
         area = self.get_content_area()
 
@@ -1343,11 +1344,17 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
             if iter:  # If a selection is made try to set it as active row, otherwise Whole file is active row
                 selected_step_id = model.get_value(iter, 12)  # Get the value
                 if not selected_step_id:  # Only execution rows ('Run X') have entry at coloumn 12, others dont
-                    self.run_id_selection.set_active(0)
+                    try:
+                        self.run_id_selection.set_active(1)
+                    except:
+                        self.run_id_selection.set_active(0)
                 else:
                     self.run_id_selection.set_active(int(self.win.run_count[selected_step_id]))
             else:
-                self.run_id_selection.set_active(0)
+                try:
+                    self.run_id_selection.set_active(1)
+                except:
+                    self.run_id_selection.set_active(0)
             self.run_id_selection.set_tooltip_text('Define which Run should be saved or the whole Log File')
 
         test_report_label = Gtk.Label(label='Test Report: ')

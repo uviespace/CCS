@@ -2,34 +2,46 @@
 
 import datetime
 import json
+import os
 import sys
 
-jfile = sys.argv[1]
-# = 'IASW-FFT-1-TS-1.csv.json'
+def run(jfile, outfile):
 
-data = json.load(open(jfile, 'r'))
+    data = json.load(open(jfile, 'r'))
 
-header = 'Item|Description|Verification|TestResult'
-name = '{}|{}|Test spec. version: {}|'.format(data['_name'], data['_description'], data['_version'])
-date = 'Date||{}|'.format(datetime.datetime.now().strftime('%Y-%m-%d'))
-precond = 'Precond.|{}||'.format(data['_precon_descr'])
-postcond = 'Postcond.|{}||'.format(data['_postcon_descr'])
-steps = []
+    header = 'Item|Description|Verification|TestResult'
+    name = '{}|{}|Test spec. version: {}| IASW-{}'.format(data['_name'], data['_description'], data['_spec_version'], data['_sw_version'])
+    # Date from last time the json file was changed + current date
+    date = 'Date||{}|{}'.format(datetime.datetime.strftime(datetime.datetime.fromtimestamp(os.stat(jfile).st_mtime), '%Y-%m-%d'), datetime.datetime.now().strftime('%Y-%m-%d'))
+    precond = 'Precond.|{}||'.format(data['_precon_descr'])
+    postcond = 'Postcond.|{}||'.format(data['_postcon_descr'])
+    steps = []
 
-for step in data['sequences'][0]['steps']:
+    for step in data['sequences'][0]['steps']:
 
-    line = 'Step {}|{}|{}|'.format(step['_step_number'], step['_description'], step['_verification_description'])
-    steps.append(line)
+        line = 'Step {}|{}|{}|'.format(step['_step_number'], step['_description'], step['_verification_description'])
+        steps.append(line)
 
-    if step['_step_comment'] != '':
-        comment = 'Comment|{}||'.format(step['_step_comment'])
-        steps.append(comment)
+        if step['_step_comment'] != '':
+            comment = 'Comment|{}||'.format(step['_step_comment'])
+            steps.append(comment)
+
+    if outfile[-1] == '/':  # If only path is given but no filename
+        outfile = outfile + data['_name'] + '-' + '-'.join(data['_spec_version'].split('-')[-2:]) + '.csv_PIPE'
+
+    with open(outfile, 'w') as fd:
+        buf = '\n'.join([header, name, date, precond] + steps + [postcond])
+        buf = buf.replace('_', '\\_')
+        fd.write(buf)
 
 
-outpath = '/'.join(jfile.split('/')[:-1]) + '/'
-outfile = outpath + data['_name'] + '-' + '-'.join(data['_version'].split('-')[-2:]) + '.csv_PIPE'
+if __name__ == '__main__':
+    json_file_path = sys.argv[1]
 
-with open(outfile, 'w') as fd:
-    buf = '\n'.join([header, name, date, precond] + steps + [postcond])
-    buf = buf.replace('_', '\\_')
-    fd.write(buf)
+    if len(sys.argv) > 1:  # If filename is given
+        outputfile = sys.argv[2]
+    else:  # If no filename is given take the working directory path, filename is used from the json file
+        outputfile = os.getcwd() + '/'
+        # outputfile = '/'.join(json_file_path[:-len(json_file_path.split('/')[-1])-1]) + '/'  # This would take the json File path
+
+    run(json_file_path, outputfile)

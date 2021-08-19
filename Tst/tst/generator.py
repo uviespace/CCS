@@ -109,7 +109,8 @@ def make_command_script(model, model_spec):
                                    testSpecFileName=create_file_name(model_spec.name),
                                    testSpecName=model_spec.name,
                                    testSpecDescription=model_spec.description,
-                                   testSpecVersion=model_spec.version,
+                                   testSpecVersion=model_spec.spec_version,
+                                   testIaswVersion=model_spec.iasw_version,
                                    testPreCondition=model_spec.precon_name,
                                    testPostCondition=model_spec.postcon_name,
                                    testComment=test_comment_w_indent)
@@ -277,7 +278,7 @@ def make_verification_script(model, model_spec):
                                    testSpecFileName=create_file_name(model_spec.name),
                                    testSpecName=model_spec.name,
                                    testSpecDescription=model_spec.description,
-                                   testSpecVersion=model_spec.version)
+                                   testSpecVersion=model_spec.spec_version)
         # add the header string
         content += '\n\n' + cls
 

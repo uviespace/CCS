@@ -16,6 +16,9 @@
 /Tst/tst/install-sh
 /Tst/tst/missing
 /Tst/tst/tst.desktop
+/Tst/confignator/confignator/confignator.log
+/Tst/test_specs/
+/Tst/logs_test_runs/
 
 ### Example user template
 !.gitkeep

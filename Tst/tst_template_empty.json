@@ -9,14 +9,14 @@
       "_precon_descr": "",
       "_precon_name": "",
       "_primary_counter_locked": false,
-      "_version": "",
+      "_spec_version": "",
       "sequences": [
             {
                   "_description": "",
                   "_name": "",
                   "_primary_counter_locked": false,
                   "_sequence": 0,
-                  "_version": "",
+                  "_spec_version": "",
                   "steps": [
                         {
                               "_command_code": "",

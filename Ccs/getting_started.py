@@ -1,4 +1,3 @@
-
 # This File gives a basic overview on the most important Functions to use the CCS
 
 # If it is not already running start the ccs.py file, this file will appear there automatically

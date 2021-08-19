@@ -2,6 +2,8 @@ class ${testSpecClassName}:
     def __init__(self, do_verification=False):
         self.id = '${testSpecFileName}'
         self.name = '${testSpecName}'
+        self.spec_version = '${testSpecVersion}'
+        self.iasw_version = '${testIaswVersion}'
         self.description = '${testSpecDescription}'
         self.precondition = '${testPreCondition}'
         self.postcondition = '${testPostCondition}'
@@ -19,7 +21,3 @@ class ${testSpecClassName}:
 
         # some tests are depended on other tests, thus information is stored on class level
         # insert class variables here
-
-    @staticmethod
-    def version():
-        return '${testSpecVersion}'

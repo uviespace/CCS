@@ -36,6 +36,7 @@ def save_file(file_path, test_spec, file_extension=None, logger=module_logger, *
             logger.exception(e)
             logger.error('Failed to json-dump the instance into a file')
 
+    return
 
 def _to_json_string(test_to_save):
     assert isinstance(test_to_save, data_model.TestSequence)
@@ -55,3 +56,7 @@ def _from_json(text_io):
     data = text_io.read()
     decoded_data = json.loads(data)
     return decoded_data
+
+
+def from_json(text_io):
+    return _from_json(text_io)

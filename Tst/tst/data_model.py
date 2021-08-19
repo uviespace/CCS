@@ -339,7 +339,7 @@ class TestSequence:
         self._sequence = sequence
         self._name = ''
         self._description = ''
-        self._version = ''
+        self._spec_version = ''
         self._primary_counter_locked = False
         self.steps = []
 
@@ -354,7 +354,7 @@ class TestSequence:
         new_test_seq.sequence = copy.copy(self.sequence)
         new_test_seq.name = copy.copy(self.name)
         new_test_seq.description = copy.copy(self.description)
-        new_test_seq.version = copy.copy(self.version)
+        new_test_seq.spec_version = copy.copy(self.spec_version)
         new_test_seq.primary_counter_locked = copy.copy(self.primary_counter_locked)
         new_test_seq.steps = copy.deepcopy(self.steps)
 
@@ -397,13 +397,13 @@ class TestSequence:
         self._description = value
 
     @property
-    def version(self):
-        return self._version
+    def spec_version(self):
+        return self._spec_version
 
-    @version.setter
-    def version(self, value: str):
+    @spec_version.setter
+    def spec_version(self, value: str):
         assert isinstance(value, str)
-        self._version = value
+        self._spec_version = value
 
     def verify_step_list_consistency(self) -> bool:
         """
@@ -863,7 +863,7 @@ class TestSequence:
         try:
             self.name = json_data['_name']
             self.description = json_data['_description']
-            self.version = json_data['_version']
+            self.spec_version = json_data['_spec_version']
             self.sequence = json_data['_sequence']
         except KeyError as keyerror:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(keyerror))
@@ -900,7 +900,8 @@ class TestSpecification:
         self.logger = logger
         self._name = ''
         self._description = ''
-        self._version = ''
+        self._spec_version = ''
+        self._iasw_version = ''
         self._primary_counter_locked = False
         self._precon_name = ''
         self._precon_code = ''
@@ -920,7 +921,8 @@ class TestSpecification:
         new_testspec.sequences = copy.copy(self.sequences)
         new_testspec.name = copy.copy(self.name)
         new_testspec.description = copy.copy(self.description)
-        new_testspec.version = copy.copy(self.version)
+        new_testspec.spec_version = copy.copy(self.spec_version)
+        new_testspec.iasw_version = copy.copy(self.iasw_version)
         new_testspec.primary_counter_locked = copy.copy(self.primary_counter_locked)
         new_testspec.precon_name = copy.copy(self.precon_name)
         new_testspec.precon_code = copy.copy(self.precon_code)
@@ -964,13 +966,22 @@ class TestSpecification:
         self._description = value
 
     @property
-    def version(self):
-        return self._version
+    def spec_version(self):
+        return self._spec_version
 
-    @version.setter
-    def version(self, value: str):
+    @spec_version.setter
+    def spec_version(self, value: str):
         assert isinstance(value, str)
-        self._version = value
+        self._spec_version = value
+
+    @property
+    def iasw_version(self):
+        return self._iasw_version
+
+    @iasw_version.setter
+    def iasw_version(self, value: str):
+        assert isinstance(value, str)
+        self._iasw_version = value
 
     @property
     def precon_name(self):
@@ -1050,7 +1061,8 @@ class TestSpecification:
         try:
             self.name = json_data['_name']
             self.description = json_data['_description']
-            self.version = json_data['_version']
+            self.spec_version = json_data['_spec_version']
+            self.iasw_version = json_data['_iasw_version']
             self.primary_counter_locked = json_data['_primary_counter_locked']
             self.precon_name = json_data['_precon_name']
             self.precon_code = json_data['_precon_code']

@@ -4,13 +4,16 @@ import os
 import logging
 import time
 import gi
+
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, Gio, GtkSource, GLib
 import confignator
 import sys
+
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
+
 cfl.add_tst_import_paths()
 import view
 import data_model
@@ -22,15 +25,11 @@ import connect_apps
 import dbus
 import toolbox
 import tc_management as tcm
-
-
+import json_to_barescript
+import json_to_csv
+import spec_to_json
 
 # creating lists for type and subtype to get rid of duplicate entries, for TC List
-
-
-
-
-
 path_icon = os.path.join(os.path.dirname(__file__), 'style/tst.svg')
 menu_xml = os.path.join(os.path.dirname(__file__), 'app_menu.xml')
 css_file = os.path.join(os.path.dirname(__file__), 'style/style.css')
@@ -126,7 +125,9 @@ class TstApp(Gtk.Application):
         return
 
     def _on_quit(self, action, param):
-        self.window.on_delete_event()
+        response = self.window.on_delete_event()
+        if response:
+            return
         self.quit()
         return
 
@@ -179,7 +180,6 @@ class TestInstance:
     def filename(self, value):
         self._filename = value
 
-
 class TstAppWindow(Gtk.ApplicationWindow):
 
     def __init__(self, logger=logger, *args, **kwargs):
@@ -205,18 +205,25 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action.connect('activate', self.on_save_as)
         self.add_action(action)
 
+        action = Gio.SimpleAction.new('csv_to_json', None)
+        action.connect('activate', self.on_csv_to_json)
+        self.add_action(action)
+
         action = Gio.SimpleAction.new('close', None)
         action.connect('activate', self.on_close)
         self.add_action(action)
 
         show_json_view = confignator.get_bool_option('tst-preferences', 'show-json-view')
-        action = Gio.SimpleAction.new_stateful('model_viewer_toggle_hide', None, GLib.Variant.new_boolean(show_json_view))
+        action = Gio.SimpleAction.new_stateful('model_viewer_toggle_hide', None,
+                                               GLib.Variant.new_boolean(show_json_view))
         action.connect('change-state', self.model_viewer_toggle_hide)
         self.add_action(action)
 
         action = Gio.SimpleAction.new('apply_css', None)
         action.connect('activate', self.on_apply_css)
         self.add_action(action)
+
+        self.create_make_menu()
 
         self.set_icon_from_file(path_icon)
 
@@ -241,10 +248,6 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_save.set_icon_name('document-save')
         self.btn_save.set_tooltip_text('Save')
         self.btn_save.connect('clicked', self.on_save)
-        self.btn_show_model_viewer = Gtk.ToolButton()
-        self.btn_show_model_viewer.set_icon_name('accessories-dictionary-symbolic')
-        self.btn_show_model_viewer.set_tooltip_text('Show/hide model viewer')
-        self.btn_show_model_viewer.connect('clicked', self.model_viewer_toggle_hide)
         self.btn_generate_products = Gtk.ToolButton()
         self.btn_generate_products.set_label('Generate scripts')
         # self.btn_generate_products.set_icon_name('printer-printing-symbolic')
@@ -264,7 +267,6 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_new_file, 0)
         self.toolbar.insert(self.btn_open_file, 1)
         self.toolbar.insert(self.btn_save, 2)
-        # self.toolbar.insert(self.btn_show_model_viewer, 2)
         self.toolbar.insert(self.btn_generate_products, 3)
         self.toolbar.insert(self.btn_start_ccs_editor, 4)
         self.toolbar.insert(self.btn_open_progress_view, 5)
@@ -307,15 +309,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.label_widget_tcm.set_text('TC Table')
         self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
 
-
         """
         self.tcm = TCTableClass()
         self.label_widget_tcm = Gtk.Label()
         self.label_widget_tcm.set_text('TC Table')
         self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
         """
-
-
 
         self.box.pack_start(self.work_desk, True, True, 0)
 
@@ -366,6 +365,19 @@ class TstAppWindow(Gtk.ApplicationWindow):
         context = self.get_style_context()
         Gtk.StyleContext.add_class(context, 'tst-css')
         self.on_apply_css()
+
+    def create_make_menu(self):
+        action = Gio.SimpleAction.new('generate_scripts', None)
+        action.connect('activate', self.on_generate_products)
+        self.add_action(action)
+
+        action = Gio.SimpleAction.new('generate_barescript', None)
+        action.connect('activate', self.on_generate_barescript)
+        self.add_action(action)
+
+        action = Gio.SimpleAction.new('generate_csv', None)
+        action.connect('activate', self.on_generate_csv)
+        self.add_action(action)
 
     def add_info_bar(self, message_type, message):
         """
@@ -449,11 +461,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
     def model_viewer_toggle_hide(self, action, value):
         visible = self.json_view.is_visible()
-        action.set_state(GLib.Variant.new_boolean(visible))
+        action.set_state(GLib.Variant.new_boolean(not visible))
         if visible:
-            self.json_view.show()
-        else:
             self.json_view.hide()
+        else:
+            self.json_view.show()
 
     def on_new_test(self, *args):
         # create a new test instance and add a sequence + first step
@@ -483,18 +495,19 @@ class TstAppWindow(Gtk.ApplicationWindow):
         Closing the page on which was clicked
         """
         for i in range(0, self.notebook.get_n_pages()):  # Loop over all availabe page numbers
-            page = self.notebook.get_nth_page(i)    # Get page widget
-            if self.notebook.get_tab_label(page) == widget.get_parent():    # Check if the label widget is the same as for the given widget
-                self.notebook.remove_page(i)    # If so close the page
+            page = self.notebook.get_nth_page(i)  # Get page widget
+            if self.notebook.get_tab_label(
+                    page) == widget.get_parent():  # Check if the label widget is the same as for the given widget
+                self.notebook.remove_page(i)  # If so close the page
                 return
 
-        #self.notebook.remove_page(widget.get_parent())
+        # self.notebook.remove_page(widget.get_parent())
 
     def on_open(self, *args):
         dialog = Gtk.FileChooserDialog('Please choose a file',
                                        self,
                                        Gtk.FileChooserAction.OPEN,
-                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
         # using the last folder from history
         last_folder = confignator.get_option('tst-history', 'last-folder')
         if os.path.isdir(last_folder):
@@ -504,28 +517,52 @@ class TstAppWindow(Gtk.ApplicationWindow):
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
             confignator.save_option('tst-history', 'last-folder', os.path.dirname(file_selected))
-            data_from_file = file_management.open_file(file_name=file_selected)
+            try:
+                json_type = True
+                data_from_file = file_management.open_file(file_name=file_selected)
+                filename = file_selected
+            except json.decoder.JSONDecodeError:
+                # data_from_file = file_management.from_json(spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False))
+                data_from_file = spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False)
+                filename = file_selected.replace('.' + file_selected.split('.')[-1], '.json')
+                json_type = False
+                if os.path.exists(filename):
+                    self.existing_json_warn_dialog(filename)
+
             if data_from_file is not None:
-                # make a new test instance and notebook page
-                self.logger.info('make a new test instance and notebook page for: {}'.format(file_selected))
-                new_test = self.new_test()
-                new_test.model.decode_from_json(json_data=data_from_file)
-                new_test.filename = file_selected
-                new_page_index = self.new_page(test_instance=new_test)
-                self.update_model_viewer()
-                new_test.view.update_widget_data()
-                self.notebook.set_current_page(new_page_index)
-        elif response == Gtk.ResponseType.CANCEL:
-            pass
+                self.on_open_create_tab(data_from_file, filename, json_type)
+
         dialog.destroy()
+        return
+
+    def on_open_create_tab(self, data_from_file, filename, json_type):
+        # make a new test instance and notebook page
+        self.logger.info('make a new test instance and notebook page for: {}'.format(filename))
+        new_test = self.new_test()
+        new_test.model.decode_from_json(json_data=data_from_file)
+        new_test.filename = filename
+        if not json:
+            new_test.ask_overwrite = True
+        else:
+            new_test.ask_overwrite = True
+        new_page_index = self.new_page(test_instance=new_test)
+        self.update_model_viewer()
+        new_test.view.update_widget_data()
+        self.notebook.set_current_page(new_page_index)
+        return
 
     def on_save(self, *args):
         # get the  data model of the current notebook page
         current_test = self.current_test_instance()
         current_model = self.current_model()
-        #current_model2=current_model.serialize(current_model)
+        # current_model2=current_model.serialize(current_model)
         if current_model is not None and current_test.filename is None:
             self.save_as_file_dialog()
+        elif current_test and current_test.ask_overwrite and current_test.filename:
+            if os.path.exists(current_test.filename):
+                self.overwrite_dialog(current_test)
+            else:
+                self.save_as_file_dialog()
         elif current_model is not None:
             file_management.save_file(file_path=current_test.filename, test_spec=current_model, logger=self.logger)
 
@@ -541,37 +578,150 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                        Gtk.FileChooserAction.SAVE,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
         dialog.set_current_folder(confignator.get_option(section='tst-history', option='last-folder'))
-        dialog.set_current_name(current_name+'.json')
+        dialog.set_current_name('{}-TS-{}.json'.format(current_name, current_model.spec_version))
         self.add_filters(dialog)
+        dialog.set_do_overwrite_confirmation(True)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
             confignator.save_option('tst-history', 'last-folder', os.path.dirname(file_selected))
-            if '-v_' in file_selected:
-                test_name = file_selected.split('-v_')[0]
-                filename = file_selected
-            else:
-                test_name = file_selected.split('.json')[0]
-                filename = '{}-v_{}.json'.format(test_name, current_model.version)
+            file_management.save_file(file_path=file_selected, test_spec=current_model, file_extension='json',
+                                      logger=self.logger)
+            current_test.filename = file_selected
+            file_name = file_selected.split('/')[-1]
+            #current_model.name = file_selected.split('/')[-1].split('.')[0].split('-TS-')[0]  # Get only the name
+            current_test.update_widget_data()
+            self.notebook.set_tab_label(current_test, self.notebook_page_label(file_name))  # Update tab label
+            self.show_all()
+            dialog.destroy()
+            return True
+        else:
+            dialog.destroy()
+            return False
 
-            file_management.save_file(file_path=filename, test_spec=current_model, file_extension='json', logger=self.logger)
-            current_test.filename = filename.split('/')[-1]
-            current_model.name = test_name.split('/')[-1]
-        elif response == Gtk.ResponseType.CANCEL:
-            pass
-        dialog.destroy()
-
-    def add_filters(self, dialog):
-        filter_text = Gtk.FileFilter()
-        filter_text.set_name('JSON format')
-        filter_text.add_mime_type('application/json')
-        filter_text.add_pattern('.json')
-        dialog.add_filter(filter_text)
+    def add_filters(self, dialog, filter_json=True):
+        if json:
+            filter_text = Gtk.FileFilter()
+            filter_text.set_name('JSON format')
+            filter_text.add_mime_type('application/json')
+            filter_text.add_pattern('.json')
+            dialog.add_filter(filter_text)
+        else:
+            filter_text = Gtk.FileFilter()
+            filter_text.set_name('Spec Files')
+            filter_text.add_mime_type('text/csv')
+            filter_text.add_pattern('.csv*')
+            dialog.add_filter(filter_text)
 
         filter_any = Gtk.FileFilter()
         filter_any.set_name('Any files')
         filter_any.add_pattern('*')
         dialog.add_filter(filter_any)
+
+    def on_csv_to_json(self, *args):
+        dialog = Gtk.FileChooserDialog('Please choose a CSV File',
+                                       self,
+                                       Gtk.FileChooserAction.OPEN,
+                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        # using the last folder from history
+        last_folder = confignator.get_option('tst-history', 'last-folder')
+        if os.path.isdir(last_folder):
+            dialog.set_current_folder(last_folder)
+        response = dialog.run()
+        self.add_filter_csv(dialog, filter_json=False)
+        if response == Gtk.ResponseType.OK:
+            confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
+            file_selected = dialog.get_filename()
+            filename = file_selected.replace('.' + file_selected.split('.')[-1], '.json')
+            data_from_file = spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False)
+            self.on_open_create_tab(data_from_file, filename, json_type=False)
+            self.on_open_create_tab(data_from_file, filename, json_type=False)
+            dialog.destroy()
+
+            self.save_as_file_dialog()
+        else:
+            dialog.destroy()
+
+        return
+
+    def overwrite_dialog(self, current_test):
+        filepath = current_test.filename
+        filename = filepath.split('/')[-1]
+        folder = filepath[:-len(filename)-1]
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
+        dialog.set_markup('Overwrite existing File?')
+        dialog.format_secondary_text('{} at {} already exists'.format(filename, folder))
+        response = dialog.run()
+
+        if response == Gtk.ResponseType.YES:
+            current_test.ask_overwrite = False
+            dialog.destroy()
+            self.on_save()
+        else:
+            dialog.destroy()
+
+        return
+
+    def existing_json_warn_dialog(self, filepath):
+        filename = filepath.split('/')[-1]
+        folder = filepath[:-len(filename)-1]
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        dialog.set_markup('CSV converted Json File already Exists'.format(filename))
+        dialog.format_secondary_text('{} at {} already exists, temporarily saved in TST \nBe careful during saving'.format(filename, folder))
+        dialog.run()
+        dialog.destroy()
+        return True
+
+    def unsaved_changes_overwrite_dialog(self, current_test):
+        filepath = current_test.filename
+        filename = filepath.split('/')[-1]
+        folder = filepath[:-len(filename)-1]
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
+        dialog.set_markup('Unsaved changes in {}, Overwrite?'.format(filename))
+        dialog.format_secondary_text('{} at {} already exists'.format(filename, folder))
+        response = dialog.run()
+        if response == Gtk.ResponseType.YES:
+            current_test.ask_overwrite = False
+            dialog.destroy()
+            self.on_save()
+        elif response == Gtk.ResponseType.CANCEL:
+            dialog.destroy()
+            return False
+        else:
+            dialog.destroy()
+
+        return True
+
+    def unsaved_changes_newfile_dialog(self, current_test):
+        filepath = current_test.filename
+        if filepath:
+            filename = filepath.split('/')[-1]
+        else:
+            filename = 'New Test'
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
+        dialog.set_markup('Unsaved File {}, Save?'.format(filename))
+        #dialog.format_secondary_text('{} at {} is unsaved'.format(filename, folder))
+        response = dialog.run()
+
+        if response == Gtk.ResponseType.YES:
+            current_test.ask_overwrite = False
+            dialog.destroy()
+            response = self.save_as_file_dialog()
+            if response:
+                return True
+            else:
+                return False
+        elif response == Gtk.ResponseType.CANCEL:
+            dialog.destroy()
+            return False
+        else:
+            dialog.destroy()
+
+        return True
 
     def on_delete_event(self, *args):
         self.logger.info('save preferences')
@@ -582,6 +732,28 @@ class TstAppWindow(Gtk.ApplicationWindow):
         confignator.save_option('tst-preferences', 'paned-position', str(self.work_desk.get_position()))
         # save the preferences of the CodeReuseFeature
         self.codeblockreuse.save_panes_positions()
+        self.logger.info('Check for Unsaved Buffer')
+        response = self._check_unsaved_buffer()
+        if not response:
+            return True
+        return False
+
+    def _check_unsaved_buffer(self):
+        for test_instance in self.notebook:
+            filename = test_instance.filename
+            tst_json = json.loads(test_instance.model.encode_to_json())
+            if filename and os.path.exists(filename):
+                file_json = file_management.open_file(filename)
+                if not tst_json == file_json:
+                    response = self.unsaved_changes_overwrite_dialog(test_instance)
+                    if not response:
+                        return False
+            else:
+                response = self.unsaved_changes_newfile_dialog(test_instance)
+                if not response:
+                    return False
+
+        return True
 
     def on_generate_products(self, *args):
         """
@@ -603,6 +775,70 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.product_paths = generator.make_all(model=model)
         # triggering the dialog after generation
         self.on_generate_products_message_dialog(paths=self.product_paths)
+
+    def on_generate_barescript(self, *args):
+        """
+        Generates a small python test file without all the additional staff from on_generate_scripts
+        """
+        dialog = Gtk.FileChooserDialog(
+            title="Save Script AS", parent=self, action=Gtk.FileChooserAction.SAVE)
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE,
+            Gtk.ResponseType.OK, )
+
+        if self.current_test_instance():
+            current_json_filename = self.current_test_instance().filename
+            current_model = self.current_model()
+        else:
+            logger.info('Small Script can not be generated without jsonfile')
+            print('Small Script can not be generated without json file')
+            return
+
+        outfile_basic = '{}-TS-{}.py'.format(current_model.name, current_model.spec_version)
+        dialog.set_current_name(outfile_basic)
+        dialog.set_current_folder(confignator.get_option('tst-history', 'last-folder'))
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            json_to_barescript.run(current_json_filename, dialog.get_filename())
+            confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
+
+        dialog.destroy()
+        return
+
+    def on_generate_csv(self, *args):
+        """
+        Generates a CSV Test Specification file
+        """
+        dialog = Gtk.FileChooserDialog(
+            title="Save CSV AS", parent=self, action=Gtk.FileChooserAction.SAVE)
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE,
+            Gtk.ResponseType.OK, )
+
+        if self.current_test_instance():
+            current_json_filename = self.current_test_instance().filename
+            current_model = self.current_model()
+        else:
+            logger.info('CSV File can not be generated without json file')
+            print('CSV File can not be generated without json file')
+            return
+
+        outfile_basic = '{}-IASW-{}-TS-{}.csv_PIPE'.format(current_model.name, current_model.iasw_version, current_model.spec_version)
+        dialog.set_current_name(outfile_basic)
+        dialog.set_current_folder(confignator.get_option('tst-history', 'last-folder'))
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            json_to_csv.run(current_json_filename, dialog.get_filename())
+            confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
+
+        dialog.destroy()
+        return
 
     def connect_to_ccs_editor(self):
         # get the DBus connection to the CCS-Editor
@@ -717,7 +953,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         return paths
 
     def on_make_desktop_entry(self):
-        #ToDo: create a file for the desktop entry
+        # ToDo: create a file for the desktop entry
         pass
 
     def on_start_progress_viewer(self, *args):
@@ -815,7 +1051,7 @@ class ViewModelAsJson(Gtk.Box):
         """
         Gets the data of the model and makes a JSON string out of it. Intended to display the model data as plain JSON
         :param data_model.TestSpecification model: a instance of the TestSpecification class
-	    # param data_model.TestSequence model: a instance of the TestSpecification class
+        :param data_model.TestSequence model: a instance of the TestSpecification class
         """
         assert isinstance(model, data_model.TestSpecification) or model is None
         if model is not None:
