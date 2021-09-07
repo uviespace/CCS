@@ -280,6 +280,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         # add the notebook for the test specifications
         self.notebook = Gtk.Notebook()
+        self.notebook.connect('switch-page', self.update_model_viewer)
         self.work_desk.pack1(self.notebook)
 
         self.feature_area = Gtk.Notebook()
@@ -452,10 +453,16 @@ class TstAppWindow(Gtk.ApplicationWindow):
                 raise Exception
         return current_model
 
-    def update_model_viewer(self):
+    def update_model_viewer(self, *args):
         """
         Gets the data of the model and makes a JSON string out of it. Intended to display the model data as plain JSON
         """
+        if len(args) == 3:
+            nb, _, n = args
+            tab = nb.get_nth_page(n)
+            self.json_view.update(tab.model)
+            return
+
         current_model = self.current_model()
         self.json_view.update(current_model)
 
@@ -600,7 +607,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             return False
 
     def add_filters(self, dialog, filter_json=True):
-        if json:
+        if filter_json:
             filter_text = Gtk.FileFilter()
             filter_text.set_name('JSON format')
             filter_text.add_mime_type('application/json')
@@ -627,15 +634,15 @@ class TstAppWindow(Gtk.ApplicationWindow):
         last_folder = confignator.get_option('tst-history', 'last-folder')
         if os.path.isdir(last_folder):
             dialog.set_current_folder(last_folder)
+        # self.add_filters(dialog, filter_json=False)
         response = dialog.run()
-        self.add_filter_csv(dialog, filter_json=False)
         if response == Gtk.ResponseType.OK:
             confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
             file_selected = dialog.get_filename()
             filename = file_selected.replace('.' + file_selected.split('.')[-1], '.json')
             data_from_file = spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False)
             self.on_open_create_tab(data_from_file, filename, json_type=False)
-            self.on_open_create_tab(data_from_file, filename, json_type=False)
+            # self.on_open_create_tab(data_from_file, filename, json_type=False)
             dialog.destroy()
 
             self.save_as_file_dialog()
@@ -703,7 +710,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             filename = 'New Test'
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
-        dialog.set_markup('Unsaved File {}, Save?'.format(filename))
+        dialog.set_markup('Unsaved file {}, save?'.format(filename))
         #dialog.format_secondary_text('{} at {} is unsaved'.format(filename, folder))
         response = dialog.run()
 
@@ -778,7 +785,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
     def on_generate_barescript(self, *args):
         """
-        Generates a small python test file without all the additional staff from on_generate_scripts
+        Generates a small python test file without all the additional stuff from on_generate_scripts
         """
         dialog = Gtk.FileChooserDialog(
             title="Save Script AS", parent=self, action=Gtk.FileChooserAction.SAVE)
@@ -789,7 +796,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             Gtk.ResponseType.OK, )
 
         if self.current_test_instance():
-            current_json_filename = self.current_test_instance().filename
+            # current_json_filename = self.current_test_instance().filename
             current_model = self.current_model()
         else:
             logger.info('Small Script can not be generated without jsonfile')
@@ -802,7 +809,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            json_to_barescript.run(current_json_filename, dialog.get_filename())
+            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename())
             confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
 
         dialog.destroy()
@@ -821,7 +828,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             Gtk.ResponseType.OK, )
 
         if self.current_test_instance():
-            current_json_filename = self.current_test_instance().filename
+            # current_json_filename = self.current_test_instance().filename
             current_model = self.current_model()
         else:
             logger.info('CSV File can not be generated without json file')
@@ -834,7 +841,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            json_to_csv.run(current_json_filename, dialog.get_filename())
+            json_to_csv.run(current_model.encode_to_json(), dialog.get_filename())
             confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
 
         dialog.destroy()
@@ -1001,34 +1008,25 @@ class ViewModelAsJson(Gtk.Box):
         super().__init__(*args, **kwargs)
         self.set_orientation(Gtk.Orientation.VERTICAL)
 
-        # toolbar
-        self.btn_show_options = Gtk.ToolButton()
-        self.btn_show_options.set_icon_name('applications-system-symbolic')
-        self.btn_show_options.connect('clicked', self.options_toggle_hide)
-        self.toolbar = Gtk.Toolbar()
-        self.toolbar.insert(self.btn_show_options, 0)
-        self.pack_start(self.toolbar, False, True, 0)
-
         # options area
         self.box_h = Gtk.Box.new(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        self.chooser_label = Gtk.Label.new()
-        self.chooser_label.set_text('Select code style scheme:')
-        self.button_accept = Gtk.Button.new()
-        self.button_accept.set_label('Apply new scheme')
-        self.button_accept.connect('clicked', self.on_button_accept_clicked)
         self.style_manager = GtkSource.StyleSchemeManager.get_default()
         self.style_manager.append_search_path(style_path)
         self.chooser_button = GtkSource.StyleSchemeChooserButton()
         self.chooser_button.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.chooser_button.connect('notify', self._update_style)
+        img = Gtk.Image.new_from_icon_name('applications-system-symbolic', Gtk.IconSize.BUTTON)
+        self.chooser_button.set_image(img)
+        self.chooser_button.set_label('')
         self.current_scheme = self.chooser_button.get_style_scheme()
-        self.box_h.pack_end(self.button_accept, True, True, 0)
-        self.box_h.pack_end(self.chooser_button, True, True, 0)
-        self.box_h.pack_end(self.chooser_label, True, True, 0)
+        self.chooser_button.set_tooltip_text('style: ' + self.current_scheme.get_name())
+        self.box_h.pack_end(self.chooser_button, False, False, 0)
         self.pack_start(self.box_h, False, True, 0)
 
         # the view of the json
         self.scrolled_window = Gtk.ScrolledWindow()
         self.model_viewer = GtkSource.View()
+        self.model_viewer.set_editable(False)
         self.model_viewer_buffer = self.model_viewer.get_buffer()
         self.lm = GtkSource.LanguageManager()
         self.model_viewer_buffer.set_language(self.lm.get_language('json'))
@@ -1036,16 +1034,19 @@ class ViewModelAsJson(Gtk.Box):
         self.scrolled_window.add(self.model_viewer)
         self.pack_start(self.scrolled_window, True, True, 0)
 
+    def _update_style(self, widget, spec):
+        if spec.name == 'style-scheme':
+            self.current_scheme = self.chooser_button.get_style_scheme()
+            self.model_viewer_buffer.set_style_scheme(self.current_scheme)
+            self.chooser_button.set_label('')
+            self.chooser_button.set_tooltip_text('style: ' + self.current_scheme.get_name())
+
     def options_toggle_hide(self, button):
         visible = self.box_h.is_visible()
         if visible:
             self.box_h.hide()
         else:
             self.box_h.show()
-
-    def on_button_accept_clicked(self, *args):
-        self.current_scheme = self.chooser_button.get_style_scheme()
-        self.model_viewer_buffer.set_style_scheme(self.current_scheme)
 
     def update(self, model):
         """

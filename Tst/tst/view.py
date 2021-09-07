@@ -928,7 +928,7 @@ class StepWidget(Gtk.EventBox):
     def set_data_in_widget(self):
         self.set_is_active_in_widget()
         self.set_description_in_widget()
-        self.set_commands_in_widget()#
+        self.set_commands_in_widget()
         self.set_step_comment_in_widget()
         self.set_verification_in_widget()
         self.set_verification_description_in_widget()

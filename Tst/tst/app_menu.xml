@@ -22,7 +22,7 @@
                     <attribute name="action">win.save_as</attribute>
                 </item>
                 <item>
-                    <attribute name="label" translatable="yes">CSV to Json</attribute>
+                    <attribute name="label" translatable="yes">Import CSV</attribute>
                     <attribute name="action">win.csv_to_json</attribute>
                 </item>
                 <item>
@@ -79,11 +79,11 @@
                     <attribute name="action">win.generate_scripts</attribute>
                 </item>
                 <item>
-                    <attribute name="label" translatable="yes">Generate Small Script</attribute>
+                    <attribute name="label" translatable="yes">Export to compact script</attribute>
                     <attribute name="action">win.generate_barescript</attribute>
                 </item>
                 <item>
-                    <attribute name="label" translatable="yes">Generate CSV File</attribute>
+                    <attribute name="label" translatable="yes">Export to CSV</attribute>
                     <attribute name="action">win.generate_csv</attribute>
                 </item>
             </section>

@@ -12,14 +12,14 @@ def run(specfile, gen_cmd, save_json):
     jspec = tmp.copy()
     specs = open(specfile, 'r').read().split('\n')
 
-    name, descr, spec_version_entry, sw_version_entry = specs[1].split('|')
-    spec_version = spec_version_entry.split('version: ')[-1]
-    sw_version = sw_version_entry.split('IASW-')[-1]
+    name, descr, spec_version_entry, _ = specs[1].split('|')
+    spec_version = spec_version_entry.split(': ')[-1]
+    sw_version = spec_version_entry.split('-')[1]
 
     jspec['_name'] = name
-    jspec['_description'] = descr
+    jspec['_description'] = descr.replace('\\_', '_')
     jspec['_spec_version'] = spec_version
-    jspec['_sw_version'] = sw_version
+    jspec['_iasw_version'] = sw_version
     jspec['_primary_counter_locked'] = False
 
     steps = jspec['sequences'][0]['steps']
@@ -27,6 +27,9 @@ def run(specfile, gen_cmd, save_json):
     steps = []
 
     for step in specs[4:]:
+
+        # remove tex escape sequences
+        step = step.replace('\\_', '_')
 
         if step.count('|') != 3:
             continue
@@ -37,14 +40,22 @@ def run(specfile, gen_cmd, save_json):
             continue
 
         if n.lower() == 'comment':
-            step = steps[-1]
-            step['_step_comment'] = descr
+            if len(steps) == 0:
+                jspec['_comment'] = descr
+            else:
+                step = steps[-1]
+                step['_step_comment'] = descr
             continue
 
         step_num = n.replace('Step ', '')
         step_temp['_step_number'] = step_num
-        step_temp['_primary_counter'] = int(step_num.split('.')[0])
-        step_temp['_secondary_counter'] = int(step_num.split('.')[1])
+        try:
+            c1, c2 = map(int, step_num.split('.'))
+        except ValueError:
+            c1 = int(step_num)
+            c2 = 0
+        step_temp['_primary_counter'] = c1
+        step_temp['_secondary_counter'] = c2
         step_temp['_description'] = descr
         step_temp['_verification_description'] = ver
 
@@ -76,7 +87,7 @@ def run(specfile, gen_cmd, save_json):
     if save_json:
         json.dump(jspec, open(specfile + '.json', 'w'), indent=4)
     else:
-        json_data = json.dumps(jspec)
+        # json_data = json.dumps(jspec)
         return jspec
 
 

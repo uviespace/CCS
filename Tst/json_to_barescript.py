@@ -15,7 +15,12 @@ import sys
 
 
 def run(jfile, outfile):
-    data = json.load(open(jfile, 'r'))
+
+    if os.path.isfile(jfile):
+        data = json.load(open(jfile, 'r'))
+    else:
+        data = json.loads(jfile)
+
     date = datetime.datetime.now().strftime('%Y-%m-%d')
 
     script = ''
@@ -24,7 +29,7 @@ def run(jfile, outfile):
     script += '# ' + data['_name'] + '\n'
     script += '# ' + data['_description'] + '\n'
     script += '# Specification Version: ' + data['_spec_version'] + '\n'
-    script += '# Software Version: ' + data['sw_version'] + '\n'
+    script += '# Software Version: ' + data['_iasw_version'] + '\n'
     script += '# Author: UVIE\n# Date: {}\n'.format(date)
     script += '#--------------------------------------------\n\n\n'
 

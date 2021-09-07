@@ -5,14 +5,18 @@ import json
 import os
 import sys
 
+
 def run(jfile, outfile):
 
-    data = json.load(open(jfile, 'r'))
+    if os.path.isfile(jfile):
+        data = json.load(open(jfile, 'r'))
+    else:
+        data = json.loads(jfile)
 
     header = 'Item|Description|Verification|TestResult'
-    name = '{}|{}|Test spec. version: {}| IASW-{}'.format(data['_name'], data['_description'], data['_spec_version'], data['_sw_version'])
+    name = '{}|{}|Test spec. version: {}| IASW-{}'.format(data['_name'], data['_description'], data['_spec_version'], data['_iasw_version'])
     # Date from last time the json file was changed + current date
-    date = 'Date||{}|{}'.format(datetime.datetime.strftime(datetime.datetime.fromtimestamp(os.stat(jfile).st_mtime), '%Y-%m-%d'), datetime.datetime.now().strftime('%Y-%m-%d'))
+    date = 'Date||{}|'.format(datetime.datetime.now().strftime('%Y-%m-%d'))
     precond = 'Precond.|{}||'.format(data['_precon_descr'])
     postcond = 'Postcond.|{}||'.format(data['_postcon_descr'])
     steps = []
