@@ -2688,6 +2688,27 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
 
     return calibrations_dict
 
+def get_tm_id(ccf_descr=None):
+    if ccf_descr is None:
+        tms = scoped_session_idb.execute('SELECT pid_type, pid_stype, pid_apid, pid_pi1_val, pid_descr '
+                                                  'FROM pid ').fetchall()
+
+    else:
+        tms = scoped_session_idb.execute('SELECT pid_type, pid_stype, pid_apid, pid_pi1_val, pid_descr '
+                                         'FROM pid '
+                                         'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+
+    scoped_session_idb.close()
+
+    tms_dict = {}
+
+    for row in tms:
+        tms_dict.setdefault(row[0:6])
+
+
+    return tms_dict
+
+
 
 def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     try:

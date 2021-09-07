@@ -9,7 +9,10 @@ import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
-import tc_management as tcm
+import s2k_partypes as s2k
+
+
+
 
 
 tc_type = None
@@ -22,10 +25,7 @@ subtype_list = []
 
 descr_list = []
 calibrations_list = []
-minval_list = []
-maxval_list = []
-altxt_list = []
-alval_list = []
+
 
 
 for command in read_in_list_of_commands:
@@ -45,55 +45,10 @@ subtype_list.sort()
 
 
 
-def get_variables(tc_type):
 
-
-    pas_numbr = ""
-    pas_altxt = ""
-    pas_alval = ""
-    prv_numbr = ""
-    prv_minval = ""
-    prv_maxval = ""
-
-    for key in dictionary_of_commands:
-        # print(key)
-        if tc_type in key:
-            for value_list in dictionary_of_commands[key]:
-
-                pas_numbr += str(value_list[3]) + " "
-                pas_altxt += str(value_list[4]) + " "
-                pas_alval += str(value_list[5]) + " "
-                prv_numbr += str(value_list[6]) + " "
-                prv_minval += str(value_list[7]) + " "
-                prv_maxval += str(value_list[8]) + " "
-                # print(value_list[0])
-
-    pas_numbr_list = list(pas_numbr.split(" "))
-    pas_numbr_list.pop()
-    pas_altxt_list = list(pas_altxt.split(" "))
-    pas_altxt_list.pop()
-    pas_alval_list = list(pas_alval.split(" "))
-    pas_alval_list.pop()
-    prv_numbr_list = list(prv_numbr.split(" "))
-    prv_numbr_list.pop()
-    prv_minval_list = list(prv_minval.split(" "))
-    prv_minval_list.pop()
-    prv_maxval_list = list(prv_maxval.split(" "))
-    prv_maxval_list.pop()
-
-    # print("pas_numbr: ", pas_numbr_list)
-    # print("pas_altxt: ", pas_altxt_list)
-    # print("pas_alval: ", pas_alval_list)
-    # print("prv_numbr: ", prv_numbr_list)
-    # print("prv_minval: ", prv_minval_list)
-    # print("prv_maxval: ", prv_maxval_list)
-
-    return pas_numbr_list, pas_altxt_list, pas_alval_list, prv_numbr_list, prv_minval_list, prv_maxval_list
-
-
-# print(get_variables("SASW LoadCmd"))
 
 dictionary_of_variables = cfl.get_tc_calibration_and_parameters()
+
 
 def get_cpc_descr(tc_type):
 
@@ -115,12 +70,17 @@ def get_calibrations(tc_type, cpc_descr):
         if tc_type in key and cpc_descr in key:
             for counter in dictionary_of_variables[key]:
 
-
+                cpc_ptc = counter[0]
+                cpc_pfc = counter[1]
                 prv_minval = counter[2]
                 prv_maxval = counter[3]
                 pas_altxt = counter[4]
                 pas_alval = counter[5]
 
+                if cpc_ptc == None:
+                    cpc_ptc = "None"
+                if cpc_pfc == None:
+                    cpc_pfc = "None"
                 if prv_minval == None:
                     prv_minval = "None"
                 if prv_maxval == None:
@@ -130,25 +90,18 @@ def get_calibrations(tc_type, cpc_descr):
                 if pas_alval == None:
                     pas_alval = "None"
 
-                treeview_tuple = tuple([prv_minval, prv_maxval, pas_altxt, pas_alval])
+
+                if cpc_ptc == "None":
+                    data_type = "None"
+                    pass
+                else:
+                    data_type = s2k.ptt[cpc_ptc][cpc_pfc]
+
+                treeview_tuple = tuple([prv_minval, prv_maxval, pas_altxt, pas_alval, data_type])
                 treeview_tuple_list.append(treeview_tuple)
     return treeview_tuple_list
 
 
-
-
-
-
-"""
-Gesamtbild bestehend aus TcTable und CommandDescriptionBox hier einfügen
-"""
-
-class TcBox(Gtk.Box):
-    pass
-
-"""
-TcTable hier einfügen
-"""
 
 
 
@@ -233,7 +186,6 @@ class TcTable(Gtk.Grid):
         if combo_iter is not None:
             model = combo.get_model()
             number = model[combo_iter][0]
-            # print(number)
             self.current_filter_telecommand = int(number)
 
         self.telecommand_filter.refilter()
@@ -287,6 +239,9 @@ class CommandDescriptionBox(Gtk.Box):
 
         Gtk.Box.__init__(self)
         self.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.set_vexpand(True)
+        # self.set_hexpand(False)
+
 
 
         # first treeview for commands
@@ -319,15 +274,16 @@ class CommandDescriptionBox(Gtk.Box):
 
 
         self.scrollable_treelist = Gtk.ScrolledWindow()
-        self.scrollable_treelist.set_vexpand(True)
-        self.pack_start(self.scrollable_treelist, True, True, 0)
+        # self.scrollable_treelist.set_vexpand(True)
+        # self.scrollable_treelist.set_hexpand(20)
+        self.pack_start(self.scrollable_treelist, True, True, 5)
 
         self.scrollable_treelist.add(self.descr_treeview)
 
 
 
         # second treeview for calibrations
-        self.cal_liststore = Gtk.ListStore(str, str, str, str)
+        self.cal_liststore = Gtk.ListStore(str, str, str, str, str)
         for cal_ref in calibrations_list:
             self.cal_liststore.append(list(cal_ref))
         self.current_filter_descr = None
@@ -340,15 +296,16 @@ class CommandDescriptionBox(Gtk.Box):
         self.cal_treeview = Gtk.TreeView(model=self.descr_filter)
 
         for i, column_title in enumerate(
-                ["prv_minval", "prv_maxval", "pas_altxt", "pas_alval"]
+                ["prv_minval", "prv_maxval", "pas_altxt", "pas_alval", "data-type"]
         ):
             calibrations_renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, calibrations_renderer, text=i)
             column.colnumbr = i
             self.cal_treeview.append_column(column)
 
+
         self.scrollable_calibrations_treelist = Gtk.ScrolledWindow()
-        self.scrollable_calibrations_treelist.set_vexpand(True)
+        # self.scrollable_calibrations_treelist.set_vexpand(True)
         self.pack_start(self.scrollable_calibrations_treelist, True, True, 0)
 
         self.scrollable_calibrations_treelist.add(self.cal_treeview)
@@ -374,7 +331,6 @@ class CommandDescriptionBox(Gtk.Box):
             # print(model[row][0])
             calibrations_list.clear()
             calibrations_list.append(get_calibrations(tc_type, model[row][0]))
-            # calibrations_list = get_calibrations(tc_type, model[row][0])
             self.refresh_cal_treeview()
 
 
@@ -400,7 +356,7 @@ class CommandDescriptionBox(Gtk.Box):
 
     def refresh_cal_treeview(self):
 
-        self.cal_liststore = Gtk.ListStore(str, str, str, str)
+        self.cal_liststore = Gtk.ListStore(str, str, str, str, str)
 
         if calibrations_list == [] or calibrations_list == [[]]:
             pass
@@ -414,12 +370,3 @@ class CommandDescriptionBox(Gtk.Box):
 
         self.cal_treeview.set_model(self.cal_liststore)
 
-
-
-
-
-
-
-
-
-        # self.show_all()
