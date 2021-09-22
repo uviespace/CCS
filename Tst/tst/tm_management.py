@@ -15,57 +15,37 @@ dictionary_of_tms = cfl.get_tm_id()
 
 
 tm_list = list(dictionary_of_tms.keys())
+tm_type_list = []
+
+tm_type_sub_list = []
 
 
 
+for counter in tm_list:
+    if counter[0] not in tm_type_list:
+        tm_type_list.append(counter[0])
+    else:
+        pass
 
 
+def get_tm_type_sublist(tm_descr):
+    tm_type_sub_list.clear()
+    for key in dictionary_of_tms:
+        if tm_descr in key:
+            for counter in dictionary_of_tms[key]:
+                pid_tpsc = str(counter[0])
+                pid_spid = str(counter[1])
+                pcf_name = str(counter[2])
+                pcf_descr = str(counter[3])
+                pcf_curtx = str(counter[4])
+                txp_from = str(counter[5])
+                txp_altxt = str(counter[6])
+                plf_offpy = str(counter[7])
 
 
+                tm_type_sub_list.append([pid_tpsc, pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt])
 
-
-
-
-
-
-
-
-
-
-
-tc_type = None
-
-
-dictionary_of_commands = cfl.get_tc_list()
-read_in_list_of_commands = list(dictionary_of_commands.keys())
-list_of_commands = []
-type_list = []
-subtype_list = []
-
-descr_list = []
-calibrations_list = []
-minval_list = []
-maxval_list = []
-altxt_list = []
-alval_list = []
-
-
-for command in read_in_list_of_commands:
-    command = list(command)
-    del command[0]
-    myorder = [2, 3, 0, 1]
-    command = [command[i] for i in myorder]
-    command[0] = int(command[0])
-    command[1] = int(command[1])
-    list_of_commands.append(command)
-    if command[0] not in type_list:
-        type_list.append(command[0])
-
-
-type_list.sort()
-subtype_list.sort()
-
-
+    return tm_type_sub_list
 
 
 
@@ -88,7 +68,7 @@ class TmTable(Gtk.Grid):
 
         # Create ListStores for the ComboBoxes
         self.type_liststore = Gtk.ListStore(int)
-        for type_ref in type_list:
+        for type_ref in tm_type_list:
             self.type_liststore.append([type_ref, ])
         # self.current_filter_type = None
 
@@ -127,9 +107,14 @@ class TmTable(Gtk.Grid):
 
         self.scrollable_treelist.add(self.treeview)
 
-        self.command_entry = Gtk.Entry()
-        self.command_entry.set_placeholder_text("<Command Variables>")
-        self.attach_next_to(self.command_entry, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 1)
+        self.telemetry_entry = Gtk.Entry()
+        self.telemetry_entry.set_placeholder_text("<Telemetry Variables>")
+        self.attach_next_to(self.telemetry_entry, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 1)
+
+        self.secondary_box = TmSecondaryTable()
+        self.attach_next_to(self.secondary_box, self.telemetry_entry, Gtk.PositionType.BOTTOM, 8, 5)
+
+
 
 
         # Set up Drag and Drop
@@ -147,18 +132,32 @@ class TmTable(Gtk.Grid):
         if combo_iter is not None:
             model = combo.get_model()
             number = model[combo_iter][0]
-            # print(number)
-            self.current_filter_telecommand = int(number)
+            self.current_filter_telemetry = int(number)
 
-        self.telecommand_filter.refilter()
+        self.telemetry_filter.refilter()
 
 
     def on_clear_button_clicked(self, widget):
-        self.current_filter_telecommand = None
-        self.telecommand_filter.refilter()
+        self.current_filter_telemetry = None
+        self.telemetry_filter.refilter()
 
     def item_selected(self, selection):
-        pass
+        model, row = selection.get_selected()
+        if row is not None:
+            tm_descr = model[row][4]
+            global tm_type_sub_list
+            tm_type_sub_list = get_tm_type_sublist(tm_descr)
+            self.secondary_box.refresh_secondary_treelist()
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -180,3 +179,68 @@ class TmTable(Gtk.Grid):
 
     def on_drag_begin(self, *args):
         pass
+
+
+
+
+
+
+class TmSecondaryTable(Gtk.Box):
+    def __init__(self):
+
+        Gtk.Box.__init__(self)
+        self.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.set_vexpand(True)
+        # self.set_hexpand(False)
+
+
+        self.secondary_liststore = Gtk.ListStore(str, str, str, str, str, str, str)
+        for tm_type_sub_ref in tm_type_sub_list:
+            self.secondary_liststore.append(list(tm_type_sub_ref))
+        self.current_filter_secondary = None
+
+        # Creating filter, feeding it with liststore model
+        self.secondary_filter = self.secondary_liststore.filter_new()
+        # setting the filter function
+        self.secondary_filter.set_visible_func(self.secondary_filter_func)
+            
+        self.secondary_treeview = Gtk.TreeView(model=self.secondary_filter)
+
+        for i, column_title in enumerate(
+            ["pid_tpsc", "pid_spic", "pcf_name", "pcf_descr", "pcf_curtx", "txp_from", "txp_altxt"]
+        ):
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+            self.secondary_treeview.append_column(column)
+
+
+        self.scrollable_secondary_tm_treelist = Gtk.ScrolledWindow()
+        self.pack_start(self.scrollable_secondary_tm_treelist, True, True, 0)
+
+        self.scrollable_secondary_tm_treelist.add(self.secondary_treeview)
+        
+        
+
+             
+        
+    def secondary_filter_func(self, model, iter, data):
+        if (
+            self.current_filter_secondary is None
+            or self.current_filter_secondary == "None"
+        ):
+            return True
+        else:
+            return model[iter][2] == self.current_filter_descr
+
+    def refresh_secondary_treelist(self):
+        self.secondary_liststore.clear()
+        self.secondary_liststore = Gtk.ListStore(str, str, str, str, str, str, str)
+        for tm_type_sub_ref in tm_type_sub_list:
+            self.secondary_liststore.append(list(tm_type_sub_ref))
+        self.secondary_treeview.set_model(self.secondary_liststore)
+
+
+
+
+
+

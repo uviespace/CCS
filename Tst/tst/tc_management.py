@@ -293,7 +293,7 @@ class CommandDescriptionBox(Gtk.Box):
         # setting the filter function
         self.cal_filter.set_visible_func(self.cal_filter_func)
 
-        self.cal_treeview = Gtk.TreeView(model=self.descr_filter)
+        self.cal_treeview = Gtk.TreeView(model=self.cal_filter)
 
         for i, column_title in enumerate(
                 ["prv_minval", "prv_maxval", "pas_altxt", "pas_alval", "data-type"]
