@@ -4,16 +4,13 @@ import os
 import logging
 import time
 import gi
-
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, Gio, GtkSource, GLib
 import confignator
 import sys
-
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
-
 cfl.add_tst_import_paths()
 import view
 import data_model
@@ -25,11 +22,18 @@ import connect_apps
 import dbus
 import toolbox
 import tc_management as tcm
+import tm_management as tmm
+
 import json_to_barescript
 import json_to_csv
 import spec_to_json
 
 # creating lists for type and subtype to get rid of duplicate entries, for TC List
+
+
+
+
+
 path_icon = os.path.join(os.path.dirname(__file__), 'style/tst.svg')
 menu_xml = os.path.join(os.path.dirname(__file__), 'app_menu.xml')
 css_file = os.path.join(os.path.dirname(__file__), 'style/style.css')
@@ -180,6 +184,7 @@ class TestInstance:
     def filename(self, value):
         self._filename = value
 
+
 class TstAppWindow(Gtk.ApplicationWindow):
 
     def __init__(self, logger=logger, *args, **kwargs):
@@ -248,6 +253,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_save.set_icon_name('document-save')
         self.btn_save.set_tooltip_text('Save')
         self.btn_save.connect('clicked', self.on_save)
+        self.btn_show_model_viewer = Gtk.ToolButton()
+        self.btn_show_model_viewer.set_icon_name('accessories-dictionary-symbolic')
+        self.btn_show_model_viewer.set_tooltip_text('Show/hide model viewer')
+        self.btn_show_model_viewer.connect('clicked', self.model_viewer_toggle_hide)
         self.btn_generate_products = Gtk.ToolButton()
         self.btn_generate_products.set_label('Generate scripts')
         # self.btn_generate_products.set_icon_name('printer-printing-symbolic')
@@ -267,6 +276,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_new_file, 0)
         self.toolbar.insert(self.btn_open_file, 1)
         self.toolbar.insert(self.btn_save, 2)
+        # self.toolbar.insert(self.btn_show_model_viewer, 2)
         self.toolbar.insert(self.btn_generate_products, 3)
         self.toolbar.insert(self.btn_start_ccs_editor, 4)
         self.toolbar.insert(self.btn_open_progress_view, 5)
@@ -310,12 +320,21 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.label_widget_tcm.set_text('TC Table')
         self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
 
+        # telemetry list tab
+        self.telemetry = tmm.TmTable()
+        self.label_widget_telemetry = Gtk.Label()
+        self.label_widget_telemetry.set_text('TM Table')
+        self.feature_area.append_page(child=self.telemetry, tab_label=self.label_widget_telemetry)
+
+
         """
         self.tcm = TCTableClass()
         self.label_widget_tcm = Gtk.Label()
         self.label_widget_tcm.set_text('TC Table')
         self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
         """
+
+
 
         self.box.pack_start(self.work_desk, True, True, 0)
 
