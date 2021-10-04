@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import gi
+import s2k_partypes as s2k
 
 
 gi.require_version("Gtk", "3.0")
@@ -41,9 +42,17 @@ def get_tm_type_sublist(tm_descr):
                 txp_from = str(counter[5])
                 txp_altxt = str(counter[6])
                 plf_offpy = str(counter[7])
+                pcf_ptc = counter[8]
+                pcf_pfc = counter[9]
 
 
-                tm_type_sub_list.append([pid_tpsc, pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt])
+                if pcf_ptc == None:
+                    data_type = "None"
+                    pass
+                else:
+                    data_type = s2k.ptt[pcf_ptc][pcf_pfc]
+
+                tm_type_sub_list.append([pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offpy, data_type])
 
     return tm_type_sub_list
 
@@ -207,7 +216,7 @@ class TmSecondaryTable(Gtk.Box):
         self.secondary_treeview = Gtk.TreeView(model=self.secondary_filter)
 
         for i, column_title in enumerate(
-            ["pid_tpsc", "pid_spic", "pcf_name", "pcf_descr", "pcf_curtx", "txp_from", "txp_altxt"]
+            ["pcf_name", "pcf_descr", "pcf_curtx", "txp_from", "txp_altxt", "plf_offby", "data_type"]
         ):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
