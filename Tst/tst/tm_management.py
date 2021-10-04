@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import gi
-import s2k_partypes as s2k
 
 
 gi.require_version("Gtk", "3.0")
@@ -10,7 +9,7 @@ import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
-
+import s2k_partypes as s2k
 
 dictionary_of_tms = cfl.get_tm_id()
 

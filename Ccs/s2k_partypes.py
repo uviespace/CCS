@@ -36,7 +36,7 @@ ptt = {
         11: 'uint11', 12: 'uint12', 13: 'uint13', 14: 'uint14', 15: 'uint15', 16: 'H', 17: 'uint17', 18: 'uint18',
         19: 'uint19', 20: 'uint20', 21: 'uint21', 22: 'uint22', 23: 'uint23', 24: 'I24', 25: 'uint25', 26: 'uint26',
         27: 'uint27', 28: 'uint28', 29: 'uint29', 30: 'uint30', 31: 'uint31', 32: 'I'},
-    7: {0: 'vOCT', 382: '382s'},
+    7: {0: 'vOCT', 1: 'placeholder', 12: 'placeholder', 382: '382s'},
     8: {0: 'vASCII', 382: '382s'},
     9: {17: 'CUC917', 18: 'CUC918'},
     11: {0: 'deduced'},
