@@ -37,8 +37,6 @@ def get_data_pool_sublist():
     return data_pool_sublist, pid_list
 
 data_pool_sublist, pid_list = get_data_pool_sublist()
-print(data_pool_sublist)
-print(pid_list)
 
 
 

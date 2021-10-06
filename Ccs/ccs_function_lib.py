@@ -2720,7 +2720,7 @@ def get_tm_id(pcf_descr=None):
                                          'ON pcf_curtx = txf_numbr '
                                          'LEFT JOIN txp '
                                          'ON txf_numbr = txp.txp_numbr '
-                                         'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+                                         'WHERE pcf_descr="{}"'.format(pcf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -2735,11 +2735,14 @@ def get_tm_id(pcf_descr=None):
 def get_data_pool_items(pcf_descr = None):
     if pcf_descr is None:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
-                                         'FROM pcf').fetchall()
+                                         'FROM pcf '
+                                        'WHERE pcf_pid <> 0').fetchall()
 
     else:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
-                                         'FROM pcf'.format(ccf_descr)).fetchall()
+                                         'FROM pcf '
+                                        'WHERE pcf_pid <> 0 '
+                                        'WHERE pcf_descr="{}"'.format(pcf_descr)).fetchall()
 
     scoped_session_idb.close()
 
