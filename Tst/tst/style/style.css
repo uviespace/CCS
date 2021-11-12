@@ -89,10 +89,10 @@
     padding-right: 10px;
     /*border-top: 5px solid @bg_color;
     border-bottom: 1px solid @bg_color;*/
-    border-top: 1px solid green;
+    /*border-top: 1px solid green;
     border-bottom: 1px solid green;
     border-left: 1px solid green;
-    border-right: 1px solid green;
+    border-right: 1px solid green;*/
     /* padding-top: 0px; */
     /* padding-bottom: 0px; */
 }
@@ -114,9 +114,9 @@
 }
 .inter-step-widget {
     border-style: solid;
-    border-width: 2px;
+    border-width: 0px;
     /*border-color: @bg_color;*/
-    border-color: yellow;
+    border-color: lightgrey;
 }
 .highlight frame border{
     border-color: @fg_color;
@@ -125,5 +125,5 @@
     border-color: @fg_color;
 }
 .highlight-2 {
-    border-color: red;
+    border-color: orange;
 }

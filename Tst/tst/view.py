@@ -131,7 +131,7 @@ class Board(Gtk.Box):
         self.test_meta_data_entries.pack_start(self.test_meta_data_iasw_version, True, True, 0)
         # checkbox for locking the step numbers
         self.test_is_locked_label = Gtk.Label()
-        self.test_is_locked_label.set_text(_('Lock step numeration:'))
+        self.test_is_locked_label.set_text(_('Lock step enumeration:'))
         self.test_meta_data_labels.pack_start(self.test_is_locked_label, True, True, 0)
         self.text_meta_data_test_is_locked = Gtk.CheckButton()
         self.test_meta_data_entries.pack_start(self.text_meta_data_test_is_locked, True, True, 0)
@@ -698,8 +698,8 @@ class StepWidget(Gtk.EventBox):
         self.whole_description_box.set_column_spacing(10)
         self.whole_description_box.attach(self.lbl_box_desc, 0, 0, 3, 1)
         self.whole_description_box.attach(self.desc_scrolled_window, 0, 1, 3, 5)
-        self.whole_description_box.attach_next_to(self.lbl_box_step_comment, self.lbl_box_desc, Gtk.PositionType.RIGHT, 1, 1)
-        self.whole_description_box.attach_next_to(self.step_comment_scrolled_window, self.desc_scrolled_window, Gtk.PositionType.RIGHT, 1, 5)
+        self.whole_description_box.attach_next_to(self.lbl_box_step_comment, self.lbl_box_desc, Gtk.PositionType.RIGHT, 3, 1)
+        self.whole_description_box.attach_next_to(self.step_comment_scrolled_window, self.desc_scrolled_window, Gtk.PositionType.RIGHT, 3, 5)
         self.detail_box.pack_start(self.whole_description_box, True, True, 0)
 
         # fields for commands and verification
@@ -723,7 +723,7 @@ class StepWidget(Gtk.EventBox):
         self.commands_scrolled_window.set_size_request(-1, 200)
         self.commands_view = GtkSource.View()
         self.commands_view.set_auto_indent(True)
-        self.commands_view.set_show_line_numbers(False)
+        self.commands_view.set_show_line_numbers(True)
         # self.commands_view.set_show_right_margin(True)
         self.commands_view.set_highlight_current_line(True)
         self.commands_view.set_indent_on_tab(True)
@@ -766,7 +766,7 @@ class StepWidget(Gtk.EventBox):
         #self.verification_scrolled_window.set_size_request(50, 100)
         self.verification_view = GtkSource.View()
         self.verification_view.set_auto_indent(True)
-        self.verification_view.set_show_line_numbers(False)
+        self.verification_view.set_show_line_numbers(True)
         # self.verification_view.set_show_right_margin(True)
         self.verification_view.set_highlight_current_line(True)
         self.verification_view.set_indent_on_tab(True)
@@ -795,8 +795,8 @@ class StepWidget(Gtk.EventBox):
         self.whole_verification_box.set_column_spacing(10)
         self.whole_verification_box.attach(self.lbl_box_verification, 0, 0, 3, 1)
         self.whole_verification_box.attach(self.verification_scrolled_window, 0, 1, 3, 5)
-        self.whole_verification_box.attach_next_to(self.lbl_box_verification_description, self.lbl_box_verification, Gtk.PositionType.RIGHT, 1, 1)
-        self.whole_verification_box.attach_next_to(self.verification_description_scrolled_window, self.verification_scrolled_window, Gtk.PositionType.RIGHT, 1, 5)
+        self.whole_verification_box.attach_next_to(self.lbl_box_verification_description, self.lbl_box_verification, Gtk.PositionType.RIGHT, 3, 1)
+        self.whole_verification_box.attach_next_to(self.verification_description_scrolled_window, self.verification_scrolled_window, Gtk.PositionType.RIGHT, 3, 5)
         self.detail_box.pack_start(self.whole_verification_box, True, True, 0)
 
         # fill the step with data before connecting the signals (!)
@@ -1046,7 +1046,7 @@ class StepWidget(Gtk.EventBox):
 
     def on_drag_data_get(self, widget, drag_context, data, info, time):
         """
-        Collect data about the step with is dragged. Set it into the selection-data in order to transfer it to the receiving widget.
+        Collect data about the step that is dragged. Set it as the selection-data in order to transfer it to the receiving widget.
         """
         step_index = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
         step = self.model.get_sequence(self.sequence).steps[step_index]
@@ -1349,7 +1349,7 @@ class InterStepWidget(Gtk.Box):
 
         # add the drawing area for the arrow
         self.drawingarea = Gtk.DrawingArea()
-        self.drawingarea_height = 30
+        self.drawingarea_height = 16
         self.hovered_over = False
         self.drawingarea.set_size_request(10, self.drawingarea_height)
         self.pack_start(self.drawingarea, True, True, 0)
