@@ -1311,6 +1311,10 @@ class StepWidget(Gtk.EventBox):
             return
 
         commands = str(self.get_commands_from_widget())
+
+        if len(commands) == 0:
+            return
+
         ed = cfl.dbus_connection('editor')
         cfl.Functions(ed, '_to_console_via_socket', commands)
 
