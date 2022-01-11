@@ -47,7 +47,8 @@ import logging.handlers
 # python confignator package would be used (".local/lib.../confignator"), but if marked as root in pycharm, it first
 # searches for the config file in the confignator folder, where the cfg is in the given path...
 cfg = configparser.ConfigParser()
-confignator_cfg = os.path.join(os.path.dirname(__file__), '../build/lib/confignator/confignator.cfg')
+#confignator_cfg = os.path.join(os.path.dirname(__file__), '../build/lib/confignator/confignator.cfg')
+confignator_cfg = os.path.join(os.path.dirname(__file__), 'confignator.cfg')
 cfg.read(confignator_cfg)
 basic_config = cfg.get('confignator-paths', 'basic-cfg')
 docu = cfg.get('confignator-paths', 'docu')
