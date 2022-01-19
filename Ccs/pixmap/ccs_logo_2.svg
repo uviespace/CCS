@@ -2,10 +2,10 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="74.560181mm"
-   height="79.647377mm"
+   width="85.5205mm"
+   height="85.5205mm"
    version="1.1"
-   viewBox="0 0 74.560183 79.647379"
+   viewBox="0 0 85.520503 85.520503"
    id="svg16"
    sodipodi:docname="ccs_logo_2.svg"
    inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20, custom)"
@@ -30,19 +30,19 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="1.9344228"
-     inkscape:cx="37.47888"
-     inkscape:cy="150.174"
+     inkscape:cx="-46.783981"
+     inkscape:cy="161.5469"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
      inkscape:window-x="0"
      inkscape:window-y="27"
      inkscape:window-maximized="1"
      inkscape:current-layer="g14"
-     fit-margin-top="8"
-     fit-margin-left="8"
-     fit-margin-right="8"
-     fit-margin-bottom="8"
-     lock-margins="false" />
+     fit-margin-top="1.1685097e-14"
+     fit-margin-left="1.1685097e-14"
+     fit-margin-right="1.1685097e-14"
+     fit-margin-bottom="1.1685097e-14"
+     lock-margins="true" />
   <metadata
      id="metadata2">
     <rdf:RDF>
@@ -55,8 +55,21 @@
     </rdf:RDF>
   </metadata>
   <g
-     transform="translate(-26.597408,-171.75281)"
+     transform="translate(-21.117249,-168.81624)"
      id="g14">
+    <path
+       style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:31.1206;stroke-linecap:round;stroke-opacity:1;paint-order:stroke markers fill"
+       id="path6418"
+       sodipodi:type="arc"
+       sodipodi:cx="63.877499"
+       sodipodi:cy="211.57649"
+       sodipodi:rx="42.76025"
+       sodipodi:ry="42.76025"
+       sodipodi:start="0.78539816"
+       sodipodi:end="0.77791353"
+       sodipodi:open="true"
+       sodipodi:arc-type="arc"
+       d="m 94.113561,241.81256 a 42.76025,42.76025 0 0 1 -60.415496,0.0565 42.76025,42.76025 0 0 1 -0.16957,-60.41529 42.76025,42.76025 0 0 1 60.414862,-0.28261 42.76025,42.76025 0 0 1 0.395661,60.41422" />
     <path
        style="color:#000000;fill:#73d216;stroke-linecap:round;-inkscape-stroke:none"
        sodipodi:type="inkscape:offset"
