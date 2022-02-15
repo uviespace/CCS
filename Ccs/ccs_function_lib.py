@@ -88,6 +88,10 @@ personal_fmtlist = ['uint', 'int', 'ascii', 'oct']
 fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
            'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
 
+# TODO: SID format should be obtained from the MIB!
+SID_SIZE = 2
+SID_FORMAT = {1: '>B', 2: '>H', 4: '>I'}
+
 
 scoped_session_idb = scoped_session_maker('idb', idb_version=None)
 scoped_session_storage = scoped_session_maker('storage')
@@ -1451,6 +1455,9 @@ def get_cuctime(tml):
             return timecal(tml[CUC_OFFSET:CUC_OFFSET + timepack[1]], string=False)
             #ct, ft = struct.unpack('>IH', tml[TM_HEADER_LEN - 7:TM_HEADER_LEN - 1])
             #ft >>= 1
+        elif isinstance(tml, packet_config.TMHeaderBits):
+            ct = tml.CTIME
+            ft = tml.FTIME
         elif isinstance(tml, list):
             if isinstance(tml[0], tuple):
                 ct = tml[0][0][13]
@@ -1505,7 +1512,7 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
             tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-                                   func.left(DbTelemetry.data, 1) == struct.pack('>B', sid)).order_by(
+                                   func.left(DbTelemetry.data, SID_SIZE) == struct.pack(SID_FORMAT[SID_SIZE], sid)).order_by(
                 DbTelemetry.idx.desc()).first()
             if tmlist is not None:
                 tmlist_filt = [tmlist.raw]
@@ -2732,6 +2739,19 @@ def get_tm_id(ccf_descr=None):
 
 
 
+def get_dp_items(source='mib'):
+    fmt = {3: {4: 'UINT8', 12: 'UINT16', 14: 'UINT32'}, 4: {4: 'INT8', 12: 'INT16', 14: 'INT32'}, 5: {1: 'FLOAT'}, 9: {18: 'CUC'}, 7: {1: '1OCT'}}
+
+    if source.lower() == 'mib':
+        dp = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc FROM pcf WHERE pcf_pid IS NOT NULL ORDER BY pcf_pid').fetchall()
+        dp_ed = [(*i[:2], fmt[i[2]][i[3]]) for i in dp]
+        return dp_ed
+    elif source.lower() == 'src':
+        return
+    else:
+        raise NotImplementedError
+
+
 def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     try:
         cmd, pars = list(get_tc_list(ccf_descr).items())[0]
@@ -2819,7 +2839,7 @@ def about_dialog(parent=None, action=None):
     #dialog.set_program_name('CCS Editor and Library Functions')
     dialog.set_program_name('UVIE Central Checkout System')
 
-    dialog.set_copyright('UVIE 09/2020')
+    dialog.set_copyright('UVIE 01/2022')
     dialog.set_license_type(Gtk.License.GPL_2_0)
     dialog.set_authors(('Marko Mecina', 'Dominik Moeslinger', 'Thanassis Tsiodras', 'Armin Luntzer'))
     #dialog.set_version('0.6')
