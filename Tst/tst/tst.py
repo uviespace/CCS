@@ -23,10 +23,16 @@ import dbus
 import toolbox
 import tc_management as tcm
 import tm_management as tmm
+import data_pool_tab as dpt
 
 import json_to_barescript
 import json_to_csv
+
 import spec_to_json
+
+#print("!!!!!!!")
+#dictionary_of_data_pool = cfl.get_data_pool_items
+#print(dictionary_of_data_pool.keys())
 
 # creating lists for type and subtype to get rid of duplicate entries, for TC List
 
@@ -343,13 +349,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.label_widget_telemetry.set_text('TM Table')
         self.feature_area.append_page(child=self.telemetry, tab_label=self.label_widget_telemetry)
 
-
-        """
-        self.tcm = TCTableClass()
-        self.label_widget_tcm = Gtk.Label()
-        self.label_widget_tcm.set_text('TC Table')
-        self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
-        """
+        # data pool list tab
+        self.data_pool_tab = dpt.DataPoolTable()
+        self.label_widget_data_pool = Gtk.Label()
+        self.label_widget_data_pool.set_text('Data Pool')
+        self.feature_area.append_page(child=self.data_pool_tab, tab_label=self.label_widget_data_pool)
 
 
 

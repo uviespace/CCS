@@ -2695,10 +2695,11 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
 
     return calibrations_dict
 
-def get_tm_id(ccf_descr=None):
-    if ccf_descr is None:
+def get_tm_id(pcf_descr=None):
+    if pcf_descr is None:
         tms = scoped_session_idb.execute('SELECT pid_type, pid_stype, pid_apid, pid_pi1_val, pid_descr, pid_tpsd, '
-                                         'pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offby '
+                                         'pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offby,'
+                                         'pcf_ptc, pcf_pfc '
                                          'FROM pid '
                                          'LEFT JOIN plf '
                                          'ON pid_spid = plf_spid AND pid_tpsd = -1 '
@@ -2713,7 +2714,8 @@ def get_tm_id(ccf_descr=None):
 
     else:
         tms = scoped_session_idb.execute('SELECT pid_type, pid_stype, pid_apid, pid_pi1_val, pid_descr , pid_tpsd, '
-                                         'pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offby '
+                                         'pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offby,'
+                                         'pcf_ptc, pcf_pfc '
                                          'FROM pid '
                                          'LEFT JOIN plf '
                                          'ON pid_spid = plf_spid AND pid_tpsd = -1 '
@@ -2725,7 +2727,7 @@ def get_tm_id(ccf_descr=None):
                                          'ON pcf_curtx = txf_numbr '
                                          'LEFT JOIN txp '
                                          'ON txf_numbr = txp.txp_numbr '
-                                         'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+                                         'WHERE pcf_descr="{}"'.format(pcf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -2736,6 +2738,28 @@ def get_tm_id(ccf_descr=None):
 
 
     return tms_dict
+
+def get_data_pool_items(pcf_descr = None):
+    if pcf_descr is None:
+        data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
+                                         'FROM pcf '
+                                        'WHERE pcf_pid <> 0').fetchall()
+
+    else:
+        data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
+                                         'FROM pcf '
+                                        'WHERE pcf_pid <> 0 '
+                                        'WHERE pcf_descr="{}"'.format(pcf_descr)).fetchall()
+
+    scoped_session_idb.close()
+
+    data_pool_dict = {}
+
+    for row in data_pool:
+        data_pool_dict.setdefault(row[0:4], []).append(row[5:])
+
+
+    return data_pool_dict
 
 
 
