@@ -455,6 +455,12 @@ class ParameterMonitor(Gtk.Window):
         return
 
     def monitor_setup(self, parameter_set=None, nslots=3):
+        if parameter_set is not None:
+            parameters = json.loads(self.cfg['ccs-monitor_parameter_sets'][parameter_set])
+            self.setup_grid(parameters)
+
+            return
+
         dialog = MonitorSetupDialog(logger=self.logger, nslots=nslots, parameter_set=parameter_set, parent=self)
 
         response = dialog.run()
@@ -476,7 +482,6 @@ class ParameterMonitor(Gtk.Window):
 
         else:
             dialog.destroy()
-
 
         return
 
