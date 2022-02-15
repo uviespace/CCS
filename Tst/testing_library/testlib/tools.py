@@ -146,19 +146,15 @@ def convert_apid_to_int(apid):
     """
     assert isinstance(apid, int) or isinstance(apid, str)
 
-    res = None
     if isinstance(apid, str):
         try:
-            if 'x' in apid:
-                res = int(apid, 16)
-            else:
-                res = int(apid)
+            res = int(apid, 0)
         except ValueError as err:
             logger.exception(err)
-    if isinstance(apid, int):
+            res = None
+
+    elif isinstance(apid, int):
         res = apid
-    if res is None:
-        logger.error('convert_apid_to_int: failed to convert the APID {} into an integer'.format(apid))
 
     return res
 
@@ -167,7 +163,6 @@ def convert_apid_to_int(apid):
 #   @param apid: <int> application process identifier
 #   @result: <int> PID, None if no valid apid is provided
 def extract_pid_from_apid(apid):
-    result = None
     """ Since commands ('0x14C' = 332 and '0x3CC' = 972) are not in the pid table, this check is not used
     # query for the existing apids
     self.c.execute('SELECT PID_APID FROM dabys_mib_cheops.pid')
@@ -183,21 +178,22 @@ def extract_pid_from_apid(apid):
     # if the apid is provided as a string try to convert it to a integer
     if isinstance(apid, str):
         try:
-            apid = int(apid)
+            apid = int(apid, 0)
         except ValueError as error:
-            try:
-                apid = int(apid, 16)
-            except ValueError as error:
-                logger.exception(error)
+            logger.exception(error)
+            raise error
 
-    if isinstance(apid, int):
+    # if isinstance(apid, int):
         # convert the apid into hexadecimal system and slice the last character (=PID), then convert it back to an int
-        apid_as_hex = hex(apid)
-        pid_as_hex = apid_as_hex[:4]
-        pid_as_dez = int(pid_as_hex, 16)
-        result = pid_as_dez
+        # apid_as_hex = hex(apid)
+        # pid_as_hex = apid_as_hex[:4]
+        # pid_as_dez = int(pid_as_hex, 16)
+        # result = pid_as_dez  # TODO: this is the PCAT, not the PID!?
 
-    return result
+    pid = apid & 0xf
+    pcat = (apid >> 4) & 0x7f
+
+    return pcat, pid
 
 
 def print_apids():
