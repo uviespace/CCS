@@ -17,6 +17,7 @@ def run(jfile, outfile):
     name = '{}|{}|Test spec. version: {}| IASW-{}'.format(data['_name'], data['_description'], data['_spec_version'], data['_iasw_version'])
     # Date from last time the json file was changed + current date
     date = 'Date||{}|'.format(datetime.datetime.now().strftime('%Y-%m-%d'))
+    testcomment = 'Comment|{}||'.format(data['_comment'])
     precond = 'Precond.|{}||'.format(data['_precon_descr'])
     postcond = 'Postcond.|{}||'.format(data['_postcon_descr'])
     steps = []
@@ -34,7 +35,10 @@ def run(jfile, outfile):
         outfile = outfile + data['_name'] + '-' + '-'.join(data['_spec_version'].split('-')[-2:]) + '.csv_PIPE'
 
     with open(outfile, 'w') as fd:
-        buf = '\n'.join([header, name, date, precond] + steps + [postcond])
+        if len(data['_comment']) != 0:
+            buf = '\n'.join([header, name, date, testcomment, precond] + steps + [postcond])
+        else:
+            buf = '\n'.join([header, name, date, precond] + steps + [postcond])
         buf = buf.replace('_', '\\_')
         fd.write(buf)
 
