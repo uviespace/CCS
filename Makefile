@@ -12,7 +12,7 @@ install-confignator:
 	@echo "+-----------------------------------------------+"
 	@echo "| installing confignator Python package |"
 	@echo "+-----------------------------------------------+"
-	    $(MAKE) all -C $(CURDIR)/Tst/confignator
+	    $(MAKE) reinstall -C $(CURDIR)/Tst/confignator
 	@echo "+-----------------------------------------------+"
 	@echo "| installed confignator Python package |"
 	@echo "+-----------------------------------------------+"
