@@ -6,7 +6,7 @@ import time
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
-from gi.repository import Gtk, Gdk, Gio, GtkSource, GLib
+from gi.repository import Gtk, Gdk, Gio, GtkSource, GLib, GdkPixbuf
 import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
@@ -31,9 +31,6 @@ import spec_to_json
 # creating lists for type and subtype to get rid of duplicate entries, for TC List
 
 
-
-
-
 path_icon = os.path.join(os.path.dirname(__file__), 'style/tst.svg')
 menu_xml = os.path.join(os.path.dirname(__file__), 'app_menu.xml')
 css_file = os.path.join(os.path.dirname(__file__), 'style/style.css')
@@ -47,6 +44,9 @@ logger.addHandler(hdlr=console_hdlr)
 log_file = confignator.get_option(section='tst-logging', option='log-file-path')
 file_hdlr = toolbox.create_file_handler(file=log_file)
 logger.addHandler(hdlr=file_hdlr)
+
+
+VERSION = '0.9'
 
 
 class TstApp(Gtk.Application):
@@ -228,6 +228,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action.connect('activate', self.on_apply_css)
         self.add_action(action)
 
+        action = Gio.SimpleAction.new('about_us', None)
+        action.connect('activate', self.on_about)
+        self.add_action(action)
+
         self.create_make_menu()
 
         self.set_icon_from_file(path_icon)
@@ -280,8 +284,21 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_generate_products, 3)
         self.toolbar.insert(self.btn_start_ccs_editor, 4)
         self.toolbar.insert(self.btn_open_progress_view, 5)
+        
+        # logo
+        sepa = Gtk.SeparatorToolItem()
+        sepa.set_expand(True)
+        self.toolbar.insert(sepa, 6)
+        self.unilogo = Gtk.ToolButton()
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
+        confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 32, 32)
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+        self.unilogo.set_icon_widget(icon)
+        #self.unilogo.set_tooltip_text('New test specification')
+        self.unilogo.connect('clicked', self.on_about)
+        self.toolbar.insert(self.unilogo, 7)
         self.box.pack_start(self.toolbar, False, True, 0)
-
+        
         self.info_bar = None
 
         # packing the widgets
@@ -1020,6 +1037,20 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                                  style_provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         Gtk.StyleContext.reset_widgets(Gdk.Screen.get_default())
+
+    def on_about(self, *args):
+        about_dialog = Gtk.AboutDialog(transient_for=self, modal=True)
+        about_dialog.set_authors(['Stefan Winkler', 'Dominik Möslinger', 'Sebastian Miksch', 'Marko Mecina'])
+        about_dialog.set_website('https://space.univie.ac.at/en')
+        about_dialog.set_website_label('space.univie.ac.at')
+        about_dialog.set_version(VERSION)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file(style_path + '/tst.png')
+        about_dialog.set_logo(pixbuf)
+        about_dialog.set_program_name('Test Specification Tool')
+        about_dialog.set_copyright('UVIE 11/2021')
+        about_dialog.set_license_type(Gtk.License.GPL_2_0)
+        about_dialog.present()
+        return
 
 
 class ViewModelAsJson(Gtk.Box):
