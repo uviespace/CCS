@@ -628,7 +628,7 @@ class TMPoolView(Gtk.Window):
         self.scrolled_treelist.get_vscrollbar().set_visible(False)
 
         self.selection = self.treeview.get_selection()
-        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
+        self.selection.set_mode(Gtk.SelectionMode.SINGLE)
         # self.selection.connect('changed', self.tree_selection_changed)
         self.selection.connect('changed', self.set_tm_data_view)
         # self.selection.connect('changed', self.unselect_bottom)
@@ -684,7 +684,7 @@ class TMPoolView(Gtk.Window):
         height = self.treeview.get_allocated_height()
         cell = self.treeview.get_columns()[0].cell_get_size()[-1] + 2
         nlines = height // cell
-        self.adj.set_page_size(nlines-3)
+        self.adj.set_page_size(nlines)
         # self._scroll_treeview()
         self.reselect_rows()
 
@@ -828,7 +828,7 @@ class TMPoolView(Gtk.Window):
                 t_shown_rows = threading.Thread(target=self.update_shown_buffer)
                 t_shown_rows.daemon = True
                 t_shown_rows.start()
-                self.shown_thread.update({t_shown_rows.getName(): True})
+                self.shown_thread.update({t_shown_rows.name: True})
             self.shown_lock.release()
                 # self.shown_thread_running = True
             # Start the updating from buffer
@@ -1258,7 +1258,7 @@ class TMPoolView(Gtk.Window):
                 self.shown_lock.acquire()
                 # Check if the thread should still run, or if it is not longer necessary
                 try:
-                    a = self.shown_thread[threading.currentThread().getName()]
+                    a = self.shown_thread[threading.current_thread().name]
                 except:
                     self.shown_lock.release()
                     break
@@ -1303,7 +1303,7 @@ class TMPoolView(Gtk.Window):
                 self.shown_lock.acquire()
                 # Check if the thread should still run, or if it is not longer necessary
                 try:
-                    a = self.shown_thread[threading.currentThread().getName()]
+                    a = self.shown_thread[threading.current_thread().name]
                 except:
                     self.shown_lock.release()
                     break
@@ -3078,7 +3078,7 @@ class TMPoolView(Gtk.Window):
             if filtered and self.filter_rules_active:
                 rows = self._filter_rows(rows)
 
-            ret = (row.raw for row in rows)
+            ret = [row.raw for row in rows]
 
         else:
             ret = self.get_raw_from_merged_tables(self.active_pool_info.filename)
@@ -3106,7 +3106,7 @@ class TMPoolView(Gtk.Window):
         # self.session_factory_storage.close()
 
         res = self.session_factory_storage.execute(que)
-        return (row[1] for row in res)
+        return [row[1] for row in res]
 
     def plot_parameters(self, widget=None, parameters={}, start_live=False):
         #if self.active_pool_info is None:
