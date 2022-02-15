@@ -10,8 +10,9 @@ cfg = confignator.get_config()
 
 user = cfg.get('database', 'user')
 pw = cfg.get('database', 'password')
+host = cfg.get('database', 'host')
 
-mysql_connection_string = 'mysql://{}:{}@localhost'.format(user, pw)
+mysql_connection_string = 'mysql://{}:{}@{}'.format(user, pw, host)
 schema_name = 'tst'
 
 
