@@ -37,6 +37,9 @@ install-database-dev-env:
 	@echo "| installed Python packages for the database    |"
 	@echo "+-----------------------------------------------+"
 	@echo
+	
+install-python-env:
+	python -m pip install numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod
 
 ccs-storage:
 	@echo "+----------------------------------------+"
