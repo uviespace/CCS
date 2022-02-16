@@ -3,7 +3,7 @@
 import datetime
 import sys
 
-sys.path.append('/home/marko/space/CCS/Ccs')
+sys.path.append('..')
 
 import ccs_function_lib as cfl
 
