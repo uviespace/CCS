@@ -589,7 +589,7 @@ class TMPoolView(Gtk.Window):
 
         self.treeview = Gtk.TreeView()
         self.treeview.set_model(self.pool_liststore)
-        self.treeview.set_rubber_banding(False)
+        self.treeview.set_rubber_banding(True)
         self.treeview.set_activate_on_single_click(True)
         # self.treeview.set_fixed_height_mode(True)
 
@@ -628,7 +628,7 @@ class TMPoolView(Gtk.Window):
         self.scrolled_treelist.get_vscrollbar().set_visible(False)
 
         self.selection = self.treeview.get_selection()
-        self.selection.set_mode(Gtk.SelectionMode.SINGLE)
+        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         # self.selection.connect('changed', self.tree_selection_changed)
         self.selection.connect('changed', self.set_tm_data_view)
         # self.selection.connect('changed', self.unselect_bottom)
@@ -684,7 +684,7 @@ class TMPoolView(Gtk.Window):
         height = self.treeview.get_allocated_height()
         cell = self.treeview.get_columns()[0].cell_get_size()[-1] + 2
         nlines = height // cell
-        self.adj.set_page_size(nlines)
+        self.adj.set_page_size(nlines-4)
         # self._scroll_treeview()
         self.reselect_rows()
 
@@ -1495,7 +1495,7 @@ class TMPoolView(Gtk.Window):
         self.autoscroll = 0
 
     def scroll_child(self, widget, event, data=None):
-        # print('Seems like I do not work')
+        print('Seems like I do not work')
         return
 
     def scroll_event(self, widget, event, data=None):
@@ -1517,6 +1517,7 @@ class TMPoolView(Gtk.Window):
             return
 
         self._scroll_treeview(scroll_lines)
+        self.offset = self.offset - 1 if self.offset > 0 else 0
         self.reselect_rows()
         # Only_scroll is necessary to not launch a second event after the scrollbar is reset to new value
         self.only_scroll = False
@@ -1541,8 +1542,11 @@ class TMPoolView(Gtk.Window):
                     break
 
             try:
-                if scroll_lines <0:
-                    self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) > 0 else 0
+                if scroll_lines < 0:
+                    if scroll_lines == -int(self.adj.get_page_size()):
+                        self.offset -= int(self.adj.get_page_size())
+                    else:
+                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) > 0 else 0
                 else:
                     if len(self.shown_all_rows) < (self.shown_limit):
                         self.offset = self.shown_all_rows[-self.adj.get_page_size()][0]
@@ -1975,7 +1979,7 @@ class TMPoolView(Gtk.Window):
         finally:
             widget.set_sensitive(True)
         upper_limit = self.adj.get_upper() - self.adj.get_page_size()
-        self.offset = int(min(upper_limit, goto))
+        self.offset = abs(int(min(upper_limit, goto)))
         self.limit = int(self.adj.get_page_size())
         #self.feed_lines_to_view(
         #    self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc'))
@@ -2000,7 +2004,7 @@ class TMPoolView(Gtk.Window):
             return
         finally:
             widget.set_sensitive(True)
-        self.offset = int(min(upper_limit, idx))
+        self.offset = abs(int(min(upper_limit, idx)))
         self.limit = int(self.adj.get_page_size())
         #self.feed_lines_to_view(
         #    self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc'))
@@ -3236,20 +3240,20 @@ class TMPoolView(Gtk.Window):
         GLib.timeout_add(self.pool_refresh_rate * 1000, self.refresh_treeview_worker2,
                          pool_name)  # , priority=GLib.PRIORITY_HIGH)
 
-    def refresh_treeview_worker(self, pool_name):
-        poolmgr = cfl.dbus_connection('poolmanager', cfl.communication ['poolmanager'])
-        # while not self.pool.recordingThread.stopRecording:
-        # Get value of dict connections, with key self.active... and key recording, True to get
-        pool_connection_recording = cfl.Dictionaries(poolmgr, 'connections', self.active_pool_info.pool_name, 'recording', True)
-        type = self.decoding_type
-        #while self.pool.connections[self.active_pool_info.pool_name]['recording']:
-        while pool_connection_recording:
-            GLib.idle_add(self.scroll_to_bottom)
-            time.sleep(self.pool_refresh_rate)
-            if pool_name != self.active_pool_info.pool_name or type != self.decoding_type:
-                dbsession.close()
-                return
-        self.stop_recording()
+    # def refresh_treeview_worker(self, pool_name):
+    #     poolmgr = cfl.dbus_connection('poolmanager', cfl.communication ['poolmanager'])
+    #     # while not self.pool.recordingThread.stopRecording:
+    #     # Get value of dict connections, with key self.active... and key recording, True to get
+    #     pool_connection_recording = cfl.Dictionaries(poolmgr, 'connections', self.active_pool_info.pool_name, 'recording', True)
+    #     type = self.decoding_type
+    #     #while self.pool.connections[self.active_pool_info.pool_name]['recording']:
+    #     while pool_connection_recording:
+    #         GLib.idle_add(self.scroll_to_bottom)
+    #         time.sleep(self.pool_refresh_rate)
+    #         if pool_name != self.active_pool_info.pool_name or type != self.decoding_type:
+    #             dbsession.close()
+    #             return
+    #     self.stop_recording()
 
     def refresh_treeview_worker2(self, pool_name):
         if pool_name != self.active_pool_info.pool_name:
