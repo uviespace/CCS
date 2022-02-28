@@ -99,6 +99,14 @@ class DataPoolTable(Gtk.Grid):
 
         self.scrollable_treelist.add(self.treeview)
 
+        # Set up Drag and Drop
+        self.treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+        self.treeview.drag_source_set_target_list(None)
+        self.treeview.drag_source_add_text_targets()
+
+        self.treeview.connect("drag-data-get", self.on_drag_data_get)
+        self.treeview.connect("drag-begin", self.on_drag_begin)
+
 
         self.show_all()
 
@@ -120,6 +128,9 @@ class DataPoolTable(Gtk.Grid):
     def item_selected(self, selection):
         model, row = selection.get_selected()
         if row is not None:
+            global pid
+            pid = model[row][0]
+        else:
             pass
 
 
@@ -133,3 +144,15 @@ class DataPoolTable(Gtk.Grid):
             return True
         else:
             return model[iter][0] == self.current_filter_data_pool
+
+
+
+
+    def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+        selection_data.set_text(pid, -1)
+
+
+    def on_drag_begin(self, *args):
+        pass
