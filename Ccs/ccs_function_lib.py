@@ -38,9 +38,10 @@ import importlib
 cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 #cfg = confignator.get_config()
 
+PCPREFIX = 'packet_config_'
 
 project = cfg.get('ccs-database', 'project')
-project = 'packet_config_' + str(project)
+project = PCPREFIX + str(project)
 packet_config = importlib.import_module(project)
 
 #cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
@@ -69,6 +70,7 @@ uuuu = 0
 used_user_defined_parameter = None
 crctype = 'crc-ccitt-false'
 crc = crcmod.predefined.mkCrcFun(crctype)
+
 # Set up logger
 logger = logging.getLogger('CFL')
 
@@ -76,9 +78,10 @@ counters = {}
 
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
 
-communication = {}
-for name in cfg['ccs-dbus_names']:
-    communication[name] = 0
+communication = {name: 0 for name in cfg['ccs-dbus_names']}
+
+scoped_session_idb = scoped_session_maker('idb', idb_version=None)
+scoped_session_storage = scoped_session_maker('storage')
 
 fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
@@ -88,15 +91,16 @@ personal_fmtlist = ['uint', 'int', 'ascii', 'oct']
 fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
            'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
 
-# TODO: SID format should be obtained from the MIB!
-SID_SIZE = 2
+# get format and offset of HK SID
 SID_FORMAT = {1: '>B', 2: '>H', 4: '>I'}
-
-
-scoped_session_idb = scoped_session_maker('idb', idb_version=None)
-scoped_session_storage = scoped_session_maker('storage')
-
-PCPREFIX = 'packet_config_'
+sidfmt = scoped_session_idb.execute('SELECT PIC_PI1_OFF,PIC_PI1_WID FROM mib_smile_sxi.pic where PIC_TYPE=3 and PIC_STYPE=25').fetchall()
+if len(sidfmt) != 0:
+    SID_OFFSET, SID_BITSIZE = sidfmt[0]
+    SID_SIZE = int(SID_BITSIZE / 8)
+else:
+    SID_SIZE = 2
+    SID_OFFSET = TM_HEADER_LEN
+    logger.warning('HK SID definition not found in MIB, using default: OFFSET={}, SIZE={}!'.format(SID_OFFSET, SID_SIZE))
 
 Notify.init('cfl')
 
@@ -1496,7 +1500,6 @@ def get_pool_rows(pool_name, dbcon=None):
 
     dbcon.close()
 
-
     return rows
 
 #  get values of parameter from HK packets
@@ -1512,7 +1515,7 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
             tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-                                   func.left(DbTelemetry.data, SID_SIZE) == struct.pack(SID_FORMAT[SID_SIZE], sid)).order_by(
+                                   func.mid(DbTelemetry.data, SID_OFFSET - TM_HEADER_LEN + 1, SID_SIZE) == struct.pack(SID_FORMAT[SID_SIZE], sid)).order_by(
                 DbTelemetry.idx.desc()).first()
             if tmlist is not None:
                 tmlist_filt = [tmlist.raw]
