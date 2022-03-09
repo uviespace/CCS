@@ -5,46 +5,30 @@ import threading
 import subprocess
 import time
 import sys
-import traceback
-
 import dbus
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 import DBus_Basic
 
-#from ccs_function_lib import General_Functions
-#cfl = General_Functions()
 import ccs_function_lib as cfl
 
 from typing import NamedTuple
-
 import confignator
-import configparser
 import gi
 
 import matplotlib
-
 matplotlib.use('Gtk3Cairo')
 
-from matplotlib.figure import Figure
+# from matplotlib.figure import Figure
 # from matplotlib.backends.backend_gtk3cairo import FigureCanvasGTK3Cairo as FigureCanvas
-from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
-from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3 as NavigationToolbar
-from matplotlib.backends.backend_gtk3 import cursord
+# from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
+# from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3 as NavigationToolbar
 
-import numpy as np
-
-from database.tm_db import DbTelemetryPool, DbTelemetry, RMapTelemetry, FEEDataTelemetry, scoped_session_maker
-#from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker
-
-from sqlalchemy.sql.expression import func, distinct
+# from sqlalchemy.sql.expression import func, distinct
 from sqlalchemy.orm import load_only, lazyload
-
+from database.tm_db import DbTelemetryPool, DbTelemetry, RMapTelemetry, FEEDataTelemetry, scoped_session_maker
 
 import importlib
-#check_cfg = configparser.ConfigParser()
-#check_cfg.read('egse.cfg')
-#check_cfg.source = 'egse.cfg'
 from confignator import config
 check_cfg = config.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
@@ -52,7 +36,6 @@ project = check_cfg.get('ccs-database', 'project')
 project = 'packet_config_' + str(project)
 packet_config = importlib.import_module(project)
 TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.PEC_LEN]
-#from packet_config import TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
@@ -74,7 +57,6 @@ fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i',
 
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
-#Telemetry = {'PUS': DbTelemetry}
 
 
 class TMPoolView(Gtk.Window):
@@ -116,7 +98,6 @@ class TMPoolView(Gtk.Window):
     active_pool_info = None  # type: Union[None, ActivePoolInfo]
     decoding_type = 'PUS'
     live_signal = {True: '[LIVE]', False: None}
-    # loaded_pools = {}
     currently_selected = set()
     shift_range = [1, 1]
     active_row = None
@@ -135,11 +116,8 @@ class TMPoolView(Gtk.Window):
     only_scroll = False
 
     def __init__(self, cfg=None, pool_name=None, cfilters='default', standalone=False):
-        Gtk.Window.__init__(self, title="Pool View", default_height=800,
-                            default_width=1100)
+        Gtk.Window.__init__(self, title="Pool View", default_height=800, default_width=1100)
 
-        #if not pool_name:
-        #    self.active_pool_info = ActivePoolInfo(None,None,None,None)
         self.refresh_treeview_active = False
         self.cnt = 0
         self.active_pool_info = ActivePoolInfo(None, None, None, None)
@@ -151,7 +129,7 @@ class TMPoolView(Gtk.Window):
 
         Notify.init('PoolViewer')
 
-        #self.dbustype = dbus.SessionBus()
+        # self.dbustype = dbus.SessionBus()
         if cfg is None:
             self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
         else:
@@ -174,8 +152,6 @@ class TMPoolView(Gtk.Window):
         self.paned.add2(self.grid)
 
         self.set_events(self.get_events() | Gdk.EventMask.SCROLL_MASK)
-
-        # self.dbcon = connect_to_db()
 
         self.treebox = self.create_treeview()
 
@@ -208,12 +184,7 @@ class TMPoolView(Gtk.Window):
         self.session_factory_idb = scoped_session_maker('idb')
         self.session_factory_storage = scoped_session_maker('storage')
 
-        #self.check_pmgr_pool()
-
-        #self.show_all()
-
-        # Session Maker
-        # self.session_factory = cfl.scoped_session
+        # self.check_pmgr_pool()
 
         # Check if pool from poolmanagers should be loaded, default is True
         # No done in connect_to_all function
@@ -274,7 +245,7 @@ class TMPoolView(Gtk.Window):
         return
 
     def quit_func(self, *args):
-        #Check if Poolmanager is running otherwise just close viewer
+        # Check if Poolmanager is running otherwise just close viewer
         if not cfl.is_open('poolmanager', cfl.communication['poolmanager']):
             self.close_terminal_connection()
             self.update_all_connections_quit()
@@ -289,7 +260,7 @@ class TMPoolView(Gtk.Window):
             Gtk.main_quit()
             return False
 
-        #Ask if Poolmanager should be cloosed too
+        # Ask if Poolmanager should be cloosed too
         ask = UnsavedBufferDialog(parent=self, msg='Response NO will keep the Poolmanager running in the Background')
         response = ask.run()
 
@@ -316,7 +287,6 @@ class TMPoolView(Gtk.Window):
 
     def close_terminal_connection(self):
         # Try to tell terminal in the editor that the variable is not longer availabe
-        ed_con = []
         for service in dbus.SessionBus().list_names():
             if service.startswith(self.cfg['ccs-dbus_names']['editor']):
                 editor = cfl.dbus_connection(service[0:-1].split('.')[1], service[-1])
@@ -328,11 +298,11 @@ class TMPoolView(Gtk.Window):
         return
 
     def update_all_connections_quit(self):
-        '''
+        """
         Tells all running applications that it is not longer availabe and suggests another main communicator if one is
         available
         :return:
-        '''
+        """
         our_con = [] # All connections to running applications without communicions form the same applications as this
         my_con = [] # All connections to same applications as this
         for service in dbus.SessionBus().list_names():
@@ -3456,70 +3426,6 @@ class LoadPoolDialog(Gtk.FileChooserDialog):
         self.show_all()
 
 
-class NavigationToolbarX(NavigationToolbar):
-
-    # override this function to avoid call to Gtk.main_iteration,
-    # which causes crash when multiple PlotViewer instances are running
-    def set_cursor(self, cursor):
-        self.canvas.get_property("window").set_cursor(cursord[cursor])
-
-    def release_zoom(self, event):
-        """the release mouse button callback in zoom to rect mode"""
-        for zoom_id in self._ids_zoom:
-            self.canvas.mpl_disconnect(zoom_id)
-        self._ids_zoom = []
-
-        self.remove_rubberband()
-
-        if not self._xypress:
-            return
-
-        last_a = []
-
-        for cur_xypress in self._xypress:
-            x, y = event.x, event.y
-            lastx, lasty, a, ind, view = cur_xypress
-            # ignore singular clicks - 5 pixels is a threshold
-            # allows the user to "cancel" a zoom action
-            # by zooming by less than 5 pixels
-            if ((abs(x - lastx) < 5 and self._zoom_mode!="y") or
-                    (abs(y - lasty) < 5 and self._zoom_mode!="x")):
-                self._xypress = None
-                self.release(event)
-                self.draw()
-                return
-
-            # detect twinx,y axes and avoid double zooming
-            twinx, twiny = False, False
-            if last_a:
-                for la in last_a:
-                    if a.get_shared_x_axes().joined(a, la):
-                        twinx = True
-                    if a.get_shared_y_axes().joined(a, la):
-                        twiny = True
-            last_a.append(a)
-
-            if self._button_pressed == 1:
-                direction = 'in'
-            elif self._button_pressed == 3:
-                direction = 'out'
-            else:
-                continue
-
-            a._set_view_from_bbox((lastx, lasty, x, y), direction,
-                                  self._zoom_mode, twinx, twiny)
-
-        xlim, ylim = a.get_xlim(), a.get_ylim()
-        self.canvas.get_parent().get_parent().get_parent().reduce_datapoints(xlim, ylim)
-
-        self.draw()
-        self._xypress = None
-        self._button_pressed = None
-
-        self._zoom_mode = None
-
-        self.push_current()
-        self.release(event)
 '''
 class LoadInfo(Gtk.Window):
     def __init__(self, parent=None, title=None):
@@ -3551,8 +3457,9 @@ class LoadInfo(Gtk.Window):
 
     def destroy_window(self, widget, window):
         window.destroy()
-
 '''
+
+
 class RecordingDialog(Gtk.MessageDialog):
     def __init__(self, parent=None):
         Gtk.Dialog.__init__(self, "Record to pool", parent, 0,
