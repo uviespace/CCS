@@ -1,8 +1,6 @@
-import os
 import json
 import struct
 import threading
-import subprocess
 import time
 
 import dbus
@@ -10,14 +8,10 @@ import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 import DBus_Basic
 
-#from ccs_function_lib import General_Functions
-#cfl = General_Functions()
 import ccs_function_lib as cfl
 
 from typing import NamedTuple
-
 import confignator
-import configparser
 import gi
 import sys
 
@@ -29,19 +23,14 @@ from matplotlib.figure import Figure
 # from matplotlib.backends.backend_gtk3cairo import FigureCanvasGTK3Cairo as FigureCanvas
 from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
 from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3 as NavigationToolbar
-from matplotlib.backends.backend_gtk3 import cursord
 
 import numpy as np
 
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker
 from sqlalchemy.sql.expression import func
-from sqlalchemy.orm import load_only
+# from sqlalchemy.orm import load_only
 
 import importlib
-
-#check_cfg = configparser.ConfigParser()
-#check_cfg.read('egse.cfg')
-#check_cfg.source = 'egse.cfg'
 
 check_cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
@@ -49,14 +38,12 @@ project = check_cfg.get('ccs-database', 'project')
 project = 'packet_config_' + str(project)
 packet_config = importlib.import_module(project)
 TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.PEC_LEN]
-#from packet_config import TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
 
 from event_storm_squasher import delayed
-
 import logging.handlers
 
 ActivePoolInfo = NamedTuple(
@@ -70,11 +57,10 @@ fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i',
            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
 
 
-
 class PlotViewer(Gtk.Window):
 
     def __init__(self, loaded_pool=None, parent=None, poolmgr=None, given_cfg=None, refresh_rate=1, parameters={},
-                 start_live=False, logger = None):
+                 start_live=False, logger=None):
         Gtk.Window.__init__(self)
 
         Notify.init('PlotViewer')
@@ -96,7 +82,7 @@ class PlotViewer(Gtk.Window):
         self.logger = cfl.start_logging('ParameterPlotter')
 
         # Specify which Pool should be used
-        if loaded_pool!= None:
+        if loaded_pool is not None:
             self.loaded_pool = loaded_pool
         else:
             self.loaded_pool = None
@@ -164,7 +150,6 @@ class PlotViewer(Gtk.Window):
         #     [pools.append([pool]) for pool in self.pool.keys()]
         #     self.pool_box.set_model(pools)
 
-
         self.pool_selector = Gtk.ComboBoxText(tooltip_text='Select Pool to Plot')
         self.pool_selector_pools = Gtk.ListStore(str, int, str, bool)
 
@@ -207,7 +192,7 @@ class PlotViewer(Gtk.Window):
 
         toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 0)
 
-        max_data_label = Gtk.Label('NMAX:')
+        max_data_label = Gtk.Label(label='NMAX:')
         max_data_label.set_tooltip_text('At most ~NMAX data points plotted (0 for unlimited)')
         self.max_data = Gtk.Entry()
         self.max_data.set_width_chars(6)
@@ -221,7 +206,7 @@ class PlotViewer(Gtk.Window):
         self.live_plot_switch = Gtk.Switch()
         self.live_plot_switch.set_tooltip_text('Toggle real time parameter plotting')
         self.live_plot_switch.connect("state-set", self.on_switch_liveplot)
-        live_plot_label = Gtk.Label('Live plot:')
+        live_plot_label = Gtk.Label(label='Live plot:')
 
         live_plot = Gtk.HBox()
         live_plot.pack_start(live_plot_label, 0, 0, 5)
@@ -248,26 +233,27 @@ class PlotViewer(Gtk.Window):
         return canvas
 
     def _create_navbar(self):
-        navbar = NavigationToolbarX(self.canvas, self)
+        # navbar = NavigationToolbarX(self.canvas, self)
+        navbar = NavigationToolbar(self.canvas, self)
 
         limits = Gtk.HBox()
         self.xmin = Gtk.Entry()
         self.xmin.set_width_chars(9)
         self.xmin.connect('activate', self.set_plot_limits)
-        xmin_label = Gtk.Label('xmin:')
+        xmin_label = Gtk.Label(label='xmin:')
         self.xmax = Gtk.Entry()
         self.xmax.set_width_chars(9)
         self.xmax.connect('activate', self.set_plot_limits)
-        xmax_label = Gtk.Label('xmax:')
+        xmax_label = Gtk.Label(label='xmax:')
 
         self.ymin = Gtk.Entry()
         self.ymin.connect('activate', self.set_plot_limits)
         self.ymin.set_width_chars(9)
-        ymin_label = Gtk.Label('ymin:')
+        ymin_label = Gtk.Label(label='ymin:')
         self.ymax = Gtk.Entry()
         self.ymax.set_width_chars(9)
         self.ymax.connect('activate', self.set_plot_limits)
-        ymax_label = Gtk.Label('ymax:')
+        ymax_label = Gtk.Label(label='ymax:')
 
         [i.set_text('{:.1f}'.format(j)) for j, i in
          zip(self.subplot.get_xlim() + self.subplot.get_ylim(), (self.xmin, self.xmax, self.ymin, self.ymax))]
@@ -287,7 +273,7 @@ class PlotViewer(Gtk.Window):
         return navbar
 
     def create_param_view(self):
-        self.treeview = Gtk.TreeView(self.create_parameter_model())
+        self.treeview = Gtk.TreeView(model=self.create_parameter_model())
 
         self.treeview.append_column(Gtk.TreeViewColumn("Parameters", Gtk.CellRendererText(), text=0))
 
@@ -1216,18 +1202,25 @@ class PlotViewer(Gtk.Window):
         GLib.timeout_add_seconds(5, self.update_pool_view)
         return
 
+
+# This class seems to be no longer needed
 class NavigationToolbarX(NavigationToolbar):
+
+    def __init__(self, *args, **kwargs):
+        super(NavigationToolbarX, self).__init__(*args, **kwargs)
+        self._ids_zoom = []
 
     # override this function to avoid call to Gtk.main_iteration,
     # which causes crash when multiple PlotViewer instances are running
     def set_cursor(self, cursor):
-        self.canvas.get_property("window").set_cursor(cursord[cursor])
+        # self.canvas.get_property("window").set_cursor(cursord[cursor])
+        self.canvas.set_cursor(cursor)
 
     def release_zoom(self, event):
         """the release mouse button callback in zoom to rect mode"""
         for zoom_id in self._ids_zoom:
             self.canvas.mpl_disconnect(zoom_id)
-        self._ids_zoom = []
+        # self._ids_zoom = []
 
         self.remove_rubberband()
 
