@@ -1,24 +1,21 @@
-import datetime
+# import datetime
 import io
-import signal
-import socket
-import struct
+# import signal
+# import socket
+# import struct
 import sys
 import time
 import os
 import datetime
 import socket
-import select
+# import select
 import crcmod
 import struct
-# from bitstring import BitArray, BitStream, Bits, ConstBitStream, ReadError
-import traceback
+# import traceback
 import DBus_Basic
 import dbus
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
-#cfl.Tcsend_DB('SASW ModHkPeriodCmd', 1, 8, pool_name='new_tmtc_pool')
-import configparser
 import confignator
 import gi
 
@@ -321,14 +318,14 @@ class DatapoolManager:
         finally:
             new_session.close()
 
-    def _clear_pool(self, pool_name):  # TODO: not working
+    def _clear_pool(self, pool_name):
+
         if pool_name not in self.connections:
             self.logger.warning('Cannot clear static pool "{}".'.format(pool_name))
             return
+
         new_session = self.session_factory_storage
-        # get protocol type
-        pkttype = self.loaded_pools[pool_name].packet_type
-        if self.connections[pool_name]['socket'].fileno() < 0:
+        if self.connections[pool_name]['socket'].fileno() < 0:  # if true, socket is closed, just "delete" pool
             n_del_pools, = new_session.execute(
                 'SELECT COUNT(*) FROM tm_pool WHERE pool_name LIKE "---TO-BE-DELETED%"').fetchall()[0]
             new_session.execute(
@@ -338,12 +335,25 @@ class DatapoolManager:
             new_session.close()
             self.logger.info('Content of pool "{}" deleted!'.format(pool_name))
             return
+
         self.connections[pool_name]['paused'] = True
         while self.connections[pool_name]['recv-thread'].is_alive():
             time.sleep(0.1)
         sockfd = self.connections[pool_name]['socket']
-        self.tm_recv_start(sockfd, pool_name, try_delete=False)
+        protocol = self.connections[pool_name]['protocol']
+
+        if protocol == 'SPW':
+            self.spw_recv_start(sockfd, pool_name, try_delete=False, force_clean=True)
+        elif protocol in ['PUS', 'PLMSIM']:
+            self.tm_recv_start(sockfd, pool_name, protocol=protocol, try_delete=False, force_clean=True)
+        else:
+            self.logger.warning('"{}" is not a supported protocol, aborting.'.format(protocol))
+            return
+
+        # self.tm_recv_start(sockfd, pool_name, try_delete=False)
+
         self.logger.info('Content of pool "{}" deleted!'.format(pool_name))
+
         while True:
             dbrow = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
             if dbrow is None:
@@ -354,6 +364,7 @@ class DatapoolManager:
                 timestamp = dbrow.modification_time
                 new_session.close()
                 break
+
         self.loaded_pools[pool_name] = ActivePoolInfo(pool_name, timestamp, pool_name, True)
         self.logger.info('Resuming recording from {}:{}'.format(*sockfd.getpeername()))
 
@@ -391,7 +402,7 @@ class DatapoolManager:
             try:
                 sockfd.connect((host, port))
             except ConnectionRefusedError:
-                self.logger.error("Connection to {}:{} refused".format(host, port))
+                self.logger.warning("Connection to {}:{} refused".format(host, port))
                 return
         self.connections[pool_name] = {'socket': sockfd, 'recording': True, 'protocol': protocol}
 
@@ -568,7 +579,7 @@ class DatapoolManager:
         if self.own_gui:
             self.own_gui.disconnect_incoming_via_code(param=[pool_name, None, None])  # Updates the gui
 
-        #Tell the Poolviewer to stop updating
+        # Tell the Poolviewer to stop updating
         if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
             pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
             cfl.Functions(pv, 'stop_recording_info', str(pool_name))
@@ -588,7 +599,7 @@ class DatapoolManager:
                 self.tc_connections[pool_name]['socket'].close()
                 del self.tc_connections[pool_name]
 
-        #Tell the Poolviewer to stop updating
+        # Tell the Poolviewer to stop updating
         if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
             pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
             cfl.Functions(pv, 'stop_recording_info', str(pool_name))
@@ -599,9 +610,14 @@ class DatapoolManager:
         return datetime.datetime.utcnow().strftime("%Y-%m-%d %T UTC: ")
 
     def tm_recv_start(self, sockfd, pool_name, protocol='PUS', drop_rx=False, drop_tx=False,
-                      delete_abandoned=False, try_delete=True, pckt_filter=None):
+                      delete_abandoned=False, try_delete=True, pckt_filter=None, force_clean=False):
 
-        self.tm_receiver_del_old_pool(pool_name, delete_abandoned=delete_abandoned, try_delete=try_delete)
+        if pool_name in self.loaded_pools and self.loaded_pools[pool_name].live and not force_clean and pool_name in self.state:
+            self.logger.info('Pool "{}" is live. Skipping deletion of previous data.')
+            start_new = False
+        else:
+            self.tm_receiver_del_old_pool(pool_name, delete_abandoned=delete_abandoned, try_delete=try_delete)
+            start_new = True
 
         self.connections[pool_name]['paused'] = False
 
@@ -612,7 +628,9 @@ class DatapoolManager:
                                       'protocol': protocol,
                                       'drop_rx': drop_rx,
                                       'drop_tx': drop_tx,
-                                      'pckt_filter': pckt_filter})
+                                      'pckt_filter': pckt_filter,
+                                      'start_new': start_new})
+
         thread.daemon = True
         thread.name = '{}-tm_recv_worker'.format(pool_name)
         # thread.stopRecording = False
@@ -621,21 +639,21 @@ class DatapoolManager:
         thread.start()
         return thread
 
-    def tm_recv_worker(self, sockfd, pool_name, protocol='PUS', drop_rx=False, drop_tx=False, pckt_filter=None):
+    def tm_recv_worker(self, sockfd, pool_name, protocol='PUS', drop_rx=False, drop_tx=False, pckt_filter=None, start_new=True):
         host, port = sockfd.getpeername()
 
         # Check if a Pool has already been started with only TC
-        start_new = True
-        if pool_name in self.loaded_pools:
-            if self.loaded_pools[pool_name].live:
-                start_new = False
-        if not pool_name in self.state:
-            start_new = True
+        # start_new = True
+        # if pool_name in self.loaded_pools:
+        #     if self.loaded_pools[pool_name].live:
+        #         start_new = False
+        # if not pool_name in self.state:
+        #     start_new = True
 
         new_session = self.session_factory_storage
+
         # If no TC Pool has been started start new one
         if start_new:
-
             pool_row = DbTelemetryPool(
                 pool_name=pool_name,
                 modification_time=time.time(),
@@ -810,7 +828,7 @@ class DatapoolManager:
         self.logger.warning('Disconnected from ' + str(host) + ':' + str(port))
         sockfd.close()
 
-    def tm_receiver_del_old_pool(self, pool_name, delete_abandoned=False, try_delete=True):
+    def tm_receiver_del_old_pool(self, pool_name, delete_abandoned=False, try_delete=True, force=False):
         new_session = self.session_factory_storage
         pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
         if pool_row:
@@ -824,10 +842,10 @@ class DatapoolManager:
                 if pool_name in self.state:
                     del self.state[pool_name]
 
-            # If the pool is started by TC do not delete
-            elif pool_name in self.loaded_pools:
-                if self.loaded_pools[pool_name].live:
-                    return
+            # If the pool is started by TC do not delete  //MM: this is taken care of outside this function
+            # elif pool_name in self.loaded_pools:
+            #     if self.loaded_pools[pool_name].live:
+            #         return
 
             if rows_in_pool < 1000 and try_delete:
                 new_session.execute(
@@ -1596,7 +1614,7 @@ class DatapoolManager:
                     delete_thread.start()
         new_session.close()
 
-    def spw_recv_start(self, sockfd, pool_name, drop_rx=False, delete_abandoned=False, try_delete=True):
+    def spw_recv_start(self, sockfd, pool_name, drop_rx=False, delete_abandoned=False, try_delete=True, force_clean=False):
 
         # delete existing pool rows
         self.spw_receiver_del_old_pool(pool_name, delete_abandoned=delete_abandoned, try_delete=try_delete)

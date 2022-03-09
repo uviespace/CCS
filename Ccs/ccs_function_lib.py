@@ -1503,7 +1503,7 @@ def get_pool_rows(pool_name, dbcon=None):
     return rows
 
 #  get values of parameter from HK packets
-def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, dbcon=None):
+def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
     # with self.poolmgr.lock:
     dbcon = scoped_session_idb
     if hk is None:

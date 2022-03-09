@@ -140,6 +140,7 @@ class TMPoolView(Gtk.Window):
 
         #if not pool_name:
         #    self.active_pool_info = ActivePoolInfo(None,None,None,None)
+        self.refresh_treeview_active = False
         self.cnt = 0
         self.active_pool_info = ActivePoolInfo(None, None, None, None)
         self.set_border_width(2)
@@ -589,7 +590,7 @@ class TMPoolView(Gtk.Window):
 
         self.treeview = Gtk.TreeView()
         self.treeview.set_model(self.pool_liststore)
-        self.treeview.set_rubber_banding(True)
+        self.treeview.set_rubber_banding(False)
         self.treeview.set_activate_on_single_click(True)
         # self.treeview.set_fixed_height_mode(True)
 
@@ -682,9 +683,9 @@ class TMPoolView(Gtk.Window):
     def set_number_of_treeview_rows(self, widget=None, allocation=None):
         # alloc = widget.get_allocation()
         height = self.treeview.get_allocated_height()
-        cell = self.treeview.get_columns()[0].cell_get_size()[-1] + 2
+        cell = 25  #self.treeview.get_columns()[0].cell_get_size()[-1] + 2
         nlines = height // cell
-        self.adj.set_page_size(nlines-4)
+        self.adj.set_page_size(nlines - 1)
         # self._scroll_treeview()
         self.reselect_rows()
 
@@ -1357,7 +1358,6 @@ class TMPoolView(Gtk.Window):
             self.shown_lock.release()
 
 
-
         '''
         running = True
         self.shown_lock.acquire()
@@ -1502,7 +1502,7 @@ class TMPoolView(Gtk.Window):
         # print(event.direction.value_name, event.delta_x, event.delta_y)
         self.only_scroll = True
         if event.direction.value_name == 'GDK_SCROLL_SMOOTH':
-            scroll_lines = 3 * event.delta_y
+            scroll_lines = 3 * max(-1, event.delta_y)
             if scroll_lines < 0:
                 self.autoscroll = 0
             elif scroll_lines > 3:
@@ -1546,28 +1546,32 @@ class TMPoolView(Gtk.Window):
                     if scroll_lines == -int(self.adj.get_page_size()):
                         self.offset -= int(self.adj.get_page_size())
                     else:
-                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) > 0 else 0
+                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) >= 0 else 0
                 else:
                     if len(self.shown_all_rows) < (self.shown_limit):
-                        self.offset = self.shown_all_rows[-self.adj.get_page_size()][0]
+                        self.offset = self.shown_all_rows[-int(self.adj.get_page_size())][0]
                     else:
-                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) > 0 else 0
-            except:
-                upper_limit = self.adj.get_upper() - self.adj.get_page_size()
+                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) >= 0 else 0
+            except IndexError:
+                upper_limit = max(0, self.adj.get_upper() - self.adj.get_page_size())
                 self.offset = int(min(upper_limit, self.adj.get_value() + scroll_lines))
 
+        if self.offset < 0:
+            return
+
         self.limit = int(self.adj.get_page_size())
-        #self.feed_lines_to_view(
-        #    self.fetch_lines_from_db(self.offset, self.limit, sort=sort, order=order, rows=rows, force_import=force_db_import))
         self.fetch_lines_from_db(self.offset, self.limit, sort=sort, order=order, rows=rows, scrolled=True, force_import=force_db_import)
         self.adj.set_value(self.offset)
 
     def key_pressed(self, widget=None, event=None):
-        def unselect_rows():
+        def unselect_rows(clear=False):
             # selection = widget.get_selection()
             # self.selection.disconnect_by_func(self.tree_selection_changed)
-            model, paths = self.selection.get_selected_rows()
-            self.currently_selected = {model[path][0] for path in paths}
+            if clear:
+                self.currently_selected = set()
+            else:
+                model, paths = self.selection.get_selected_rows()
+                self.currently_selected = {model[path][0] for path in paths}
             self.reselect_rows()
             # self.selection.connect('changed', self.tree_selection_changed)
 
@@ -1610,17 +1614,19 @@ class TMPoolView(Gtk.Window):
             self.autoscroll = True
             self.autoselect = True
             self.scroll_to_bottom()
-            unselect_rows()
+            unselect_rows(clear=True)
         elif event.keyval == Gdk.KEY_Page_Up:
             # cursor_path = self.treeview.get_cursor()[0]
             self._scroll_treeview(-self.limit)
-            self.treeview.set_cursor(cursor_path)
+            if cursor_path is not None:
+                self.treeview.set_cursor(cursor_path)
             self.autoscroll = False
             unselect_rows()
         elif event.keyval == Gdk.KEY_Page_Down:
             # cursor_path = self.treeview.get_cursor()[0]
             self._scroll_treeview(self.limit)
-            self.treeview.set_cursor(cursor_path)
+            if cursor_path is not None:
+                self.treeview.set_cursor(cursor_path)
             self.autoscroll = False
             unselect_rows()
             # else:
@@ -1669,9 +1675,9 @@ class TMPoolView(Gtk.Window):
                 try:
                     self.selection.select_path(model.get_path(model.get_iter(row[0] - self.offset - 1)))
                 except ValueError:
-                    pass
+                    print('valerr')
                 except TypeError:
-                    pass
+                    print('typerr')
 
     def unselect_bottom(self, widget=None):
         if widget.count_selected_rows() > 1:
@@ -1916,41 +1922,41 @@ class TMPoolView(Gtk.Window):
         #self._on_scrollbar_changed()
         pass
 
-    def resize_scrollbar(self):
-
-        if self.first_run or self.resize_thread.is_alive():
-            self.first_run = False
-            self.resize_thread = threading.Thread(target=self.small_refresh_function)
-            return
-
-        self.resize_thread = threading.Thread(target=self.scrollbar_size_worker)
-        self.resize_thread.setDaemon(True)
-        self.resize_thread.start()
-
-    def scrollbar_size_worker(self):
-        #print(1)
-        new_session = self.session_factory_storage
-        rows = new_session.query(
-            Telemetry[self.decoding_type]
-        ).join(
-            DbTelemetryPool,
-            Telemetry[self.decoding_type].pool_id == DbTelemetryPool.iid
-        ).filter(
-            DbTelemetryPool.pool_name == self.active_pool_info.filename
-        )
-        #new_session.close()
-        cnt = rows.count()
-        #print(cnt)
-        rows = self._filter_rows(rows)
-        cnt = rows.count()
-        #count_q = que.statement.with_only_columns([func.count()]).order_by(None)
-        #cnt = new_session.execute(count_q).scalar()
-        #cnt = new_session.query(que).count()
-        #print(2)
-        #print(cnt)
-        GLib.idle_add(self.adj.set_upper, cnt,)
-        #print(3)
-        new_session.close()
+    # def resize_scrollbar(self):
+    #
+    #     if self.first_run or self.resize_thread.is_alive():
+    #         self.first_run = False
+    #         self.resize_thread = threading.Thread(target=self.small_refresh_function)
+    #         return
+    #
+    #     self.resize_thread = threading.Thread(target=self.scrollbar_size_worker)
+    #     self.resize_thread.setDaemon(True)
+    #     self.resize_thread.start()
+    #
+    # def scrollbar_size_worker(self):
+    #     #print(1)
+    #     new_session = self.session_factory_storage
+    #     rows = new_session.query(
+    #         Telemetry[self.decoding_type]
+    #     ).join(
+    #         DbTelemetryPool,
+    #         Telemetry[self.decoding_type].pool_id == DbTelemetryPool.iid
+    #     ).filter(
+    #         DbTelemetryPool.pool_name == self.active_pool_info.filename
+    #     )
+    #     #new_session.close()
+    #     cnt = rows.count()
+    #     #print(cnt)
+    #     rows = self._filter_rows(rows)
+    #     cnt = rows.count()
+    #     #count_q = que.statement.with_only_columns([func.count()]).order_by(None)
+    #     #cnt = new_session.execute(count_q).scalar()
+    #     #cnt = new_session.query(que).count()
+    #     #print(2)
+    #     #print(cnt)
+    #     GLib.idle_add(self.adj.set_upper, cnt,)
+    #     #print(3)
+    #     new_session.close()
 
     def _toggle_rule(self, widget=None, data=None):
         self.filter_rules_active = widget.get_active()
@@ -2166,26 +2172,11 @@ class TMPoolView(Gtk.Window):
         if pool_name is None:
             return
 
-        #self.pool._clear_pool(pool_name)
-        #self.active_pool_info = self.pool.loaded_pools[pool_name]
         poolmgr.Functions('_clear_pool', pool_name)
         # self.active_pool_info = poolmgr.Dictionaries('loaded_pools', pool_name)
         self.Active_Pool_Info_append(poolmgr.Dictionaries('loaded_pools', pool_name))
+        self.offset = 0
 
-        # new_session = self.dbcon
-        # new_session.execute(
-        #     'UPDATE tm_pool SET pool_name="---TO-BE-DELETED---" WHERE tm_pool.pool_name="{}"'.format(
-        #         self.get_active_pool_name()))
-        # new_session.commit()
-        #
-        # # new_session.execute(
-        # #     'delete tm from tm inner join tm_pool on tm.pool_id=tm_pool.iid where tm_pool.pool_name="{}"'.format(
-        # #         self.active_pool_info.filename))
-        # # new_session.execute('delete tm_pool from tm_pool where tm_pool.pool_name="{}"'.format(
-        # #     self.active_pool_info.filename))
-        # # # new_session.flush()
-        # # new_session.commit()
-        # new_session.close()
         self.adj.set_upper(self.count_current_pool_rows())
         self._on_scrollbar_changed()
         widget.set_sensitive(True)
@@ -2585,6 +2576,9 @@ class TMPoolView(Gtk.Window):
         if nrows > 1:
             self.tm_header_view.set_buffer(Gtk.TextBuffer(text='{} packets selected'.format(nrows)))
             datamodel.clear()
+            return
+
+        if selection is None:
             return
 
         model, treepath = selection.get_selected_rows()
@@ -3233,9 +3227,10 @@ class TMPoolView(Gtk.Window):
         return
 
     def refresh_treeview(self, pool_name):
-        # thread = threading.Thread(target=self.refresh_treeview_worker, args=[pool_name])
-        # thread.daemon = True
-        # thread.start()
+        if self.refresh_treeview_active:
+            return
+
+        self.refresh_treeview_active = True
         self.n_pool_rows = 0
         GLib.timeout_add(self.pool_refresh_rate * 1000, self.refresh_treeview_worker2,
                          pool_name)  # , priority=GLib.PRIORITY_HIGH)
@@ -3257,36 +3252,23 @@ class TMPoolView(Gtk.Window):
 
     def refresh_treeview_worker2(self, pool_name):
         if pool_name != self.active_pool_info.pool_name:
+            self.refresh_treeview_active = False
             return False
 
-        #if not self.active_pool_info.live:
-        #    return False
-        #if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
-        #    poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        #else:
-        #    return False
-
-        # Get value of dict connections, with key self.active... and key recording, True to get
-        #pool_connection_recording = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name, 'recording',
-        #                                                 True)
-        #pool_connection = poolmgr.Dictionaries('connections', self.active_pool_info.pool_name)
         if self.active_pool_info.live:
-        #if self.pool.connections[self.active_pool_info.pool_name]['recording']:
             rows = self.get_current_pool_rows()
             if rows.first() is None:
                 cnt = 0
             else:
                 cnt = rows.order_by(Telemetry[self.decoding_type].idx.desc()).first().idx
             if cnt != self.n_pool_rows:
-                # self.selection.disconnect_by_func(self.tree_selection_changed)
                 self.scroll_to_bottom(n_pool_rows=cnt, rows=rows)
-                # self.selection.connect('changed', self.tree_selection_changed)
                 self.n_pool_rows = cnt
                 return True
             else:
                 return True
         else:
-            #self.stop_recording()
+            self.refresh_treeview_active = False
             return False
 
     def dbtest(self, pool_name, sleep=0.1):
@@ -3353,7 +3335,7 @@ class TMPoolView(Gtk.Window):
                 trashbytes = 0
         '''
         if not self.active_pool_info.live:
-            return
+            return False
 
         if not instance:
             instance = 1
