@@ -1650,11 +1650,11 @@ def show_extracted_packet():
     """
     pv = dbus_connection('poolviewer', communication['poolviewer'])
     if not pv:
+        logger.warning('Could not obtain selected packets from PV!')
         return
 
     return eval(pv.Functions('selected_packet'))
 
-#@property
 def packet_selection():
     """Alias for show_extracted_packet call"""
     return show_extracted_packet()
