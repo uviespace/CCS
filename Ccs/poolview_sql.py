@@ -3025,7 +3025,11 @@ class TMPoolView(Gtk.Window):
         else:
             return str(self.stored_packet)
 
-    def get_packets_from_indices(self, indices=[], filtered=False, merged_tables=False):
+    def get_packets_from_indices(self, indices=None, filtered=False, merged_tables=False):
+
+        if indices is None:
+            indices = []
+
         new_session = self.session_factory_storage
 
         if not merged_tables:
@@ -3325,10 +3329,9 @@ class TMPoolView(Gtk.Window):
 
 class ExtractionDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, pkttype='PUS'):
-        super(ExtractionDialog, self).__init__(title="Extract packets", parent=parent, flags=0,
-                                               buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK,
-                                                        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
+        super(ExtractionDialog, self).__init__(title="Extract packets", parent=parent, flags=0)
 
+        self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
         self.set_transient_for(parent)
 
         box = self.get_content_area()
