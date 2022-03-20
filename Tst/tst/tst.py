@@ -196,7 +196,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
     def __init__(self, logger=logger, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.logger = logger
-        self.logger.info('Initializing a instance of the class TstAppWindow')
+        self.logger.info('Initializing an instance of the class TstAppWindow')
         self.product_paths = []
 
         # actions
