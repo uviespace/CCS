@@ -43,8 +43,8 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
 
-from event_storm_squasher import delayed
-import logging.handlers
+# from event_storm_squasher import delayed
+# import logging.handlers
 
 ActivePoolInfo = NamedTuple(
     'ActivePoolInfo', [
@@ -342,22 +342,30 @@ class PlotViewer(Gtk.Window):
         self.store = parameter_model
 
         dbcon = self.session_factory_idb
-        #dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid where pid_type=3')
-        dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid order by pid_type,pid_pi1_val')
+        dbres = dbcon.execute('SELECT pid_descr,pid_spid,pid_type from pid order by pid_type,pid_stype,pid_pi1_val')
         hks = dbres.fetchall()
+
+        topleveliters = {}
         for hk in hks:
-            it = parameter_model.append(None, [hk[0]])
-            dbres = dbcon.execute(
-                'SELECT pcf.pcf_descr from pcf left join plf on pcf.pcf_name=plf.plf_name left join pid on \
-                plf.plf_spid=pid.pid_spid where pid.pid_spid={} ORDER BY pcf.pcf_descr'.format(hk[1]))
+
+            if not hk[2] in topleveliters:
+                serv = parameter_model.append(None, ['Service ' + str(hk[2])])
+                topleveliters[hk[2]] = serv
+
+            it = parameter_model.append(topleveliters[hk[2]], [hk[0]])
+
+            dbres = dbcon.execute('SELECT pcf.pcf_descr from pcf left join plf on pcf.pcf_name=plf.plf_name left join pid on \
+                                   plf.plf_spid=pid.pid_spid where pid.pid_spid={} ORDER BY pcf.pcf_descr'.format(hk[1]))
             params = dbres.fetchall()
             for par in params:
                 parameter_model.append(it, [par[0]])
+
         dbcon.close()
 
         # add user defined PACKETS
+        topit = parameter_model.append(None, ['UDEF'])
         for hk in self.user_tm_decoders:
-            it = parameter_model.append(None, ['UDEF|{}'.format(self.user_tm_decoders[hk][0])])
+            it = parameter_model.append(topit, ['UDEF|{}'.format(self.user_tm_decoders[hk][0])])
             for par in self.user_tm_decoders[hk][1]:
                 parameter_model.append(it, [par[1]])
 
@@ -367,7 +375,6 @@ class PlotViewer(Gtk.Window):
             parameter_model.append(self.useriter, [userpar])
 
         return parameter_model
-
 
     def pool_changed(self, combobox, pool=False):
         if pool:
@@ -458,7 +465,6 @@ class PlotViewer(Gtk.Window):
                 if not x:   # Add a pool if it is not already in the model (liststore)
                     model.append([pool_info[0], pool_info[1], pool_info[2], pool_info[3]])
 
-
         elif all_pools and all_pools[2]:
             pool_info = all_pools
             x = False  # If the pool is already in the plotter
@@ -478,10 +484,7 @@ class PlotViewer(Gtk.Window):
 
         #if len(model) == 2:
         #    self.pool_changed(False, pool_info[2])
-        #print(all_pools)
-        #print(self.pool_selector.get_entry_text_column())
         return True
-
 
     def add_user_parameter(self, widget, treeview):
         parameter_model = treeview.get_model()
@@ -502,13 +505,12 @@ class PlotViewer(Gtk.Window):
         parameter_model = treeview.get_model()
 
         try:
-            parent = model[parpath].parent[0] # Check if selection is an object or the parent tab is selected
+            parent = model[parpath].parent[0]  # Check if selection is an object or the parent tab is selected
             parname = model[parpath][0]
             param_values = cfl.remove_user_parameter(parname)
 
         except:
             param_values = cfl.remove_user_parameter(parentwin=self)
-
 
         if param_values:
             parameter_model = self.treeview.get_model()
@@ -524,7 +526,7 @@ class PlotViewer(Gtk.Window):
         selection = treeview.get_selection()
         model, parpath = selection.get_selected_rows()
         try:
-            parent = model[parpath].parent[0] # Check if selection is an object or the parent tab is selected
+            parent = model[parpath].parent[0]  # Check if selection is an object or the parent tab is selected
             parname = model[parpath][0]
             param_values = cfl.edit_user_parameter(self, parname)
             if param_values:
@@ -539,7 +541,6 @@ class PlotViewer(Gtk.Window):
                     {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
 
         return
-
 
     def create_univie_box(self):
         """
@@ -1384,6 +1385,8 @@ class UserParameterDialog(Gtk.MessageDialog):
             self.bitlen.set_sensitive(False)
             self.offbi.set_sensitive(False)
 '''
+
+
 class DataWindow(Gtk.Window):
     def __init__(self, parent=None):
         Gtk.Window.__init__(self)
@@ -1395,6 +1398,7 @@ class DataWindow(Gtk.Window):
 
         self.textview = Gtk.TextView(cursor_visible=False, editable=False)
         sv.add(self.textview)
+
 
 class SelectPoolDialog(Gtk.Dialog):
 
