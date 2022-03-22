@@ -25,7 +25,7 @@ matplotlib.use('Gtk3Cairo')
 # from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3 as NavigationToolbar
 
 # from sqlalchemy.sql.expression import func, distinct
-from sqlalchemy.orm import load_only, lazyload
+from sqlalchemy.orm import load_only
 from database.tm_db import DbTelemetryPool, DbTelemetry, RMapTelemetry, FEEDataTelemetry, scoped_session_maker
 
 import importlib
@@ -43,7 +43,7 @@ from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
 
 from event_storm_squasher import delayed
 
-import logging.handlers
+# import logging.handlers
 
 ActivePoolInfo = NamedTuple(
     'ActivePoolInfo', [
@@ -2795,8 +2795,8 @@ class TMPoolView(Gtk.Window):
                                              self.count_current_pool_rows(), self.my_bus_name[-1], protocol)
 
             except:
-                self.logger.warning('Pool could not be loaded, File: ' +str(filename) + 'does probably not exist')
-                print('Pool could not be loaded, File' +str(filename)+ 'does probably not exist')
+                self.logger.warning('Pool could not be loaded, File: ' + str(filename) + 'does probably not exist')
+                # print('Pool could not be loaded, File' +str(filename)+ 'does probably not exist')
                 return
         else:
             dialog = Gtk.FileChooserDialog(title="Load File to pool", parent=self, action=Gtk.FileChooserAction.OPEN)
@@ -2833,7 +2833,6 @@ class TMPoolView(Gtk.Window):
                                          self.count_current_pool_rows(), self.my_bus_name[-1], package_type)
 
             dialog.destroy()
-
 
         if new_pool:
             self._set_pool_list_and_display(new_pool)
