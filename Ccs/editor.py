@@ -5,21 +5,20 @@ gi.require_version('GtkSource', '3.0')
 gi.require_version('Vte', '2.91')
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, GtkSource, Pango, GLib, Vte, GObject
-import configparser
 import time
 import datetime
-import logging
-import logging.handlers
+# import logging
+# import logging.handlers
 import numpy as np
 import glob
 import sys
 import socket
 import threading
 import pickle
-import struct
-import IPython
+# import struct
+# import IPython
 import confignator
-import json
+# import json
 import os
 
 import dbus
@@ -29,13 +28,12 @@ import DBus_Basic
 # from pydbus import SessionBus
 
 # import ipython_view
+# from threading import Thread
 import config_dialog
-from threading import Thread
-#from ccs_function_lib import General_Functions
-#cfl = General_Functions()
 import ccs_function_lib as cfl
 
 pixmap_folder = confignator.get_option('ccs-paths', 'pixmap')
+action_folder = confignator.get_option('ccs-paths', 'actions')
 # from jupyter_client import find_connection_file
 
 
@@ -83,7 +81,6 @@ UI_INFO = """
 </ui>
 """
 
-""" TODO """
 
 VTE_VERSION = "{}.{}.{}".format(Vte.MAJOR_VERSION, Vte.MINOR_VERSION, Vte.MICRO_VERSION)
 
@@ -167,7 +164,6 @@ class IPythonTerminal(Vte.Terminal):
 
 
 class CcsEditor(Gtk.Window):
-    #default_config = 'egse.cfg'
 
     tref = datetime.datetime(2000, 1, 1, 0, 0, 0)
     tnow = datetime.datetime.utcnow
@@ -176,7 +172,7 @@ class CcsEditor(Gtk.Window):
         super(CcsEditor, self).__init__(title="CCS Editor")
 
         # self.set_default_size(1366, 768)  # laptop full screen
-        self.set_default_size(1015, 1080)
+        self.set_default_size(1010, 1080)
         # self.set_default_size(1920, 1080) # samsung full screen
 
         """ load config file """
@@ -233,8 +229,7 @@ class CcsEditor(Gtk.Window):
         self.grid.attach(box, 2, 1, 1, 1)
         '''
         self.univie_box = self.create_univie_box()
-        #self.univie_box = cfl.create_univie_box(self)
-        self.grid.attach(self.univie_box, 2,1,1,1)
+        self.grid.attach(self.univie_box, 2, 1, 1, 1)
 
         self.sourcemarks = {}
         self.create_mark_attributes()
@@ -264,8 +259,8 @@ class CcsEditor(Gtk.Window):
         # self.ipython_view.connect('commit', self.ipy_commit)
         self.feed_ready = True
 
-        self.nb.append_page(self.ipython_view, tab_label=Gtk.Label('Console', angle=270))
-        self.nb.append_page(self.logwin, tab_label=Gtk.Label('Log', angle=270))
+        self.nb.append_page(self.ipython_view, tab_label=Gtk.Label(label='Console', angle=270))
+        self.nb.append_page(self.logwin, tab_label=Gtk.Label(label='Log', angle=270))
         self.paned.add2(self.nb)
 
         self.log_file = None    # save the shown text from the log file tab
@@ -628,7 +623,7 @@ class CcsEditor(Gtk.Window):
         # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
         # self.ipython_view._processLine()
         # line += '\n'
-        print(line)
+        # print(line)
         if not line.endswith('\n'):
             line += '\n'
         # if line.count('\n') > 1:
@@ -749,7 +744,7 @@ class CcsEditor(Gtk.Window):
         action_group.add_action_with_accel(action, "<control>F")
 
     def create_pool_menu(self, action_group):
-        action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None, sensitive=False)
         action_group.add_action(action)
 
         action = Gtk.Action(name="SelectConfig", label="_Select Configuration", tooltip=None, stock_id=None)
@@ -1199,19 +1194,19 @@ class CcsEditor(Gtk.Window):
 
         self.create_action_buttons(toolbar, targets)
 
-        button_reload_config = Gtk.ToolButton()
-        button_reload_config.set_icon_name("stock_refresh")
-        button_reload_config.set_tooltip_text('Reload action configuration file')
-        button_reload_config.connect("clicked", self.reload_config)
-        toolbar.add(button_reload_config)
+        # button_reload_config = Gtk.ToolButton()
+        # button_reload_config.set_icon_name("stock_refresh")
+        # button_reload_config.set_tooltip_text('Reload action configuration file')
+        # button_reload_config.connect("clicked", self.reload_config)
+        # toolbar.add(button_reload_config)
 
         toolbar.add(Gtk.SeparatorToolItem())
 
-        button_reset_ns = Gtk.ToolButton()
-        button_reset_ns.set_icon_name("edit-clear")
-        button_reset_ns.set_tooltip_text('Reset console namespace')
-        button_reset_ns.connect('clicked', self.reset_ns)
-        toolbar.add(button_reset_ns)
+        # button_reset_ns = Gtk.ToolButton()
+        # button_reset_ns.set_icon_name("edit-clear")
+        # button_reset_ns.set_tooltip_text('Reset console namespace')
+        # button_reset_ns.connect('clicked', self.reset_ns)
+        # toolbar.add(button_reset_ns)
 
         return toolbar
 
@@ -1220,16 +1215,17 @@ class CcsEditor(Gtk.Window):
         for n in range(nbutt):
             button_action = Gtk.ToolButton()
 
-            button_img_path = self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1))
+            button_img_path = os.path.join(pixmap_folder, self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
             except:
+                self.logger.info('Could not load image {}'.format(button_img_path))
                 pixmap_path = os.path.join(pixmap_folder, 'action.png')
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
             icon = Gtk.Image.new_from_pixbuf(pixbuf)
             button_action.set_icon_widget(icon)
             button_action.set_name('action{}'.format(n + 1))
-            button_action.set_tooltip_text(self.cfg.get('ccs-actions', 'action{}'.format(n + 1)))
+            button_action.set_tooltip_text(os.path.join(action_folder, self.cfg.get('ccs-actions', 'action{}'.format(n + 1))))
             button_action.connect("clicked", self.on_button_action)
             button_action.connect('button-press-event', self.show_action_context)
             button_action.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
@@ -1240,11 +1236,10 @@ class CcsEditor(Gtk.Window):
     def on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
         text = data.get_text()
 
-        filename = widget.get_name() + '.py'
+        filename = os.path.join(action_folder, widget.get_name() + '.py')
         with open(filename, 'w') as fdesc:
             fdesc.write(text)
-
-        self.cfg.set('ccs-actions', widget.get_name(), filename)
+        self.cfg.set('ccs-actions', widget.get_name(), widget.get_name() + '.py')
 
         self.cfg.save_to_file()
 
@@ -1256,7 +1251,7 @@ class CcsEditor(Gtk.Window):
     def action_context_menu(self, action):
         menu = Gtk.Menu()
 
-        item = Gtk.MenuItem('Open action script file')
+        item = Gtk.MenuItem(label='Open action script file')
         item.connect('activate', self.show_action_script, action)
         menu.append(item)
         return menu
@@ -1269,28 +1264,31 @@ class CcsEditor(Gtk.Window):
         menu.popup(None, None, None, None, 3, event.time)
 
     def show_action_script(self, widget=None, action=None):
-        if action == None:
+        if action is None:
             return
-        self.open_file('{}.py'.format(action))
+        self.open_file(os.path.join(action_folder, self.cfg.get('ccs-actions', action)))
         return
 
     def open_file(self, filename):
 
-        with open(filename, 'r') as fdesc:
-            data = fdesc.read()
-            fdesc.close()
+        try:
+            with open(filename, 'r') as fdesc:
+                data = fdesc.read()
+                fdesc.close()
 
-            sourceview = self.notebook_open_tab(filename=filename).get_child()
-            buf = sourceview.get_buffer()
-            buf.set_text(data)
-            label = self._notebookt_current_get_label()
-            label.set_text(label.get_text().strip('*'))
-            buf.connect('changed', self._notebook_buffer_modified, None, label)
+                sourceview = self.notebook_open_tab(filename=filename).get_child()
+                buf = sourceview.get_buffer()
+                buf.set_text(data)
+                label = self._notebookt_current_get_label()
+                label.set_text(label.get_text().strip('*'))
+                buf.connect('changed', self._notebook_buffer_modified, None, label)
 
-            self._parse_editor_commands(buf)
-            view = self._get_active_view()
-            begin = buf.get_iter_at_line(0)
-            self._set_play_mark(view, begin)
+                self._parse_editor_commands(buf)
+                view = self._get_active_view()
+                begin = buf.get_iter_at_line(0)
+                self._set_play_mark(view, begin)
+        except FileNotFoundError as err:
+            self.logger.warning(str(err))
 
     def _parse_editor_commands(self, buffer):
         lines = buffer.get_text(*buffer.get_bounds(), True).split('\n')
@@ -1415,7 +1413,7 @@ class CcsEditor(Gtk.Window):
         univie_box = Gtk.HBox()
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 48, 48)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(pixmap_folder, 'Icon_Space_blau_en.png'), 48, 48)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
         univie_button.set_tooltip_text('Applications and About')
@@ -1425,21 +1423,21 @@ class CcsEditor(Gtk.Window):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize()+ '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())  # + '   ')
             start_button.connect("clicked", cfl.on_open_univie_clicked)
-            vbox.pack_start(start_button, False, True, 10)
+            vbox.pack_start(start_button, True, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
         conn_button.connect("clicked", self.on_communication_dialog)
-        vbox.pack_start(conn_button, False, True, 10)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the option to see the Credits
         about_button = Gtk.Button.new_with_label('About')
         about_button.connect("clicked", self._on_select_about_dialog)
-        vbox.pack_start(about_button, False, True, 10)
+        vbox.pack_start(about_button, True, True, 10)
 
         self.popover.add(vbox)
         self.popover.set_position(Gtk.PositionType.BOTTOM)
@@ -1735,26 +1733,30 @@ class CcsEditor(Gtk.Window):
 
     def on_button_action(self, widget):
         action_name = widget.get_name()
+
         if not (self.cfg.has_option('ccs-actions', action_name) and self.cfg.get('ccs-actions', action_name) != ''):
-            #print(action_name + ': not defined!')
             self.logger.info(action_name + ': not defined!')
             return
-        action = self.cfg.get('ccs-actions', action_name)
+
+        action = os.path.join(action_folder, self.cfg.get('ccs-actions', action_name))
+        if not os.path.isfile(action):
+            self.logger.warning('File {} not found.'.format(action))
+            return
+
         cmd = 'exec(open("{}","r").read())'.format(action)
-        self.logger.info('{} button pressed'.format(action))
+        self.logger.debug('{} button pressed'.format(action))
         try:
             # self.ipython_view.text_buffer.insert_at_cursor(cmd, len(cmd))
             # self.ipython_view._processLine()
             self._to_console_via_socket(cmd)
             # exec(open(action,'r').read())
             # print(action + ' executed')
-        except FileNotFoundError:
-            print(action + ': file not found!')
-            self.logger.warning(action + ': file not found!')
+        except Exception as err:
+            self.logger.warning(str(err))
+
         return action
 
     def reload_config(self, widget):
-        #self.cfg.read(self.cfg.source)
         cfg_path = confignator.get_option('paths', 'ccs') + '/' + self.cfg.source
         self.cfg = confignator.get_config(file_path=cfg_path)
 
@@ -1772,16 +1774,16 @@ class CcsEditor(Gtk.Window):
         self.show_all()
         return
 
-    def reset_ns(self, widget):
-        cmd = 'get_ipython().reset()\n\n'
-        # self.ipython_view.text_buffer.insert_at_cursor(cmd, len(cmd))
-        # self.ipython_view._processLine()
-        self._to_console_via_socket(cmd)
-        # self.ipython_view.updateNamespace({'cfg': self.cfg})
-        # self.ipython_view.updateNamespace(globals())
-        self._to_console_via_socket('import configparser\n'
-                                    'cfg = configparser.ConfigParser()\n'
-                                    'cfg.read("{}")'.format(confignator.get_option('config-files', 'ccs').split('/')[-1]))
+    # def reset_ns(self, widget):
+    #     cmd = 'get_ipython().reset()\n\n'
+    #     # self.ipython_view.text_buffer.insert_at_cursor(cmd, len(cmd))
+    #     # self.ipython_view._processLine()
+    #     self._to_console_via_socket(cmd)
+    #     # self.ipython_view.updateNamespace({'cfg': self.cfg})
+    #     # self.ipython_view.updateNamespace(globals())
+    #     self._to_console_via_socket('import configparser\n'
+    #                                 'cfg = configparser.ConfigParser()\n'
+    #                                 'cfg.read("{}")'.format(confignator.get_option('config-files', 'ccs').split('/')[-1]))
 
     def create_log_window(self):
         logwin = Gtk.ScrolledWindow()
@@ -1817,11 +1819,10 @@ class CcsEditor(Gtk.Window):
 
 class UnsavedBufferDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, msg=None):
-        Gtk.MessageDialog.__init__(self, title="Unsaved changes", parent=parent, flags=0,
-                                   buttons=(
-                                   Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES,
-                                   Gtk.STOCK_NO, Gtk.ResponseType.NO,))
+        Gtk.MessageDialog.__init__(self, title="Unsaved changes", parent=parent, flags=0)
 
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES,
+                                   Gtk.STOCK_NO, Gtk.ResponseType.NO,)
         head, message = self.get_message_area().get_children()
         if msg == None:
             head.set_text('There are unsaved changes. Save?')
@@ -1845,11 +1846,11 @@ class ActionWindow(Gtk.Window):
             button = Gtk.ToolButton()
             if self.editor.cfg.has_option('ccs-actions', 'action{}'.format(i + 1)) and \
                     self.editor.cfg.get('ccs-actions', 'action{}'.format(i + 1)) != '':
-                button.set_tooltip_text(self.editor.cfg.get('ccs-actions', 'action{}'.format(i + 1)))
+                button.set_tooltip_text(os.path.join(action_folder, self.editor.cfg.get('ccs-actions', 'action{}'.format(i + 1))))
             else:
                 button.set_tooltip_text('no action')
             try:
-                button_img_path = self.editor.cfg.get('ccs-actions', 'action{}_img'.format(i + 1))
+                button_img_path = os.path.join(pixmap_folder, self.editor.cfg.get('ccs-actions', 'action{}_img'.format(i + 1)))
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
             except:
                 pixbuf = pixbuf_default

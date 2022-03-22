@@ -330,7 +330,7 @@ class MessageListener(dbus.service.Object):
         elif isinstance(data, (int, str, float, bool, bytes, bytearray)):
             pass
         else:
-            self.win.logger.warning("A object of type " + str(type(data)) + " can probably not be send via dbus")
+            self.win.logger.info("Object of type " + str(type(data)) + " can probably not be sent via dbus")
         return data
 
 
