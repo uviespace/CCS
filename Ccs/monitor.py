@@ -1,7 +1,6 @@
 import json
 import threading
 import time
-import configparser
 import sys
 import DBus_Basic
 import dbus
@@ -9,12 +8,16 @@ import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 import gi
 import confignator
-
 gi.require_version('Gtk', '3.0')
 
 from gi.repository import Gtk, Gdk, GLib, GdkPixbuf
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker
+from sqlalchemy.sql.expression import func
 import ccs_function_lib as cfl
+
+INTERVAL = 1.
+MAX_AGE = 20.
+
 
 class ParameterMonitor(Gtk.Window):
     limit_colors = {0: "green", 1: "orange", 2: "red"}
@@ -22,7 +25,7 @@ class ParameterMonitor(Gtk.Window):
                     'green': Gdk.RGBA(0.913725, 0.913725, 0.913725, 1.)}
     parameter_types = {"S": "s", "N": ".3G"}
 
-    def __init__(self, given_cfg=None, pool_name=None, parameter_set='default', interval=1.0, max_age=20., user_limits=None):
+    def __init__(self, given_cfg=None, pool_name=None, parameter_set=None, interval=INTERVAL, max_age=MAX_AGE, user_limits=None):
 
         Gtk.Window.__init__(self, title="Parameter Monitor (Pool: {:})".format(pool_name))
         self.set_border_width(10)
@@ -63,29 +66,31 @@ class ParameterMonitor(Gtk.Window):
         self.add(hbox)
 
         self.evt_cnt = self.create_event_counter()
+        self.evt_check_enabled = True
+        self.evt_check_tocnt = 0
 
         self.parameter_set = parameter_set
         self.parameters = {}
+        self.monitored_pkts = None
 
         # Is now done in the __name__ == __main__ part
         #if parameter_set is not None:
         #    self.set_parameter_view(parameter_set)
 
-
         hbox.pack_start(self.evt_cnt, 0, 0, 0)
-        hbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), 1, 1, 0)
+        hbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), 0, 1, 0)
         hbox.pack_start(self.grid, 1, 1, 0)
 
         # Add Univie Button
         univie_box = self.create_univie_box()
-        hbox.pack_start(univie_box, 1, 1, 0)
+        hbox.pack_start(univie_box, 0, 1, 0)
 
         hbox.set_spacing(20)
 
         # Is now done in the __name__ == __main__ part
         #if pool_name is not None:
         #    self.set_pool(pool_name)
-            #self.update_parameter_view(interval=interval, max_age=max_age)
+        #self.update_parameter_view(interval=interval, max_age=max_age)
 
         self.connect('destroy', self.destroy_monitor)
 
@@ -110,7 +115,6 @@ class ParameterMonitor(Gtk.Window):
                 self.logger.info('To many pools running in manager, could not determine which one to use')
         except:
             return
-
 
     def set_pool(self, pool_name):
         self.pool_name = pool_name
@@ -176,16 +180,16 @@ class ParameterMonitor(Gtk.Window):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         for name in self.cfg['ccs-dbus_names']:
             start_button = Gtk.Button.new_with_label("Start " + name.capitalize() + '   ')
             start_button.connect("clicked", cfl.on_open_univie_clicked)
-            vbox.pack_start(start_button, False, True, 10)
+            vbox.pack_start(start_button, False, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
         conn_button.connect("clicked", self.on_communication_dialog)
-        vbox.pack_start(conn_button, False, True, 10)
+        vbox.pack_start(conn_button, False, True, 0)
 
         # Add the option to see the Credits
         about_button = Gtk.Button.new_with_label('About')
@@ -238,6 +242,8 @@ class ParameterMonitor(Gtk.Window):
         for ncol, col in enumerate(parameters):
             for nrow, parameter in enumerate(col):
                 box = Gtk.HBox()
+                parameter, *pktid = eval(parameter)
+                box.pktid = tuple(pktid)
                 dbres = dbcon.execute('SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_categ,pcf.pcf_unit,ocf.ocf_nbool,\
                                     ocp.ocp_lvalu,ocp.ocp_hvalu from pcf left join ocf on pcf.pcf_name=ocf.ocf_name\
                                     left join ocp on ocf_name=ocp_name where pcf.pcf_name="{}"'.format(parameter))
@@ -255,7 +261,6 @@ class ParameterMonitor(Gtk.Window):
                 except IndexError:
                     self.logger.error('Parameter {} does not exist - cannot add!'.format(parameter))
                     continue
-
                 # override with user defined limits
                 if self.pdescr.get(parameter) in self.user_limits:
                     try:
@@ -299,11 +304,14 @@ class ParameterMonitor(Gtk.Window):
 
         for parameter in parameter_grid:
             self.parameters[parameter.param_id] = {'field': parameter.get_children()[1], 'value': None,
-                                                   'format': parameter.format, 'alarm': None}
+                                                   'format': parameter.format, 'alarm': None, 'pktid': parameter.pktid}
+
+        self.monitored_pkts = {self.parameters[k]['pktid']: {'pkttime': 0, 'reftime': time.time(), 'data': None} for k in self.parameters}
+
         self.grid.show_all()
         return
 
-    def update_parameter_view(self, interval=1.0, max_age=20.):
+    def update_parameter_view(self, interval=INTERVAL, max_age=MAX_AGE):
         self.interval = interval
         self.max_age = max_age
         self.updating = True
@@ -313,45 +321,60 @@ class ParameterMonitor(Gtk.Window):
         thread.start()
 
     def update_parameters(self):
-        while self.updating:
-            self.update_parameters_worker()
-            # GLib.idle_add()
+        while not self.parameters:
             time.sleep(self.interval)
-        return
+
+        while self.updating:
+            start = time.time()
+            self.update_parameters_worker()
+            dt = time.time() - start
+            # print(dt)
+            time.sleep(self.interval - min(self.interval, dt))
 
     def update_parameters_worker(self):
-        # tmlist = self.poolmgr.datapool[self.pool_name]['pckts'].values()
         rows = cfl.get_pool_rows(self.pool_name)
-        reftime = cfl.get_last_pckt_time(self.pool_name, False)
-        self.check_evts(rows)
 
+        if self.evt_check_enabled:
+            ctime = time.time()
+            self.check_evts(rows)
+            cdt = time.time() - ctime
+            # disable check_evts if it causes too much delay
+            if cdt > 0.7 * self.interval:
+                self.evt_check_tocnt += 1
+                if self.evt_check_tocnt > 5:
+                    self.disable_evt_cnt()
+
+        for pktid in self.monitored_pkts:
+            pktinfo = self.get_last_pkt_with_id(rows, pktid)
+
+            if pktinfo is None:
+                continue
+
+            pkttime, pkt = pktinfo
+            if pkttime != self.monitored_pkts[pktid]['pkttime']:
+                self.monitored_pkts[pktid]['reftime'] = time.time()
+                self.monitored_pkts[pktid]['pkttime'] = pkttime
+
+                tm = cfl.Tmdata(pkt)[0]
+                self.monitored_pkts[pktid]['data'] = {par[4][1][0]: par[0] for par in tm}
+
+        checktime = time.time()
         for pname in self.parameters:
-            # pname = parameter.param_id
-            # value_field = parameter.get_children()[1]
-            # value_field = self.parameters[pname]['field']
 
-            value = cfl.get_param_values(rows, None, pname, last=1)[0]
-            if len(value) == 0:
-                # buf = self.parameters[pname]['field'].get_buffer()
+            pktid = self.parameters[pname]['pktid']
 
+            if self.monitored_pkts[pktid]['data'] is None:
                 self.parameters[pname]['value'] = None
                 self.parameters[pname]['alarm'] = "blue"
-
-                # def updt_buf():
-                #     buf.delete(*buf.get_bounds())
-                #     buf.insert_markup(buf.get_start_iter(),
-                #                       '<span size="large" foreground="{}" weight="bold">{}</span>'.format(
-                #                           'blue', '--'), -1)
-
-                # GLib.idle_add(updt_buf)
                 continue
             else:
                 try:
-                    [value_time], [value] = value
-                except ValueError:
-                    value_time, value = value[0]
+                    value = self.monitored_pkts[pktid]['data'][pname]
+                except Exception as err:
+                    self.logger.warning('Could not update value of {} [{}]!'.format(pname, str(err)))
+                    continue
 
-            if reftime - value_time > self.max_age:
+            if checktime - self.monitored_pkts[pktid]['reftime'] > self.max_age:
                 limit_color = 'grey'
             else:
                 if self.pdescr.get(pname) in self.user_limits:
@@ -359,8 +382,6 @@ class ParameterMonitor(Gtk.Window):
                 else:
                     user_limit = None
                 limit_color = self.limit_colors[cfl.Tm_limits_check(pname, value, user_limit)]
-
-            # buf = self.parameters[pname]['field'].get_buffer()
 
             self.parameters[pname]['value'] = value
             self.parameters[pname]['alarm'] = limit_color
@@ -381,24 +402,38 @@ class ParameterMonitor(Gtk.Window):
 
         GLib.idle_add(updt_buf)
 
-        def updt_bg_color():
-            alarms = [self.parameters[x]['alarm'] for x in self.parameters.keys()]
-            if alarms.count('red'):
-                self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['red'])
-                if not self.presented:
-                    self.present()
-                    self.presented = True
-            elif alarms.count('orange'):
-                self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['orange'])
-                if not self.presented:
-                    self.present()
-                    self.presented = True
-            else:
-                self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['green'])
-                self.presented = False
+        # def updt_bg_color():
+        #     alarms = [self.parameters[x]['alarm'] for x in self.parameters.keys()]
+        #     if alarms.count('red'):
+        #         self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['red'])
+        #         if not self.presented:
+        #             self.present()
+        #             self.presented = True
+        #     elif alarms.count('orange'):
+        #         self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['orange'])
+        #         if not self.presented:
+        #             self.present()
+        #             self.presented = True
+        #     else:
+        #         self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['green'])
+        #         self.presented = False
 
         # GLib.idle_add(updt_bg_color)
-        return
+        # return
+
+    def get_last_pkt_with_id(self, rows, pktid):
+        spid, st, sst, apid, pi1, pi1off, pi1wid = pktid
+        if pi1off != -1:
+            rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
+                               func.mid(DbTelemetry.data, pi1off - cfl.TM_HEADER_LEN + 1, pi1wid // 8) == pi1.to_bytes(
+                                pi1wid // 8, 'big')).order_by(DbTelemetry.idx.desc()).first()
+        else:
+            rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid).order_by(DbTelemetry.idx.desc()).first()
+
+        if rows is None:
+            return
+
+        return float(rows.timestamp[:-1]), rows.raw
 
     def pckt_counter(self, rows, st, sst):
         npckts = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst).count()
@@ -421,7 +456,6 @@ class ParameterMonitor(Gtk.Window):
 
             GLib.idle_add(updt_buf, buf, evt)
 
-
         def updt_bg_color():
             if self.events['Error HIGH'][1] > self.evt_reset_values['Error HIGH']:
                 self.override_background_color(Gtk.StateType.NORMAL, self.alarm_colors['red'])
@@ -436,14 +470,30 @@ class ParameterMonitor(Gtk.Window):
         for panel in panels:
             buf = panel[1].get_buffer()
             value = int(buf.get_text(*buf.get_bounds(), True))
-            # GLib.idle_add(buf.insert_markup, buf.get_start_iter(),
-            #              '<span size="large" foreground="black" weight="bold">{}</span>'.format(value), -1)
             # reset alarm treshold for evts
             self.evt_reset_values[panel[0].get_text()] = value
-        # GLib.idle_add(self.override_background_color, Gtk.StateType.NORMAL, self.alarm_colors['green'])
         return
 
-    def add_evt_cnt(self, widget = None):
+    def disable_evt_cnt(self, widget=None):
+        self.evt_check_enabled = False
+
+        def updt_buf(cbuf, cevt):
+            cbuf.delete(*cbuf.get_bounds())
+            cbuf.insert_markup(cbuf.get_start_iter(), '<span size="large" foreground="{}" weight="bold">{}</span>'.format(
+                'grey', self.events[cevt][1]), -1)
+
+        for evt in self.evt_cnt.get_children()[:-2]:
+            evt.set_sensitive(False)
+            buf = evt.get_children()[1]
+
+            GLib.idle_add(updt_buf, buf.get_buffer(), evt.get_children()[0].get_text())
+
+        rbutton = self.evt_cnt.get_children()[-2]
+        rbutton.set_label('Count EVTs')
+        rbutton.set_tooltip_text('Event counting has been disabled because of heavy load, probably because of a too large pool.\nClick to force count update.')
+        self.logger.warning('Counting events takes too long - disabling.')
+
+    def add_evt_cnt(self, widget=None):
         self.monitor_setup()
 
     def set_update_interval(self, widget=None, interval=1.0):
@@ -478,6 +528,7 @@ class ParameterMonitor(Gtk.Window):
 
             self.cfg.save_to_file()
             self.setup_grid(parameters)
+            # self.set_pool(self.pool_name)
             dialog.destroy()
 
         else:
@@ -687,7 +738,7 @@ class MonitorSetupDialog(Gtk.Dialog):
         self.label.set_model(self.create_label_model())
         self.label.connect('changed', self.check_label)
 
-        self.load_button = Gtk.Button('Load')
+        self.load_button = Gtk.Button(label='Load')
         self.load_button.set_tooltip_text('Load Parameter Set')
         self.load_button.connect('clicked', self.load_set)
 
@@ -715,10 +766,10 @@ class MonitorSetupDialog(Gtk.Dialog):
 
 
     def create_param_view(self):
-        self.treeview = Gtk.TreeView(self.create_parameter_model())
+        self.treeview = Gtk.TreeView(model=self.create_parameter_model())
 
         self.treeview.append_column(Gtk.TreeViewColumn("Parameters", Gtk.CellRendererText(), text=0))
-        hidden_column = Gtk.TreeViewColumn("PCF_NAME", Gtk.CellRendererText(), text=1)
+        hidden_column = Gtk.TreeViewColumn("ID", Gtk.CellRendererText(), text=1)
         hidden_column.set_visible(False)
         self.treeview.append_column(hidden_column)
 
@@ -734,10 +785,10 @@ class MonitorSetupDialog(Gtk.Dialog):
 
     def create_slot(self, group=None):
         parameter_list = Gtk.ListStore(str, str)
-        treeview = Gtk.TreeView(parameter_list)
+        treeview = Gtk.TreeView(model=parameter_list)
 
         treeview.append_column(Gtk.TreeViewColumn("Parameters", Gtk.CellRendererText(), text=0))
-        hidden_column = Gtk.TreeViewColumn("PCF_NAME", Gtk.CellRendererText(), text=1)
+        hidden_column = Gtk.TreeViewColumn("ID", Gtk.CellRendererText(), text=1)
         hidden_column.set_visible(False)
         treeview.append_column(hidden_column)
         treeview.set_headers_visible(False)
@@ -745,9 +796,10 @@ class MonitorSetupDialog(Gtk.Dialog):
         # add parameters if modifying existing configuration
         if group is not None:
             for item in group:
-                descr, name = self.name_to_descr(item)
+                pname, *param_id = eval(item)
+                descr, name = self.name_to_descr(pname)
                 if descr is not None:
-                    parameter_list.append([descr, name])
+                    parameter_list.append([descr, item])
 
         sw = Gtk.ScrolledWindow()
         sw.set_size_request(100, 200)
@@ -783,16 +835,30 @@ class MonitorSetupDialog(Gtk.Dialog):
         parameter_model = Gtk.TreeStore(str, str)
 
         dbcon = self.session_factory_idb
-        #dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid where pid_type=3 and pid_stype=25')
-        dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid order by pid_type,pid_pi1_val')
+        dbres = dbcon.execute('SELECT pid_descr,pid_spid,pid_type from pid order by pid_type,pid_stype,pid_pi1_val')
         hks = dbres.fetchall()
+
+        topleveliters = {}
         for hk in hks:
-            it = parameter_model.append(None, [hk[0], None])
-            dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name from pcf left join plf on\
-             pcf.pcf_name=plf.plf_name left join pid on plf.plf_spid=pid.pid_spid where pid.pid_spid={}'.format(hk[1]))
+
+            if not hk[2] in topleveliters:
+                serv = parameter_model.append(None, ['Service ' + str(hk[2]), None])
+                topleveliters[hk[2]] = serv
+
+            it = parameter_model.append(topleveliters[hk[2]], [hk[0], None])
+
+            dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name, pid.pid_spid, pid.pid_type, pid.pid_stype, \
+             pid.pid_apid, pid.pid_pi1_val, pic.pic_pi1_off, pic.pic_pi1_wid from pcf left join plf on\
+             pcf.pcf_name=plf.plf_name left join pid on plf.plf_spid=pid.pid_spid left join pic\
+             on pid.pid_type=pic.pic_type and pid.pid_stype=pic.pic_stype\
+             and pid.pid_apid=pic.pic_apid where pid.pid_spid={}'.format(hk[1]))
+
             params = dbres.fetchall()
-            [parameter_model.append(it, [par[0], par[1]]) for par in params]
+
+            [parameter_model.append(it, [par[0], str(par[1:])]) for par in params]
+
         dbcon.close()
+
         self.useriter = parameter_model.append(None, ['User defined', None])
         for userpar in self.monitor.cfg['ccs-plot_parameters']:
             parameter_model.append(self.useriter, [userpar, None])
@@ -806,8 +872,11 @@ class MonitorSetupDialog(Gtk.Dialog):
             return
 
         param = par_model[par_iter]
+
+        if param[1] is None:
+            return
+
         listmodel.append([*param])
-        return
 
     def remove_parameter(self, widget, listview):
         model, modeliter = listview.get_selection().get_selected()
@@ -816,49 +885,42 @@ class MonitorSetupDialog(Gtk.Dialog):
             return
 
         model.remove(modeliter)
-        return
 
     def check_label(self, widget):
         if widget.get_active_text():
-           self.ok_button.set_sensitive(True)
+            self.ok_button.set_sensitive(True)
         else:
-           self.ok_button.set_sensitive(False)
-        #if widget.get_text_length():
-        #    self.ok_button.set_sensitive(True)
-        #else:
-        #    self.ok_button.set_sensitive(False)
+            self.ok_button.set_sensitive(False)
 
     def load_set(self, widget):
         entry = self.label.get_active_text()
         if entry in self.monitor.cfg['ccs-monitor_parameter_sets'].keys():
             for slot in self.slots:
                 slot[3].clear()
-            #param_set = self.monitor.cfg['ccs-monitor_parameter_sets', entry]
+
             param_set = json.loads(self.monitor.cfg['ccs-monitor_parameter_sets'][entry])
 
             dbcon = self.session_factory_idb
             i = -1
             for slots in param_set:
-                i +=1
-                if len(slots) > 1:
-                    dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name FROM pcf where pcf.pcf_name in {}'.format(tuple(slots)))
+                i += 1
+                pnames = {eval(par)[0]: par for par in slots}
+                if len(pnames) > 1:
+                    dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name FROM pcf where pcf.pcf_name in {}'.format(tuple(pnames)))
                     params = dbres.fetchall()
 
-                elif len(slots) == 1:
-                    dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name FROM pcf where pcf.pcf_name ="{}"'.format(slots[0]))
+                elif len(pnames) == 1:
+                    dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name FROM pcf where pcf.pcf_name="{}"'.format(pnames[0]))
                     params = dbres.fetchall()
                 else:
                     continue
 
                 for par in params:
-                    self.slots[i][3].append([*par])
+                    self.slots[i][3].append([par[0], pnames[par[1]]])
             dbcon.close()
 
         else:
-            print('Inserted Set Name could not be found')
-            self.logger.info('Given Set name could not be found in Config File')
-
-
+            self.logger.info('Given Set name could not be found in config File')
 
 
 if __name__ == "__main__":
@@ -872,6 +934,7 @@ if __name__ == "__main__":
         cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
     win = ParameterMonitor()
+
     # Important to tell Dbus that Gtk loop can be used before the first dbus command
     DBusGMainLoop(set_as_default=True)
     Bus_Name = cfg.get('ccs-dbus_names', 'monitor')
@@ -887,9 +950,9 @@ if __name__ == "__main__":
 
     elif len(sys.argv) == 3:
         win.pool_name = sys.argv[1]
-        win.set_pool(sys.argv[1])
         win.parameter_set = sys.argv[2]
         win.set_parameter_view(sys.argv[2])
+        win.set_pool(sys.argv[1])
     else:
         win.check_for_pools()
 
