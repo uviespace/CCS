@@ -8,7 +8,7 @@
    version="1.1"
    id="svg5"
    inkscape:version="1.1.2 (0a00cf5339, 2022-02-04, custom)"
-   sodipodi:docname="roman_3.svg"
+   sodipodi:docname="roman_7.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -24,8 +24,8 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="1.8116734"
-     inkscape:cx="-334.22138"
-     inkscape:cy="-96.595775"
+     inkscape:cx="-334.22139"
+     inkscape:cy="-96.595777"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
      inkscape:window-x="0"
@@ -44,16 +44,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-136.77969,-121.40705)">
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#5e5c64;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="136.72148"
-       y="132.7782"
-       id="text72430"><tspan
-         sodipodi:role="line"
-         id="tspan72428"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#5e5c64;stroke-width:0.264583"
-         x="136.72148"
-         y="132.7782">Ⅶ</tspan></text>
+    <g
+       aria-label="Ⅶ"
+       id="text72430"
+       style="font-weight:bold;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';letter-spacing:0px;word-spacing:0px;fill:#5e5c64;stroke-width:0.264583">
+      <path
+         d="m 142.89155,127.50772 c 0.24341,-0.62442 0.57149,-0.6985 1.02658,-0.73025 0.57149,0.0318 0.85724,0.0847 0.85724,0.94191 v 3.76766 c 0,0.87841 -0.29633,0.92074 -0.87841,0.95249 -0.10583,0.0635 -0.10583,0.29634 0,0.35983 0.42333,-0.0106 1.15358,-0.0212 1.57691,-0.0212 0.40217,0 1.05833,0.0106 1.48166,0.0212 0,0 0,0 0.0106,0 0.0106,0 0.0212,0 0.0318,0 0.0106,0 0.0212,0 0.0317,0 0,0 0,0 0,0 0.42333,-0.0106 1.11124,-0.0212 1.51341,-0.0212 0.42333,0 1.13241,0.0106 1.55574,0.0212 0.10584,-0.0635 0.10584,-0.29633 0,-0.35983 -0.58208,-0.0317 -0.87841,-0.0741 -0.87841,-0.95249 v -3.76766 c 0,-0.87841 0.29633,-0.92075 0.87841,-0.9525 0.10584,-0.0635 0.10584,-0.29633 0,-0.35983 -0.42333,0.0106 -1.13241,0.0212 -1.55574,0.0212 -0.40217,0 -1.09008,0 -1.51341,-0.0106 0,0 0,-0.0106 0,-0.0106 -0.0106,0 -0.0212,0.0106 -0.0317,0.0106 -0.0106,0 -0.0212,-0.0106 -0.0318,-0.0106 -0.0106,0 -0.0106,0.0106 -0.0106,0.0106 -0.42333,0.0106 -1.07949,0.0106 -1.48166,0.0106 -0.41275,0 -1.10066,0 -1.524,-0.0106 v -0.0106 c -0.0106,0 -0.0212,0.0106 -0.0317,0.0106 -0.0106,0 -0.0212,-0.0106 -0.0212,-0.0106 -0.0106,0 -0.0106,0.0106 -0.0106,0.0106 -0.34925,0 -0.48684,0.0106 -0.87842,0.0106 -0.43391,0 -1.016,-0.0106 -1.40758,-0.0212 -0.0635,0.0635 -0.0635,0.29633 0,0.35983 0.40217,0.0318 0.87842,0.10584 0.73025,0.49742 l -1.4605,3.29141 -0.17991,0.41274 -0.15875,-0.47624 -1.31233,-3.30199 c -0.127,-0.33867 0.27517,-0.39159 0.78316,-0.42334 0.0635,-0.0635 0.0635,-0.29633 0,-0.35983 -0.39158,0.0106 -1.44991,0.0212 -1.86266,0.0212 -0.43391,0 -0.92074,-0.0106 -1.31233,-0.0212 -0.0635,0.0635 -0.0635,0.29633 0,0.35983 0.41275,0.0423 0.75142,0.0847 0.9525,0.5715 l 2.30716,5.3234 c 0.0635,0.15875 0.16933,0.24342 0.28575,0.24342 0.10583,0 0.1905,-0.0741 0.26458,-0.24342 z m 4.10632,4.93181 c -0.56092,-0.0317 -0.84667,-0.0847 -0.84667,-0.95249 v -3.76766 c 0,-0.85725 0.28575,-0.91016 0.84667,-0.94191 0.56091,0.0318 0.84666,0.0847 0.84666,0.94191 v 3.76766 c 0,0.86783 -0.28575,0.92074 -0.84666,0.95249 z"
+         id="path823" />
+    </g>
   </g>
 </svg>

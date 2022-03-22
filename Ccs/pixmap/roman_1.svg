@@ -8,7 +8,7 @@
    version="1.1"
    id="svg5"
    inkscape:version="1.1.2 (0a00cf5339, 2022-02-04, custom)"
-   sodipodi:docname="numerals.svg"
+   sodipodi:docname="roman_1.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -24,8 +24,8 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="1.8116734"
-     inkscape:cx="59.88938"
-     inkscape:cy="-10.487541"
+     inkscape:cx="59.889382"
+     inkscape:cy="-10.487542"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
      inkscape:window-x="0"
@@ -44,16 +44,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-28.947337,-82.292847)">
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#5e5c64;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="28.698629"
-       y="93.663994"
-       id="text45640"><tspan
-         sodipodi:role="line"
-         id="tspan48024"
-         x="28.698629"
-         y="93.663994"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#5e5c64">Ⅰ</tspan></text>
+    <g
+       aria-label="Ⅰ"
+       id="text45640"
+       style="font-weight:bold;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';letter-spacing:0px;word-spacing:0px;fill:#5e5c64;stroke-width:0.264583">
+      <path
+         d="m 29.905126,88.605177 v 3.767654 c 0,0.878414 -0.296333,0.920747 -0.878414,0.952497 -0.105833,0.0635 -0.105833,0.296333 0,0.359832 0.423332,-0.01058 1.153579,-0.02117 1.576911,-0.02117 0.423332,0 1.132413,0.01058 1.555745,0.02117 0.105833,-0.0635 0.105833,-0.296332 0,-0.359832 -0.582081,-0.03175 -0.878414,-0.07408 -0.878414,-0.952497 v -3.767654 c 0,-0.878414 0.296333,-0.920747 0.878414,-0.952497 0.105833,-0.0635 0.105833,-0.296333 0,-0.359833 -0.423332,0.01058 -1.132413,0.02117 -1.555745,0.02117 -0.423332,0 -1.153579,-0.01058 -1.576911,-0.02117 -0.105833,0.0635 -0.105833,0.296333 0,0.359833 0.582081,0.03175 0.878414,0.07408 0.878414,0.952497 z"
+         id="path823" />
+    </g>
   </g>
 </svg>

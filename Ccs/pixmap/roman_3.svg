@@ -24,8 +24,8 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="1.8116734"
-     inkscape:cx="-325.94174"
-     inkscape:cy="-2.2079034"
+     inkscape:cx="-325.94175"
+     inkscape:cy="-2.2079035"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
      inkscape:window-x="0"
@@ -44,16 +44,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-51.238648,-136.65328)">
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#5e5c64;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="50.989941"
-       y="148.02443"
-       id="text62068"><tspan
-         sodipodi:role="line"
-         id="tspan62066"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#5e5c64;stroke-width:0.264583"
-         x="50.989941"
-         y="148.02443">Ⅲ</tspan></text>
+    <g
+       aria-label="Ⅲ"
+       id="text62068"
+       style="font-weight:bold;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';letter-spacing:0px;word-spacing:0px;fill:#5e5c64;stroke-width:0.264583">
+      <path
+         d="m 52.196437,142.96561 v 3.76766 c 0,0.87841 -0.296333,0.92074 -0.878414,0.95249 -0.105833,0.0635 -0.105833,0.29634 0,0.35984 0.423332,-0.0106 1.15358,-0.0212 1.576912,-0.0212 0.402165,0 1.05833,0.0106 1.481662,0.0212 0,0 0,0 0.01058,0 0.01058,0 0.02117,0 0.03175,0 0.01058,0 0.02117,0 0.03175,0 0,0 0,0 0,0 0.423332,-0.0106 1.111246,-0.0212 1.513411,-0.0212 0.402166,0 1.05833,0.0106 1.481662,0.0212 0,0 0,0 0.01058,0 0.01058,0 0.02117,0 0.03175,0 0.01058,0 0.02117,0 0.03175,0 0,0 0,0 0,0 0.423332,-0.0106 1.111246,-0.0212 1.513411,-0.0212 0.423332,0 1.132413,0.0106 1.555745,0.0212 0.105833,-0.0635 0.105833,-0.29634 0,-0.35984 -0.582081,-0.0317 -0.878413,-0.0741 -0.878413,-0.95249 v -3.76766 c 0,-0.87841 0.296332,-0.92074 0.878413,-0.95249 0.105833,-0.0635 0.105833,-0.29634 0,-0.35984 -0.423332,0.0106 -1.132413,0.0212 -1.555745,0.0212 -0.402165,0 -1.090079,0 -1.513411,-0.0106 0,0 0,-0.0106 0,-0.0106 -0.01058,0 -0.02117,0.0106 -0.03175,0.0106 -0.01058,0 -0.02117,-0.0106 -0.03175,-0.0106 -0.01058,0 -0.01058,0.0106 -0.01058,0.0106 -0.423332,0.0106 -1.079496,0.0106 -1.481662,0.0106 -0.402165,0 -1.090079,0 -1.513411,-0.0106 0,0 0,-0.0106 0,-0.0106 -0.01058,0 -0.02117,0.0106 -0.03175,0.0106 -0.01058,0 -0.02117,-0.0106 -0.03175,-0.0106 -0.01058,0 -0.01058,0.0106 -0.01058,0.0106 -0.423332,0.0106 -1.079497,0.0106 -1.481662,0.0106 -0.423332,0 -1.15358,-0.0106 -1.576912,-0.0212 -0.105833,0.0635 -0.105833,0.29634 0,0.35984 0.582081,0.0318 0.878414,0.0741 0.878414,0.95249 z m 5.29165,4.72015 c -0.560915,-0.0317 -0.846664,-0.0847 -0.846664,-0.95249 v -3.76766 c 0,-0.85725 0.285749,-0.91016 0.846664,-0.94191 0.560915,0.0318 0.846664,0.0847 0.846664,0.94191 v 3.76766 c 0,0.86783 -0.285749,0.92074 -0.846664,0.95249 z m -3.069157,0 c -0.560915,-0.0317 -0.846664,-0.0847 -0.846664,-0.95249 v -3.76766 c 0,-0.85725 0.285749,-0.91016 0.846664,-0.94191 0.560915,0.0318 0.846664,0.0847 0.846664,0.94191 v 3.76766 c 0,0.86783 -0.285749,0.92074 -0.846664,0.95249 z"
+         id="path823" />
+    </g>
   </g>
 </svg>

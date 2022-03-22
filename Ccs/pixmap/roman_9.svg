@@ -8,7 +8,7 @@
    version="1.1"
    id="svg5"
    inkscape:version="1.1.2 (0a00cf5339, 2022-02-04, custom)"
-   sodipodi:docname="roman_3.svg"
+   sodipodi:docname="roman_9.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -44,16 +44,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-92.318471,-166.73686)">
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#5e5c64;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="92.069763"
-       y="178.108"
-       id="text77966"><tspan
-         sodipodi:role="line"
-         id="tspan77964"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#5e5c64;stroke-width:0.264583"
-         x="92.069763"
-         y="178.108">Ⅸ</tspan></text>
+    <g
+       aria-label="Ⅸ"
+       id="text77966"
+       style="font-weight:bold;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';letter-spacing:0px;word-spacing:0px;fill:#5e5c64;stroke-width:0.264583">
+      <path
+         d="m 99.679156,177.16609 c 0.253999,0.381 0.338664,0.56091 -0.254,0.59266 -0.0635,0.0635 -0.0635,0.29634 0,0.35984 0.423332,-0.0106 1.227664,-0.0212 1.650994,-0.0212 0.41275,0 1.0795,0.0106 1.397,0.0212 0.0635,-0.0635 0.0529,-0.29634 -0.0106,-0.35984 -0.4445,-0.0317 -0.69849,-0.14816 -1.11124,-0.69849 l -1.640414,-2.14841 c -0.232833,-0.33867 -0.137583,-0.42334 0.0635,-0.64559 l 1.428745,-1.66157 c 0.28575,-0.37042 0.61383,-0.45509 1.09008,-0.508 0.0635,-0.0635 0.0635,-0.29633 0,-0.35983 -0.3175,0.0106 -0.83608,0.0212 -1.0795,0.0212 -0.24341,0 -0.80433,-0.0106 -1.227659,-0.0212 -0.0635,0.0635 -0.0635,0.29633 0,0.35983 0.465669,0.0318 0.624419,0.20108 0.465669,0.51858 -0.28575,0.508 -0.624418,0.86783 -1.068917,1.37583 -0.116416,0.127 -0.275166,0.0423 -0.412748,-0.14817 l -0.804331,-1.15358 c -0.243416,-0.39158 -0.22225,-0.56091 0.370415,-0.59266 0.0635,-0.0635 0.0635,-0.29633 0,-0.35983 -0.423332,0.0106 -1.02658,0.0212 -1.449912,0.0212 -0.380999,0 -1.185329,0 -1.555745,-0.0106 0,0 0,0 0,-0.0106 -0.02117,0 -0.03175,0.0106 -0.05292,0.0106 -0.01058,0 -0.02117,-0.0106 -0.03175,-0.0106 -0.01058,0.0106 -0.01058,0.0106 -0.01058,0.0106 -0.423332,0.0106 -1.068913,0.0106 -1.460495,0.0106 -0.423332,0 -1.15358,-0.0106 -1.576912,-0.0212 -0.105833,0.0635 -0.105833,0.29633 0,0.35983 0.582082,0.0318 0.878414,0.0741 0.878414,0.95249 v 3.76766 c 0,0.87841 -0.296332,0.92075 -0.878414,0.9525 -0.105833,0.0635 -0.105833,0.29633 0,0.35983 0.423332,-0.0106 1.15358,-0.0212 1.576912,-0.0212 0.423332,0 1.132413,0.0106 1.555745,0.0212 0,0 0.01058,-0.0106 0.02117,-0.0106 0.296332,-0.0106 0.645581,-0.0212 0.814914,-0.0212 0.243416,0 0.86783,0.0106 1.291162,0.0212 0.0635,-0.0635 0.0635,-0.29634 0,-0.35984 -0.476248,-0.0317 -0.624414,-0.20108 -0.465665,-0.51858 0.380999,-0.62441 0.740831,-0.97366 1.195913,-1.59808 0.09525,-0.13758 0.169333,-0.11641 0.317499,0.127 z m -4.413236,0.59266 c -0.412749,-0.0529 -0.613832,-0.20108 -0.613832,-0.94191 v -3.76766 c 0,-0.84666 0.275166,-0.91016 0.836081,-0.94191 0.412749,0.0317 0.613831,0.14817 1.005413,0.68792 l 1.534579,1.93674 c 0.222249,0.28575 0.211666,0.34925 0.04233,0.56091 l -1.746244,1.95791 c -0.296333,0.33867 -0.624415,0.45509 -1.05833,0.508 z"
+         id="path823" />
+    </g>
   </g>
 </svg>

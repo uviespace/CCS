@@ -8,7 +8,7 @@
    version="1.1"
    id="svg5"
    inkscape:version="1.1.2 (0a00cf5339, 2022-02-04, custom)"
-   sodipodi:docname="roman_3.svg"
+   sodipodi:docname="roman_10.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -24,7 +24,7 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="1.8116734"
-     inkscape:cx="-303.31073"
+     inkscape:cx="-303.31074"
      inkscape:cy="-110.39517"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
@@ -44,16 +44,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-144.36459,-164.86314)">
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#5e5c64;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="144.30638"
-       y="176.23428"
-       id="text79888"><tspan
-         sodipodi:role="line"
-         id="tspan79886"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:10.5833px;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#5e5c64;stroke-width:0.264583"
-         x="144.30638"
-         y="176.23428">Ⅹ</tspan></text>
+    <g
+       aria-label="Ⅹ"
+       id="text79888"
+       style="font-weight:bold;font-size:10.5833px;line-height:1.25;font-family:'Linux Libertine O';-inkscape-font-specification:'Linux Libertine O, Bold';letter-spacing:0px;word-spacing:0px;fill:#5e5c64;stroke-width:0.264583">
+      <path
+         d="m 148.89953,175.29237 c 0.254,0.381 0.33867,0.56091 -0.254,0.59266 -0.0635,0.0635 -0.0635,0.29634 0,0.35984 0.42334,-0.0106 1.22767,-0.0212 1.651,-0.0212 0.41275,0 1.0795,0.0106 1.39699,0.0212 0.0635,-0.0635 0.0529,-0.29634 -0.0106,-0.35984 -0.4445,-0.0317 -0.6985,-0.14816 -1.11125,-0.69849 l -1.64041,-2.14841 c -0.23283,-0.33867 -0.13758,-0.42334 0.0635,-0.64558 l 1.42875,-1.66158 c 0.28575,-0.37042 0.61383,-0.45508 1.09008,-0.508 0.0635,-0.0635 0.0635,-0.29633 0,-0.35983 -0.3175,0.0106 -0.83608,0.0212 -1.0795,0.0212 -0.24341,0 -0.80433,-0.0106 -1.22766,-0.0212 -0.0635,0.0635 -0.0635,0.29633 0,0.35983 0.46566,0.0317 0.62441,0.20108 0.46566,0.51858 -0.28574,0.508 -0.62441,0.86783 -1.06891,1.37583 -0.11642,0.127 -0.27516,0.0423 -0.41275,-0.14817 l -0.80433,-1.15358 c -0.24341,-0.39158 -0.22225,-0.56091 0.37042,-0.59266 0.0635,-0.0635 0.0635,-0.29633 0,-0.35983 -0.42334,0.0106 -1.02658,0.0212 -1.44992,0.0212 -0.41274,0 -1.32291,-0.0106 -1.64041,-0.0212 -0.0635,0.0635 -0.0529,0.29633 0.0106,0.35983 0.4445,0.0317 0.63499,0.13758 1.03716,0.6985 l 1.53458,1.93674 c 0.22225,0.28575 0.21166,0.34925 0.0423,0.56092 l -1.74624,1.95791 c -0.3175,0.35983 -0.66675,0.46566 -1.13242,0.50799 -0.0635,0.0635 -0.0635,0.29634 0,0.35984 0.3175,-0.0106 0.93133,-0.0212 1.17475,-0.0212 0.24342,0 0.86783,0.0106 1.29116,0.0212 0.0635,-0.0635 0.0635,-0.29634 0,-0.35984 -0.47625,-0.0317 -0.62441,-0.20108 -0.46566,-0.51858 0.381,-0.62441 0.74083,-0.97366 1.19591,-1.59808 0.0952,-0.13758 0.16933,-0.11641 0.3175,0.127 z"
+         id="path823" />
+    </g>
   </g>
 </svg>
