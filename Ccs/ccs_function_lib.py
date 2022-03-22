@@ -127,7 +127,6 @@ def start_app(console, file_path, wd, *args):
             command += arg
         command += ' >/dev/null 2>&1 &'
         logger.debug('command which will be executed: {}'.format(command))
-        #print(command)
         os.system(command)
     else:
         subprocess.Popen(['python3', file_path, *args], cwd=wd)
@@ -291,26 +290,28 @@ def start_logging(name):
 # This returns a dbus connection to a given Application-Name
 def dbus_connection(name, instance=1):
     if instance == 0:
-        #print('There is no main instance of {} given in the project'.format(name))
-        logger.info('There is no main instance of {} given in the project'.format(name))
+        logger.warning('There is no main instance of {} given in the project'.format(name))
         return False
+
     if not instance:
         instance = 1
+
     dbus_type = dbus.SessionBus()
     try:
         Bus_Name = cfg.get('ccs-dbus_names', name)
     except:
         print(str(name) + ' is not a valid DBUS name')
         print(str(name) + ' could not be found in config file')
-        logger.info('Name could not be found in config file')
+        logger.warning(str(name) + ' could not be found in config file')
     Bus_Name += str(instance)
+
     try:
         dbuscon = dbus_type.get_object(Bus_Name, '/MessageListener')
         return dbuscon
     except:
         print('Connection to ' + str(name) + ' is not possible')
-        #print('Please start ' + str(name) + ' if it is not running')
-        logger.info('Connection to ' + str(name) + ' is not possible')
+        # print('Please start ' + str(name) + ' if it is not running')
+        logger.warning('Connection to ' + str(name) + ' is not possible')
         return False
 
 # Returns True if application is running or False if not
@@ -479,7 +480,7 @@ def dbus_to_python(data, user_console=False):
 
 def python_to_dbus(data, user_console=False):
     """
-    Convets Python Types to Dbus Types, only containers, since 'normal' data types are converted automatically by dbus
+    Converts Python Types to Dbus Types, only containers, since 'normal' data types are converted automatically by dbus
     @param data: Dbus Type variables or containers
     @param user_console: Flag to check for NoneType arguments
     @return: Same data for python variables, same data for container types as dbus containers
@@ -498,7 +499,7 @@ def python_to_dbus(data, user_console=False):
     elif isinstance(data, (int, str, float, bool, bytes, bytearray)):
         pass
     else:
-        logger.warning("A object of type " + str(type(data)) + " can probably not be send via dbus")
+        logger.info("Object of type " + str(type(data)) + " can probably not be sent via dbus")
     return data
 
 
@@ -512,20 +513,21 @@ def convert_to_python(func):
         return dbus_to_python(func(*args, **kwargs))
     return wrapper
 
-def set_monitor(pool_name = None, param_set = None):
+
+def set_monitor(pool_name=None, param_set=None):
     if is_open('monitor'):
         monitor = dbus_connection('monitor', communication['monitor'])
     else:
         print('The Parmameter Monitor is not running')
         return
 
-    if pool_name != None:
+    if pool_name is not None:
         monitor.Functions('set_pool', pool_name)
     else:
         print('Pool Name has to be specified (cfl.set_monitor(pool_name, parmeter_set))')
         return
 
-    if param_set !=None:
+    if param_set is not None:
         # Ignore_reply is ok here
         monitor.Functions('monitor_setup', param_set, ignore_reply=True)
     else:
@@ -547,13 +549,14 @@ def ptt_reverse(type):
     elif type.startswith('ascii'):
         return [8, type[5:]]
 
-
     for i in ptt: # First Section
         for j in ptt[i]: # Second Section
             if ptt[i][j] == type: # Check for type
                 return [i, j]
 
     return False
+
+
 '''
 def ptt_reverse_pfc(type):
 
@@ -576,6 +579,8 @@ def ptt_reverse_pfc(type):
     return False
 
 '''
+
+
 def user_tm_decoders_func():
 
     if cfg.has_section('ccs-user_defined_packets'):
@@ -585,6 +590,7 @@ def user_tm_decoders_func():
         user_tm_decoders = {}
 
     return user_tm_decoders
+
 
 # TM formatted
 #
@@ -1502,8 +1508,13 @@ def get_pool_rows(pool_name, dbcon=None):
 
     return rows
 
+
 #  get values of parameter from HK packets
 def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
+
+    if param is None:
+        return
+
     # with self.poolmgr.lock:
     dbcon = scoped_session_idb
     if hk is None:
@@ -1516,9 +1527,12 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
         if not isinstance(tmlist, list):
             tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
                                    func.mid(DbTelemetry.data, SID_OFFSET - TM_HEADER_LEN + 1, SID_SIZE) == struct.pack(SID_FORMAT[SID_SIZE], sid)).order_by(
-                DbTelemetry.idx.desc()).first()
+                DbTelemetry.idx.desc())
             if tmlist is not None:
-                tmlist_filt = [tmlist.raw]
+                if last > 1:
+                    tmlist_filt = [tm.raw for tm in tmlist[:last]]
+                else:
+                    tmlist_filt = [tmlist.first().raw]
             else:
                 tmlist_filt = []
         else:
@@ -2352,11 +2366,16 @@ def Tcsend_common(tc_bytes, apid, st, sst, sleep=0.2, pool_name='LIVE'):
 #   @return: <CUC> timestamp or None if failing
 def get_last_pckt_time(pool_name='LIVE', string=True, dbcon=None):
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
-    cuc = None
+
+    if not pmgr:
+        logger.warning('Accessing PMGR failed!')
+        return
+
+    # cuc = None
     packet = None
     # fetch the pool_name
     #filename = self.poolmgr.loaded_pools[pool_name].filename
-    pmd = pmgr.Dictionaries('loaded_pools')
+    # pmd = pmgr.Dictionaries('loaded_pools')
     poolname = pmgr.Dictionaries('loaded_pools', pool_name)
     filename = poolname[2] # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
     if not filename:
@@ -2863,22 +2882,19 @@ def about_dialog(parent=None, action=None):
     dialog = Gtk.AboutDialog()
     dialog.set_transient_for(parent)
 
-    #dialog.set_program_name('CCS Editor and Library Functions')
     dialog.set_program_name('UVIE Central Checkout System')
 
     dialog.set_copyright('UVIE 01/2022')
     dialog.set_license_type(Gtk.License.GPL_2_0)
     dialog.set_authors(('Marko Mecina', 'Dominik Moeslinger', 'Thanassis Tsiodras', 'Armin Luntzer'))
-    #dialog.set_version('0.6')
     dialog.set_version('2.0')
-    # dialog.set_logo_icon_name('stock_about')
-    dialog.set_logo(GdkPixbuf.Pixbuf.new_from_file(pics_path + '/IfA_Logo_48.png'))
+    dialog.set_logo(GdkPixbuf.Pixbuf.new_from_file(os.path.join(pics_path, 'IfA_Logo_48.png')))
     dialog.set_website('https://space.univie.ac.at')
     dialog.set_website_label('space.univie.ac.at')
 
     dialog.run()
     dialog.destroy()
-    return
+
 
 def change_communication_func(main_instance=None,new_main=None,new_main_nbr=None,application=None,application_nbr=1,parentwin=None):
     """
@@ -3977,7 +3993,7 @@ class TmDecoderDialog(Gtk.Dialog):
             slot = self.create_slot()
             slotbox.pack_start(slot, 1, 1, 0)
 
-        note = Gtk.Label(label="Note: User-Defined_IDB parameter can only be used if IDB order is choosen, "
+        note = Gtk.Label(label="Note: User-Defined_IDB parameter can only be used if IDB order is chosen, "
                                "User-Defined_Local only for Local order")
 
         box = Gtk.VBox()
