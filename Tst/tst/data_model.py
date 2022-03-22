@@ -989,6 +989,10 @@ class TestSpecification:
 
     @precon_name.setter
     def precon_name(self, value: str):
+        if value == None:
+            value = "None"
+        else:
+            pass
         assert isinstance(value, str)
         self._precon_name = value
 
@@ -1016,6 +1020,10 @@ class TestSpecification:
 
     @postcon_name.setter
     def postcon_name(self, value: str):
+        if value == None:
+            value = "None"
+        else:
+            pass
         assert isinstance(value, str)
         self._postcon_name = value
 

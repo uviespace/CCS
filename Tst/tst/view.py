@@ -71,7 +71,7 @@ class Board(Gtk.Box):
     """
     def __init__(self, model, app, filename=None, logger=logger):
         """
-        When a instance is initialized:
+        When an instance is initialized:
         * a data model instance is created
         * the toolbar is created
         * a instance of a grid is added
