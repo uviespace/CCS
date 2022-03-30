@@ -845,8 +845,6 @@ class CcsEditor(Gtk.Window):
             #self.cfg.read(self.cfg.source)
             self.cfg = confignator.get_config(file_path=cfg_path)
 
-
-
             print('[TODO] cfg sections:' + str(self.cfg.sections()))
 
             message = Gtk.MessageDialog(dialog, Gtk.DialogFlags.DESTROY_WITH_PARENT, Gtk.MessageType.INFO,
@@ -1101,10 +1099,9 @@ class CcsEditor(Gtk.Window):
 
         dialog.destroy()
 
-    def on_menu_file_open(self, widget):
-        dialog = Gtk.FileChooserDialog(title="Open", parent=None, action=Gtk.FileChooserAction.OPEN)
+    def on_menu_file_open(self, widget=None):
+        dialog = Gtk.FileChooserDialog(title="Open", parent=None, action=Gtk.FileChooserAction.OPEN, select_multiple=True)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-        filename = None
         self.add_file_dialog_filters(dialog)
 
         dialog.set_transient_for(self)
@@ -1112,11 +1109,11 @@ class CcsEditor(Gtk.Window):
         response = dialog.run()
 
         if response == Gtk.ResponseType.OK:
-            filename = dialog.get_filename()
-            self.open_file(filename)
-
-        if filename != None:
-            self.logger.info('Opend:' + str(filename))
+            filenames = dialog.get_filenames()
+            for filename in filenames:
+                if os.path.isfile(filename):
+                    self.open_file(filename)
+                    self.logger.debug('Opened file: ' + filename)
 
         dialog.destroy()
 
