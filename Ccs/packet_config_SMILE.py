@@ -66,8 +66,8 @@ TC_SECONDARY_HEADER = [
     ("SOURCE_ID", ctypes.c_uint8, 8)
 ]
 
-# [format of time stamp, amount of bytes of time stamp includig sync byte(s), fine time resolution, length of sync flag]
-timepack = [ptt[9][18], 8, 10 ** 6, 1]
+# [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of sync flag]
+timepack = [ptt[9][18], 8, 1e6, 1]
 CUC_EPOCH = datetime.datetime(2018, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 
@@ -109,15 +109,15 @@ def timecal(data, string=False):
 def calc_timestamp(time, sync=0, return_bytes=False):
     if isinstance(time, (float, int)):
         ctime = int(time)
-        ftime = round(time % 1 * 1e6)
+        ftime = round(time % 1 * timepack[2])
 
     elif isinstance(time, str):
         if time[:-1] in ['U', 'S']:
             t = float(time[:-1])
         else:
-            t = time
+            t = float(time)
         ctime = int(t)
-        ftime = round(t % 1 * 1e6)
+        ftime = round(t % 1 * timepack[2])
         sync = 0b101 if time[-1].upper() == 'S' else 0
 
     elif isinstance(time, bytes):

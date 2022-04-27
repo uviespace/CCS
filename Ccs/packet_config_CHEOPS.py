@@ -61,19 +61,24 @@ TC_SECONDARY_HEADER = [
     ("SERV_SUB_TYPE", ctypes.c_uint8, 8),
     ("SOURCE_ID", ctypes.c_uint8, 8)
 ]
-# [Format of time Packet, Amount of Bytes in Time Packet, Factor for Finetime
-timepack = [ptt[9][17], 6, 2**15]
+# [Format of time Packet, Amount of Bytes in Time Packet, Factor for Finetime, length of extra sync flag
+timepack = [ptt[9][17], 6, 2**15, 0]
 CUC_EPOCH = datetime.datetime(2000, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
+
 
 def timecal(data, string=False):
     if not isinstance(data, bytes):
         try:
             return data[0]
-        except:
+        except (IndexError, TypeError):
             return data
+
+    if len(data) != timepack[1]:
+        raise ValueError('Wrong length of time stamp data ({} bytes)'.format(len(data)))
+
     data = int.from_bytes(data, 'big')
     coarse = data >> 16
-    fine = ((data & 0xffff) >> 1) / 2 ** 15
+    fine = ((data & 0xffff) >> 1) / timepack[2]
     if string:
         sync = ['U', 'S'][data & 1]
         return '{:.6f}{}'.format(coarse + fine, sync)
@@ -84,11 +89,11 @@ def timecal(data, string=False):
 def calc_timestamp(time, sync=0):
     if isinstance(time, (float, int)):
         ctime = int(time)
-        ftime = int(time % 1 * 2 ** 15)
+        ftime = round(time % 1 * timepack[2])
     elif isinstance(time, str):
         t = float(time[:-1])
         ctime = int(t)
-        ftime = int(t % 1 * 2 ** 15)
+        ftime = round(t % 1 * timepack[2])
         sync = 1 if time[-1].upper() == 'S' else 0
     elif isinstance(time, bytes):
         ctime = int.from_bytes(time[:4], 'big')
@@ -98,16 +103,17 @@ def calc_timestamp(time, sync=0):
     return ctime, ftime, sync
 
 
-
-PEC_LEN = 2  # in byte
-P_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER]) // 8
-TM_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TM_SECONDARY_HEADER]) // 8
-TC_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TC_SECONDARY_HEADER]) // 8
+# P_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER]) // 8
+# TM_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TM_SECONDARY_HEADER]) // 8
+# TC_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TC_SECONDARY_HEADER]) // 8
 
 
 class PHeaderBits(ctypes.BigEndianStructure):
     _pack_ = 1
     _fields_ = [(label, ctype, bits) for label, ctype, bits in PRIMARY_HEADER]
+
+
+P_HEADER_LEN = ctypes.sizeof(PHeaderBits)
 
 
 class PHeader(ctypes.Union):
@@ -123,6 +129,9 @@ class TMHeaderBits(ctypes.BigEndianStructure):
     _fields_ = [(label, ctype, bits) for label, ctype, bits in PRIMARY_HEADER + TM_SECONDARY_HEADER]
 
 
+TM_HEADER_LEN = ctypes.sizeof(TMHeaderBits)
+
+
 class TMHeader(ctypes.Union):
     _pack_ = 1
     _fields_ = [
@@ -134,6 +143,9 @@ class TMHeader(ctypes.Union):
 class TCHeaderBits(ctypes.BigEndianStructure):
     _pack_ = 1
     _fields_ = [(label, ctype, bits) for label, ctype, bits in PRIMARY_HEADER + TC_SECONDARY_HEADER]
+
+
+TC_HEADER_LEN = ctypes.sizeof(TCHeaderBits)
 
 
 class TCHeader(ctypes.Union):
