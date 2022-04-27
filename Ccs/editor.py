@@ -7,35 +7,28 @@ gi.require_version('Vte', '2.91')
 from gi.repository import Gtk, Gdk, GdkPixbuf, GtkSource, Pango, GLib, Vte, GObject
 import time
 import datetime
-# import logging
-# import logging.handlers
 import numpy as np
 import glob
 import sys
 import socket
 import threading
 import pickle
-# import struct
-# import IPython
 import confignator
-# import json
 import os
 
 import dbus
 import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 import DBus_Basic
-# from pydbus import SessionBus
 
-# import ipython_view
-# from threading import Thread
 import config_dialog
 import ccs_function_lib as cfl
 
 pixmap_folder = confignator.get_option('ccs-paths', 'pixmap')
 action_folder = confignator.get_option('ccs-paths', 'actions')
-# from jupyter_client import find_connection_file
 
+scripts = glob.glob(os.path.join(confignator.get_option('paths', 'ccs'), "scripts/*.py"))
+script_actions = '\n'.join(["<menuitem action='{}' />".format(os.path.split(script)[-1][:-3]) for script in scripts])
 
 UI_INFO = """
 <ui>
@@ -74,15 +67,18 @@ UI_INFO = """
       <menuitem action='ActionButtons' />
       <menuitem action='RestartTerminal' />
     </menu>
+    <menu action='ScriptsMenu'>
+        {}    
+    </menu>
     <menu action='HelpMenu'>
       <menuitem action='AboutDialog' />
     </menu>
   </menubar>
 </ui>
-"""
-
+""".format(script_actions)
 
 VTE_VERSION = "{}.{}.{}".format(Vte.MAJOR_VERSION, Vte.MINOR_VERSION, Vte.MICRO_VERSION)
+
 
 class SearchDialog(Gtk.Dialog):
     def __init__(self, parent):
@@ -104,19 +100,7 @@ class SearchDialog(Gtk.Dialog):
         self.show_all()
 
 
-# ["/usr/bin/env", "ipython3", "-i", ".ipyloadcfg.py"],
 class IPythonTerminal(Vte.Terminal):
-    # if IPython.version_info[0] > 4:
-    #     try:
-    #         import rlipython
-    #         term = ["/usr/bin/env", "ipython3", "--gui=gtk3", "-i", ".ipyloadcfg.py", "--config", ".ipycfg.py",
-    #                 "--TerminalIPythonApp.interactive_shell_class=rlipython.TerminalInteractiveShell"]
-    #     except ImportError:
-    #         print("You are using IPython {}.{}.{} - either downgrade to v4.2.1 or install the rlipython module".format(
-    #             *IPython.version_info[:3]))
-    #         sys.exit()
-    # else:
-    #     term = ["/usr/bin/env", "ipython3", "--gui=gtk3", "-i", ".ipyloadcfg.py", "--config", ".ipycfg.py"]
 
     ccs_path = confignator.get_option('paths', 'ccs')
     ipyloadcfg_path = os.path.join(ccs_path, '.ipyloadcfg.py')
@@ -126,16 +110,6 @@ class IPythonTerminal(Vte.Terminal):
 
     def __init__(self, scrollback_lines, *args, **kwds):
         super(IPythonTerminal, self).__init__(*args, **kwds)
-        # cfile = find_connection_file()
-        #self.set_scrollback_lines(scrollback_lines)
-        #self.pty = self.pty_new_sync(Vte.PtyFlags.DEFAULT)
-        #self.spawn_sync(Vte.PtyFlags.DEFAULT,
-        #                None,
-        #                self.term,
-        #                [],
-        #                GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-        #                None,
-        #                None)
         self.spawn_async(
             Vte.PtyFlags.DEFAULT,  # Pty Flags
             None,  # Working DIR
@@ -679,6 +653,7 @@ class CcsEditor(Gtk.Window):
         self.create_pool_menu(action_group)
         self.create_modules_menu(action_group)
         self.create_tools_menu(action_group)
+        self.create_scripts_menu(action_group)
         self.create_help_menu(action_group)
 
         uimanager = Gtk.UIManager()
@@ -791,13 +766,22 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self._on_restart_terminal)
         action_group.add_action(action)
 
+    def create_scripts_menu(self, action_group):
+        action = Gtk.Action(name="ScriptsMenu", label="_Scripts", tooltip=None, stock_id=None)
+        action_group.add_action(action)
+
+        for script in scripts:
+            name = os.path.split(script)[-1]
+            action = Gtk.Action(name=name[:-3], label="_{}".format(name.replace('_', '__')), tooltip=None, stock_id=None)
+            action.connect("activate", self._on_open_script, script)
+            action_group.add_action(action)
+
     def create_help_menu(self, action_group):
         action = Gtk.Action(name="HelpMenu", label="_Help", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
         action = Gtk.Action(name="AboutDialog", label="_About", tooltip=None, stock_id=Gtk.STOCK_ABOUT)
         action.connect("activate", self._on_select_about_dialog)
-        #action.connect("activate", cfl.about_dialog(self))
         action_group.add_action(action)
 
     def _on_undo(self, action):
@@ -923,6 +907,13 @@ class CcsEditor(Gtk.Window):
     def _on_restart_terminal(self, action):
         self.restart_terminal()
         return
+
+    def _on_open_script(self, action, filename):
+        if os.path.isfile(filename):
+            self.open_file(filename)
+            self.logger.debug('Opened script ' + filename)
+        else:
+            self.logger.error('Could not open script {}'.format(filename))
 
     def _on_select_about_dialog(self, action):
         cfl.about_dialog(self)
@@ -1271,7 +1262,6 @@ class CcsEditor(Gtk.Window):
         try:
             with open(filename, 'r') as fdesc:
                 data = fdesc.read()
-                fdesc.close()
 
                 sourceview = self.notebook_open_tab(filename=filename).get_child()
                 buf = sourceview.get_buffer()
@@ -1285,7 +1275,7 @@ class CcsEditor(Gtk.Window):
                 begin = buf.get_iter_at_line(0)
                 self._set_play_mark(view, begin)
         except FileNotFoundError as err:
-            self.logger.warning(str(err))
+            self.logger.error(str(err))
 
     def _parse_editor_commands(self, buffer):
         lines = buffer.get_text(*buffer.get_bounds(), True).split('\n')
