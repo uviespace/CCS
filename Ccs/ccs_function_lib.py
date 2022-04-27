@@ -1,21 +1,17 @@
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
+
 from gi.repository import Gtk, GLib, Notify, GdkPixbuf
 import subprocess
 import struct
-# import configparser
 import crcmod
 import datetime
 import dateutil.parser as duparser
 import io
-# import itertools
 import types
 import sys
-# import threading
-# import queue
 import select
-# import traceback
 import json
 import time
 import dbus
@@ -31,21 +27,14 @@ from s2k_partypes import ptt, ptype_parameters, ptype_values
 import confignator
 import importlib
 
-#check_cfg = configparser.ConfigParser()
-#check_cfg.read('egse.cfg')
-#check_cfg.source = 'egse.cfg'
 
 cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
-#cfg = confignator.get_config()
 
 PCPREFIX = 'packet_config_'
 
 project = cfg.get('ccs-database', 'project')
-project = PCPREFIX + str(project)
-packet_config = importlib.import_module(project)
-
-#cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
-#cfg.source = confignator.get_option('config-files', 'ccs').split('/')[-1]  # Used to write into the config file
+project_cfg = PCPREFIX + str(project)
+packet_config = importlib.import_module(project_cfg)
 
 
 PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack,\
@@ -61,8 +50,7 @@ PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
 FMT_TYPE_PARAM = packet_config.FMT_TYPE_PARAM
 
 if cfg.has_section('ccs-user_defined_packets'):
-    user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k])
-                             for k in cfg['ccs-user_defined_packets']}
+    user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
 else:
     user_tm_decoders = {}
 
@@ -89,7 +77,7 @@ fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i',
 personal_fmtlist = ['uint', 'int', 'ascii', 'oct']
 
 fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
-           'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
+                 'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
 
 # get format and offset of HK SID
 SID_FORMAT = {1: '>B', 2: '>H', 4: '>I'}
@@ -279,13 +267,12 @@ def start_logging(name):
 
     rootLogger = logging.getLogger('')
     rootLogger.setLevel(loglevel)
-    socketHandler = logging.handlers.SocketHandler('localhost',
-                                                   logging.handlers.DEFAULT_TCP_LOGGING_PORT)
-    # don't bother with a formatter, since a socket handler sends the event as
-    # an unformatted pickle
+    socketHandler = logging.handlers.SocketHandler('localhost', logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+    # don't bother with a formatter, since a socket handler sends the event as an unformatted pickle
     rootLogger.addHandler(socketHandler)
     log = logging.getLogger(name)
     return log
+
 
 # This returns a dbus connection to a given Application-Name
 def dbus_connection(name, instance=1):
@@ -314,6 +301,7 @@ def dbus_connection(name, instance=1):
         logger.warning('Connection to ' + str(name) + ' is not possible')
         return False
 
+
 # Returns True if application is running or False if not
 def is_open(name, instance=1):
     dbus_type = dbus.SessionBus()
@@ -325,6 +313,7 @@ def is_open(name, instance=1):
         return True
     except:
         return False
+
 
 def show_functions(conn, filter=None):
     """
@@ -351,6 +340,7 @@ def show_functions(conn, filter=None):
         method_list2.append(str(i))
 
     return method_list2
+
 
 def ConnectionCheck(dbus_con, argument=None):
     """

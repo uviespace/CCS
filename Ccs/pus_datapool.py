@@ -402,7 +402,7 @@ class DatapoolManager:
             try:
                 sockfd.connect((host, port))
             except ConnectionRefusedError:
-                self.logger.warning("Connection to {}:{} refused".format(host, port))
+                self.logger.error("Connection to {}:{} refused".format(host, port))
                 return
         self.connections[pool_name] = {'socket': sockfd, 'recording': True, 'protocol': protocol}
 

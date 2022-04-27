@@ -305,7 +305,7 @@ class CcsEditor(Gtk.Window):
 
             if not conn.Variables('main_instance') == self.main_instance:
                 print('Both are not running in the same project, no change possible')
-                self.logger.info('Application {} is not in the same project as {}: Can not communicate'.format(
+                self.logger.warning('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return
 
@@ -964,7 +964,7 @@ class CcsEditor(Gtk.Window):
         page_num = self.editor_notebook.get_current_page()
         nb_page = self.editor_notebook.get_nth_page(page_num)
         buf = nb_page.get_child().get_buffer()
-        if filename == None:
+        if filename is None:
             buf.connect('changed', self._notebook_buffer_modified, None, label)
 
         hbox.show_all()
@@ -973,7 +973,7 @@ class CcsEditor(Gtk.Window):
 
         view = self._get_active_view()
         begin = buf.get_iter_at_line(0)
-        self._set_play_mark(view, begin);
+        self._set_play_mark(view, begin)
 
         return sourceview
 
@@ -1034,7 +1034,7 @@ class CcsEditor(Gtk.Window):
     """ save the buffer and reconnect the "changed" signal signal """
 
     def _notebook_save_helper(self, filename, label=None):
-        if label == None or (not hasattr(label, 'page_num')):
+        if label is None or (not hasattr(label, 'page_num')):
             page_num = self.editor_notebook.get_current_page()
         else:
             page_num = label.page_num
@@ -1044,7 +1044,7 @@ class CcsEditor(Gtk.Window):
         start, end = buf.get_bounds()
         text = buf.get_text(start, end, True)
 
-        if label == None:
+        if label is None:
             label = self._notebookt_current_get_label()
         label.set_text(label.get_text().strip('*'))
         buf.connect('changed', self._notebook_buffer_modified, None, label)
@@ -1067,7 +1067,7 @@ class CcsEditor(Gtk.Window):
         return nb_label.get_children()[0]
 
     def on_menu_file_save(self, widget=None, label=None):
-        if label == None:
+        if label is None:
             label = self._notebookt_current_get_label()
         filename = label.get_tooltip_text()
 
@@ -1092,7 +1092,7 @@ class CcsEditor(Gtk.Window):
         if response == Gtk.ResponseType.OK:
             filename = dialog.get_filename()
             self._notebook_save_helper(filename, label=label)
-            if label == None:
+            if label is None:
                 label = self._notebookt_current_get_label()
                 label.set_text(filename.split('/')[-1])
                 label.set_tooltip_text(filename)
@@ -1216,7 +1216,7 @@ class CcsEditor(Gtk.Window):
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
             except:
-                self.logger.info('Could not load image {}'.format(button_img_path))
+                self.logger.warning('Could not load image {}'.format(button_img_path))
                 pixmap_path = os.path.join(pixmap_folder, 'action.png')
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
             icon = Gtk.Image.new_from_pixbuf(pixbuf)
@@ -1431,6 +1431,11 @@ class CcsEditor(Gtk.Window):
         conn_button.connect("clicked", self.on_communication_dialog)
         vbox.pack_start(conn_button, True, True, 0)
 
+        # Add the configuration manager option
+        conn_button = Gtk.Button.new_with_label('Preferences')
+        conn_button.connect("clicked", cfl.start_config_editor)
+        vbox.pack_start(conn_button, True, True, 0)
+
         # Add the option to see the Credits
         about_button = Gtk.Button.new_with_label('About')
         about_button.connect("clicked", self._on_select_about_dialog)
@@ -1452,10 +1457,8 @@ class CcsEditor(Gtk.Window):
         self.popover.popup()
 
     def on_communication_dialog(self, button):
-
         cfl.change_communication_func(main_instance=self.main_instance, parentwin=self)
-
-        #self._to_console("cfl.communication = " + str(cfl.communication))
+        # self._to_console("cfl.communication = " + str(cfl.communication))
 
     def on_button_nextline(self, widget=None, data=None):
         self.button_run_nextline.set_sensitive(False)
@@ -1732,7 +1735,7 @@ class CcsEditor(Gtk.Window):
         action_name = widget.get_name()
 
         if not (self.cfg.has_option('ccs-actions', action_name) and self.cfg.get('ccs-actions', action_name) != ''):
-            self.logger.info(action_name + ': not defined!')
+            self.logger.warning(action_name + ': not defined!')
             return
 
         action = os.path.join(action_folder, self.cfg.get('ccs-actions', action_name))
