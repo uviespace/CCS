@@ -76,7 +76,8 @@ logging_format = fmt
 logging_level_file = logging.INFO
 logging_level_console = logging.WARNING
 module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.DEBUG)
+# module_logger.setLevel(logging.INFO)
+module_logger.setLevel(getattr(logging, cfg.get('confignator-logging', 'level')))
 logging_file_name = 'confignator.log'
 
 

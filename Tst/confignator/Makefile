@@ -25,12 +25,14 @@ build:
 		rm -f $(CONFIGNATOR_CFG)
 		# create the new file containing the path to the configuration file
 		@echo "# This is the configuration file for the confignator and is a generated file, created during the installation of the confignator package." >> $(CONFIGNATOR_CFG)
-		@echo "# Modifications have to be done in the Makefile of the confignator package and a reinstall of it is needed!\n" >> $(CONFIGNATOR_CFG)
+		@echo -e "# Modifications have to be done in the Makefile of the confignator package and a reinstall of it is needed!\n" >> $(CONFIGNATOR_CFG)
 		@echo "[confignator-paths]" >> $(CONFIGNATOR_CFG)
 		@echo "basic-path = $(BASIC_PATH)" >> $(CONFIGNATOR_CFG)
 		@echo "basic-cfg = $(BASIC_CONFI_CFG)" >> $(CONFIGNATOR_CFG)
 		@echo "docu = $(DOCU_INDEX_HTML)" >> $(CONFIGNATOR_CFG)
-		@echo "log-file = ''\n" >> $(CONFIGNATOR_CFG)
+		@echo -e "log-file = ''\n" >> $(CONFIGNATOR_CFG)
+		@echo "[confignator-logging]" >> $(CONFIGNATOR_CFG)
+		@echo -e "level = INFO\n" >> $(CONFIGNATOR_CFG)
 		# build the Python package
 		# python3 setup.py sdist;
 		python3 setup.py bdist_wheel
