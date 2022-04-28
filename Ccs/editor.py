@@ -51,11 +51,8 @@ UI_INFO = """
       <menuitem action='EditPaste' />
       <separator />
       <menuitem action='EditFind' />
-    </menu>
-    <menu action='PoolMenu'>
-      <menuitem action='SelectConfig' />
-      <menuitem action='EditConfig' />
-      <menuitem action='CreateConfig' />
+      <separator />
+      <menuitem action='EditPreferences' />
     </menu>
     <menu action='ModulesMenu'>
       <menuitem action='Poolviewer' />
@@ -83,9 +80,8 @@ VTE_VERSION = "{}.{}.{}".format(Vte.MAJOR_VERSION, Vte.MINOR_VERSION, Vte.MICRO_
 class SearchDialog(Gtk.Dialog):
     def __init__(self, parent):
         Gtk.Dialog.__init__(self, "Search", parent,
-                            Gtk.DialogFlags.MODAL, buttons=(
-                Gtk.STOCK_FIND, Gtk.ResponseType.OK,
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
+                            Gtk.DialogFlags.MODAL, buttons=(Gtk.STOCK_FIND, Gtk.ResponseType.OK,
+                                                            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
 
         box = self.get_content_area()
         box.set_spacing(5)
@@ -116,7 +112,7 @@ class IPythonTerminal(Vte.Terminal):
             self.term,  # Command/BIN (argv)
             None,  # Environmental Variables (envv)
             GLib.SpawnFlags.DEFAULT,  # Spawn Flags
-            None, None, # Child Setup
+            None, None,  # Child Setup
             -1,  # Timeout (-1 for indefinitely)
             None,  # Cancellable
             None,  # Callback
@@ -142,7 +138,7 @@ class CcsEditor(Gtk.Window):
     tref = datetime.datetime(2000, 1, 1, 0, 0, 0)
     tnow = datetime.datetime.utcnow
 
-    def __init__(self, given_cfg = None):
+    def __init__(self, given_cfg=None):
         super(CcsEditor, self).__init__(title="CCS Editor")
 
         # self.set_default_size(1366, 768)  # laptop full screen
@@ -717,6 +713,10 @@ class CcsEditor(Gtk.Window):
         action = Gtk.Action(name="EditFind", label="_Find", tooltip=None, stock_id=Gtk.STOCK_FIND)
         action.connect("activate", self.on_search_clicked)
         action_group.add_action_with_accel(action, "<control>F")
+
+        action = Gtk.Action(name="EditPreferences", label="_Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
+        action.connect("activate", cfl.start_config_editor)
+        action_group.add_action(action)
 
     def create_pool_menu(self, action_group):
         action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None, sensitive=False)
