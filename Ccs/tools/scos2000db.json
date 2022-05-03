@@ -1,0 +1,1036 @@
+{
+  "schema": {
+    "name": "mib_schema",
+    "default_character_set": "latin1",
+    "collate": "latin1_swedish_ci"
+  },
+  "prologue": [
+    "SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;",
+    "SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;",
+    "SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL';"
+  ],
+  "epilogue": [
+    "SET SQL_MODE=@OLD_SQL_MODE;",
+    "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;",
+    "SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;"
+  ],
+  "tables": {
+    "caf": {
+      "columns": {
+        "CAF_NUMBR": " VARCHAR(10) NOT NULL ",
+        "CAF_DESCR": " VARCHAR(32) NULL DEFAULT NULL ",
+        "CAF_ENGFMT": " CHAR(1) NOT NULL ",
+        "CAF_RAWFMT": " CHAR(1) NOT NULL ",
+        "CAF_RADIX": " CHAR(1) NOT NULL ",
+        "CAF_UNIT": " VARCHAR(4) NULL DEFAULT NULL ",
+        "CAF_NCURVE": " INT(3) NULL DEFAULT NULL ",
+        "CAF_INTER": " CHAR(1) NULL DEFAULT 'F' "
+      },
+      "options": [
+        "  PRIMARY KEY (`CAF_NUMBR`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cap": {
+      "columns": {
+        "CAP_NUMBR": " VARCHAR(10) NOT NULL ",
+        "CAP_XVALS": " VARCHAR(14) NOT NULL ",
+        "CAP_YVALS": " VARCHAR(14) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CAP_NUMBR`, `CAP_XVALS`) ,",
+        "  CONSTRAINT `cap_ibfk_1`",
+        "    FOREIGN KEY (`CAP_NUMBR` )",
+        "    REFERENCES `$SCHEMA`.`caf` (`CAF_NUMBR` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cca": {
+      "columns": {
+        "CCA_NUMBR": " VARCHAR(10) NOT NULL ",
+        "CCA_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "CCA_ENGFMT": " CHAR(1) NULL DEFAULT 'R' ",
+        "CCA_RAWFMT": " CHAR(1) NULL DEFAULT 'U' ",
+        "CCA_RADIX": " CHAR(1) NULL DEFAULT 'D' ",
+        "CCA_UNIT": " VARCHAR(4) NULL DEFAULT NULL ",
+        "CCA_NCURVE": " INT(3) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CCA_NUMBR`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ccf": {
+      "columns": {
+        "CCF_CNAME": " VARCHAR(8) NOT NULL ",
+        "CCF_DESCR": " VARCHAR(24) NOT NULL ",
+        "CCF_DESCR2": " VARCHAR(64) NULL DEFAULT NULL ",
+        "CCF_CTYPE": " VARCHAR(8) NULL DEFAULT NULL ",
+        "CCF_CRITICAL": " CHAR(1) NULL DEFAULT 'N' ",
+        "CCF_PKTID": " VARCHAR(8) NOT NULL ",
+        "CCF_TYPE": " INT(3) NULL DEFAULT NULL ",
+        "CCF_STYPE": " INT(3) NULL DEFAULT NULL ",
+        "CCF_APID": " INT(5) NULL DEFAULT NULL ",
+        "CCF_NPARS": " INT(3) NULL DEFAULT NULL ",
+        "CCF_PLAN": " CHAR(1) NULL DEFAULT 'N' ",
+        "CCF_EXEC": " CHAR(1) NULL DEFAULT 'Y' ",
+        "CCF_ILSCOPE": " CHAR(1) NULL DEFAULT 'N' ",
+        "CCF_ILSTAGE": " CHAR(1) NULL DEFAULT 'C' ",
+        "CCF_SUBSYS": " INT(3) NULL DEFAULT NULL ",
+        "CCF_HIPRI": " CHAR(1) NULL DEFAULT 'N' ",
+        "CCF_MAPID": " INT(2) NULL DEFAULT NULL ",
+        "CCF_DEFSET": " VARCHAR(8) NULL DEFAULT NULL ",
+        "CCF_RAPID": " INT(5) NULL DEFAULT NULL ",
+        "CCF_ACK": " INT(2) NULL DEFAULT NULL ",
+        "CCF_SUBSCHEDID": " INT(5) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CCF_CNAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ccs": {
+      "columns": {
+        "CCS_NUMBR": " VARCHAR(10) NOT NULL ",
+        "CCS_XVALS": " VARCHAR(17) NOT NULL ",
+        "CCS_YVALS": " VARCHAR(17) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CCS_NUMBR`, `CCS_YVALS`) ,",
+        "  CONSTRAINT `ccs_ibfk_1`",
+        "    FOREIGN KEY (`CCS_NUMBR` )",
+        "    REFERENCES `$SCHEMA`.`cca` (`CCA_NUMBR` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cdf": {
+      "columns": {
+        "CDF_CNAME": " VARCHAR(8) NOT NULL ",
+        "CDF_ELTYPE": " CHAR(1) NOT NULL ",
+        "CDF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "CDF_ELLEN": " INT(4) NOT NULL ",
+        "CDF_BIT": " INT(4) NOT NULL ",
+        "CDF_GRPSIZE": " INT(2) NOT NULL DEFAULT '0' ",
+        "CDF_PNAME": " VARCHAR(8) NULL DEFAULT NULL ",
+        "CDF_INTER": " CHAR(1) NULL DEFAULT 'R' ",
+        "CDF_VALUE": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CDF_TMID": " VARCHAR(8) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CDF_CNAME`, `CDF_BIT`, `CDF_GRPSIZE`) ,",
+        "  CONSTRAINT `cdf_ibfk_1`",
+        "    FOREIGN KEY (`CDF_CNAME` )",
+        "    REFERENCES `$SCHEMA`.`ccf` (`CCF_CNAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cpc": {
+      "columns": {
+        "CPC_PNAME": " VARCHAR(8) NOT NULL ",
+        "CPC_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "CPC_PTC": " INT(2) NOT NULL ",
+        "CPC_PFC": " INT(5) NOT NULL ",
+        "CPC_DISPFMT": " CHAR(1) NULL DEFAULT 'R' ",
+        "CPC_RADIX": " CHAR(1) NULL DEFAULT 'D' ",
+        "CPC_UNIT": " VARCHAR(4) NULL DEFAULT NULL ",
+        "CPC_CATEG": " CHAR(1) NULL DEFAULT 'N' ",
+        "CPC_PRFREF": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CPC_CCAREF": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CPC_PAFREF": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CPC_INTER": " CHAR(1) NULL DEFAULT 'R' ",
+        "CPC_DEFVAL": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CPC_CORR": " CHAR(1) NULL DEFAULT 'Y' ",
+        "CPC_OBTID": " INT(5) NULL DEFAULT '0' "
+      },
+      "options": [
+        "  PRIMARY KEY (`CPC_PNAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pst": {
+      "columns": {
+        "PST_NAME": " VARCHAR(8) NOT NULL ",
+        "PST_DESCR": " VARCHAR(24) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PST_NAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cps": {
+      "columns": {
+        "CPS_NAME": " VARCHAR(8) NOT NULL ",
+        "CPS_PAR": " VARCHAR(8) NOT NULL ",
+        "CPS_BIT": " INT(4) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CPS_NAME`, `CPS_BIT`) ,",
+        "  CONSTRAINT `cps_ibfk_1`",
+        "    FOREIGN KEY (`CPS_NAME` )",
+        "    REFERENCES `$SCHEMA`.`pst` (`PST_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "csf": {
+      "columns": {
+        "CSF_NAME": " VARCHAR(8) NOT NULL ",
+        "CSF_DESC": " VARCHAR(24) NOT NULL ",
+        "CSF_DESC2": " VARCHAR(64) NULL DEFAULT NULL ",
+        "CSF_IFTT": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSF_NFPARS": " SMALLINT(3) NULL DEFAULT NULL ",
+        "CSF_ELEMS": " SMALLINT(5) NULL DEFAULT NULL ",
+        "CSF_CRITICAL": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSF_PLAN": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSF_EXEC": " CHAR(1) NULL DEFAULT 'Y' ",
+        "CSF_SUBSYS": " SMALLINT(3) NULL DEFAULT NULL ",
+        "CSF_GENTIME": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CSF_DOCNAME": " VARCHAR(32) NULL DEFAULT NULL ",
+        "CSF_ISSUE": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CSF_DATE": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CSF_DEFSET": " VARCHAR(8) NULL DEFAULT NULL ",
+        "CSF_SUBSCHEDID": " INT(5) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CSF_NAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "csp": {
+      "columns": {
+        "CSP_SQNAME": " VARCHAR(8) NOT NULL ",
+        "CSP_FPNAME": " VARCHAR(8) NOT NULL ",
+        "CSP_FPNUM": " INT(5) NOT NULL ",
+        "CSP_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "CSP_PTC": " INT(2) NOT NULL ",
+        "CSP_PFC": " INT(5) NOT NULL ",
+        "CSP_DISPFMT": " CHAR(1) NULL DEFAULT 'R' ",
+        "CSP_RADIX": " CHAR(1) NULL DEFAULT 'D' ",
+        "CSP_TYPE": " CHAR(1) NOT NULL DEFAULT 'P' ",
+        "CSP_VTYPE": " CHAR(1) NULL DEFAULT NULL ",
+        "CSP_DEFVAL": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CSP_CATEG": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSP_PRFREF": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CSP_CCAREF": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CSP_PAFREF": " VARCHAR(10) NULL DEFAULT NULL ",
+        "CSP_UNIT": " VARCHAR(4) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CSP_SQNAME`, `CSP_FPNAME`) ,",
+        "  CONSTRAINT `csp_ibfk_1`",
+        "    FOREIGN KEY (`CSP_SQNAME` )",
+        "    REFERENCES `$SCHEMA`.`csf` (`CSF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "css": {
+      "columns": {
+        "CSS_SQNAME": " VARCHAR(8) NOT NULL ",
+        "CSS_COMM": " VARCHAR(32) NULL DEFAULT NULL ",
+        "CSS_ENTRY": " INT(5) NOT NULL ",
+        "CSS_TYPE": " CHAR(1) NOT NULL ",
+        "CSS_ELEMID": " VARCHAR(8) NULL DEFAULT NULL ",
+        "CSS_NPARS": " INT(3) NULL DEFAULT NULL ",
+        "CSS_MANDISP": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSS_RELTYPE": " CHAR(1) NULL DEFAULT 'R' ",
+        "CSS_RELTIME": " VARCHAR(8) NULL DEFAULT NULL ",
+        "CSS_EXTIME": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CSS_PREVREL": " CHAR(1) NULL DEFAULT 'R' ",
+        "CSS_GROUP": " CHAR(1) NULL DEFAULT NULL ",
+        "CSS_BLOCK": " CHAR(1) NULL DEFAULT NULL ",
+        "CSS_ILSCOPE": " CHAR(1) NULL DEFAULT NULL ",
+        "CSS_ILSTAGE": " CHAR(1) NULL DEFAULT NULL ",
+        "CSS_DYNPTV": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSS_STAPTV": " CHAR(1) NULL DEFAULT 'N' ",
+        "CSS_CEV": " CHAR(1) NULL DEFAULT 'N' "
+      },
+      "options": [
+        "  PRIMARY KEY (`CSS_SQNAME`, `CSS_ENTRY`) ,",
+        "  CONSTRAINT `css_ibfk_1`",
+        "    FOREIGN KEY (`CSS_SQNAME` )",
+        "    REFERENCES `$SCHEMA`.`csf` (`CSF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pcf": {
+      "columns": {
+        "PCF_NAME": " VARCHAR(8) NOT NULL ",
+        "PCF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "PCF_PID": " INT(10) NULL DEFAULT NULL ",
+        "PCF_UNIT": " VARCHAR(4) NULL DEFAULT NULL ",
+        "PCF_PTC": " INT(2) NOT NULL ",
+        "PCF_PFC": " INT(5) NOT NULL ",
+        "PCF_WIDTH": " SMALLINT(6) NULL DEFAULT NULL ",
+        "PCF_VALID": " VARCHAR(8) NULL DEFAULT NULL ",
+        "PCF_RELATED": " VARCHAR(8) NULL DEFAULT NULL ",
+        "PCF_CATEG": " CHAR(1) NOT NULL ",
+        "PCF_NATUR": " CHAR(1) NOT NULL ",
+        "PCF_CURTX": " VARCHAR(10) NULL DEFAULT NULL ",
+        "PCF_INTER": " CHAR(1) NULL DEFAULT 'F' ",
+        "PCF_USCON": " CHAR(1) NULL DEFAULT 'N' ",
+        "PCF_DECIM": " SMALLINT(3) NULL DEFAULT NULL ",
+        "PCF_PARVAL": " VARCHAR(14) NULL DEFAULT NULL ",
+        "PCF_SUBSYS": " VARCHAR(8) NULL DEFAULT NULL ",
+        "PCF_VALPAR": " SMALLINT(5) NULL DEFAULT '1' ",
+        "PCF_SPTYPE": " CHAR(1) NULL DEFAULT NULL ",
+        "PCF_CORR": " CHAR(1) NULL DEFAULT 'Y' ",
+        "PCF_OBTID": " INT(5) NULL DEFAULT '0' ",
+        "PCF_DARC": " CHAR(1) NULL DEFAULT '0' ",
+        "PCF_ENDIAN": " CHAR(1) NULL DEFAULT 'B' "
+      },
+      "options": [
+        "  PRIMARY KEY (`PCF_NAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cur": {
+      "columns": {
+        "CUR_PNAME": " VARCHAR(8) NOT NULL ",
+        "CUR_POS": " INT(2) NOT NULL ",
+        "CUR_RLCHK": " VARCHAR(8) NOT NULL ",
+        "CUR_VALPAR": " INT(5) NOT NULL ",
+        "CUR_SELECT": " VARCHAR(10) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CUR_PNAME`, `CUR_POS`) ,",
+        "  CONSTRAINT `cur_ibfk_1`",
+        "    FOREIGN KEY (`CUR_PNAME` )",
+        "    REFERENCES `$SCHEMA`.`pcf` (`PCF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cvs": {
+      "columns": {
+        "CVS_ID": " INT(5) NOT NULL ",
+        "CVS_TYPE": " CHAR(1) NOT NULL ",
+        "CVS_SOURCE": " CHAR(1) NOT NULL ",
+        "CVS_START": " INT(5) NOT NULL ",
+        "CVS_INTERVAL": " INT(5) NOT NULL ",
+        "CVS_SPID": " INT(10) NULL DEFAULT NULL ",
+        "CVS_UNCERTAINTY": " INT(5) NULL DEFAULT '-1' "
+      },
+      "options": [
+        "  PRIMARY KEY (`CVS_ID`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cve": {
+      "columns": {
+        "CVE_CVSID": " INT(5) NOT NULL ",
+        "CVE_PARNAM": " VARCHAR(8) NOT NULL ",
+        "CVE_INTER": " CHAR(1) NULL DEFAULT 'R' ",
+        "CVE_VAL": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CVE_TOL": " VARCHAR(17) NULL DEFAULT NULL ",
+        "CVE_CHECK": " CHAR(1) NULL DEFAULT 'B' "
+      },
+      "options": [
+        "  PRIMARY KEY (`CVE_CVSID`, `CVE_PARNAM`) ,",
+        "  CONSTRAINT `cve_ibfk_1`",
+        "    FOREIGN KEY (`CVE_CVSID` )",
+        "    REFERENCES `$SCHEMA`.`cvs` (`CVS_ID` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "cvp": {
+      "columns": {
+        "CVP_TASK": " VARCHAR(8) NOT NULL ",
+        "CVP_TYPE": " CHAR(1) NOT NULL DEFAULT 'C' ",
+        "CVP_CVSID": " INT(5) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`CVP_TASK`, `CVP_TYPE`, `CVP_CVSID`) ,",
+        "  INDEX CVP_CVSID (`CVP_CVSID` ASC) ,",
+        "  CONSTRAINT `cvp_ibfk_1`",
+        "    FOREIGN KEY (`CVP_TASK` )",
+        "    REFERENCES `$SCHEMA`.`ccf` (`CCF_CNAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE,",
+        "  CONSTRAINT `cvp_ibfk_2`",
+        "    FOREIGN KEY (`CVP_CVSID` )",
+        "    REFERENCES `$SCHEMA`.`cvs` (`CVS_ID` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "dpf": {
+      "columns": {
+        "DPF_NUMBE": " VARCHAR(8) NOT NULL ",
+        "DPF_TYPE": " CHAR(1) NOT NULL ",
+        "DPF_HEAD": " VARCHAR(32) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`DPF_NUMBE`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "dpc": {
+      "columns": {
+        "DPC_NUMBE": " VARCHAR(8) NOT NULL ",
+        "DPC_NAME": " VARCHAR(8) NULL DEFAULT NULL ",
+        "DPC_FLDN": " INT(2) NOT NULL ",
+        "DPC_COMM": " INT(4) NULL DEFAULT '0' ",
+        "DPC_MODE": " CHAR(1) NULL DEFAULT 'Y' ",
+        "DPC_FORM": " CHAR(1) NULL DEFAULT 'N' ",
+        "DPC_TEXT": " VARCHAR(32) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`DPC_NUMBE`, `DPC_FLDN`) ,",
+        "  CONSTRAINT `dpc_ibfk_1`",
+        "    FOREIGN KEY (`DPC_NUMBE` )",
+        "    REFERENCES `$SCHEMA`.`dpf` (`DPF_NUMBE` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "dst": {
+      "columns": {
+        "DST_APID": " INT(5) NOT NULL ",
+        "DST_ROUTE": " VARCHAR(30) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`DST_APID`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "gpf": {
+      "columns": {
+        "GPF_NUMBE": " VARCHAR(8) NOT NULL ",
+        "GPF_TYPE": " CHAR(1) NOT NULL ",
+        "GPF_HEAD": " VARCHAR(32) NULL DEFAULT NULL",
+        "GPF_SCROL": " CHAR(1) NULL DEFAULT 'N' ",
+        "GPF_HCOPY": " CHAR(1) NULL DEFAULT 'N' ",
+        "GPF_DAYS": " INT(2) NOT NULL ",
+        "GPF_HOURS": " INT(2) NOT NULL ",
+        "GPF_MINUT": " INT(2) NOT NULL ",
+        "GPF_AXCLR": " CHAR(1) NOT NULL ",
+        "GPF_XTICK": " INT(2) NOT NULL ",
+        "GPF_YTICK": " INT(2) NOT NULL ",
+        "GPF_XGRID": " INT(2) NOT NULL ",
+        "GPF_YGRID": " INT(2) NOT NULL ",
+        "GPF_UPUN": " INT(2) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`GPF_NUMBE`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "gpc": {
+      "columns": {
+        "GPC_NUMBE": " VARCHAR(8) NOT NULL ",
+        "GPC_POS": " INT(1) NOT NULL ",
+        "GPC_WHERE": " CHAR(1) NOT NULL ",
+        "GPC_NAME": " VARCHAR(8) NOT NULL ",
+        "GPC_RAW": " CHAR(1) NULL DEFAULT 'U' ",
+        "GPC_MINIM": " VARCHAR(14) NOT NULL ",
+        "GPC_MAXIM": " VARCHAR(14) NOT NULL ",
+        "GPC_PRCLR": " CHAR(1) NOT NULL ",
+        "GPC_SYMBO": " CHAR(1) NULL DEFAULT '0' ",
+        "GPC_LINE": " CHAR(1) NULL DEFAULT '0' ",
+        "GPC_DOMAIN": " INT(5) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`GPC_NUMBE`, `GPC_POS`) ,",
+        "  CONSTRAINT `gpc_ibfk_1`",
+        "    FOREIGN KEY (`GPC_NUMBE` )",
+        "    REFERENCES `$SCHEMA`.`gpf` (`GPF_NUMBE` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "grp": {
+      "columns": {
+        "GRP_NAME": " VARCHAR(14) NOT NULL ",
+        "GRP_DESCR": " VARCHAR(24) NOT NULL ",
+        "GRP_GTYPE": " VARCHAR(2) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`GRP_NAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "grpa": {
+      "columns": {
+        "GRPA_GNAME": " VARCHAR(14) NOT NULL ",
+        "GRPA_PANAME": " VARCHAR(8) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`GRPA_GNAME`, `GRPA_PANAME`) ,",
+        "  INDEX GRPA_PANAME (`GRPA_PANAME` ASC) ,",
+        "  CONSTRAINT `grpa_ibfk_1`",
+        "    FOREIGN KEY (`GRPA_GNAME` )",
+        "    REFERENCES `$SCHEMA`.`grp` (`GRP_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE,",
+        "  CONSTRAINT `grpa_ibfk_2`",
+        "    FOREIGN KEY (`GRPA_PANAME` )",
+        "    REFERENCES `$SCHEMA`.`pcf` (`PCF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "grpk": {
+      "columns": {
+        "GRPK_GNAME": " VARCHAR(14) NOT NULL ",
+        "GRPK_PKSPID": " INT(10) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`GRPK_GNAME`, `GRPK_PKSPID`) ,",
+        "  CONSTRAINT `grpk_ibfk_1`",
+        "    FOREIGN KEY (`GRPK_GNAME` )",
+        "    REFERENCES `$SCHEMA`.`grp` (`GRP_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "lgf": {
+      "columns": {
+        "LGF_IDENT": " VARCHAR(10) NOT NULL ",
+        "LGF_DESCR": " VARCHAR(32) NULL DEFAULT NULL ",
+        "LGF_POL1": " VARCHAR(14) NOT NULL ",
+        "LGF_POL2": " VARCHAR(14) NULL DEFAULT '0' ",
+        "LGF_POL3": " VARCHAR(14) NULL DEFAULT '0' ",
+        "LGF_POL4": " VARCHAR(14) NULL DEFAULT '0' ",
+        "LGF_POL5": " VARCHAR(14) NULL DEFAULT '0' "
+      },
+      "options": [
+        "  PRIMARY KEY (`LGF_IDENT`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "mcf": {
+      "columns": {
+        "MCF_IDENT": " VARCHAR(10) NOT NULL ",
+        "MCF_DESCR": " VARCHAR(32) NULL DEFAULT NULL ",
+        "MCF_POL1": " VARCHAR(14) NOT NULL ",
+        "MCF_POL2": " VARCHAR(14) NULL DEFAULT '0' ",
+        "MCF_POL3": " VARCHAR(14) NULL DEFAULT '0' ",
+        "MCF_POL4": " VARCHAR(14) NULL DEFAULT '0' ",
+        "MCF_POL5": " VARCHAR(14) NULL DEFAULT '0' "
+      },
+      "options": [
+        "  PRIMARY KEY (`MCF_IDENT`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ocf": {
+      "columns": {
+        "OCF_NAME": " VARCHAR(8) NOT NULL ",
+        "OCF_NBCHCK": " INT(2) NOT NULL ",
+        "OCF_NBOOL": " INT(2) NOT NULL ",
+        "OCF_INTER": " CHAR(1) NOT NULL ",
+        "OCF_CODIN": " CHAR(1) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`OCF_NAME`) ,",
+        "  CONSTRAINT `ocf_ibfk_1`",
+        "    FOREIGN KEY (`OCF_NAME` )",
+        "    REFERENCES `$SCHEMA`.`pcf` (`PCF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ocp": {
+      "columns": {
+        "OCP_NAME": " VARCHAR(8) NOT NULL ",
+        "OCP_POS": " INT(2) NOT NULL ",
+        "OCP_TYPE": " CHAR(1) NOT NULL ",
+        "OCP_LVALU": " VARCHAR(14) NULL DEFAULT NULL ",
+        "OCP_HVALU": " VARCHAR(14) NULL DEFAULT NULL ",
+        "OCP_RLCHK": " VARCHAR(8) NULL DEFAULT NULL ",
+        "OCP_VALPAR": " INT(5) NULL DEFAULT '1' "
+      },
+      "options": [
+        "  PRIMARY KEY (`OCP_NAME`, `OCP_POS`) ,",
+        "  CONSTRAINT `ocp_ibfk_1`",
+        "    FOREIGN KEY (`OCP_NAME` )",
+        "    REFERENCES `$SCHEMA`.`ocf` (`OCF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "paf": {
+      "columns": {
+        "PAF_NUMBR": " VARCHAR(10) NOT NULL ",
+        "PAF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "PAF_RAWFMT": " CHAR(1) NULL DEFAULT 'U' ",
+        "PAF_NALIAS": " INT(3) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PAF_NUMBR`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pas": {
+      "columns": {
+        "PAS_NUMBR": " VARCHAR(10) NOT NULL ",
+        "PAS_ALTXT": " VARCHAR(16) NOT NULL ",
+        "PAS_ALVAL": " VARCHAR(17) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PAS_NUMBR`, `PAS_ALVAL`) ,",
+        "  CONSTRAINT `pas_ibfk_1`",
+        "    FOREIGN KEY (`PAS_NUMBR` )",
+        "    REFERENCES `$SCHEMA`.`paf` (`PAF_NUMBR` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pcpc": {
+      "columns": {
+        "PCPC_PNAME": " VARCHAR(8) NOT NULL ",
+        "PCPC_DESC": " VARCHAR(24) NOT NULL ",
+        "PCPC_CODE": " CHAR(1) NULL DEFAULT 'U' "
+      },
+      "options": [
+        "  PRIMARY KEY (`PCPC_PNAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "tcp": {
+      "columns": {
+        "TCP_ID": " VARCHAR(8) NOT NULL ",
+        "TCP_DESC": " VARCHAR(24) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`TCP_ID`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pcdf": {
+      "columns": {
+        "PCDF_TCNAME": " VARCHAR(8) NOT NULL ",
+        "PCDF_DESC": " VARCHAR(24) NULL DEFAULT NULL ",
+        "PCDF_TYPE": " CHAR(1) NOT NULL ",
+        "PCDF_LEN": " INT(4) NOT NULL ",
+        "PCDF_BIT": " INT(4) NOT NULL ",
+        "PCDF_PNAME": " VARCHAR(8) NULL DEFAULT NULL ",
+        "PCDF_VALUE": " VARCHAR(10) NOT NULL ",
+        "PCDF_RADIX": " CHAR(1) NULL DEFAULT 'H' "
+      },
+      "options": [
+        "  PRIMARY KEY (`PCDF_TCNAME`, `PCDF_BIT`) ,",
+        "  INDEX PCDF_PNAME (`PCDF_PNAME` ASC) ,",
+        "  CONSTRAINT `pcdf_ibfk_1`",
+        "    FOREIGN KEY (`PCDF_TCNAME` )",
+        "    REFERENCES `$SCHEMA`.`tcp` (`TCP_ID` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE,",
+        "  CONSTRAINT `pcdf_ibfk_2`",
+        "    FOREIGN KEY (`PCDF_PNAME` )",
+        "    REFERENCES `$SCHEMA`.`pcpc` (`PCPC_PNAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pic": {
+      "columns": {
+        "PIC_TYPE": " INT(3) NOT NULL ",
+        "PIC_STYPE": " INT(3) NOT NULL ",
+        "PIC_PI1_OFF": " INT(5) NOT NULL ",
+        "PIC_PI1_WID": " INT(3) NOT NULL ",
+        "PIC_PI2_OFF": " INT(5) NOT NULL ",
+        "PIC_PI2_WID": " INT(3) NOT NULL ",
+        "PIC_APID": " INT(5) NULL DEFAULT NULL"
+      },
+      "options": [
+        "  PRIMARY KEY (`PIC_TYPE`, `PIC_STYPE`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "tpcf": {
+      "columns": {
+        "TPCF_SPID": " INT(10) NOT NULL ",
+        "TPCF_NAME": " VARCHAR(12) NULL DEFAULT NULL ",
+        "TPCF_SIZE": " INT(8) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`TPCF_SPID`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pid": {
+      "columns": {
+        "PID_TYPE": " INT(3) NOT NULL ",
+        "PID_STYPE": " INT(3) NOT NULL ",
+        "PID_APID": " INT(5) NOT NULL ",
+        "PID_PI1_VAL": " INT(10) NOT NULL DEFAULT '0' ",
+        "PID_PI2_VAL": " INT(10) NOT NULL DEFAULT '0' ",
+        "PID_SPID": " INT(10) NOT NULL ",
+        "PID_DESCR": " VARCHAR(64) NULL DEFAULT NULL ",
+        "PID_UNIT": " VARCHAR(8) NULL DEFAULT NULL ",
+        "PID_TPSD": " INT(10) NULL DEFAULT '-1' ",
+        "PID_DFHSIZE": " INT(2) NOT NULL ",
+        "PID_TIME": " CHAR(1) NULL DEFAULT 'N' ",
+        "PID_INTER": " INT(8) NULL DEFAULT NULL ",
+        "PID_VALID": " CHAR(1) NULL DEFAULT 'Y' ",
+        "PID_CHECK": " INT(1) NULL DEFAULT '0' ",
+        "PID_EVENT": " CHAR(1) NULL DEFAULT 'N' ",
+        "PID_EVID": " VARCHAR(17) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PID_TYPE`, `PID_STYPE`, `PID_APID`, `PID_PI1_VAL`, `PID_PI2_VAL`, `PID_SPID`) ,",
+        "  INDEX PID_SPID (`PID_SPID` ASC) ,",
+        "  CONSTRAINT `pid_ibfk_1`",
+        "    FOREIGN KEY (`PID_SPID` )",
+        "    REFERENCES `$SCHEMA`.`tpcf` (`TPCF_SPID` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "plf": {
+      "columns": {
+        "PLF_NAME": " VARCHAR(8) NOT NULL ",
+        "PLF_SPID": " INT(10) NOT NULL ",
+        "PLF_OFFBY": " INT(5) NOT NULL ",
+        "PLF_OFFBI": " INT(1) NOT NULL ",
+        "PLF_NBOCC": " INT(4) NULL DEFAULT '1' ",
+        "PLF_LGOCC": " INT(5) NULL DEFAULT '0' ",
+        "PLF_TIME": " INT(9) NULL DEFAULT '0' ",
+        "PLF_TDOCC": " INT(9) NULL DEFAULT '1' "
+      },
+      "options": [
+        "  PRIMARY KEY (`PLF_NAME`, `PLF_SPID`) ,",
+        "  CONSTRAINT `plf_ibfk_1`",
+        "    FOREIGN KEY (`PLF_NAME` )",
+        "    REFERENCES `$SCHEMA`.`pcf` (`PCF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ppc": {
+      "columns": {
+        "PPC_NUMBE": " VARCHAR(4) NOT NULL ",
+        "PPC_POS": " INT(2) NOT NULL ",
+        "PPC_NAME": " VARCHAR(8) NOT NULL ",
+        "PPC_FORM": " CHAR(1) NULL DEFAULT 'N' "
+      },
+      "options": [
+        "  PRIMARY KEY (`PPC_NUMBE`, `PPC_POS`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ppf": {
+      "columns": {
+        "PPF_NUMBE": " VARCHAR(4) NOT NULL ",
+        "PPF_HEAD": " VARCHAR(32) NULL DEFAULT NULL ",
+        "PPF_NBPR": " INT(2) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PPF_NUMBE`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "prf": {
+      "columns": {
+        "PRF_NUMBR": " VARCHAR(10) NOT NULL ",
+        "PRF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
+        "PRF_INTER": " CHAR(1) NULL DEFAULT 'R' ",
+        "PRF_DSPFMT": " CHAR(1) NULL DEFAULT 'U' ",
+        "PRF_RADIX": " CHAR(1) NULL DEFAULT 'D' ",
+        "PRF_NRANGE": " INT(3) NULL DEFAULT NULL ",
+        "PRF_UNIT": " VARCHAR(4) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PRF_NUMBR`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "prv": {
+      "columns": {
+        "PRV_NUMBR": " VARCHAR(10) NOT NULL ",
+        "PRV_MINVAL": " VARCHAR(17) NOT NULL ",
+        "PRV_MAXVAL": " VARCHAR(17) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PRV_NUMBR`, `PRV_MINVAL`) ,",
+        "  CONSTRAINT `prv_ibfk_1`",
+        "    FOREIGN KEY (`PRV_NUMBR` )",
+        "    REFERENCES `$SCHEMA`.`prf` (`PRF_NUMBR` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "psm": {
+      "columns": {
+        "PSM_NAME": " VARCHAR(8) NOT NULL ",
+        "PSM_TYPE": " CHAR(1) NOT NULL ",
+        "PSM_PARSET": " VARCHAR(8) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PSM_NAME`, `PSM_TYPE`, `PSM_PARSET`) ,",
+        "  INDEX psm_ibfk_1 (`PSM_PARSET` ASC) ,",
+        "  CONSTRAINT `psm_ibfk_1`",
+        "    FOREIGN KEY (`PSM_PARSET` )",
+        "    REFERENCES `$SCHEMA`.`pst` (`PST_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "psv": {
+      "columns": {
+        "PSV_NAME": " VARCHAR(8) NOT NULL ",
+        "PSV_PVSID": " VARCHAR(8) NOT NULL ",
+        "PSV_DESCR": " VARCHAR(24) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PSV_PVSID`) ,",
+        "  INDEX psv_ibfk_1 (`PSV_NAME` ASC) ,",
+        "  CONSTRAINT `psv_ibfk_1`",
+        "    FOREIGN KEY (`PSV_NAME` )",
+        "    REFERENCES `$SCHEMA`.`pst` (`PST_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "ptv": {
+      "columns": {
+        "PTV_CNAME": " VARCHAR(8) NOT NULL ",
+        "PTV_PARNAM": " VARCHAR(8) NOT NULL ",
+        "PTV_INTER": " CHAR(1) NULL DEFAULT 'R' ",
+        "PTV_VAL": " VARCHAR(17) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PTV_CNAME`, `PTV_PARNAM`) ,",
+        "  CONSTRAINT `ptv_ibfk_1`",
+        "    FOREIGN KEY (`PTV_CNAME` )",
+        "    REFERENCES `$SCHEMA`.`ccf` (`CCF_CNAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "pvs": {
+      "columns": {
+        "PVS_ID": " VARCHAR(8) NOT NULL ",
+        "PVS_PSID": " VARCHAR(8) NOT NULL ",
+        "PVS_PNAME": " VARCHAR(8) NOT NULL ",
+        "PVS_INTER": " CHAR(1) NULL DEFAULT 'R' ",
+        "PVS_VALS": " VARCHAR(17) NULL DEFAULT NULL ",
+        "PVS_BIT": " INT(4) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`PVS_ID`, `PVS_BIT`) ,",
+        "  INDEX pvs_ibfk_1 (`PVS_PSID` ASC) ,",
+        "  CONSTRAINT `pvs_ibfk_1`",
+        "    FOREIGN KEY (`PVS_PSID` )",
+        "    REFERENCES `$SCHEMA`.`pst` (`PST_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE,",
+        "  CONSTRAINT `pvs_ibfk_2`",
+        "    FOREIGN KEY (`PVS_ID` )",
+        "    REFERENCES `$SCHEMA`.`psv` (`PSV_PVSID` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "sdf": {
+      "columns": {
+        "SDF_SQNAME": " VARCHAR(8) NOT NULL ",
+        "SDF_ENTRY": " INT(5) NOT NULL ",
+        "SDF_ELEMID": " VARCHAR(8) NOT NULL ",
+        "SDF_POS": " INT(4) NOT NULL ",
+        "SDF_PNAME": " VARCHAR(8) NOT NULL ",
+        "SDF_FTYPE": " CHAR(1) NULL DEFAULT 'E' ",
+        "SDF_VTYPE": " CHAR(1) NOT NULL ",
+        "SDF_VALUE": " VARCHAR(17) NULL DEFAULT NULL ",
+        "SDF_VALSET": " VARCHAR(8) NULL DEFAULT NULL ",
+        "SDF_REPPOS": " INT(4) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`SDF_SQNAME`, `SDF_ENTRY`, `SDF_POS`) ,",
+        "  CONSTRAINT `sdf_ibfk_1`",
+        "    FOREIGN KEY (`SDF_SQNAME` , `SDF_ENTRY` )",
+        "    REFERENCES `$SCHEMA`.`css` (`CSS_SQNAME` , `CSS_ENTRY` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "spf": {
+      "columns": {
+        "SPF_NUMBE": " VARCHAR(8) NOT NULL ",
+        "SPF_HEAD": " VARCHAR(32) NULL DEFAULT NULL ",
+        "SPF_NPAR": " SMALLINT(1) NOT NULL ",
+        "SPF_UPUN": " INT(2) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`SPF_NUMBE`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "spc": {
+      "columns": {
+        "SPC_NUMBE": " VARCHAR(8) NOT NULL ",
+        "SPC_POS": " INT(1) NOT NULL ",
+        "SPC_NAME": " VARCHAR(8) NOT NULL ",
+        "SPC_UPDT": " CHAR(1) NULL DEFAULT NULL ",
+        "SPC_MODE": " CHAR(1) NULL DEFAULT NULL ",
+        "SPC_FORM": " CHAR(1) NULL DEFAULT 'N' ",
+        "SPC_BACK": " CHAR(1) NULL DEFAULT '0' ",
+        "SPC_FORE": " CHAR(1) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`SPC_NUMBE`, `SPC_POS`) ,",
+        "  CONSTRAINT `spc_ibfk_1`",
+        "    FOREIGN KEY (`SPC_NUMBE` )",
+        "    REFERENCES `$SCHEMA`.`spf` (`SPF_NUMBE` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "txf": {
+      "columns": {
+        "TXF_NUMBR": " VARCHAR(10) NOT NULL ",
+        "TXF_DESCR": " VARCHAR(32) NULL DEFAULT NULL ",
+        "TXF_RAWFMT": " CHAR(1) NOT NULL ",
+        "TXF_NALIAS": " INT(3) NULL DEFAULT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`TXF_NUMBR`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "txp": {
+      "columns": {
+        "TXP_NUMBR": " VARCHAR(10) NOT NULL ",
+        "TXP_FROM": " VARCHAR(14) NOT NULL ",
+        "TXP_TO": " VARCHAR(14) NOT NULL ",
+        "TXP_ALTXT": " VARCHAR(14) NOT NULL "
+      },
+      "options": [
+        "  PRIMARY KEY (`TXP_NUMBR`, `TXP_FROM`) ,",
+        "  CONSTRAINT `txp_ibfk_1`",
+        "    FOREIGN KEY (`TXP_NUMBR` )",
+        "    REFERENCES `$SCHEMA`.`txf` (`TXF_NUMBR` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "vdf": {
+      "columns": {
+        "VDF_NAME": " VARCHAR(8) NOT NULL ",
+        "VDF_COMMENT": " VARCHAR(32) NULL DEFAULT NULL ",
+        "VDF_DOMAINID": " INT(5) NULL DEFAULT NULL ",
+        "VDF_RELEASE": " INT(5) NULL DEFAULT '0' ",
+        "VDF_ISSUE": " INT(5) NULL DEFAULT '0' "
+      },
+      "options": [
+        "  PRIMARY KEY (`VDF_NAME`) "
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    },
+    "vpd": {
+      "columns": {
+        "VPD_TPSD": " INT(10) NOT NULL ",
+        "VPD_POS": " INT(4) NOT NULL ",
+        "VPD_NAME": " VARCHAR(8) NOT NULL ",
+        "VPD_GRPSIZE": " INT(3) NULL DEFAULT '0' ",
+        "VPD_FIXREP": " INT(3) NULL DEFAULT '0' ",
+        "VPD_CHOICE": " CHAR(1) NULL DEFAULT 'N' ",
+        "VPD_PIDREF": " CHAR(1) NULL DEFAULT 'N' ",
+        "VPD_DISDESC": " VARCHAR(16) NULL DEFAULT NULL ",
+        "VPD_WIDTH": " INT(2) NOT NULL DEFAULT '1' ",
+        "VPD_JUSTIFY": " CHAR(1) NULL DEFAULT 'L' ",
+        "VPD_NEWLINE": " CHAR(1) NULL DEFAULT 'N' ",
+        "VPD_DCHAR": " INT(1) NULL DEFAULT '0' ",
+        "VPD_FORM": " CHAR(1) NULL DEFAULT 'N' ",
+        "VPD_OFFSET": " INT(6) NULL DEFAULT '0' "
+      },
+      "options": [
+        "  PRIMARY KEY (`VPD_TPSD`, `VPD_POS`) ,",
+        "  INDEX vpd_ibfk_1 (`VPD_NAME` ASC) ,",
+        "  CONSTRAINT `vpd_ibfk_1`",
+        "    FOREIGN KEY (`VPD_NAME` )",
+        "    REFERENCES `$SCHEMA`.`pcf` (`PCF_NAME` )",
+        "    ON DELETE CASCADE",
+        "    ON UPDATE CASCADE"
+      ],
+      "engine": "InnoDB",
+      "default_character_set": "latin1"
+    }
+  }
+}
