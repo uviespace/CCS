@@ -2875,7 +2875,7 @@ def about_dialog(parent=None, action=None):
     dialog.set_program_name('UVIE Central Checkout System')
 
     dialog.set_copyright('UVIE 01/2022')
-    dialog.set_license_type(Gtk.License.GPL_2_0)
+    dialog.set_license_type(Gtk.License.MPL_2_0)
     dialog.set_authors(('Marko Mecina', 'Dominik Moeslinger', 'Thanassis Tsiodras', 'Armin Luntzer'))
     dialog.set_version('2.0')
     dialog.set_logo(GdkPixbuf.Pixbuf.new_from_file(os.path.join(pics_path, 'IfA_Logo_48.png')))

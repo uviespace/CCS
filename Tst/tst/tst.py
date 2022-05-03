@@ -355,8 +355,6 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.label_widget_data_pool.set_text('Data Pool')
         self.feature_area.append_page(child=self.data_pool_tab, tab_label=self.label_widget_data_pool)
 
-
-
         self.box.pack_start(self.work_desk, True, True, 0)
 
         # # panes for the step grid an so on
@@ -1052,7 +1050,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         about_dialog.set_logo(pixbuf)
         about_dialog.set_program_name('Test Specification Tool')
         about_dialog.set_copyright('UVIE 11/2021')
-        about_dialog.set_license_type(Gtk.License.GPL_2_0)
+        about_dialog.set_license_type(Gtk.License.MPL_2_0)
         about_dialog.present()
         return
 
