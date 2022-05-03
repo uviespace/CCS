@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 import sys
-import os
+# import os
 import confignator
 sys.path.append(confignator.get_option('paths', 'ccs'))
 sys.path.append(confignator.get_option('paths', 'tst'))
