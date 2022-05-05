@@ -1,10 +1,10 @@
-This file documents the required steps to get the SMILE SXI EGSE up and running on a freshly installed (Arch) Linux system.
+This file documents the required steps to get the UVIE EGSE software up and running on a freshly installed (Arch) Linux system.
 
 manjaro-xfce-21.0.5 linux5.10
 
 # Prerequisites
-1) get EGSE repository
-    $> git clone gitlab.phaidra.org/mecinam2/CCS.git
+1) get CCS repository
+    $> git clone https://gitlab.phaidra.org/mecinam2/CCS.git
     
 2) install MySQL/MariaDB and set it up
     - mariadb
