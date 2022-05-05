@@ -1,8 +1,12 @@
-This file documents the required steps to get the SMILE SXI EGSE up and running on a freshly installed Manjaro Linux system.
+This file documents the required steps to get the SMILE SXI EGSE up and running on a freshly installed (Arch) Linux system.
 
 manjaro-xfce-21.0.5 linux5.10
 
-1) install MySQL/MariaDB and set it up
+# Prerequisites
+1) get EGSE repository
+    $> git clone gitlab.phaidra.org/mecinam2/CCS.git
+    
+2) install MySQL/MariaDB and set it up
     - mariadb
     - mysql-workbench (optional)
 
@@ -13,12 +17,12 @@ manjaro-xfce-21.0.5 linux5.10
     mysql> GRANT ALL PRIVILEGES ON * . * TO 'egse'@'localhost';
     mysql> FLUSH PRIVILEGES;
 
-2) install packages/devtools
+3) install packages/devtools
     - gtksourceview3 [<=3.24.11-1]
     - ipython [<=7.31]
     - make
 
-3) install python modules
+4) install python modules (this can be done be running 'make install-python-env' in the CCS base directory)
     - python-numpy
     - python-scipy
     - python-matplotlib
@@ -32,13 +36,12 @@ manjaro-xfce-21.0.5 linux5.10
     - python-crcmod
     - python-psutil
 
-4) get EGSE repository
-    $> git clone gitlab.phaidra.org/mecinam2/CCS.git
+# Installation
+In the CCS base directory, make DB schemas and Python packages
+
+    - first configure egse.cfg!
     
-5) In CCS directory, make DB schemas and Python packages
-    - first configure egse.cfg
-    
+    $> make install-confignator
     $> make ccs-storage
     $> make codeblockreusefeature
-    $> make install-confignator
     $> make install-testlib
