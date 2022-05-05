@@ -97,14 +97,18 @@ def import_mib():
 
 if __name__ == '__main__':
 
-    if len(sys.argv) > 1:
+    if '-c' in sys.argv:
+        MIBDIR = '/home/user/space/mib'  # directory containing the SCOS2000 *.dat files
+        DBNAME = 'mib_schema_test'  # SQL schema name to be created
+        DBURL = 'mysql://user:password@127.0.0.1'  # credentials of MySQL account
+    elif len(sys.argv) > 1:
         MIBDIR, DBNAME, dbuser = sys.argv[1:4]
         dbpw = getpass.getpass()
         DBURL = 'mysql://{}:{}@127.0.0.1'.format(dbuser, dbpw)
     else:
-        MIBDIR = '/home/user/space/mib'  # directory containing the SCOS2000 *.dat files
-        DBNAME = 'mib_schema_test'  # SQL schema name to be created
-        DBURL = 'mysql://user:password@127.0.0.1'  # credentials of MySQL account
+        print('USAGE: ./import_mib.py <MIBDIR> <DBSCHEMA> <DBUSERNAME> [-c]\n'
+              'Options:\n\t-c\tUse configuration in script, any command line arguments will be ignored')
+        sys.exit()
 
     generate_wbsql()
     create_schema()
