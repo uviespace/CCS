@@ -1,46 +1,53 @@
-.PHONY: install-confignator install-testlib set-start-scripts-permissions build-pc build-fw-profile build-crplm build-cria
+.PHONY: install-confignator ccs-storage codeblockreusefeature install-testlib
 
 all: install build-pc
 
-install: install-confignator install-testlib set-start-scripts-permissions
+install: install-confignator ccs-storage codeblockreusefeature install-testlib
 
 databases: ccs-storage codeblockreusefeature
 
-build-pc: build-fw-profile build-crplm build-cria build-crfee
+# build-pc: build-fw-profile build-crplm build-cria build-crfee
 
 install-confignator:
-	@echo "+-----------------------------------------------+"
+	@echo "+---------------------------------------+"
 	@echo "| installing confignator Python package |"
-	@echo "+-----------------------------------------------+"
+	@echo "+---------------------------------------+"
 	    $(MAKE) reinstall -C $(CURDIR)/Tst/confignator
-	@echo "+-----------------------------------------------+"
+	@echo "+--------------------------------------+"
 	@echo "| installed confignator Python package |"
-	@echo "+-----------------------------------------------+"
+	@echo "+--------------------------------------+"
 	@echo
 
 install-testlib:
-	@echo "+-----------------------------------------------+"
+	@echo "+-----------------------------------+"
 	@echo "| installing testlib Python package |"
-	@echo "+-----------------------------------------------+"
+	@echo "+-----------------------------------+"
 	    $(MAKE) all -C $(CURDIR)/Tst/testing_library
-	@echo "+-----------------------------------------------+"
+	@echo "+----------------------------------+"
 	@echo "| installed testlib Python package |"
-	@echo "+-----------------------------------------------+"
+	@echo "+----------------------------------+"
 	@echo
 
 install-database-dev-env:
-	@echo "+-----------------------------------------------+"
-	@echo "| installing Python packages for the database   |"
-	@echo "+-----------------------------------------------+"
+	@echo "+---------------------------------------------------+"
+	@echo "| installing Python dev packages for the database   |"
+	@echo "+---------------------------------------------------+"
 	    $(MAKE) install-devenv -C $(CURDIR)/Ccs/database
-	@echo "+-----------------------------------------------+"
-	@echo "| installed Python packages for the database    |"
-	@echo "+-----------------------------------------------+"
+	@echo "+---------------------------------------------------+"
+	@echo "| installed Python dev packages for the database    |"
+	@echo "+---------------------------------------------------+"
 	@echo
 	
 install-python-env:
-	python -m pip install numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod
-
+	@echo "+-----------------------------+"
+	@echo "| installing Python modules   |"
+	@echo "+-----------------------------+"
+	python -m pip install --user --upgrade numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod psutil
+	@echo "+-----------------------------+"
+	@echo "| installed Python modules    |"
+	@echo "+-----------------------------+"
+	@echo
+	
 ccs-storage:
 	@echo "+----------------------------------------+"
 	@echo "| setting up the storage database schema |"
