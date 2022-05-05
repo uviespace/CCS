@@ -5,10 +5,10 @@ gi.require_version("GtkSource", "3.0")
 from gi.repository import Gtk, Gdk, GtkSource
 import confignator
 import sys
+
 sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
-
 
 dictionary_of_data_pool = cfl.get_data_pool_items()
 list_of_data_pool = list(dictionary_of_data_pool.keys())
@@ -16,6 +16,7 @@ list_of_data_pool = list(dictionary_of_data_pool.keys())
 data_pool_sublist = []
 
 pid_list = []
+
 
 def get_data_pool_sublist():
     for counter in list_of_data_pool:
@@ -36,9 +37,8 @@ def get_data_pool_sublist():
 
     return data_pool_sublist, pid_list
 
+
 data_pool_sublist, pid_list = get_data_pool_sublist()
-
-
 
 
 class DataPoolTable(Gtk.Grid):
@@ -79,9 +79,7 @@ class DataPoolTable(Gtk.Grid):
 
         # creating the treeview, making it use the filter a model, adding columns
         self.treeview = Gtk.TreeView.new_with_model(Gtk.TreeModelSort(self.data_pool_filter))
-        for i, column_title in enumerate(
-            ["pcf_pid", "pcf_descr", "datatype"]
-        ):
+        for i, column_title in enumerate(["PID", "DESCR", "DATATYPE"]):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
             column.set_sort_column_id(i)
@@ -107,7 +105,6 @@ class DataPoolTable(Gtk.Grid):
         self.treeview.connect("drag-data-get", self.on_drag_data_get)
         self.treeview.connect("drag-begin", self.on_drag_begin)
 
-
         self.show_all()
 
     def on_pid_combo_changed(self, combo):
@@ -119,11 +116,9 @@ class DataPoolTable(Gtk.Grid):
 
         self.data_pool_filter.refilter()
 
-
     def on_clear_button_clicked(self, widget):
         self.current_filter_data_pool = None
         self.data_pool_filter.refilter()
-
 
     def item_selected(self, selection):
         model, row = selection.get_selected()
@@ -132,8 +127,6 @@ class DataPoolTable(Gtk.Grid):
             pid = model[row][0]
         else:
             pass
-
-
 
     def data_pool_filter_func(self, model, iter, data):
 
@@ -145,14 +138,10 @@ class DataPoolTable(Gtk.Grid):
         else:
             return model[iter][0] == self.current_filter_data_pool
 
-
-
-
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
         selection_data.set_text(pid, -1)
-
 
     def on_drag_begin(self, *args):
         pass

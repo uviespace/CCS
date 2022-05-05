@@ -2660,12 +2660,16 @@ def get_tc_list(ccf_descr=None):
 
     if ccf_descr is None:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
-                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
-                                          'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname').fetchall()
+                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
+                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
+                                          'ORDER BY ccf_type, ccf_stype, ccf_cname').fetchall()
     else:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
-                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
-                                          'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
+                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
+                                          'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -2676,6 +2680,7 @@ def get_tc_list(ccf_descr=None):
 
     return cmd_dict
 
+
 def get_tc_calibration_and_parameters(ccf_descr=None):
 
     if ccf_descr is None:
@@ -2685,7 +2690,8 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
                                                   'LEFT JOIN cpc ON cdf.cdf_pname=cpc.cpc_pname '
                                                   'LEFT JOIN prv ON cpc.cpc_prfref=prv.prv_numbr '
                                                   'LEFT JOIN pas ON cpc.cpc_pafref=pas.pas_numbr '
-                                                  'WHERE cpc_descr IS NOT NULL').fetchall()
+                                                  'WHERE cpc_descr IS NOT NULL ORDER BY ccf_type, ccf_stype, ccf_cname, '
+                                                  'cdf_bit, pas_alval').fetchall()
 
     else:
         calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
@@ -2694,8 +2700,8 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
                                                   'LEFT JOIN cpc ON cdf.cdf_pname=cpc.cpc_pname '
                                                   'LEFT JOIN prv ON cpc.cpc_prfref=prv.prv_numbr '
                                                   'LEFT JOIN pas ON cpc.cpc_pafref=pas.pas_numbr '
-                                                  'WHERE cpc_descr IS NOT NULL '
-                                                  'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+                                                  'WHERE cpc_descr IS NOT NULL AND '
+                                                  'ccf_descr="{}"'.format(ccf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -2704,8 +2710,29 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
     for row in calibrations:
         calibrations_dict.setdefault(row[0:5], []).append(row[5:11])
 
-
     return calibrations_dict
+
+
+def get_tm_parameter_list(st, sst, apid, pi1val):
+    que = 'SELECT pid_spid, pid_tpsd FROM pid WHERE pid_type={} AND pid_stype={} AND pid_apid={} AND pid_pi1_val={}'.format(st, sst, apid, pi1val)
+    spid, tpsd = scoped_session_idb.execute(que).fetchall()[0]
+
+    if tpsd == -1:
+        que = 'SELECT plf_name, pcf_descr, plf_offby, pcf_ptc, pcf_pfc FROM plf LEFT JOIN pcf ON plf_name=pcf_name WHERE plf_spid={} ORDER BY plf_offby, plf_offbi'.format(spid)
+    else:
+        que = 'SELECT vpd_name, pcf_descr, NULL, pcf_ptc, pcf_pfc FROM vpd LEFT JOIN pcf ON vpd_name=pcf_name WHERE vpd_tpsd={} ORDER BY vpd_pos'.format(tpsd)
+
+    res = scoped_session_idb.execute(que).fetchall()
+
+    return res
+
+
+def get_tm_parameter_info(pname):
+    que = 'SELECT ocp_lvalu, ocp_hvalu, ocp_type, txp_from, txp_altxt FROM pcf LEFT JOIN ocp ON pcf_name=ocp_name LEFT JOIN txp ON pcf_curtx=txp_numbr WHERE pcf_name="{}" ORDER BY txp_from, ocp_pos'.format(pname)
+    res = scoped_session_idb.execute(que).fetchall()
+
+    return res
+
 
 def get_tm_id(pcf_descr=None):
     if pcf_descr is None:
@@ -2722,7 +2749,8 @@ def get_tm_id(pcf_descr=None):
                                          'LEFT JOIN txf '
                                          'ON pcf_curtx = txf_numbr '
                                          'LEFT JOIN txp '
-                                         'ON txf_numbr = txp.txp_numbr').fetchall()
+                                         'ON txf_numbr = txp.txp_numbr '
+                                         'ORDER BY pid_type, pid_stype, pid_apid, pid_pi1_val').fetchall()
 
     else:
         tms = scoped_session_idb.execute('SELECT pid_type, pid_stype, pid_apid, pid_pi1_val, pid_descr , pid_tpsd, '
@@ -2748,20 +2776,17 @@ def get_tm_id(pcf_descr=None):
     for row in tms:
         tms_dict.setdefault(row[0:5], []).append(row[5:])
 
-
     return tms_dict
 
-def get_data_pool_items(pcf_descr = None):
+
+def get_data_pool_items(pcf_descr=None):
     if pcf_descr is None:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
-                                         'FROM pcf '
-                                        'WHERE pcf_pid <> 0').fetchall()
+                                               'FROM pcf WHERE pcf_pid <> 0').fetchall()
 
     else:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
-                                         'FROM pcf '
-                                        'WHERE pcf_pid <> 0 '
-                                        'WHERE pcf_descr="{}"'.format(pcf_descr)).fetchall()
+                                               'FROM pcf WHERE pcf_pid <> 0 AND pcf_descr="{}"'.format(pcf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -2770,9 +2795,7 @@ def get_data_pool_items(pcf_descr = None):
     for row in data_pool:
         data_pool_dict.setdefault(row[0:4], []).append(row[5:])
 
-
     return data_pool_dict
-
 
 
 def get_dp_items(source='mib'):
