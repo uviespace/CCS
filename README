@@ -13,16 +13,17 @@ manjaro-xfce-21.0.5 linux5.10
     $> sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
     $> sudo systemctl enable --now mariadb
     $> sudo mariadb-secure-installation
-    mysql> CREATE USER 'egse'@'localhost' IDENTIFIED BY 'xrayvision';
-    mysql> GRANT ALL PRIVILEGES ON * . * TO 'egse'@'localhost';
+    mysql> CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
+    mysql> GRANT ALL PRIVILEGES ON * . * TO 'user'@'localhost';
     mysql> FLUSH PRIVILEGES;
 
 3) install packages/devtools
     - gtksourceview3 [<=3.24.11-1]
     - ipython [<=7.31]
+    - python-pip
     - make
 
-4) install python modules (this can be done be running 'make install-python-env' in the CCS base directory)
+4) install python modules (to install the modules with pip in ~/.local, you can run 'make install-python-env' in the CCS base directory)
     - python-numpy
     - python-scipy
     - python-matplotlib
@@ -37,11 +38,17 @@ manjaro-xfce-21.0.5 linux5.10
     - python-psutil
 
 # Installation
-In the CCS base directory, make DB schemas and Python packages
+In the CCS base directory, execute
 
     - first configure egse.cfg!
     
     $> make install-confignator
     $> make ccs-storage
     $> make codeblockreusefeature
-    $> make install-testlib
+    
+# MIB
+Use CCS/Ccs/tools/import_mib.py to import a set of SCOS2000 MIB files into a MySQL DB schema
+
+# CCS & TST
+start_ccs: starts the CCS
+start_tst: starts the TST
