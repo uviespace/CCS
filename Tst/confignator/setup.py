@@ -4,8 +4,8 @@ import setuptools
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
-with open('LICENSE') as f:
-    license_text = f.read()
+# with open('LICENSE') as f:
+#     license_text = f.read()
 
 setuptools.setup(
     name='confignator',
@@ -16,11 +16,11 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='',
-    license=license_text,
+    license='MPL 2.0',
     packages=setuptools.find_packages(),
     classifiers=[
         'Programming Language :: Python :: 3',
-        'License',
+        'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',
         'Operating System',
     ],
     package_data={
