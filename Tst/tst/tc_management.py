@@ -3,7 +3,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "3.0")
-from gi.repository import Gtk, Gdk, GtkSource
+from gi.repository import Gtk, Gdk, GtkSource, Pango
 import confignator
 import sys
 
@@ -40,15 +40,24 @@ dictionary_of_variables = cfl.get_tc_calibration_and_parameters()
 
 
 def get_cpc_descr(tc_type):
-    # read_in_list_of_variables = list(dictionary_of_variables.keys())
 
     cpc_descr = []
 
     for key in dictionary_of_variables:
         if tc_type in key:
             ptc, pfc = dictionary_of_variables[key][0][:2]
-            cpc_descr.append([*key[2:4], s2k.ptt[ptc][pfc]])
-    # cpc_descr = [[list_element] for list_element in cpc_descr]
+
+            # check if parameter is editable, fixed, or spare
+            eltype, cdfdesc = key[2:4]
+            if eltype == 'A':
+                cpc_descr.append(['', key[3], '{} bit'.format(key[4]), False, Pango.Style.ITALIC])
+            elif eltype == 'F':
+                cpc_descr.append([*key[6:8], s2k.ptt[ptc][pfc], True, Pango.Style.ITALIC])
+            elif eltype is None:
+                pass
+            else:
+                cpc_descr.append([*key[6:8], s2k.ptt[ptc][pfc], True, Pango.Style.NORMAL])
+
     return cpc_descr
 
 
@@ -65,6 +74,9 @@ def get_calibrations(tc_type, cpc_descr):
                 prv_maxval = counter[3]
                 pas_altxt = counter[4]
                 pas_alval = counter[5]
+
+                if key[2] == 'F' and pas_altxt != key[5]:
+                    continue
 
                 if pas_alval is not None:
                     if pas_alval in alvals:
@@ -101,7 +113,6 @@ class TcTable(Gtk.Grid):
 
         self.set_size_request(500, 500)
         # self.set_orientation(Gtk.Orientation.VERTICAL)
-        # self.grid = Gtk.Grid
         self.set_row_spacing(5)
 
         self.telecommand_liststore = Gtk.ListStore(int, int, str, str)
@@ -226,36 +237,34 @@ class CommandDescriptionBox(Gtk.Box):
         # self.set_hexpand(False)
 
         # first treeview for commands
-        self.descr_liststore = Gtk.ListStore(int, str, str, str)
+        self.descr_liststore = Gtk.ListStore(int, str, str, str, bool, Pango.Style)
         for descr_ref in descr_list:
             self.descr_liststore.append(list(descr_ref))
         self.current_filter_descr = None
 
         # Creating filter, feeding it with liststore model
         self.descr_filter = self.descr_liststore.filter_new()
+
         # setting the filter function
         self.descr_filter.set_visible_func(self.descr_filter_func)
 
         self.descr_treeview = Gtk.TreeView(model=self.descr_filter)
 
-        for i, column_title in enumerate(["POS", "NAME", "PARAMETER", "DATATYPE"]):
+        for i, column_title in enumerate(["POS", "NAME", "PARAMETER", "DATATYPE", "sensitive", "style"]):
             renderer = Gtk.CellRendererText()
             if column_title == "POS":
                 renderer.set_property('xalign', 1)
-            column = Gtk.TreeViewColumn(column_title, renderer, text=i)
-            if column_title == "NAME":
+            column = Gtk.TreeViewColumn(column_title, renderer, text=i, sensitive=4, style=5)
+            if column_title in ["NAME", "style", "sensitive"]:
                 column.set_visible(False)
             column.colnr = i
             self.descr_treeview.append_column(column)
 
         # item selection
-        # self.treeview.connect("button-press-event", self.on_cell_clicked)
         self.selected_row = self.descr_treeview.get_selection()
         self.selected_row.connect("changed", self.item_selected)
 
         self.scrollable_treelist = Gtk.ScrolledWindow()
-        # self.scrollable_treelist.set_vexpand(True)
-        # self.scrollable_treelist.set_hexpand(20)
         self.pack_start(self.scrollable_treelist, True, True, 5)
 
         self.scrollable_treelist.add(self.descr_treeview)
@@ -268,6 +277,7 @@ class CommandDescriptionBox(Gtk.Box):
 
         # Creating filter, feeding it with liststore model
         self.cal_filter = self.cal_liststore.filter_new()
+
         # setting the filter function
         self.cal_filter.set_visible_func(self.cal_filter_func)
 
@@ -280,7 +290,6 @@ class CommandDescriptionBox(Gtk.Box):
             self.cal_treeview.append_column(column)
 
         self.scrollable_calibrations_treelist = Gtk.ScrolledWindow()
-        # self.scrollable_calibrations_treelist.set_vexpand(True)
         self.pack_start(self.scrollable_calibrations_treelist, True, True, 0)
 
         self.scrollable_calibrations_treelist.add(self.cal_treeview)
@@ -294,21 +303,19 @@ class CommandDescriptionBox(Gtk.Box):
     def item_selected(self, selection):
         model, row = selection.get_selected()
         if row is not None:
-            # print("item_selected")
-            # print(model[row][0])
             calibrations_list.clear()
-            calibrations_list.append(get_calibrations(tc_type, model[row][2]))
+
+            if model[row][1] != '':
+                calibrations_list.append(get_calibrations(tc_type, model[row][1]))
             self.refresh_cal_treeview()
 
     def refresh_descr_treeview(self):
         self.descr_liststore.clear()
-        # self.descr_liststore = Gtk.ListStore(str, str, str, str)
         for i, descr_ref in enumerate(descr_list):
             self.descr_liststore.append([i+1] + list(descr_ref))
-        # self.descr_treeview.set_model(self.descr_liststore)
 
     def cal_filter_func(self, model, iter, data):
-        if (self.current_filter_descr is None or self.current_filter_descr == "None"):
+        if self.current_filter_descr is None or self.current_filter_descr == "None":
             return True
         else:
             return model[iter][2] == self.current_filter_descr
@@ -322,7 +329,5 @@ class CommandDescriptionBox(Gtk.Box):
         else:
             for cal_ref in calibrations_list[0]:
                 self.cal_liststore.append(list(cal_ref))
-
-        # self.cal_treeview.set_model(self.cal_liststore)
 
         self.cal_treeview.set_model(self.cal_liststore)

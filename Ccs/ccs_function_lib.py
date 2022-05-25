@@ -2692,31 +2692,32 @@ def get_tc_list(ccf_descr=None):
 def get_tc_calibration_and_parameters(ccf_descr=None):
 
     if ccf_descr is None:
-        calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
+        calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_eltype, cdf_descr, cdf_ellen, '
+                                                  'cdf_value, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
                                                   'cpc_pfc, prv_minval, prv_maxval, pas_altxt, pas_alval '
                                                   'FROM ccf LEFT JOIN cdf ON ccf.ccf_cname=cdf.cdf_cname '
                                                   'LEFT JOIN cpc ON cdf.cdf_pname=cpc.cpc_pname '
                                                   'LEFT JOIN prv ON cpc.cpc_prfref=prv.prv_numbr '
                                                   'LEFT JOIN pas ON cpc.cpc_pafref=pas.pas_numbr '
-                                                  'WHERE cpc_descr IS NOT NULL ORDER BY ccf_type, ccf_stype, ccf_cname, '
-                                                  'cdf_bit, pas_alval').fetchall()
+                                                  'ORDER BY ccf_type, ccf_stype, '
+                                                  'ccf_cname, cdf_bit, pas_alval').fetchall()
 
     else:
-        calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
+        calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_eltype, cdf_descr, cdf_ellen, '
+                                                  'cdf_value, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
                                                   'cpc_pfc, prv_minval, prv_maxval, pas_altxt, pas_alval '
                                                   'FROM ccf LEFT JOIN cdf ON ccf.ccf_cname=cdf.cdf_cname '
                                                   'LEFT JOIN cpc ON cdf.cdf_pname=cpc.cpc_pname '
                                                   'LEFT JOIN prv ON cpc.cpc_prfref=prv.prv_numbr '
                                                   'LEFT JOIN pas ON cpc.cpc_pafref=pas.pas_numbr '
-                                                  'WHERE cpc_descr IS NOT NULL AND '
-                                                  'ccf_descr="{}"'.format(ccf_descr)).fetchall()
+                                                  'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
 
     scoped_session_idb.close()
 
     calibrations_dict = {}
 
     for row in calibrations:
-        calibrations_dict.setdefault(row[0:5], []).append(row[5:11])
+        calibrations_dict.setdefault(row[:9], []).append(row[9:])
 
     return calibrations_dict
 
