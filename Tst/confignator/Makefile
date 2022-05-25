@@ -17,7 +17,7 @@ clean: clean-build clean-doc-build
 
 reinstall: clean uninstall build install
 
-build:
+build:	clean
 	@echo "\e[1m=====================================\e[0m"
 	@echo "\e[1m building confignator Python package \e[0m"
 	@echo "\e[1m=====================================\e[0m"

@@ -1,0 +1,19 @@
+# requirements for running CCS/TST
+# markupsafe < 2.1.0
+wheel
+ipython >= 7, < 8
+numpy
+scipy
+matplotlib
+cairocffi
+mysqlclient
+sqlalchemy
+sphinx
+sphinx_rtd_theme
+astropy
+crcmod
+psutil
+
+# for TASTE, which also needs libdbus-1-dev, gir1.2-notify-0.7, libgirepository1.0-dev, libgtk-3-dev
+# pygobject
+# dbus-python

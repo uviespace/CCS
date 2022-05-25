@@ -12,7 +12,19 @@ install-confignator:
 	@echo "+---------------------------------------+"
 	@echo "| installing confignator Python package |"
 	@echo "+---------------------------------------+"
-	    $(MAKE) reinstall -C $(CURDIR)/Tst/confignator
+	    $(MAKE) build -C $(CURDIR)/Tst/confignator
+	    pip install -U $(CURDIR)/Tst/confignator/dist/*.whl
+	@echo "+--------------------------------------+"
+	@echo "| installed confignator Python package |"
+	@echo "+--------------------------------------+"
+	@echo
+	
+install-confignator-userspace:
+	@echo "+---------------------------------------+"
+	@echo "| installing confignator Python package |"
+	@echo "+---------------------------------------+"
+	    $(MAKE) build -C $(CURDIR)/Tst/confignator
+	    pip install --user -U $(CURDIR)/Tst/confignator/dist/*.whl
 	@echo "+--------------------------------------+"
 	@echo "| installed confignator Python package |"
 	@echo "+--------------------------------------+"
@@ -42,7 +54,17 @@ install-python-env:
 	@echo "+-----------------------------+"
 	@echo "| installing Python modules   |"
 	@echo "+-----------------------------+"
-	python -m pip install --user --upgrade numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod psutil
+	    python -m pip install --user --upgrade numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod psutil
+	@echo "+-----------------------------+"
+	@echo "| installed Python modules    |"
+	@echo "+-----------------------------+"
+	@echo
+
+install-python-requirements:
+	@echo "+-----------------------------+"
+	@echo "| installing Python modules   |"
+	@echo "+-----------------------------+"
+	    pip install -U -r $(CURDIR)/requirements.txt
 	@echo "+-----------------------------+"
 	@echo "| installed Python modules    |"
 	@echo "+-----------------------------+"

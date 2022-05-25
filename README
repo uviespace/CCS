@@ -19,11 +19,11 @@ manjaro-xfce-21.0.5 linux5.10
 
 3) install packages/devtools
     - gtksourceview3 [<=3.24.11-1]
-    - ipython [<=7.31]
+    - ipython [<=7.*]
     - python-pip
     - make
 
-4) install python modules (to install the modules with pip in ~/.local, you can run 'make install-python-env' in the CCS base directory)
+4) install python modules (to install the modules with pip in ~/.local, you can run 'make install-python-env' in the CCS base directory or use 'pip install [--user] -r requirements.txt')
     - python-numpy
     - python-scipy
     - python-matplotlib
