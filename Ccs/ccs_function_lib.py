@@ -62,6 +62,12 @@ crc = crcmod.predefined.mkCrcFun(crctype)
 # Set up logger
 logger = logging.getLogger('CFL')
 
+LOGLEVEL_DICT = {'DEBUG': logging.DEBUG,
+                 'INFO': logging.INFO,
+                 'WARNING': logging.WARNING,
+                 'ERROR': logging.ERROR,
+                 'CRITICAL': logging.CRITICAL}
+
 counters = {}
 
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
@@ -184,7 +190,13 @@ def start_editor(console=True, *args):
 
     directory = confignator.get_option('paths', 'ccs')
     file_path = os.path.join(directory, 'editor.py')
-    start_app(console, file_path, directory, *args)
+
+    if '--terminal' in args:
+        args = list(args)
+        args.remove('--terminal')
+        os.system(' '.join(['python3', file_path, *args]))
+    else:
+        start_app(console, file_path, directory, *args)
 
     return
 
@@ -258,16 +270,12 @@ def start_config_editor(console=False, *args):
 # The logger is returned with the given name an can be used like a normal logger
 def start_logging(name):
     level = cfg.get('ccs-logging', 'level')
-    loglevel_dict = {'DEBUG': logging.DEBUG,
-                          'INFO': logging.INFO,
-                          'WARNING': logging.WARNING,
-                          'ERROR': logging.ERROR,
-                          'CRITICAL': logging.CRITICAL}
-    loglevel = loglevel_dict[level]
+    loglevel = LOGLEVEL_DICT[level]
 
     rootLogger = logging.getLogger('')
     rootLogger.setLevel(loglevel)
     socketHandler = logging.handlers.SocketHandler('localhost', logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+
     # don't bother with a formatter, since a socket handler sends the event as an unformatted pickle
     rootLogger.addHandler(socketHandler)
     log = logging.getLogger(name)

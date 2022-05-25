@@ -153,13 +153,7 @@ class CcsEditor(Gtk.Window):
             self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
             self.cfg.source = confignator.get_option('config-files', 'ccs')
 
-        # try:
-        #     with open('.pickledcfg', 'wb') as fdesc:
-        #         pickle.dump(self.cfg, fdesc)
-        # except Exception as e:
-        #     pass
-        # finally:
-        #     fdesc.close()
+        self.logdir = confignator.get_option('ccs-paths', 'log-file-dir')
 
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
         self.paned.set_wide_handle(True)
@@ -179,25 +173,7 @@ class CcsEditor(Gtk.Window):
 
         self.searchbar = self.create_searchbar()
         self.grid.attach(self.searchbar, 0, 2, 3, 1)
-        '''        
-        """ logo """
-        box = Gtk.HBox()
-        button = Gtk.ToolButton()
-        button.set_icon_name("system-search-symbolic")
-        size = button.get_icon_size()
-        t, h, w = Gtk.IconSize.lookup(size)
-        # icons are half the size of button (usually)
-        pixmap_path = os.path.join(pixmap_folder, 'UVIE_Logo_48.png')
-        logo = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, -1, w * 2)
-        img = Gtk.Image.new_from_pixbuf(logo)
-        box.pack_end(img, False, False, 0)
 
-        pixmap_path = os.path.join(pixmap_folder, 'IfA_Logo_48.png')
-        logo = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, -1, w * 2)
-        img = Gtk.Image.new_from_pixbuf(logo)
-        box.pack_end(img, False, False, 0)
-        self.grid.attach(box, 2, 1, 1, 1)
-        '''
         self.univie_box = self.create_univie_box()
         self.grid.attach(self.univie_box, 2, 1, 1, 1)
 
@@ -206,10 +182,6 @@ class CcsEditor(Gtk.Window):
 
         self.editor_notebook = Gtk.Notebook(scrollable=True)
         self.grid.attach(self.editor_notebook, 0, 3, 3, 1)
-
-        # scrolledwindow = Gtk.ScrolledWindow()
-        # scrolledwindow.set_overlay_scrolling(False)
-        # scrolledwindow.add(self.ipython_view)
 
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
@@ -221,12 +193,7 @@ class CcsEditor(Gtk.Window):
 
         self.logwin, self.logwintext, self.logbuffer = self.create_log_window()
 
-        # self._share_variables(**{'cfg': self.cfg})
-
-        # self.ipython_view = ipython_view.IPythonView()
-        # self.ipython_view.updateNamespace(globals())
         self.ipython_view = IPythonTerminal(scrollback_lines=int(self.cfg.get('ccs-editor', 'scrollback_lines')))
-        # self.ipython_view.connect('commit', self.ipy_commit)
         self.feed_ready = True
 
         self.nb.append_page(self.ipython_view, tab_label=Gtk.Label(label='Console', angle=270))
@@ -1786,7 +1753,7 @@ class CcsEditor(Gtk.Window):
 
     def switch_notebook_page(self, logwin, view, buffer):
 
-        filelist = glob.glob("logs/*.log")
+        filelist = glob.glob(os.path.join(self.logdir, '*.log'))
         filelist.sort(reverse=True)
         file = open(filelist[0], 'r')
         file = file.read()
@@ -1853,6 +1820,7 @@ class ActionWindow(Gtk.Window):
 
         self.add(grid)
         self.show_all()
+
 
 if __name__ == "__main__":
     given_cfg = None
