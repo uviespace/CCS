@@ -24,6 +24,7 @@ import toolbox
 import tc_management as tcm
 import tm_management as tmm
 import data_pool_tab as dpt
+import verification_tab as vt
 
 import json_to_barescript
 import json_to_csv
@@ -354,6 +355,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.label_widget_data_pool = Gtk.Label()
         self.label_widget_data_pool.set_text('Data Pool')
         self.feature_area.append_page(child=self.data_pool_tab, tab_label=self.label_widget_data_pool)
+
+        # verification tab
+        self.verification_tab = vt.VerificationTable()
+        self.label_widget_verification = Gtk.Label()
+        self.label_widget_verification.set_text("Verification")
+        self.feature_area.append_page(child=self.verification_tab, tab_label=self.label_widget_verification)
 
 
 

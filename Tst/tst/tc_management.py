@@ -5,6 +5,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "3.0")
 from gi.repository import Gtk, Gdk, GtkSource
+from gi.repository.GdkPixbuf import Pixbuf
 import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
@@ -117,11 +118,14 @@ class TcTable(Gtk.Grid):
         for telecommand_ref in list_of_commands:
             self.telecommand_liststore.append(list(telecommand_ref))
         self.current_filter_telecommand = None
+        self.current_filter_longdescr = None
+        self.current_filter_descr = None
 
         # Creating the filter, feeding it with the liststore model
         self.telecommand_filter = self.telecommand_liststore.filter_new()
         # setting the filter function
         self.telecommand_filter.set_visible_func(self.telecommand_filter_func)
+        # self.telecommand_filter.set_visible_func(self.search_filter_func)
 
         # Create ListStores for the ComboBoxes
         self.type_liststore = Gtk.ListStore(int)
@@ -141,6 +145,23 @@ class TcTable(Gtk.Grid):
         self.attach_next_to(
             self.clear_button, self.type_combo, Gtk.PositionType.RIGHT, 1, 1
         )
+
+        """
+        self.search_entry = Gtk.Entry()
+        self.search_entry.set_placeholder_text("<search>")
+        self.attach_next_to(
+            self.search_entry, self.clear_button, Gtk.PositionType.RIGHT, 1, 1
+        )
+
+        self.search_button = Gtk.ToolButton()
+        self.search_button.set_icon_name("search")
+        self.search_button.set_tooltip_text("Search")
+        self.search_button.connect("clicked", self.on_search)
+        self.attach_next_to(
+            self.search_button, self.search_entry, Gtk.PositionType.RIGHT, 1, 1
+        )
+        """
+
 
         # creating the treeview, making it use the filter a model, adding columns
         self.treeview = Gtk.TreeView.new_with_model(Gtk.TreeModelSort(self.telecommand_filter))
@@ -181,6 +202,7 @@ class TcTable(Gtk.Grid):
 
         self.show_all()
 
+
     def on_type_combo_changed(self, combo):
         combo_iter = combo.get_active_iter()
         if combo_iter is not None:
@@ -194,6 +216,7 @@ class TcTable(Gtk.Grid):
     def on_clear_button_clicked(self, widget):
         self.current_filter_telecommand = None
         self.telecommand_filter.refilter()
+
 
     def item_selected(self, selection):
         model, row = selection.get_selected()
@@ -213,8 +236,9 @@ class TcTable(Gtk.Grid):
         else:
             pass
 
-    def telecommand_filter_func(self, model, iter, data):
 
+    def telecommand_filter_func(self, model, iter, data):
+        # print("test telecommand filter")
         if (
                 self.current_filter_telecommand is None
                 or self.current_filter_telecommand == "None"
@@ -223,13 +247,39 @@ class TcTable(Gtk.Grid):
         else:
             return model[iter][0] == self.current_filter_telecommand
 
+
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
         selection_data.set_text(cfl.make_tc_template(descr, comment=False, add_parcfg=True), -1)
 
+
     def on_drag_begin(self, *args):
         pass
+
+
+    def on_search(self, *args):
+        data_from_search_entry = self.search_entry.get_text()
+
+        self.telecommand_filter = self.telecommand_liststore.filter_new()
+        # setting the filter function
+        self.telecommand_filter.set_visible_func(self.search_filter_func)
+
+        self.telecommand_filter.refilter()
+
+        print(data_from_search_entry)
+        print("search started")
+
+
+    def search_filter_func(self, model, iter, data):
+        print("test search filter")
+        if (
+                self.current_filter_longdescr is None
+                or self.current_filter_longdescr == "None"
+        ):
+            return True
+        else:
+            return model[iter][3] == self.current_filter_longdescr
 
 
 

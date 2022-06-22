@@ -53,7 +53,7 @@ class MessageListener(dbus.service.Object):
         try:
             self.win.set_title(str(project) + ': ' + str(self.win.get_title()) + ' ' + str(counting-1))
         except:
-            # Looks like a odd title name but is reshaped in pus_datapool.py
+            # Looks like an odd title name but is reshaped in pus_datapool.py
             self.win.windowname = str(project) + ': @ ' + str(counting-1)
         ###
 
