@@ -61,8 +61,10 @@ import ccs_function_lib as cfl
 
 from database import tm_db
 
-from . import idb
-from . import tools
+# from . import idb
+# from . import tools
+import tools
+import idb
 
 # create a logger
 logger = logging.getLogger(__name__)
@@ -112,13 +114,14 @@ def filter_chain(query, pool_name, is_tm=True, st=None, sst=None, apid=None, seq
         # ToDo database has the CUC timestamp as string. Here the timestamps are floats.
         # Does this comparison operations work?
         t_from_string = str(t_from) + 'U'  # the timestamps in the database are saved as string
-        query = query.filter(tm_db.DbTelemetry.timestamp >= t_from_string)  # ToDo check if the change from > to >= breaks something!
+        query = query.filter(tm_db.DbTelemetry.timestamp >= t_from)  # ToDo check if the change from > to >= breaks something!
+        # ToDo: Funktion Cast verwenden um String auf Double zu casten
         # query = query.filter(tm_db.DbTelemetry.timestamp > t_from)  # <- comparison with float
     if t_to is not None:
         # ToDo database has the CUC timestamp as string. Here the timestamps are floats.
         # Does this comparison operations work?
         t_to_string = str(t_to) + 'U'  # the timestamps in the database are saved as string
-        query = query.filter(tm_db.DbTelemetry.timestamp <= t_to_string)
+        query = query.filter(tm_db.DbTelemetry.timestamp <= t_to) # ToDo: Funktion Cast verwenden um String auf Double zu casten
         # query = query.filter(tm_db.DbTelemetry.timestamp <= end)  # <- comparison with float
     if dest_id is not None:
         query = query.filter(tm_db.DbTelemetry.destID == dest_id)
@@ -136,6 +139,7 @@ def highest_cuc_timestamp(tm_list):
     :rtype: PUS packet || None
     """
     highest = None
+    timestamp = None
     if isinstance(tm_list, list) and len(tm_list) > 0:
         cuc = 0
         for i in range(len(tm_list)):
@@ -147,7 +151,8 @@ def highest_cuc_timestamp(tm_list):
             if tstamp > cuc:
                 cuc = tstamp
                 highest = tm_list[i]
-    return highest
+                timestamp = tstamp
+    return highest, timestamp
 
 
 def lowest_cuc_timestamp(pool_name, tm_list):
@@ -622,11 +627,13 @@ def get_tm(pool_name, st=None, sst=None, apid=None, ssc=None, duration=5, t_from
         of decoded telemetry packets or []
     """
 
+
     # set the time interval
     t_from, t_to = set_time_interval(pool_name=pool_name, t_from=t_from, t_to=t_to, duration=duration)
 
     # for the case that t_to is in future, wait
     current_cuc = cfl.get_last_pckt_time(pool_name=pool_name, string=False)
+
     if t_to > current_cuc:
         difference = t_to - current_cuc
         time.sleep(difference)
@@ -979,7 +986,7 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
     :param pool_name: str
         Name of the TM pool in the database
     :param t_tc_sent: float
-        CUC timestamp of the telecommand
+        CUC timestamp from which search for telecommand should start
     :param tc_apid: int or str
         Application process ID of the sent TC. Can be provided as integer or hexadecimal string
     :param tc_ssc: int
@@ -1002,7 +1009,7 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
 
     # make database query
     packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent - 1)
-
+    # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
     # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
     ack_tms = []
     for i in range(len(packets)):
@@ -1530,6 +1537,68 @@ def get_acquisition(pool_name, tm_21_3):
         for i in range(len(meta_data)):
             logger.info(meta_data[i])
     return result
+
+
+
+def await_tc_identifier(pool_name, tc_apid, tc_ssc):
+    """
+    Gather the data necessary to identify the newest telecommand and put it in tuple.
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param tc_apid: int or str
+        APID of the TC
+    :param tc_ssc: int
+        Sequence number of TC
+    :param last_tm_timestamp: float
+        Timestamp of the latest TM in datapool
+    :return: tc_identifier: tuple
+        Tuple with data to identify TC
+
+    """
+
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, int) or isinstance(tc_apid, str)
+    assert isinstance(tc_ssc, int)
+
+    last_tm_timestamp = cfl.get_pool_rows(pool_name)[-1].timestamp
+    length_last_tm_timestamp = len(last_tm_timestamp)
+    last_tm_timestamp = last_tm_timestamp[:length_last_tm_timestamp - 1]
+    last_tm_timestamp = float(last_tm_timestamp)
+
+    tc_identifier = (tc_apid, tc_ssc, last_tm_timestamp)
+
+    return tc_identifier
+
+
+def get_tc_identifier(pool_name, tc_apid, tc_ssc, tc_time):
+    """
+    Gather the data necessary to identify the newest telecommand and put it in tuple.
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param tc_apid: int or str
+        APID of the TC
+    :param tc_ssc: int
+        Sequence number of TC
+    :param tc_time: float or int
+        Timestamp of the latest TM in datapool
+    :return: tc_identifier: tuple
+        Tuple with data to identify TC
+
+    """
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, int) or isinstance(tc_apid, str)
+    assert isinstance(tc_ssc, int)
+    assert isinstance(tc_time, int) or isinstance(tc_time, float)
+
+    tc_time = float(tc_time)
+
+    tc_identifier = (tc_apid, tc_ssc, tc_time)
+
+    return tc_identifier
+
+
+
+
 
 if __name__ == '__main__':
     sys.path.append('.')

@@ -16,6 +16,7 @@ import dnd_data_parser
 import toolbox
 import cairo
 import sys
+import verification
 
 import confignator
 ccs_path = confignator.get_option('paths', 'ccs')
@@ -1311,12 +1312,23 @@ class StepWidget(Gtk.EventBox):
             return
 
         commands = str(self.get_commands_from_widget())
+        commands2 = str(self.get_verification_from_widget())
+
 
         if len(commands) == 0:
             return
 
+        # if len(commands2) == 0:
+        #    return
+        # print("Commands: ", commands)
+        # print("Verification: ", commands2)
+        # print(type(commands2))
+
+        # verification.read_verification(commands2)
+
         ed = cfl.dbus_connection('editor')
         cfl.Functions(ed, '_to_console_via_socket', commands)
+        # cfl.Functions(ed, '_to_console_via_socket', commands2)
 
     def on_toggle_detail(self, toolbutton, *args):
         """

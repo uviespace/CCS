@@ -2384,6 +2384,7 @@ def get_last_pckt_time(pool_name='LIVE', string=True, dbcon=None):
         DbTelemetry.idx.desc()
     ).first()
     dbcon.close()
+
     if row is not None:
         packet = row.raw
     else:
