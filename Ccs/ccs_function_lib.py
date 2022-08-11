@@ -2671,7 +2671,7 @@ def get_tc_list(ccf_descr=None):
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
                                           'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
-                                          'ORDER BY ccf_type, ccf_stype, ccf_cname').fetchall()
+                                          'ORDER BY SUBSTRING(ccf_cname, 1, 2), ccf_type, ccf_stype').fetchall()
     else:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
