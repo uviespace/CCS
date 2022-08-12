@@ -30,9 +30,6 @@ import json_to_csv
 
 import spec_to_json
 
-#print("!!!!!!!")
-#dictionary_of_data_pool = cfl.get_data_pool_items
-#print(dictionary_of_data_pool.keys())
 
 # creating lists for type and subtype to get rid of duplicate entries, for TC List
 
@@ -52,7 +49,7 @@ file_hdlr = toolbox.create_file_handler(file=log_file)
 logger.addHandler(hdlr=file_hdlr)
 
 
-VERSION = '0.9'
+VERSION = '0.10'
 
 
 class TstApp(Gtk.Application):
@@ -263,25 +260,31 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_save.set_icon_name('document-save')
         self.btn_save.set_tooltip_text('Save')
         self.btn_save.connect('clicked', self.on_save)
-        self.btn_show_model_viewer = Gtk.ToolButton()
-        self.btn_show_model_viewer.set_icon_name('accessories-dictionary-symbolic')
-        self.btn_show_model_viewer.set_tooltip_text('Show/hide model viewer')
-        self.btn_show_model_viewer.connect('clicked', self.model_viewer_toggle_hide)
+        # self.btn_show_model_viewer = Gtk.ToolButton()
+        # self.btn_show_model_viewer.set_icon_name('accessories-dictionary-symbolic')
+        # self.btn_show_model_viewer.set_tooltip_text('Show/hide model viewer')
+        # self.btn_show_model_viewer.connect('clicked', self.model_viewer_toggle_hide)
         self.btn_generate_products = Gtk.ToolButton()
         self.btn_generate_products.set_label('Generate scripts')
-        # self.btn_generate_products.set_icon_name('printer-printing-symbolic')
-        self.btn_generate_products.set_tooltip_text('Generate the command.py, verification.py and the manually.py')
+        self.btn_generate_products.set_icon_name('text-x-python')
+        self.btn_generate_products.set_tooltip_text('Generate command.py, verification.py and manually.py')
         self.btn_generate_products.connect('clicked', self.on_generate_products)
+
         self.btn_start_ccs_editor = Gtk.ToolButton()
-        self.btn_start_ccs_editor.set_label('Start CCS-Editor')
-        # self.btn_start_ccs_editor.set_icon_name('accessories-text-editor')
+        self.btn_start_ccs_editor.set_label('Start CCS')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
+            confignator.get_option('paths', 'ccs') + '/pixmap/ccs_logo_2.svg', 28, 28)
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+        self.btn_start_ccs_editor.set_icon_widget(icon)
         self.btn_start_ccs_editor.set_tooltip_text('Start CCS-Editor')
         self.btn_start_ccs_editor.connect('clicked', self.on_start_ccs_editor)
+
         self.btn_open_progress_view = Gtk.ToolButton()
         self.btn_open_progress_view.set_label('Start ProgressView')
-        # self.btn_open_progress_view.set_icon_name('x-office-presentation')
+        self.btn_open_progress_view.set_icon_name('utilities-system-monitor')
         self.btn_open_progress_view.set_tooltip_text('Start ProgressView')
         self.btn_open_progress_view.connect('clicked', self.on_start_progress_viewer)
+
         self.toolbar = Gtk.Toolbar()
         self.toolbar.insert(self.btn_new_file, 0)
         self.toolbar.insert(self.btn_open_file, 1)
@@ -291,18 +294,29 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_start_ccs_editor, 4)
         self.toolbar.insert(self.btn_open_progress_view, 5)
         
-        # logo
+        # IDB chooser
+        self.idb_chooser = Gtk.ToolButton()
+
+        label = Gtk.Label()
+        label.set_markup('<b>IDB:</b> {}'.format(cfl.scoped_session_idb.bind.url.database))
+        self.idb_chooser.set_label_widget(label)
+        self.idb_chooser.set_tooltip_text('Select IDB')
+        self.idb_chooser.connect('clicked', self.on_set_idb_version)
+        self.toolbar.insert(self.idb_chooser, 6)
+
+        # separator
         sepa = Gtk.SeparatorToolItem()
         sepa.set_expand(True)
-        self.toolbar.insert(sepa, 6)
+        self.toolbar.insert(sepa, 7)
+
+        # logo
         self.unilogo = Gtk.ToolButton()
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-        confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 32, 32)
+            confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 32, 32)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.unilogo.set_icon_widget(icon)
-        #self.unilogo.set_tooltip_text('New test specification')
         self.unilogo.connect('clicked', self.on_about)
-        self.toolbar.insert(self.unilogo, 7)
+        self.toolbar.insert(self.unilogo, 8)
         self.box.pack_start(self.toolbar, False, True, 0)
         
         self.info_bar = None
@@ -321,39 +335,39 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         self.codeblockreuse = codeblockreuse.CBRSearch(app_win=self, logger=self.logger)
         self.label_widget_codeblockreuse = Gtk.Label()
-        self.label_widget_codeblockreuse.set_text('Code Block Reuse Feature')
+        self.label_widget_codeblockreuse.set_text('Code Snippets')
         self.feature_area.append_page(child=self.codeblockreuse, tab_label=self.label_widget_codeblockreuse)
-
-        self.json_view = ViewModelAsJson()
-        self.update_model_viewer()
-        self.label_widget_json_view = Gtk.Label()
-        self.label_widget_json_view.set_text('JSON view of the test')
-        self.feature_area.append_page(child=self.json_view, tab_label=self.label_widget_json_view)
 
         import log_viewer
         self.log_view = log_viewer.LogView(filename=log_file, app_win=self)
         self.label_widget_log_view = Gtk.Label()
-        self.label_widget_log_view.set_text('LogView')
+        self.label_widget_log_view.set_text('Log View')
         self.feature_area.append_page(child=self.log_view, tab_label=self.label_widget_log_view)
+
+        self.json_view = ViewModelAsJson()
+        self.update_model_viewer()
+        self.label_widget_json_view = Gtk.Label()
+        self.label_widget_json_view.set_text('JSON View')
+        self.feature_area.append_page(child=self.json_view, tab_label=self.label_widget_json_view)
 
         # command list tab
 
         self.tcm = tcm.TcTable()
         self.label_widget_tcm = Gtk.Label()
         self.label_widget_tcm.set_text('TC Table')
-        self.feature_area.append_page(child=self.tcm, tab_label=self.label_widget_tcm)
+        self.feature_area.insert_page(child=self.tcm, tab_label=self.label_widget_tcm, position=1)
 
         # telemetry list tab
         self.telemetry = tmm.TmTable()
         self.label_widget_telemetry = Gtk.Label()
         self.label_widget_telemetry.set_text('TM Table')
-        self.feature_area.append_page(child=self.telemetry, tab_label=self.label_widget_telemetry)
+        self.feature_area.insert_page(child=self.telemetry, tab_label=self.label_widget_telemetry, position=2)
 
         # data pool list tab
         self.data_pool_tab = dpt.DataPoolTable()
         self.label_widget_data_pool = Gtk.Label()
         self.label_widget_data_pool.set_text('Data Pool')
-        self.feature_area.append_page(child=self.data_pool_tab, tab_label=self.label_widget_data_pool)
+        self.feature_area.insert_page(child=self.data_pool_tab, tab_label=self.label_widget_data_pool, position=3)
 
         self.box.pack_start(self.work_desk, True, True, 0)
 
@@ -1049,10 +1063,79 @@ class TstAppWindow(Gtk.ApplicationWindow):
         pixbuf = GdkPixbuf.Pixbuf.new_from_file(style_path + '/tst.png')
         about_dialog.set_logo(pixbuf)
         about_dialog.set_program_name('Test Specification Tool')
-        about_dialog.set_copyright('UVIE 11/2021')
+        about_dialog.set_copyright('UVIE 08/2022')
         about_dialog.set_license_type(Gtk.License.MPL_2_0)
         about_dialog.present()
         return
+
+    def on_set_idb_version(self, *args):
+        dialog = IDBChooser()
+        dialog.set_transient_for(self)
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            model, it = dialog.selection.get_selected()
+            idb = model[it][0]
+            cfl.set_scoped_session_idb_version(idb_version=idb)
+            label = self.idb_chooser.get_label_widget()
+            label.set_markup('<b>IDB:</b> {}'.format(cfl.scoped_session_idb.bind.url.database))
+            self.feature_area.freeze_child_notify()
+            page = self.feature_area.get_current_page()
+            self.reload_tc_table()
+            self.reload_tm_table()
+            self.reload_dp_table()
+            self.feature_area.set_current_page(page)
+            self.feature_area.thaw_child_notify()
+            dialog.destroy()
+        else:
+            dialog.destroy()
+
+    def reload_tc_table(self):
+        self.feature_area.remove_page(self.feature_area.page_num(self.tcm))
+        tcm.reload_tc_data()
+        self.tcm = tcm.TcTable()
+        self.feature_area.insert_page(self.tcm, self.label_widget_tcm, 1)
+
+    def reload_tm_table(self):
+        self.feature_area.remove_page(self.feature_area.page_num(self.telemetry))
+        tmm.reload_tm_data()
+        self.telemetry = tmm.TmTable()
+        self.feature_area.insert_page(self.telemetry, self.label_widget_telemetry, 2)
+
+    def reload_dp_table(self):
+        self.feature_area.remove_page(self.feature_area.page_num(self.data_pool_tab))
+        dpt.reload_dp_data()
+        self.data_pool_tab = dpt.DataPoolTable()
+        self.feature_area.insert_page(self.data_pool_tab, self.label_widget_data_pool, 3)
+
+
+class IDBChooser(Gtk.Dialog):
+    def __init__(self):
+        super(IDBChooser, self).__init__(title='Select MIB')
+        self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.set_size_request(300, 200)
+
+        idb_selection = Gtk.ListStore(str)
+        mibs = cfl.scoped_session_idb.execute('show databases').fetchall()
+
+        for m, in mibs:
+            if m.count('mib'):
+                idb_selection.append([m])
+
+        tv = Gtk.TreeView(model=idb_selection)
+        self.selection = tv.get_selection()
+        self.selection.set_mode(Gtk.SelectionMode.SINGLE)
+
+        col = Gtk.TreeViewColumn('SCHEMA NAME', Gtk.CellRendererText(), text=0)
+        tv.append_column(col)
+
+        scr = Gtk.ScrolledWindow()
+        scr.add(tv)
+
+        box = self.get_content_area()
+        box.pack_start(scr, True, True, 0)
+
+        self.show_all()
 
 
 class ViewModelAsJson(Gtk.Box):

@@ -25,6 +25,24 @@ for counter in tm_list:
         pass
 
 
+def reload_tm_data():
+    global dictionary_of_tms
+    global tm_list
+    global tm_type_list
+    global tm_type_sub_list
+
+    dictionary_of_tms = cfl.get_tm_id()
+
+    tm_list = list(dictionary_of_tms.keys())
+    tm_type_list = []
+
+    tm_type_sub_list = []
+
+    for counter in tm_list:
+        if counter[0] not in tm_type_list:
+            tm_type_list.append(counter[0])
+
+
 def get_tm_type_sublist(tm_descr):
     tm_type_sub_list.clear()
     for key in dictionary_of_tms:

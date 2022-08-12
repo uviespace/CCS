@@ -39,6 +39,45 @@ subtype_list.sort()
 dictionary_of_variables = cfl.get_tc_calibration_and_parameters()
 
 
+def reload_tc_data():
+    global tc_type
+    global dictionary_of_commands
+    global read_in_list_of_commands
+    global list_of_commands
+    global type_list
+    global subtype_list
+    global descr_list
+    global calibrations_list
+    global dictionary_of_variables
+
+    tc_type = None
+
+    dictionary_of_commands = cfl.get_tc_list()
+    read_in_list_of_commands = list(dictionary_of_commands.keys())
+    list_of_commands = []
+    type_list = []
+    subtype_list = []
+
+    descr_list = []
+    calibrations_list = []
+
+    for command in read_in_list_of_commands:
+        command = list(command)
+        del command[0]
+        myorder = [2, 3, 0, 1]
+        command = [command[i] for i in myorder]
+        command[0] = int(command[0])
+        command[1] = int(command[1])
+        list_of_commands.append(command)
+        if command[0] not in type_list:
+            type_list.append(command[0])
+
+    type_list.sort()
+    subtype_list.sort()
+
+    dictionary_of_variables = cfl.get_tc_calibration_and_parameters()
+
+
 def get_cpc_descr(tc_type):
 
     cpc_descr = []

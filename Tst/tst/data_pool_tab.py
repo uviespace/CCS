@@ -14,8 +14,18 @@ dictionary_of_data_pool = cfl.get_data_pool_items()
 list_of_data_pool = list(dictionary_of_data_pool.keys())
 
 data_pool_sublist = []
-
 pid_list = []
+
+
+def reload_dp_data():
+    global dictionary_of_data_pool
+    global list_of_data_pool
+    global data_pool_sublist
+    global pid_list
+
+    dictionary_of_data_pool = cfl.get_data_pool_items()
+    list_of_data_pool = list(dictionary_of_data_pool.keys())
+    data_pool_sublist, pid_list = get_data_pool_sublist()
 
 
 def get_data_pool_sublist():

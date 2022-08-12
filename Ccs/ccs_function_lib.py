@@ -103,6 +103,12 @@ def get_scoped_session_idb(idb_version=None):
     return scoped_session_maker('idb', idb_version=idb_version)
 
 
+def set_scoped_session_idb_version(idb_version=None):
+    global scoped_session_idb
+    scoped_session_idb.close()
+    scoped_session_idb = scoped_session_maker('idb', idb_version=idb_version)
+
+
 def get_scoped_session_storage():
     return scoped_session_maker('storage')
 
@@ -2671,7 +2677,7 @@ def get_tc_list(ccf_descr=None):
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
                                           'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
-                                          'ORDER BY SUBSTRING(ccf_cname, 1, 2), ccf_type, ccf_stype').fetchall()
+                                          'ORDER BY SUBSTRING(ccf_cname, 1, 2), ccf_type, ccf_stype, ccf_cname').fetchall()
     else:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
@@ -3921,8 +3927,8 @@ class TmDecoderDialog(Gtk.Dialog):
         self.logger = logger
         self.cfg = cfg
 
-        self.session_factory_idb = scoped_session_maker('idb')
-        self.session_factory_storage = scoped_session_maker('storage')
+        self.session_factory_idb = scoped_session_idb
+        self.session_factory_storage = scoped_session_storage
 
         box = self.get_content_area()
 
