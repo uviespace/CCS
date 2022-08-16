@@ -2,7 +2,7 @@
 
 all: install build-pc
 
-install: install-python-requirements install-confignator-userspace ccs-storage codeblockreusefeature
+install: install-python-requirements install-confignator ccs-storage codeblockreusefeature
 
 databases: ccs-storage codeblockreusefeature
 
@@ -13,7 +13,7 @@ install-confignator:
 	@echo "| installing confignator Python package |"
 	@echo "+---------------------------------------+"
 	    $(MAKE) build -C $(CURDIR)/Tst/confignator
-	    pip install -U $(CURDIR)/Tst/confignator/dist/*.whl
+	    if [ -z $VIRTUAL_ENV ]; then pip install --user -U $(CURDIR)/Tst/confignator/dist/*.whl; else pip install -U $(CURDIR)/Tst/confignator/dist/*.whl; fi
 	@echo "+--------------------------------------+"
 	@echo "| installed confignator Python package |"
 	@echo "+--------------------------------------+"
