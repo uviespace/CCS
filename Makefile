@@ -1,8 +1,8 @@
-.PHONY: install-confignator ccs-storage codeblockreusefeature install-testlib
+.PHONY: install-confignator install-confignator-userspace ccs-storage codeblockreusefeature install-testlib
 
 all: install build-pc
 
-install: install-confignator ccs-storage codeblockreusefeature install-testlib
+install: install-python-requirements install-confignator-userspace ccs-storage codeblockreusefeature
 
 databases: ccs-storage codeblockreusefeature
 
@@ -54,7 +54,7 @@ install-python-env:
 	@echo "+-----------------------------+"
 	@echo "| installing Python modules   |"
 	@echo "+-----------------------------+"
-	    python -m pip install --user --upgrade numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod psutil
+	    python -m pip install --user -U numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod psutil
 	@echo "+-----------------------------+"
 	@echo "| installed Python modules    |"
 	@echo "+-----------------------------+"
@@ -64,7 +64,7 @@ install-python-requirements:
 	@echo "+-----------------------------+"
 	@echo "| installing Python modules   |"
 	@echo "+-----------------------------+"
-	    pip install -U -r $(CURDIR)/requirements.txt
+	    pip install --user -U -r $(CURDIR)/requirements.txt
 	@echo "+-----------------------------+"
 	@echo "| installed Python modules    |"
 	@echo "+-----------------------------+"
