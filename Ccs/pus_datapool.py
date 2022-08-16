@@ -1706,7 +1706,7 @@ class DatapoolManager:
         if (tla == self.TLA) and (pid in self.PROTOCOL_IDS):
             buf = pkt_size_stream
         else:
-            return None, pkt_size_stream[1:]
+            return pid, None, None, pkt_size_stream[1:]
 
         if self.PROTOCOL_IDS[pid] == "FEEDATA":
             header = self.pc.FeeDataTransferHeader()
@@ -1726,7 +1726,7 @@ class DatapoolManager:
             elif (instruction >> 5) & 0b11 == 0b00:
                 header = self.pc.RMapReplyReadHeader()
 
-        hsize = header.__class__.bits.size
+        hsize = type(header).bits.size
 
         while len(buf) < hsize:
             buf += sockfd.recv(hsize - len(buf))
