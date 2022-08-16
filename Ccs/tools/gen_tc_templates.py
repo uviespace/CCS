@@ -18,7 +18,7 @@ def export(outfile, sep):
 
     temps = []
     for tc in cfl.get_tc_list():
-        temps.append(cfl.make_tc_template(tc[1], add_parcfg=True))
+        temps.append(cfl.make_tc_template(tc[1], pool_name='LIVE', add_parcfg=True))
 
     with open(outfile, 'w') as fd:
         fd.write(header + sep.join(temps))
