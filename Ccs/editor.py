@@ -1774,6 +1774,7 @@ class CcsEditor(Gtk.Window):
         self.log_file = file
         return True
 
+
 class UnsavedBufferDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, msg=None):
         Gtk.MessageDialog.__init__(self, title="Unsaved changes", parent=parent, flags=0)
@@ -1787,6 +1788,7 @@ class UnsavedBufferDialog(Gtk.MessageDialog):
             head.set_text(msg)
 
         self.show_all()
+
 
 class ActionWindow(Gtk.Window):
     def __init__(self, editor, nbuttons=20, ncolumns=2):

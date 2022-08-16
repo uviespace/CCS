@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import editor
 import gi
@@ -16,6 +17,7 @@ cfg = confignator.get_config()
 
 def run():
     global cfg
+    global files_to_open
 
     win = editor.CcsEditor()
     # cfl.start_editor()
@@ -38,12 +40,11 @@ def run():
         cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
     # pv = TMPoolView(cfg)
     DBusGMainLoop(set_as_default=True)
-    if len(sys.argv) > 1:
-        for fname in sys.argv[1:]:
-            if not fname.startswith('-'):
-                win.open_file(fname)
+    if files_to_open:
+        for fname in files_to_open:
+            win.open_file(fname)
     else:
-        win.open_file('getting_started.py')
+        win.open_file(os.path.join(confignator.get_option('paths', 'ccs'),'getting_started.py'))
 
     Bus_Name = cfg.get('ccs-dbus_names', 'editor')
 
@@ -52,11 +53,12 @@ def run():
 
 if __name__ == "__main__":
 
-    if '--quickstart' not in sys.argv:
+    if '--setup' in sys.argv:
         cfl.ProjectDialog()
         Gtk.main()
-    else:
-        sys.argv.remove('--quickstart')
+        sys.argv.remove('--setup')
+
+    files_to_open = [fn for fn in sys.argv[1:] if not fn.startswith('-')]
 
     run()
     Gtk.main()
