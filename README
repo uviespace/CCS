@@ -52,3 +52,9 @@ Use CCS/Ccs/tools/import_mib.py to import a set of SCOS2000 MIB files into a MyS
 # CCS & TST
 start_ccs: starts the CCS
 start_tst: starts the TST
+
+# Troubleshooting
+If working within a Python venv, you might need to install vext to access the system-site installation of gi:
+pip install vext
+pip install vext.gi
+
