@@ -64,7 +64,7 @@ install-python-requirements:
 	@echo "+-----------------------------+"
 	@echo "| installing Python modules   |"
 	@echo "+-----------------------------+"
-	    pip install --user -U -r $(CURDIR)/requirements.txt
+		if [ -z $VIRTUAL_ENV ]; then pip install -U -r $(CURDIR)/requirements.txt; else pip install --user -U -r $(CURDIR)/requirements.txt; fi
 	@echo "+-----------------------------+"
 	@echo "| installed Python modules    |"
 	@echo "+-----------------------------+"
