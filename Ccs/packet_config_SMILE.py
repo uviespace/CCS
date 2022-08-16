@@ -382,6 +382,7 @@ class FeeDataTransferHeader(ctypes.Union):
 
     def __init__(self, *args, **kw):
         super(FeeDataTransferHeader, self).__init__()
+        self.bits.INIT_LOGICAL_ADDR = SPW_DPU_LOGICAL_ADDRESS
         self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS["FEEDATA"]
 
     @property
@@ -394,9 +395,123 @@ class FeeDataTransferHeader(ctypes.Union):
         return int.from_bytes(self.bin[4:6], 'big')
 
 
-##########################
+#########################
 # FEE utility functions #
-##########################
+#########################
+
+# FEE RW registers (SMILE-MSSL-PL-Register_map_v0.20)
+
+FEE_CFG_REG_0  = 0x00000000
+FEE_CFG_REG_1  = 0x00000004
+FEE_CFG_REG_2  = 0x00000008
+FEE_CFG_REG_3  = 0x0000000C
+FEE_CFG_REG_4  = 0x00000010
+FEE_CFG_REG_5  = 0x00000014
+FEE_CFG_REG_6  = 0x00000018  # unused
+FEE_CFG_REG_7  = 0x0000001C  # unused
+FEE_CFG_REG_8  = 0x00000020  # unused
+FEE_CFG_REG_9  = 0x00000024  # unused
+FEE_CFG_REG_10 = 0x00000028  # unused
+FEE_CFG_REG_11 = 0x0000002C  # unused
+FEE_CFG_REG_12 = 0x00000030  # unused
+FEE_CFG_REG_13 = 0x00000034  # unused
+FEE_CFG_REG_14 = 0x00000038
+FEE_CFG_REG_15 = 0x0000003C
+FEE_CFG_REG_16 = 0x00000040
+FEE_CFG_REG_17 = 0x00000044
+FEE_CFG_REG_18 = 0x00000048
+FEE_CFG_REG_19 = 0x0000004C
+FEE_CFG_REG_20 = 0x00000050
+FEE_CFG_REG_21 = 0x00000054
+FEE_CFG_REG_22 = 0x00000058
+FEE_CFG_REG_23 = 0x0000005C
+FEE_CFG_REG_24 = 0x00000060
+FEE_CFG_REG_25 = 0x00000064
+FEE_CFG_REG_26 = 0x00000068
+
+
+# FEE  RO registers (SMILE-MSSL-PL-Register_map_v0.20)
+
+FEE_HK_REG_0  = 0x00000700  # reserved
+FEE_HK_REG_1  = 0x00000704  # reserved
+FEE_HK_REG_2  = 0x00000708  # reserved
+FEE_HK_REG_3  = 0x0000070C  # reserved
+FEE_HK_REG_4  = 0x00000710
+FEE_HK_REG_5  = 0x00000714
+FEE_HK_REG_6  = 0x00000718
+FEE_HK_REG_7  = 0x0000071C
+FEE_HK_REG_8  = 0x00000720
+FEE_HK_REG_9  = 0x00000724
+FEE_HK_REG_10 = 0x00000728
+FEE_HK_REG_11 = 0x0000072C
+FEE_HK_REG_12 = 0x00000730
+FEE_HK_REG_13 = 0x00000734
+FEE_HK_REG_14 = 0x00000738
+FEE_HK_REG_15 = 0x0000073C
+FEE_HK_REG_16 = 0x00000740
+FEE_HK_REG_17 = 0x00000744
+FEE_HK_REG_18 = 0x00000748
+FEE_HK_REG_19 = 0x0000074C
+FEE_HK_REG_20 = 0x00000750
+FEE_HK_REG_21 = 0x00000754
+FEE_HK_REG_22 = 0x00000758
+FEE_HK_REG_23 = 0x0000075C
+FEE_HK_REG_24 = 0x00000760  # reserved
+FEE_HK_REG_25 = 0x00000764  # reserved
+FEE_HK_REG_26 = 0x00000768  # reserved
+FEE_HK_REG_27 = 0x0000076C  # reserved
+FEE_HK_REG_28 = 0x00000770  # reserved
+FEE_HK_REG_29 = 0x00000774  # reserved
+FEE_HK_REG_30 = 0x00000778  # reserved
+FEE_HK_REG_31 = 0x0000077C  # reserved
+FEE_HK_REG_32 = 0x00000780
+FEE_HK_REG_33 = 0x00000784
+FEE_HK_REG_34 = 0x00000788
+FEE_HK_REG_35 = 0x0000078C
+FEE_HK_REG_36 = 0x00000790
+FEE_HK_REG_37 = 0x00000794
+
+
+# FEE modes
+# see MSSL-SMILE-SXI-IRD-0001  Draft A.14, req. MSSL-IF-17
+# also SMILE-MSSL-PL-Register_map_v0.22, as the IRD does not list all modes
+
+FEE_MODE_ID_ON	   = 0x0  # the thing is switched on
+FEE_MODE_ID_FTP	   = 0x1  # frame transfer pattern
+FEE_MODE_ID_STBY   = 0x2  # stand-by-mode
+FEE_MODE_ID_FT	   = 0x3  # frame transfer
+FEE_MODE_ID_FF	   = 0x4  # full frame
+FEE_CMD__ID_IMM_ON = 0x8  # immediate on-mode, this is a command, not a mode
+FEE_MODE_ID_FFSIM  = 0x9  # full frame simulation simulation
+FEE_MODE_ID_EVSIM  = 0xA  # event detection simulation
+FEE_MODE_ID_PTP1   = 0xB  # parallel trap pump mode 1
+FEE_MODE_ID_PTP2   = 0xC  # parallel trap pump mode 2
+FEE_MODE_ID_STP1   = 0xD  # serial trap pump mode 1
+FEE_MODE_ID_STP2   = 0xE  # serial trap pump mode 2
+
+FEE_MODE2_NOBIN = 0x1	 # no binning mode
+FEE_MODE2_BIN6  = 0x2	 # 6x6 binning mode
+FEE_MODE2_BIN24 = 0x3	 # 24x4 binning mode
+
+# these identifiy the bits in the readout node selection register
+FEE_READOUT_NODE_E2	= 0b0010
+FEE_READOUT_NODE_F2	= 0b0001
+FEE_READOUT_NODE_E4	= 0b1000
+FEE_READOUT_NODE_F4	= 0b0100
+
+# see MSSL-SMILE-SXI-IRD-0001 Draft A.14, req. MSSL-IF-108
+FEE_CCD_SIDE_F = 0x0		 # left side
+FEE_CCD_SIDE_E = 0x1		 # right side
+FEE_CCD_INTERLEAVED = 0x2	 # F and E inverleaved
+
+FEE_CCD_ID_2 = 0x0
+FEE_CCD_ID_4 = 0x1
+
+FEE_PKT_TYPE_DATA	= 0x0	 # any data
+FEE_PKT_TYPE_EV_DET = 0x1	 # event detection
+FEE_PKT_TYPE_HK		= 0x2	 # housekeeping
+FEE_PKT_TYPE_WMASK	= 0x3	 # wandering mask packet
+
 
 class RMapCommandWrite(RMapCommandHeader):
     """This is intended for building an RMap Write Command"""
@@ -423,7 +538,7 @@ class RMapCommandWrite(RMapCommandHeader):
         self.bits.INIT_LOGICAL_ADDR = initiator
         self.bits.TRANSACTION_ID = tid
         self.bits.EXT_ADDR = addr >> 32
-        self.bits.ADDR = addr
+        self.bits.ADDR = addr & 0xFFFFFFFF
         self.bits.DATA_LEN = len(self.data)
         self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
 
@@ -490,25 +605,29 @@ class FeeDataTransfer(FeeDataTransferHeader):
     - bit 3:2 = reserved
     - bits 1:0 = packet type: 0 = data packet, 1 = Event detection packet, 2 = housekeeping packet
     """
-    modes = {0: "On Mode",
-             1: "Frame Transfer Pattern",
-             2: "Stand-By-Mode",
-             3: "Frame Transfer",
-             4: "Full Frame",
-             5: "Parallel trap pumping mode 1",
-             6: "Parallel trap pumping mode 2",
-             7: "Serial trap pumping mode 1",
-             8: "Serial trap pumping mode 2"}
-    ccd_sides = {0: "left side (F)",
-                 1: "right side (E)",
-                 2: "F&E interleaved"}
-    ccds = {0: "CCD2",
-            1: "CCD4"}
-    pkt_types = {0: "Data",
-                 1: "Event detection",
-                 2: "Housekeeping"}
 
-    DATA_HK_STRUCT = []
+    _modes = {FEE_MODE_ID_ON: "On Mode",
+              FEE_MODE_ID_FTP: "Frame Transfer Pattern",
+              FEE_MODE_ID_STBY: "Stand-By-Mode",
+              FEE_MODE_ID_FT: "Frame Transfer",
+              FEE_MODE_ID_FF: "Full Frame",
+              FEE_MODE_ID_FFSIM: "Full frame simulation",
+              FEE_MODE_ID_EVSIM: "Event detection simulation",
+              FEE_MODE_ID_PTP1: "Parallel trap pumping mode 1",
+              FEE_MODE_ID_PTP2: "Parallel trap pumping mode 2",
+              FEE_MODE_ID_STP1: "Serial trap pumping mode 1",
+              FEE_MODE_ID_STP2: "Serial trap pumping mode 2"}
+    _ccd_sides = {FEE_CCD_SIDE_F: "left side (F)",
+                  FEE_CCD_SIDE_E: "right side (E)",
+                  FEE_CCD_INTERLEAVED: "F&E interleaved"}
+    _ccds = {FEE_CCD_ID_2: "CCD2",
+             FEE_CCD_ID_4: "CCD4"}
+    _pkt_types = {FEE_PKT_TYPE_DATA: "Data",
+                  FEE_PKT_TYPE_EV_DET: "Event detection",
+                  FEE_PKT_TYPE_HK: "Housekeeping",
+                  FEE_PKT_TYPE_WMASK: "Wandering mask"}
+
+    _DATA_HK_STRUCT = []
 
     def __init__(self, pkt=None):
         super(FeeDataTransfer, self).__init__()
@@ -538,17 +657,29 @@ class FeeDataTransfer(FeeDataTransferHeader):
         self.set_type_details()
         self.set_evt_data()
 
+    #@property
+    def info(self):
+        head = 'HEADER\n' + '\n'.join(['{}:\t{}'.format(key, self.type_details[key]) for key in self.type_details])
+        if self.evt_data is not None:
+            data = 'DATA\ncolumn: {}, row: {}\n\n{}'.format(self.evt_data['COLUMN'], self.evt_data['ROW'],
+                                                            str(self.evt_data['IMAGE']).replace('[', ' ').replace(']', ' '))
+        else:
+            data = 'DATA\n' + self.data.hex().upper()
+
+        # return head + '\n' + data
+        print(head + '\n' + data)
+
     def set_type_details(self):
-        self.type_details = {"MODE": self.modes[self.bits.MODE] if self.bits.MODE in self.modes else self.bits.MODE,
+        self.type_details = {"MODE": self._modes[self.bits.MODE] if self.bits.MODE in self._modes else self.bits.MODE,
                              "LAST_PKT": bool(self.bits.LAST_PKT),
-                             "CCDSIDE": self.ccd_sides[
-                                 self.bits.CCDSIDE] if self.bits.CCDSIDE in self.ccd_sides else self.bits.CCDSIDE,
-                             "CCD": self.ccds[self.bits.CCD] if self.bits.CCD in self.ccds else self.bits.CCD,
-                             "PKT_TYPE": self.pkt_types[
-                                 self.bits.PKT_TYPE] if self.bits.PKT_TYPE in self.pkt_types else self.bits.PKT_TYPE}
+                             "CCDSIDE": self._ccd_sides[
+                                 self.bits.CCDSIDE] if self.bits.CCDSIDE in self._ccd_sides else self.bits.CCDSIDE,
+                             "CCD": self._ccds[self.bits.CCD] if self.bits.CCD in self._ccds else self.bits.CCD,
+                             "PKT_TYPE": self._pkt_types[
+                                 self.bits.PKT_TYPE] if self.bits.PKT_TYPE in self._pkt_types else self.bits.PKT_TYPE}
 
     def set_evt_data(self):
-        if self.bits.PKT_TYPE == 1:
+        if self.bits.PKT_TYPE == FEE_PKT_TYPE_EV_DET:
             evtdata = EventDetectionData()
             evtdata.bin[:] = self.data
             self.evt_data = {"COLUMN": evtdata.bits.column,
