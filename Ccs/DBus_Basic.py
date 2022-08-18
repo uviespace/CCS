@@ -1,15 +1,11 @@
-#This file is used to set up a D-Bus
+# This file is used to set up a D-Bus
 import dbus
 import dbus.service
-import sys
-import subprocess
-#import confignator
 import ccs_function_lib as cfl
 import os
 
 
-
-#Set up two Methodes to excess over a given dbus name
+# Set up two Methodes to excess over a given dbus name
 class MessageListener(dbus.service.Object):
     def __init__(self, win, Bus_Name, *args):
         project = None
@@ -23,7 +19,7 @@ class MessageListener(dbus.service.Object):
 
         Bus_Name += str(1)
 
-        #Check if the Bus name already exists and increase the number if it does
+        # Check if the Bus name already exists and increase the number if it does
         counting = 1
         check = True
         while check == True:
@@ -36,7 +32,7 @@ class MessageListener(dbus.service.Object):
                 else:
                     check = False
 
-        #Set up the bus
+        # Set up the bus
         self.Bus_Name = Bus_Name
         self.name = dbus.service.BusName(self.Bus_Name, bus=self.bus)
         super().__init__(self.name, '/MessageListener')
@@ -47,14 +43,14 @@ class MessageListener(dbus.service.Object):
         if not project:
             project = self.win.cfg['ccs-database']['project']
 
-        self.win.main_instance = project    # Variable in each application to tell the group name
+        self.win.main_instance = project  # Variable in each application to tell the group name
 
         # This exception is necessary for the Poolmanager since most of the time a GUI does not exist
         try:
-            self.win.set_title(str(project) + ': ' + str(self.win.get_title()) + ' ' + str(counting-1))
+            self.win.set_title(str(project) + ': ' + str(self.win.get_title()) + ' ' + str(counting - 1))
         except:
             # Looks like a odd title name but is reshaped in pus_datapool.py
-            self.win.windowname = str(project) + ': @ ' + str(counting-1)
+            self.win.windowname = str(project) + ': @ ' + str(counting - 1)
         ###
 
         # Tell the terminal that a bus has been set up, this function has to exist in every file
@@ -64,7 +60,7 @@ class MessageListener(dbus.service.Object):
         import log_server
         log_server_path = log_server.__file__
         os.system('nohup python3 ' + str(log_server_path) + ' >/dev/null 2>&1 &')
-        #subprocess.Popen(['python3', log_server_path])
+        # subprocess.Popen(['python3', log_server_path])
 
     # Return all available methods
     @dbus.service.method('com.communication.interface')
@@ -100,7 +96,7 @@ class MessageListener(dbus.service.Object):
             print(argument)
         return
 
-    #This makes one use all function given in the used file for the given instance (win variable in __init__ function)
+    # This makes one use all function given in the used file for the given instance (win variable in __init__ function)
     @dbus.service.method('com.communication.interface', byte_arrays=True)
     def Functions(self, function_name, *args):
 
@@ -183,10 +179,10 @@ class MessageListener(dbus.service.Object):
         else:
             count = 0
             try:
-                if len(args)%2 != 0:
+                if len(args) % 2 != 0:
                     raise KeyError
                 while count < len(args):
-                    dict_to_call[args[count]] = args[count+1]
+                    dict_to_call[args[count]] = args[count + 1]
                     count += 2
             except:
                 print('Please give a valid number of arguments')
@@ -241,9 +237,8 @@ class MessageListener(dbus.service.Object):
                 if arg.get('kwargs'):
                     kwargs = arg['kwargs']
                     del arg['kwargs']
-                    #kwargs = arg
+                    # kwargs = arg
                     args.remove(arg)
-
 
         '''
         breaklist = list(arguments)
@@ -278,7 +273,7 @@ class MessageListener(dbus.service.Object):
         arguments = tuple(args)
         return arguments, kwargs
 
-    def dbus_to_python( self, data, user_console=False):
+    def dbus_to_python(self, data, user_console=False):
         """
         Convets dbus Types to Python Types
         @param data: Dbus Type variables or containers
