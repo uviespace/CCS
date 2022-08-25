@@ -2,16 +2,21 @@ import pickle
 import logging
 import logging.handlers
 import socketserver
-import struct
 import datetime
 import dbus
 import dbus.service
 import time
+import select
 import os
 from os import listdir
 from os.path import isfile, join
 
 import confignator
+cfg = confignator.get_config()
+
+SOCKET_TIMEOUT = 0.5
+SOCKET_RD_INTERVAL = 0.5
+LOGFMT = '%(asctime)s: %(name)-15s %(levelname)-8s %(message)s'
 
 
 class LogRecordStreamHandler(socketserver.StreamRequestHandler):
@@ -30,16 +35,13 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
             chunk = self.connection.recv(4)
             if len(chunk) < 4:
                 break
-            slen = struct.unpack('>L', chunk)[0]
+            slen = int.from_bytes(chunk, 'big')
             chunk = self.connection.recv(slen)
             while len(chunk) < slen:
                 chunk = chunk + self.connection.recv(slen - len(chunk))
-            obj = self.unPickle(chunk)
+            obj = pickle.loads(chunk)
             record = logging.makeLogRecord(obj)
             self.handleLogRecord(record)
-
-    def unPickle(self, data):
-        return pickle.loads(data)
 
     def handleLogRecord(self, record):
         # if a name is specified, we use the named logger rather than the one
@@ -65,57 +67,40 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
     def __init__(self, host='localhost',
                  port=logging.handlers.DEFAULT_TCP_LOGGING_PORT, handler=LogRecordStreamHandler):
 
-        socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
-        self.abort = 0
-        self.timeout = 1
+        super(LogRecordSocketReceiver, self).__init__((host, port), handler)
+
+        # socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
+        # self.abort = 0
+        self.timeout = SOCKET_TIMEOUT
         self.logname = None
 
     def serve_until_stopped(self, cfg):
 
-        import select
-
         # Check all dbus connections if any process is running, if not close the logging file
-        dbustype = dbus.SessionBus()
         while True:
-            dbus_names = cfg['ccs-dbus_names']
             closing = True
+            dbus_names = cfg['ccs-dbus_names'].values()
 
-            our_con = []
             for service in dbus.SessionBus().list_names():
-                if service.startswith('com'):
-                    our_con.append(service)
-
-            for app in our_con:
-                if app[:-1] in cfg['ccs-dbus_names'].values():
+                if service.startswith('com') and service[:-1] in dbus_names:
                     closing = False
 
-            #for name in dbus_names:
-            #    Bus_name = cfg.get('ccs-dbus_names', name)
-            #    try:
-            #        connection = dbustype.get_object(Bus_name, '/MessageListener')
-            #        connection.LoggingCheck()
-            #    except:
-            #        closing += 1
-
-            # If anything is incomming call the handler and log it
-            rd, wr, ex = select.select([self.socket.fileno()],
-                                       [], [],
-                                       self.timeout)
+            # If anything is incoming call the handler and log it
+            rd, wr, ex = select.select([self.socket.fileno()], [], [], self.timeout)
             if rd:
                 self.handle_request()
-            abort = self.abort
 
         # Close the file if there is no more dbus connection
             if closing:
                 break
             else:
-                time.sleep(.1)
+                time.sleep(SOCKET_RD_INTERVAL)
 
 
 def main():
     # Specify how the format of the Log-Filename is and where to save it
     logname = '%Y%m%d_%H%M%S'
-    logpath = confignator.get_option('ccs-paths', 'log-file-dir')
+    logpath = cfg.get('ccs-paths', 'log-file-dir')
 
     # Choose which time should be used for the title
     tnow = datetime.datetime.now          # Use the local- Time for the log file title
@@ -124,18 +109,28 @@ def main():
     # Get the time in the correct format
     logtimestart = datetime.datetime.strftime(tnow(), logname)
     logfilename = os.path.join(logpath, logtimestart + '.log')
+    logfmt = LOGFMT
 
-    # Connect to the config file
-    cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+    logger = logging.getLogger('log_server')
 
     # Start the server
     # If it is already running LogRecordSocketReciever() will give an error and the server is therefor not started again
     try:
         tcpserver = LogRecordSocketReceiver()
 
+        # set up the file logging
+        # logging.basicConfig(format='%(asctime)s: %(name)-15s %(levelname)-8s %(message)s', filename=logfilename)
+        fh = logging.FileHandler(filename=logfilename)
+        fh.setFormatter(logging.Formatter(logfmt))
+        rl = logging.getLogger()
+        rl.addHandler(fh)
+        rl.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
+        # rl.setLevel(logging.INFO)
+
         # Check how many log files should be kept and delete the rest
         amount = cfg.get('ccs-logging', 'max_logs')
-        if amount: # If amount is empty keep an endless amount of logs
+        # If amount is empty keep an endless amount of logs
+        if amount:
             while True:
                 onlyfiles = [f for f in listdir("logs/") if isfile(join("logs/", f))]
                 onlyfiles.sort()
@@ -144,20 +139,21 @@ def main():
                 else:
                     break
 
-        # Give a format and filename configuration for logging
-        logging.basicConfig(
-            format='%(asctime)s: %(name)-15s %(levelname)-8s %(message)s', filename=logfilename)
-        # print('TCP-server for logging is started')
+        logger.info('TCP-server for logging started')
         tcpserver.serve_until_stopped(cfg)
-    except:
-        pass
+        logger.info('TCP-server for logging shutting down')
+    # Catch exception if log_server is already running and address/port is already in use
+    except OSError:
+        logger.info('TCP-server for logging seems to be already running.')
+    except Exception as err:
+        raise err
 
 
-class Logging():
+class Logging:
     # This sets up a logging client for the already running TCP-logging Server,
-    # The logger is returned with the given name an can be used like a normal logger
+    # The logger is returned with the given name and can be used like a normal logger
     def start_logging(self, name):
-        loglevel = confignator.get_option('logging', 'level')
+        loglevel = confignator.get_option('ccs-logging', 'level')
 
         rootLogger = logging.getLogger('')
         rootLogger.setLevel(loglevel)

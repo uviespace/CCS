@@ -1,11 +1,15 @@
 # This file is used to set up a D-Bus
 import dbus
 import dbus.service
-import ccs_function_lib as cfl
 import os
 
+import log_server
 
-# Set up two Methodes to excess over a given dbus name
+# STDOUT = '/dev/null'
+STDOUT = '/tmp/log_server.log'
+
+
+# Set up methods to access via a given dbus name
 class MessageListener(dbus.service.Object):
     def __init__(self, win, Bus_Name, *args):
         project = None
@@ -22,7 +26,7 @@ class MessageListener(dbus.service.Object):
         # Check if the Bus name already exists and increase the number if it does
         counting = 1
         check = True
-        while check == True:
+        while check:
             counting += 1
             for service in dbus.SessionBus().list_names():
                 if service == Bus_Name:
@@ -37,9 +41,10 @@ class MessageListener(dbus.service.Object):
         self.name = dbus.service.BusName(self.Bus_Name, bus=self.bus)
         super().__init__(self.name, '/MessageListener')
         self.win = win
-        #### This will be a series of functions to let the user use more than one 'instance' of the CCS running on the
+
+        # This will be a series of functions to let the user use more than one 'instance' of the CCS running on the
         # same machine,
-        # Variabel project is the name of the group of application working together
+        # Variable project is the name of the group of applications working together
         if not project:
             project = self.win.cfg['ccs-database']['project']
 
@@ -48,18 +53,16 @@ class MessageListener(dbus.service.Object):
         # This exception is necessary for the Poolmanager since most of the time a GUI does not exist
         try:
             self.win.set_title(str(project) + ': ' + str(self.win.get_title()) + ' ' + str(counting - 1))
-        except:
-            # Looks like a odd title name but is reshaped in pus_datapool.py
+        except Exception as err:
+            print(err)
+            # Looks like an odd title name but is reshaped in pus_datapool.py
             self.win.windowname = str(project) + ': @ ' + str(counting - 1)
-        ###
 
         # Tell the terminal that a bus has been set up, this function has to exist in every file
         self.win.connect_to_all(Bus_Name, counting - 1)
 
         # Start the Logging TCP-Server, the check if it is already setup is in log_server.py
-        import log_server
-        log_server_path = log_server.__file__
-        os.system('nohup python3 ' + str(log_server_path) + ' >/dev/null 2>&1 &')
+        os.system('nohup python3 {} >{} 2>&1 &'.format(log_server.__file__, STDOUT))
         # subprocess.Popen(['python3', log_server_path])
 
     # Return all available methods
@@ -70,7 +73,7 @@ class MessageListener(dbus.service.Object):
         for method in method_list_former:
             if method.startswith('__'):
                 pass
-            elif argument and not argument in method:
+            elif argument and argument not in method:
                 pass
             else:
                 method_list.append(method)
