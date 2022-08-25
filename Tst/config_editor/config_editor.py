@@ -47,7 +47,7 @@ import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
 
 app_name = 'Configuration Editor'
-dbus_name = 'smile.tst.configeditor'
+dbus_name = 'egse.configeditor'
 menu_xml = os.path.join(os.path.dirname(__file__), 'app_menu.xml')
 css_file = os.path.join(os.path.dirname(__file__), 'style_config_editor.css')
 
@@ -69,7 +69,9 @@ fmt += '%(threadName)s\t'
 logging_format = fmt
 
 module_logger = logging.getLogger(__name__)
-module_logger.setLevel(level=logging.DEBUG)
+module_logger.setLevel(level=logging.WARNING)
+
+SHOW_MERGE_PAGE = confignator.get_bool_option('config-editor-general', 'show-merge-page')
 
 
 def create_console_handler(frmt=logging_format):
@@ -168,7 +170,7 @@ class ConfigurationEditor(Gtk.ApplicationWindow):
             self.logger = module_logger
         else:
             self.logger = logger
-        self.logger.info('Initializing a instance of ConfigurationEditor class')
+        self.logger.debug('Initialising an instance of ConfigurationEditor class')
         self.tabs = []
         self.merge_cfg = None
         self.merge_page = None
@@ -180,7 +182,7 @@ class ConfigurationEditor(Gtk.ApplicationWindow):
         self._show_merge_page = None
 
         self.show_interpol_val = False
-        self.show_merge_page = True
+        self.show_merge_page = SHOW_MERGE_PAGE
 
         # actions
         self.act_siv = Gio.SimpleAction.new_stateful('show_interpol_val',
@@ -528,7 +530,7 @@ class PageWidget(Gtk.ScrolledWindow):
         if cfg is not None:
             self.file_path = None
         if cfg is None and file_path is not None:
-            self.cfg = confignator.get_config(file_path=self.file_path, logger=self.logger)
+            self.cfg = confignator.get_config(file_path=self.file_path, logger=self.logger, check_interpolation=self.window.show_interpol_val)
         if cfg is None and file_path is None:
             tb = sys.exc_info()[2]
             message = 'None of the both arguments was provided (cfg or file_path). One of them is needed.'
