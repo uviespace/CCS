@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 import logging
-import os
-import sys
 
-from confignator import config
+import confignator
+cfg = confignator.get_config()
 
 from testlib import analyse_command_log
 
-print(os.getcwd())
-sys.path.append(os.path.realpath('../'))
-sys.path.append(os.path.realpath('../../Ccs/esa/'))
 from testlib import tm
 from testlib import tools
 
@@ -24,14 +20,13 @@ tst_logger.set_level(logger=logger)
 tst_logger.create_console_handler(logger=logger)
 tst_logger.create_file_handler(logger=logger)
 
-config = config.Config(file_path='../../Ccs/esa/egse.cfg')
 example_pool_file = '../example/IASW_777.tmpool'
 
-pm = pus_datapool.PUSDatapoolManager(cfg=config)
-ccs = packets.CCScom(cfg=config, poolmgr=pm)
+pm = pus_datapool.PUSDatapoolManager(cfg=cfg)
+ccs = packets.CCScom(cfg=cfg, poolmgr=pm)
 
 # load the tmpool file into the database
-tpv = poolview_sql.TMPoolView(cfg=config)
+tpv = poolview_sql.TMPoolView(cfg=cfg)
 tpv.set_ccs(ccs=ccs)
 tpv.load_pool(filename=example_pool_file)
 

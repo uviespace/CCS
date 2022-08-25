@@ -5,7 +5,6 @@ gi.require_version('Notify', '0.7')
 from gi.repository import Gtk, GLib, Notify, GdkPixbuf
 import subprocess
 import struct
-import crcmod
 import datetime
 import dateutil.parser as duparser
 import io
@@ -21,6 +20,7 @@ import glob
 import numpy as np
 import logging.handlers
 from database.tm_db import scoped_session_maker, DbTelemetry, DbTelemetryPool, RMapTelemetry, FEEDataTelemetry
+from sqlalchemy.exc import OperationalError as SQLOperationalError
 from sqlalchemy.sql.expression import func
 
 from s2k_partypes import ptt, ptype_parameters, ptype_values
@@ -28,21 +28,22 @@ import confignator
 import importlib
 
 
-cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+cfg = confignator.get_config(check_interpolation=False)
 
 PCPREFIX = 'packet_config_'
+
+CFL_LOGGER_NAME = 'cfl'
 
 project = cfg.get('ccs-database', 'project')
 project_cfg = PCPREFIX + str(project)
 packet_config = importlib.import_module(project_cfg)
 
-
 PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack,\
-timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH = \
+timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc = \
     [packet_config.PUS_VERSION, packet_config.TMHeader, packet_config.TCHeader, packet_config.PHeader,
      packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.P_HEADER_LEN, packet_config.PEC_LEN,
      packet_config.MAX_PKT_LEN, packet_config.timepack, packet_config.timecal, packet_config.calc_timestamp,
-     packet_config.CUC_OFFSET, packet_config.CUC_EPOCH]
+     packet_config.CUC_OFFSET, packet_config.CUC_EPOCH, packet_config.puscrc]
 
 PLM_PKT_PREFIX_TC_SEND = packet_config.PLM_PKT_PREFIX_TC_SEND
 PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
@@ -54,21 +55,18 @@ if cfg.has_section('ccs-user_defined_packets'):
 else:
     user_tm_decoders = {}
 
-uuuu = 0
 used_user_defined_parameter = None
-crctype = 'crc-ccitt-false'
-crc = crcmod.predefined.mkCrcFun(crctype)
+
+# CRCTYPE = 'crc-ccitt-false'
+# crc = crcmod.predefined.mkCrcFun(CRCTYPE)
+
+SREC_MAX_BYTES_PER_LINE = 250
 
 # Set up logger
-logger = logging.getLogger('CFL')
+logger = logging.getLogger(CFL_LOGGER_NAME)
+logger.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
 
-LOGLEVEL_DICT = {'DEBUG': logging.DEBUG,
-                 'INFO': logging.INFO,
-                 'WARNING': logging.WARNING,
-                 'ERROR': logging.ERROR,
-                 'CRITICAL': logging.CRITICAL}
-
-counters = {}
+counters = {}  # keeps track of PUS TC packet sequence counters (one per APID)
 
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
 
@@ -76,6 +74,14 @@ communication = {name: 0 for name in cfg['ccs-dbus_names']}
 
 scoped_session_idb = scoped_session_maker('idb', idb_version=None)
 scoped_session_storage = scoped_session_maker('storage')
+
+# check if MIB schema exists
+try:
+    scoped_session_idb.execute('show schemas').fetchall()
+except SQLOperationalError as err:
+    logger.critical(err)
+    sys.exit()
+
 
 fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
@@ -99,8 +105,22 @@ else:
 Notify.init('cfl')
 
 
-def get_scoped_session_idb(idb_version=None):
-    return scoped_session_maker('idb', idb_version=idb_version)
+def _add_log_socket_handler():
+    global logger
+    # check if a handler is already present
+    for hdlr in logger.handlers:
+        if isinstance(hdlr, logging.handlers.SocketHandler):
+            return
+    sh = logging.handlers.SocketHandler('localhost', logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+    sh.setFormatter(logging.Formatter('%(asctime)s: %(name)-15s %(levelname)-8s %(message)s'))
+    logger.addHandler(sh)
+
+
+def _remove_log_socket_handlers():
+    global logger
+    for hdlr in logger.handlers:
+        if isinstance(hdlr, logging.handlers.SocketHandler):
+            logger.removeHandler(hdlr)
 
 
 def set_scoped_session_idb_version(idb_version=None):
@@ -156,7 +176,7 @@ def start_pv(console=True, *args):
         args += (console,)
         console = True
 
-    directory = confignator.get_option('paths', 'ccs')
+    directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'poolview_sql.py')
     start_app(console, file_path, directory, *args)
 
@@ -174,7 +194,7 @@ def start_pmgr(console=True, *args):
         args += (console,)
         console = True
 
-    directory = confignator.get_option('paths', 'ccs')
+    directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'pus_datapool.py')
     start_app(console, file_path, directory, *args)
 
@@ -194,7 +214,7 @@ def start_editor(console=True, *args):
         args += (console,)
         console = True
 
-    directory = confignator.get_option('paths', 'ccs')
+    directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'editor.py')
 
     if '--terminal' in args:
@@ -219,7 +239,7 @@ def start_monitor(console= True, *args):
         args += (console,)
         console = True
 
-    directory = confignator.get_option('paths', 'ccs')
+    directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'monitor.py')
     start_app(console, file_path, directory, *args)
 
@@ -238,35 +258,35 @@ def start_plotter(console= True, *args):
         args += (console,)
         console = True
 
-    directory = confignator.get_option('paths', 'ccs')
+    directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'plotter.py')
     start_app(console, file_path, directory, *args)
 
     return
 
 def start_tst(console=False, *args):
-    directory = confignator.get_option('paths', 'tst')
+    directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'tst/main.py')
     start_app(console, file_path, directory, *args)
     return
 
 
 def start_progress_view(console=False, *args):
-    directory = confignator.get_option('paths', 'tst')
+    directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'progress_view/progress_view.py')
     start_app(console, file_path, directory, *args)
     return
 
 
 def start_log_viewer(console=False, *args):
-    directory = confignator.get_option('paths', 'tst')
+    directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'log_viewer/log_viewer.py')
     start_app(console, file_path, directory, *args)
     return
 
 
 def start_config_editor(console=False, *args):
-    file_path = confignator.get_option('start-module', 'config-editor')
+    file_path = cfg.get('start-module', 'config-editor')
     directory = os.path.dirname(file_path)
     start_app(console, file_path, directory, *args)
     return
@@ -276,7 +296,7 @@ def start_config_editor(console=False, *args):
 # The logger is returned with the given name an can be used like a normal logger
 def start_logging(name):
     level = cfg.get('ccs-logging', 'level')
-    loglevel = LOGLEVEL_DICT[level]
+    loglevel = getattr(logging, level.upper())
 
     rootLogger = logging.getLogger('')
     rootLogger.setLevel(loglevel)
@@ -285,13 +305,14 @@ def start_logging(name):
     # don't bother with a formatter, since a socket handler sends the event as an unformatted pickle
     rootLogger.addHandler(socketHandler)
     log = logging.getLogger(name)
+
     return log
 
 
 # This returns a dbus connection to a given Application-Name
 def dbus_connection(name, instance=1):
     if instance == 0:
-        logger.warning('There is no main instance of {} given in the project'.format(name))
+        logger.error('No instance of {} found.'.format(name))
         return False
 
     if not instance:
@@ -301,18 +322,17 @@ def dbus_connection(name, instance=1):
     try:
         Bus_Name = cfg.get('ccs-dbus_names', name)
     except:
-        print(str(name) + ' is not a valid DBUS name')
-        print(str(name) + ' could not be found in config file')
-        logger.warning(str(name) + ' could not be found in config file')
+        logger.warning(str(name) + ' is not a valid DBUS name.')
+        logger.warning(str(name) + ' not found in config file.')
     Bus_Name += str(instance)
 
     try:
         dbuscon = dbus_type.get_object(Bus_Name, '/MessageListener')
         return dbuscon
     except:
-        print('Connection to ' + str(name) + ' is not possible')
+        # print('Connection to ' + str(name) + ' is not possible')
         # print('Please start ' + str(name) + ' if it is not running')
-        logger.warning('Connection to ' + str(name) + ' is not possible')
+        logger.warning('Connection to ' + str(name) + ' is not possible.')
         return False
 
 
@@ -320,12 +340,13 @@ def dbus_connection(name, instance=1):
 def is_open(name, instance=1):
     dbus_type = dbus.SessionBus()
     try:
-        #dbus_connection(name, instance)
+        # dbus_connection(name, instance)
         Bus_Name = cfg.get('ccs-dbus_names', name)
         Bus_Name += str(instance)
         dbus_type.get_object(Bus_Name, '/MessageListener')
         return True
-    except:
+    except Exception as err:
+        logger.info(err)
         return False
 
 
@@ -482,6 +503,7 @@ def dbus_to_python(data, user_console=False):
         data = result
     return data
 
+
 def python_to_dbus(data, user_console=False):
     """
     Converts Python Types to Dbus Types, only containers, since 'normal' data types are converted automatically by dbus
@@ -522,13 +544,15 @@ def set_monitor(pool_name=None, param_set=None):
     if is_open('monitor'):
         monitor = dbus_connection('monitor', communication['monitor'])
     else:
-        print('The Parmameter Monitor is not running')
+        # print('The Parmameter Monitor is not running')
+        logger.error('The Parmameter Monitor is not running')
         return
 
     if pool_name is not None:
         monitor.Functions('set_pool', pool_name)
     else:
-        print('Pool Name has to be specified (cfl.set_monitor(pool_name, parmeter_set))')
+        # print('Pool Name has to be specified (cfl.set_monitor(pool_name, parmeter_set))')
+        logger.error('Pool Name has to be specified (cfl.set_monitor(pool_name, parmeter_set))')
         return
 
     if param_set is not None:
@@ -1129,7 +1153,8 @@ def Tmread(pckt):
         head_pars = header.bits
 
     except Exception as err:
-        print(' #!# Error unpacking packet: {}\n{}'.format(pckt, err))
+        # print('Error unpacking packet: {}\n{}'.format(pckt, err))
+        logger.warning('Error unpacking packet: {}\n{}'.format(pckt, err))
         head_pars = None
         data = None
         crc = None
@@ -1231,7 +1256,8 @@ def read_stream_recursive(tms, parameters, decoded=None):
             if 'ptype' in locals():
                 fmt = ptype_values[ptype]
             else:
-                print('No format deduced for parameter, aborting.')
+                # print('No format deduced for parameter, aborting.')
+                logger.warning('No format deduced for parameter, aborting.')
                 return decoded
         value = read_stream(tms, fmt)
 
@@ -1488,7 +1514,7 @@ def get_cuctime(tml):
         # the fine time, consisting out of 2 octets (2x 8bit), has a resolution of 2^16 - 1 bit = 2^15
         resolution = timepack[2]
         if ft > resolution:
-            logger.warning('get_cuctime: ValueError: the value of finetime is larger than its resolution')
+            logger.warning('get_cuctime: the finetime value {} is larger than its resolution of {}'.format(ft, resolution))
             raise ValueError(
                 'get_cuctime: the finetime value {} is larger than its resolution of {}'.format(ft, resolution))
 
@@ -1762,37 +1788,35 @@ def connect_tc(pool_name, host, port, protocol='PUS'):  #, drop_rx=True, timeout
     pmgr.Functions('connect_tc', pool_name, host, port, {'kwargs': dbus.Dictionary({'protocol': protocol})})
     return
 
+
 ##
 #  TC send (DB)
 #
-#  Send a telecommand over _cncsocket_ to DPU/SEM. This function uses the I-DB to generate the properly formatted PUS packet. The TC is specified with the CCF_DESCR string (case sensitive!) _cmd_, followed by the corresponding number of arguments. The default TC acknowledgement behaviour can be overridden by passing the _ack_ argument.
+#  Send a telecommand over _cncsocket_ to DPU/SEM. This function uses the I-DB to generate the properly formatted
+#  PUS packet. The TC is specified with the CCF_DESCR string (case sensitive!) _cmd_, followed by the corresponding
+#  number of arguments. The default TC acknowledgement behaviour can be overridden by passing the _ack_ argument.
 #  @param cmd       CCF_DESCR string of the TC to be issued
 #  @param args      Parameters required by the TC specified with _cmd_
 #  @param ack       Override the I-DB TC acknowledment value (4-bit binary string, e.g., '0b1011')
 #  @param pool_name Name of pool bound to socket connected to the C&C port
-#  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a loop to prevent too many packets are being sent over the socket in a too short time interval.
-def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0.2, no_check=False, **kwargs):
+#  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a
+#  loop to prevent too many packets are being sent over the socket in a too short time interval.
+def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, **kwargs):
+
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
+    if not pmgr:
+        return
+
     try:
         tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, **kwargs)
     except TypeError as e:
         raise e
+
     if pool_name is None:
         pool_name = pmgr.Variables('tc_name')
-        # pool_name = self.poolmgr.tc_name
 
-    # THIS NOW HAPPENS IN PMGR
-    # convert to SXI PLM transmission protocol
-    #if protocol.upper() == 'PLMSIM':
-    #    tc = PLM_PKT_PREFIX_TC_SEND + tc.hex().upper().encode() + PLM_PKT_SUFFIX
+    return _tcsend_common(tc, apid, st, sst, sleep=sleep, pool_name=pool_name, pkt_time=pkt_time)
 
-    # self.poolmgr.tc_send(pool_name, tc.bytes)
-    # self.counters[int(str(apid), 0)] += 1
-    # self.logger.info('TC %s,%s sent to %s\n' % (st, sst, apid))
-    # time.sleep(sleep)
-    # return Tcsend_common(tc.bytes, apid, st, sst, sleep, pool_name)
-
-    return Tcsend_common(tc, apid, st, sst, sleep, pool_name)
 
 ##
 #  Generate TC
@@ -1801,7 +1825,6 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0.2, no_check=False, *
 #  @param cmd  CCF_DESCR string of the requested TC
 #  @param args Parameters required by the cmd
 #  @param ack  Override the I-DB TC acknowledment value (4-bit binary string, e.g., '0b1011')
-
 def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, **kwargs):
     # with self.poolmgr.lock:
     que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
@@ -2072,7 +2095,7 @@ def get_pid(parnames):
     if len(set(parnames)) != len(parnames):
         msg = "Duplicate parameters will be ignored! {}".format(set([p for p in parnames if parnames.count(p) > 1]))
         logger.warning(msg)
-        print(msg)
+        # print(msg)
 
     que = 'SELECT pcf_descr,pcf_pid from pcf where BINARY pcf_descr in ({})'.format(', '.join(['"{}"'.format(p) for p in parnames]))
     dbcon = scoped_session_idb
@@ -2091,7 +2114,7 @@ def get_pid(parnames):
         if nopid:
             msg = "The following parameters have no PID: {}".format(nopid)
             logger.warning(msg)
-            print(msg)
+            # print(msg)
         sort_order = [parnames.index(d) for d in descr]
         descr, pid = zip(*[x for _, x in sorted(zip(sort_order, fetch), key=lambda x: x[0])])
         return descr, pid
@@ -2100,7 +2123,7 @@ def get_pid(parnames):
         msg = 'Unknown datapool item(s) {}'.format(parnames)
         # raise NameError(msg)
         logger.error(msg)
-        print(msg)
+        # print(msg)
         return None
 
 ##
@@ -2122,13 +2145,15 @@ def tc_param_in_range(prf, val, pdesc):
             ranges = [(int(pval[2], 16), int(pval[3], 16)) for pval in prfs]
         if not any([rng[0] <= float(val) <= rng[1] for rng in ranges]):
             limits = ' | '.join(['{:}-{:}'.format(*rng) for rng in ranges])
-            print('Parameter %s out of range: %s [valid: %s]' % (pdesc, val, limits))
+            # print('Parameter %s out of range: %s [valid: %s]' % (pdesc, val, limits))
+            logger.warning('Parameter %s out of range: %s [valid: %s]' % (pdesc, val, limits))
             Notify.Notification.new('Parameter %s out of range: %s [valid: %s]' % (pdesc, val, limits)).show()
             return False, 'Parameter %s out of range: %s [valid: %s]' % (pdesc, val, limits)
     elif prfs[0][0] == 'A':
         if val not in [i[2] for i in prfs]:
             valid = ' | '.join([i[2] for i in prfs])
-            print('Invalid parameter value for %s: %s [valid: %s]' % (pdesc, val, valid))
+            # print('Invalid parameter value for %s: %s [valid: %s]' % (pdesc, val, valid))
+            logger.warning('Invalid parameter value for %s: %s [valid: %s]' % (pdesc, val, valid))
             Notify.Notification.new('Invalid parameter value for %s: %s [valid: %s]' % (pdesc, val, valid)).show()
             return False, 'Invalid parameter value for %s: %s [valid: %s]' % (pdesc, val, valid)
     else:
@@ -2180,7 +2205,6 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
 
     tm = PUSpack(version=version, typ=typ, dhead=dhead, apid=apid, gflags=gflags, sc=sc, pktl=pktl,
                       tmv=tmv, st=st, sst=sst, sdid=destid, timestamp=timestamp, data=data, **kwargs)
-    #tm += data
 
     if chksm is None:
         chksm = crc(tm)
@@ -2221,7 +2245,6 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
                       sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, **kwargs)
 
     if chksm is None:
-        #chksm = crc(bytes(tc))
         chksm = crc(tc)
 
     tc += chksm.to_bytes(2, 'big')  # 16 bit CRC
@@ -2334,6 +2357,7 @@ def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_c
             ptc += 1
     return varlist, args2
 
+
 ##
 # TC send (common part of Tcsend_DB and Tcsend)
 #
@@ -2343,20 +2367,27 @@ def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_c
 #  @param sst       Service sub-type of TC
 #  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a loop to prevent too many packets are being sent over the socket in a too short time interval.
 #  @param pool_name Name of pool bound to socket connected to the C&C port
-def Tcsend_common(tc_bytes, apid, st, sst, sleep=0.2, pool_name='LIVE'):
-    # Note: in general, it is not possible to obtain the OBC time, thus the last packet time is used if available
+def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time=False):
 
-    global counters #Static Document change a variable only when it is global
-    t = get_last_pckt_time(pool_name=pool_name, string=False)
-    if t is None:
-        t = 0
-    Tcsend_bytes(tc_bytes, pool_name)
-    # self.Tctostore(tc.bytes,tcpool)
+    global counters
+
+    # Note: in general, it is not possible to obtain the OBC time, thus the last packet time is used if available
+    if pkt_time:
+        t = get_last_pckt_time(pool_name=pool_name, string=False)
+        if t is None:
+            t = 0
+    # Alternatively, use local time (JD)
+    else:
+        t = time.time()
+
+    sent = Tcsend_bytes(tc_bytes, pool_name)
+    if not sent:
+        return
+
     # get the SSC of the sent packet
     ssc = counters[int(str(apid), 0)]
     # increase the SSC counter
     counters[int(str(apid), 0)] += 1
-    #logger.info('TC(%s,%s) sent to APID %s @ %f' % (st, sst, apid, t))
     # More specific Logging format that is compatible with the TST
     log_dict = dict([('st', st),('sst', sst),('ssc', ssc),('apid', apid),('timestamp', t)])
     json_string = '{} {}'.format('#SENT TC', json.dumps(log_dict))
@@ -2364,24 +2395,27 @@ def Tcsend_common(tc_bytes, apid, st, sst, sleep=0.2, pool_name='LIVE'):
     time.sleep(sleep)
     return apid, ssc, t
 
+
 # get the CUC timestamp of the lastest TM packet
 #   @param pool_name: name of the pool
 #   @param string: <boolean> if true the CUC timestamp is returned as a string, otherwise as a float
 #   @return: <CUC> timestamp or None if failing
-def get_last_pckt_time(pool_name='LIVE', string=True, dbcon=None):
+def get_last_pckt_time(pool_name='LIVE', string=True):
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
     if not pmgr:
         logger.warning('Accessing PMGR failed!')
         return
 
-    # cuc = None
     packet = None
     # fetch the pool_name
-    #filename = self.poolmgr.loaded_pools[pool_name].filename
-    # pmd = pmgr.Dictionaries('loaded_pools')
-    poolname = pmgr.Dictionaries('loaded_pools', pool_name)
-    filename = poolname[2] # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
+    try:
+        poolname = pmgr.Dictionaries('loaded_pools', pool_name)
+    except (dbus.DBusException, KeyError):
+        logger.error('Pool {} is not connected/accessible!'.format(pool_name))
+        return
+
+    filename = poolname[2]  # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
     if not filename:
         filename = pool_name
 
@@ -2401,7 +2435,7 @@ def get_last_pckt_time(pool_name='LIVE', string=True, dbcon=None):
     if row is not None:
         packet = row.raw
     else:
-        logger.debug('get_packet_from_pool(): failed to get packets from query')
+        logger.warning('get_packet_from_pool: failed to get packets from query')
 
     # extract the CUC timestamp
     if string:
@@ -2422,52 +2456,52 @@ def get_last_pckt_time(pool_name='LIVE', string=True, dbcon=None):
                 cuc = None
     return cuc
 
+
 def Tcsend_bytes(tc_bytes, pool_name='LIVE'):
+
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
+
+    if not pmgr:
+        return False
+
+    # check if pool is connected
+    try:
+        pmgr.Dictionaries('tc_connections', pool_name)
+    except (dbus.DBusException, KeyError):
+        logger.error('"{}" has no TC connection!'.format(pool_name))
+        return False
+
     # Tell dbus with signature = that you send a byte array (ay), otherwise does not allow null bytes
-    msg = pmgr.Functions('tc_send', pool_name, tc_bytes, signature='ssay')
-    logger.debug(msg)
-    #pmgr.Functions('tc_send', pool_name, tc_bytes, ignore_reply=True)
-    #self.poolmgr.tc_send(pool_name, tc_bytes)
+    try:
+        pmgr.Functions('tc_send', pool_name, tc_bytes, signature='ssay')
+        return True
+    except dbus.DBusException:
+        logger.error('Failed to send packet of length {} to {}!'.format(len(tc_bytes), pool_name))
+        return False
+    # logger.debug(msg)
+    # pmgr.Functions('tc_send', pool_name, tc_bytes, ignore_reply=True)
+
 
 ##
 #  Send C&C command
 #
 #  Send command to C&C socket
-#  @param socket_name Name of the pool bound to the socket for CnC/TC communication
+#  @param pool_name Name of the pool bound to the socket for CnC/TC communication
 #  @param cmd         Command string to be sent to C&C socket
 def CnCsend(cmd, pool_name=None):
-    #### This function was new arranged
-    #Necessary to make it possible to use  socket in poolmanager
     global counters # One can only Change variable as global since we are static
 
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
     if pool_name is None:
         pool_name = pmgr.Variables('tc_name')
-        #pool_name = self.poolmgr.tc_name
-    #cncsocket = self.poolmgr.tc_connections[pool_name] ######Problem with socket element
     packed_data = CnCpack(data=cmd, sc=counters.setdefault(1804, 1))
-    #cncsocket.send(self.CnCpack(data=cmd, sc=self.counters.setdefault(1804, 1)).bytes)
-    received = pmgr.Functions('socket_send_packed_data', packed_data, pool_name, signature = 'says')
-    # logfile.write(logtf(self.tnow()) + ' ' + cmd + ' [CnC]\n')
-    if received != None:
+    received = pmgr.Functions('socket_send_packed_data', packed_data, pool_name, signature='says')
+    if received is not None:
         counters[1804] += 1
         received = bytes(received) # convert dbus type to python type
-    print('[CNC Response:]' + str(received))
+    # print('[CNC Response:]' + str(received))
+    logger.info('[CNC Response:]' + str(received))
 
-    '''
-    received = None
-    try:
-        received = cncsocket.recv(1024)
-        # self.logger.info.write(logtf(self.tnow()) + ' ' + recv[6:].decode() + ' [CnC]\n')
-        self.logger.info(received.decode(errors='replace') + ' [CnC]')
-        # logfile.flush()
-        # s.close()
-        self.counters[1804] += 1
-    except socket.timeout:
-        self.logger.error('Got a timeout')
-        self.logger.exception(socket.timeout)
-    '''
     return received
 
 
@@ -2495,6 +2529,7 @@ def CnCpack(data=b'', version=0b011, typ=1, dhead=0, pid=112, cat=12, gflags=0b1
 
     return bytes(header.bin) + data.encode()
 
+
 ##
 #  Send data to socket
 #
@@ -2505,6 +2540,7 @@ def Datasend(data, pool_name):
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
     pmgr.Functions('tc_send', pool_name, data)
     return
+
 
 ##
 #  Limits check
@@ -2547,6 +2583,7 @@ def Tm_limits_check(param, val, user_limit: dict = None, dbcon=None):
         else:
             return 1
 
+
 ##
 #  st_to_num
 #
@@ -2563,7 +2600,7 @@ def str_to_num(string, fmt=None):
     return num
 
 
-def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0.2, ack=None, pool_name='LIVE'):
+def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0., ack=None, pool_name='LIVE'):
     """
     Function for loading large data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_DB_ function until
@@ -2588,14 +2625,16 @@ def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0.2, ack=None, 
 
     slices = [data[i:i + slicesize] for i in range(0, len(data), slicesize)]
     if slicesize > 1000:
-        print('SLICESIZE > 1000 bytes, this is not gonna work!')
+        # print('SLICESIZE > 1000 bytes, this is not gonna work!')
+        logger.warning('SLICESIZE > 1000 bytes, this is not gonna work!')
     slicount = 1
 
     for sli in slices:
         t1 = time.time()
         parts = struct.unpack(len(sli) * 'B', sli)
         Tcsend_DB(cmd, memid, mempos, len(parts), *parts, ack=ack, pool_name=pool_name)
-        sys.stdout.write('%i / %i packets sent\r' % (slicount, len(slices)))
+        sys.stdout.write('%i / %i packets sentto {}\r'.format(slicount, len(slices), memid))
+        logger.info('%i / %i packets sent to {}'.format(slicount, len(slices), memid))
         slicount += 1
         dt = time.time() - t1
         if dt < sleep:
@@ -2615,7 +2654,8 @@ def bin_to_hex(fname, outfile):
     buf = prettyhex(bindata)
     with open(outfile, 'w') as fd:
         fd.write(buf)
-        print('Wrote {} bytes as HEX-ASCII to {}.'.format(len(bindata), outfile))
+        # print('Wrote {} bytes as HEX-ASCII to {}.'.format(len(bindata), outfile))
+        logger.info('Wrote {} bytes as HEX-ASCII to {}.'.format(len(bindata), outfile))
 
 
 def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_line=32):
@@ -2632,8 +2672,8 @@ def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_lin
     def srec_chksum(x):
         return sum(bytes.fromhex(x)) & 0xff ^ 0xff
 
-    if bytes_per_line > 250:
-        print("Maximum number of bytes per line is 250!")
+    if bytes_per_line > SREC_MAX_BYTES_PER_LINE:
+        logger.error("Maximum number of bytes per line is {}!".format(SREC_MAX_BYTES_PER_LINE))
         return
 
     if isinstance(data, str):
@@ -2667,7 +2707,8 @@ def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_lin
         fd.write('\n'.join(sreclist) + '\n')
         fd.write(terminator)
 
-    print('Data written to file: "{}"'.format(outfile))
+    # print('Data written to file: "{}"'.format(outfile))
+    logger.info('Data written to file: "{}"'.format(outfile))
 
 
 def get_tc_list(ccf_descr=None):
@@ -2794,8 +2835,23 @@ def get_tm_id(pcf_descr=None):
     return tms_dict
 
 
-def get_data_pool_items(pcf_descr=None):
-    if pcf_descr is None:
+def get_data_pool_items(pcf_descr=None, src_file=None):
+    if src_file:
+        with open(src_file, 'r') as fd:
+            lines = fd.readlines()
+        data_pool = []
+        for line in lines:
+            if not line.startswith('#'):
+                dp_item = line.strip().split('|')
+                # check for format
+                if len(dp_item) == 6:
+                    data_pool.append(dp_item[:2][::-1] + dp_item[2:])
+                else:
+                    raise Exception
+
+        return data_pool
+
+    elif pcf_descr is None and not src_file:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
                                                'FROM pcf WHERE pcf_pid <> 0').fetchall()
 
@@ -2820,8 +2876,6 @@ def get_dp_items(source='mib'):
         dp = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc FROM pcf WHERE pcf_pid IS NOT NULL ORDER BY pcf_pid').fetchall()
         dp_ed = [(*i[:2], fmt[i[2]][i[3]]) for i in dp]
         return dp_ed
-    elif source.lower() == 'src':
-        return
     else:
         raise NotImplementedError
 
@@ -2904,7 +2958,7 @@ def about_dialog(parent=None, action=None):
     if not parent:
         return
 
-    pics_path = confignator.get_option('paths', 'ccs')
+    pics_path = cfg.get('paths', 'ccs')
     pics_path += '/pixmap'
 
     dialog = Gtk.AboutDialog()
@@ -2912,7 +2966,7 @@ def about_dialog(parent=None, action=None):
 
     dialog.set_program_name('UVIE Central Checkout System')
 
-    dialog.set_copyright('UVIE 01/2022')
+    dialog.set_copyright('UVIE 08/2022')
     dialog.set_license_type(Gtk.License.MPL_2_0)
     dialog.set_authors(('Marko Mecina', 'Dominik Moeslinger', 'Thanassis Tsiodras', 'Armin Luntzer'))
     dialog.set_version('2.0')
@@ -2943,8 +2997,8 @@ def change_communication_func(main_instance=None,new_main=None,new_main_nbr=None
             conn = dbus_connection(application.lower(), application_nbr)
             main_instance = conn.Variables('main_instance')
         else:
-            print('Please give a value for "main_instance" (project name)')
-            logger.info('No main_instance was given therefore main communication could not be changed')
+            # print('Please give a value for "main_instance" (project name)')
+            logger.warning('No main_instance was given therefore main communication could not be changed')
             return
     # Instance from an application is given call the dialog
     if parentwin:
@@ -2964,15 +3018,15 @@ def change_communication_func(main_instance=None,new_main=None,new_main_nbr=None
             conn = dbus_connection(application.lower(), application_nbr)
             conn.Functions('change_communication', application.lower(), application_nbr)
         else:
-            print('Given application instance or new main communication instance is not open')
-            logger.info('Could not change main communication instance to {} for {} since one of these is not '
+            # print('Given application instance or new main communication instance is not open')
+            logger.warning('Could not change main communication instance to {} for {} since one of these is not '
                         'running'.format(str(new_main)+str(new_main_nbr), str(application)+str(application_nbr)))
     # Change the main communication for the entire project
     elif new_main and new_main_nbr:
         change_main_communication(new_main, new_main_nbr, main_instance)
     else:
-        print('Please give a new main application and the instance number')
-        logger.info('Not enough information was given to change the main communication')
+        # print('Please give a new main application and the instance number')
+        logger.warning('Not enough information was given to change the main communication')
 
     return
 
@@ -3011,7 +3065,7 @@ def add_decode_parameter(label=None, format=None, bytepos=None, parentwin=None):
     :return:
     """
 
-    fmt=None
+    fmt = None
 
     if format and label:
         #if label in cfg['ccs-plot_parameters']:
@@ -3020,7 +3074,7 @@ def add_decode_parameter(label=None, format=None, bytepos=None, parentwin=None):
         if isinstance(format, str):
             if not ptt_reverse(format):
                 if not format in fmtlist.keys():
-                    print('Please give a correct Format')
+                    logger.error('Please give a correct Format')
                     return
                 else:
                     fmt = fmtlist[format]
@@ -3031,10 +3085,10 @@ def add_decode_parameter(label=None, format=None, bytepos=None, parentwin=None):
                 try:
                     fmt = ptt[format[0]][format[1]]
                 except:
-                    print('Give valid location of format')
+                    logger.error('Give valid location of format')
                     return
             else:
-                print('Please give a correct Format Length')
+                logger.error('Please give a correct Format Length')
                 return
 
         if bytepos:
@@ -3068,40 +3122,39 @@ def add_decode_parameter(label=None, format=None, bytepos=None, parentwin=None):
             return
 
     else:
-        print('Please give a Format')
+        logger.error('Please give a Format')
         return
 
     # If a position was found the parameter will be stored in user_decoder layer in cfg
     if pos:
         if fmt in fmtlengthlist:
-            len = fmtlengthlist[fmt]
+            leng = fmtlengthlist[fmt]
         elif fmt.startswith(('bit', 'int', 'oct')):
             len_test = int(fmt[3:])
             if len_test % 8 == 0:
-                len = len_test
+                leng = len_test
         elif fmt.startswith('uint'):
             len_test = int(fmt[4:])
             if len_test % 8 == 0:
-                len = len_test
+                leng = len_test
         elif fmt.startswith('ascii'):
             len_test = int(fmt[5:])
             if len_test % 8 == 0:
-                len = len_test
+                leng = len_test
         else:
-            print('Something went wrong')
-            logger.info('Error while generating Udef Parameter')
+            # print('Something went wrong')
+            logger.error('Failed generating UDEF Parameter')
             return
 
-        if len:
-            dump = {'bytepos': str(pos), 'bytelen': str(len), 'format': str(fmt)}
-            cfg['ccs-user_decoders'][label] = json.dumps(dump)
+        if leng:
+            dump = {'bytepos': str(pos), 'bytelen': str(leng), 'format': str(fmt)}
+            cfg.save_option_to_file('ccs-user_decoders', label, json.dumps(dump))
         else:
             dump = {'bytepos': str(pos), 'format': str(fmt)}
-            cfg['ccs-user_decoders'][label] = json.dumps(dump)
+            cfg.save_option_to_file('ccs-user_decoders', label, json.dumps(dump))
     else:
         cfg['ccs-decode_parameters'][label] = json.dumps(('format', str(fmt)))
-
-    cfg.save_to_file()
+        cfg.save_option_to_file('ccs-decode_parameters', label, json.dumps(('format', str(fmt))))
 
     if fmt:
         return fmt
@@ -3128,7 +3181,7 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
         tag = '{}-{}-{}-{}'.format(st, sst, apid, sid)
 
     elif parentwin is not None:
-        dialog = TmDecoderDialog(cfg=cfg, logger=logger, parent=parentwin)
+        dialog = TmDecoderDialog(logger=logger, parent=parentwin)
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
@@ -3146,7 +3199,7 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
             dialog.destroy()
             return
     else:
-        print('Please give: label, st, sst and apid')
+        logger.error('Please give: label, st, sst and apid')
         return
     dbcon = scoped_session_idb
 
@@ -3175,7 +3228,7 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
                     try:
                         params_values = json.loads(cfg['ccs-user_decoders'][parameters_descr[i]])
                     except:
-                        print('Parameter: {} can only be decoded in given order'.format(parameters_descr[i]))
+                        # print('Parameter: {} can only be decoded in given order'.format(parameters_descr[i]))
                         logger.info('Parameter: {} can only be decoded in given order'.format(parameters_descr[i]))
                         return
                     ptt_value = ptt_reverse(params_values['format'])
@@ -3271,28 +3324,20 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
                 dbres = dbcon.execute(que)
                 parmas = dbres.fetchall()
 
-    print('Created custom TM decoder {} with parameters: {}'.format(label, [x[1] for x in params]))
+    # print('Created custom TM decoder {} with parameters: {}'.format(label, [x[1] for x in params]))
+    logger.debug('Created custom TM decoder {} with parameters: {}'.format(label, [x[1] for x in params]))
     user_tm_decoders[tag] = (label, params)
     dbcon.close()
 
     if not cfg.has_section('ccs-user_defined_packets'):
         cfg.add_section('ccs-user_defined_packets')
-    cfg['ccs-user_defined_packets'][tag] = json.dumps((label, [tuple(x) for x in params]))
-
-    #cfg.save_option('packets', 'testt', [])
-
-    cfg.save_to_file()
-
-    #with open(cfg.source, 'w') as fdesc:
-    #    cfg.write(fdesc)
-    #del(fdesc)
-    #return
+    cfg.save_option_to_file('ccs-user_defined_packets', tag, json.dumps((label, [tuple(x) for x in params])))
 
 
 # Add a User defined Parameter
 def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, bytepos=None, fmt=None, offbi=None, bitlen=None, parentwin=None):
     # If a Gtk Parent Window is given, open the Dialog window to specify the details for the parameter
-    if parentwin != None:
+    if parentwin is not None:
         dialog = AddUserParamerterDialog(parent=parentwin)
 
         response = dialog.run()
@@ -3315,18 +3360,15 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
 
             if not cfg.has_section('ccs-plot_parameters'):
                 cfg.add_section('ccs-plot_parameters')
-            cfg['ccs-plot_parameters'][label] = json.dumps(
-                {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
+            cfg.save_option_to_file('ccs-plot_parameters', label, json.dumps(
+                {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi}))
 
-            cfg.save_to_file()
-
-            #with open(cfg.source, 'w') as fdesc:
-            #    cfg.write(fdesc)
             dialog.destroy()
             return label, apid, st, sst, sid, bytepos, fmt, offbi
 
         dialog.destroy()
         return
+
     # Else If parameter is given as the name of the parameter the others have to exist as well and the parameter is created
     if isinstance(parameter, str):
         label = parameter
@@ -3335,17 +3377,17 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
                 if bitlen:
                     fmt += bitlen
                 else:
-                    print('Please give a bitlen (Amount of Bits) if fmt (Parameter Type) is set to "bit"')
-                    logger.info('Parameter could not be created, no bitlen was given, while fmt was set to  "bit"')
+                    # print('Please give a bitlen (Amount of Bits) if fmt (Parameter Type) is set to "bit"')
+                    logger.error('Parameter could not be created, no bitlen was given, while fmt was set to  "bit"')
                     return
 
             if not isinstance(sid,int):
-                sid = int(sid, 0) if sid != None else None
+                sid = int(sid, 0) if sid is not None else None
             if not isinstance(offbi, int):
-                offbi = int(offbi, 0) if offbi != None else 0
+                offbi = int(offbi, 0) if offbi is not None else 0
         else:
-            print('Please give all neaded parameters in the correct format')
-            logger.info('Parameter could not be created, because not all specifications were given correctly')
+            # print('Please give all neaded parameters in the correct format')
+            logger.error('Parameter could not be created, because not all specifications were given correctly')
             return
     # Esle if the Parameter is given as a Dictionary get all the needed informations and create the parameter
     elif isinstance(parameter, dict):
@@ -3360,8 +3402,8 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
                 if bitlen:
                     fmt += bitlen
                 else:
-                    print('Please give a bitlen (Amount of Bits) if fmt (Parameter Type) is set to "bit"')
-                    logger.info('Parameter could not be created, no bitlen was given, while fmt was set to  "bit"')
+                    # print('Please give a bitlen (Amount of Bits) if fmt (Parameter Type) is set to "bit"')
+                    logger.error('Parameter could not be created, no bitlen was given, while fmt was set to "bit"')
                     return
 
             if not isinstance(parameter['sid'], int):
@@ -3369,49 +3411,31 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
             if not isinstance(parameter['offbi'], int):
                 offbi = int(parameter['offbi'], 0) if parameter['offbi'] else 0
         else:
-            print('Please give all neaded parameters in the correct format')
-            logger.info('Parameter could not be created, because not all specifications were given correctly')
+            # print('Please give all neaded parameters in the correct format')
+            logger.error('Parameter could not be created, because not all specifications were given correctly')
             return
 
     else:
-        print('Please give all Parameters correctly')
+        logger.error('Please give all arameters correctly')
         return
     # Add the created Parameter to the config file egse.cfg
     if not cfg.has_section('ccs-plot_parameters'):
         cfg.add_section('ccs-plot_parameters')
 
-    cfg['ccs-plot_parameters'][label] = json.dumps(
-        {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
-
-    cfg.save_to_file()
-
-    #with open(cfg.source, 'w') as fdesc:
-    #    cfg.write(fdesc)
-
-    #if is_open('plotter'):
-        #plot = dbus_connection('plotter', communication['plotter'])
-        #para = (label, apid, st, sst, sid, bytepos, fmt, offbi)
-        #plot.Functions('update_user_defined_parameter', para, ignore_reply=True)
-        #plot.Functions('update_user_defined_parameter', para)
+    cfg.save_option_to_file('ccs-plot_parameters', label, json.dumps(
+        {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi}))
 
     return label, apid, st, sst, sid, bytepos, fmt, offbi
 
+
 # Removes a user defined Parameter
-def remove_user_parameter(parname = None, parentwin = None):
+def remove_user_parameter(parname=None, parentwin=None):
     # If a Parameter is given delete the parameter
     if parname and cfg.has_option('ccs-plot_parameters', parname):
-        cfg['ccs-plot_parameters'].pop(parname)
+        cfg.remove_option_from_file('ccs-plot_parameters', parname)
 
-        cfg.save_to_file()
-
-        #with open(cfg.source, 'w') as fdesc:
-        #    cfg.write(fdesc)
-        '''
-        if is_open('plotter'):
-            plot = dbus_connection('plotter')
-            plot.Functions('update_user_defined_parameter',parname , ignore_reply=True)
-        '''
         return parname
+
     # Else if a Parent Gtk window is given open the dialog to select a parameter
     elif parentwin is not None:
         dialog = RemoveUserParameterDialog(cfg, parentwin)
@@ -3419,13 +3443,7 @@ def remove_user_parameter(parname = None, parentwin = None):
         if response == Gtk.ResponseType.OK:
             param = dialog.remove_name.get_active_text()
 
-            cfg['ccs-plot_parameters'].pop(param)
-
-            cfg.save_to_file()
-
-            #with open(cfg.source, 'w') as fdesc:
-            #    cfg.write(fdesc)
-            dialog.destroy()
+            cfg.remove_option_from_file('ccs-plot_parameters', param)
 
             return param
 
@@ -3434,12 +3452,13 @@ def remove_user_parameter(parname = None, parentwin = None):
 
         return
 
-    elif parname != None:
-        print('Selected User Defined Paramter could not be found please select a new one')
+    elif parname is not None:
+        logger.error('Selected User Defined Paramter could not be found, please select a new one.')
         return
 
     else:
         return
+
 
 # Edit an existing user defined Parameter
 def edit_user_parameter(parentwin = None, parname = None):
@@ -3463,19 +3482,14 @@ def edit_user_parameter(parentwin = None, parname = None):
                 if fmt == 'bit':
                     fmt += dialog.bitlen.get_text()
             except ValueError as error:
-                print(error)
+                logger.error(error)
                 dialog.destroy()
                 return None
 
             if not cfg.has_section('ccs-plot_parameters'):
                 cfg.add_section('ccs-plot_parameters')
-            cfg['ccs-plot_parameters'][label] = json.dumps(
-                {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
-
-            cfg.save_to_file()
-
-            #with open(cfg.source, 'w') as fdesc:
-            #    cfg.write(fdesc)
+            cfg.save_option_to_file('ccs-plot_parameters', label, json.dumps(
+                {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi}))
 
             dialog.destroy()
 
@@ -3487,8 +3501,8 @@ def edit_user_parameter(parentwin = None, parname = None):
     # Else Open a Window to select a parameter and call the same function again with an existing parameter
     # The upper code will be executed
     else:
-        if parname != None:
-            print('Selected User Defined Paramter could not be found please select a new one')
+        if parname is not None:
+            logger.warning('Selected User Defined Paramter could not be found please select a new one')
 
         dialog = EditUserParameterDialog(cfg, parentwin)
         response = dialog.run()
@@ -3551,9 +3565,7 @@ def get_spw_from_plm_gw(sock_plm, sock_gnd, strip_spw=4):
         sock_gnd.send(spwdata[strip_spw:])  # strip SpW header before routing packet
     else:
         sock_gnd.send(spwdata)
-    print(plen, len(spwdata), spwdata.hex())
-
-    # print('> SPW PCKT routing aborted! <')
+    logger.info(plen, len(spwdata), spwdata.hex())
 
 
 def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'):
@@ -3576,7 +3588,7 @@ def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'
         tcsock = gnd
 
     while gw.fileno() > 0:
-        print(gw, gnd)
+        logger.info(gw, gnd)
         gnd_s, addr = gnd.accept()
         tc_s, addr2 = tcsock.accept()
 
@@ -3593,7 +3605,7 @@ def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'
                             if rawtc == b'':
                                 raise socket.error('Lost connection to port '.format(tc_s.getsockname()))
                             else:
-                                print('# TC:', spw_head + rawtc)
+                                logger.info('# TC:', spw_head + rawtc)
                                 msg = pack_plm_gateway_data(spw_head + rawtc)
                                 gw.send(msg)
 
@@ -3604,7 +3616,7 @@ def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'
             except socket.error:
                 gnd_s.close()
                 tc_s.close()
-                print('Closed TM/TC ports. Reopening...')
+                logger.info('Closed TM/TC ports. Reopening...')
                 break
 
         time.sleep(1)
@@ -3669,29 +3681,31 @@ def get_packets_from_pool(pool_name, indices=[], st=None, sst=None, apid=None, d
     new_session.close()
     return ret
 
+
 def add_tst_import_paths():
     """
     Include all paths to TST files that could potentially be used.
     """
     # Add general tst path
-    sys.path.append(confignator.get_option('paths', 'tst'))
+    sys.path.append(cfg.get('paths', 'tst'))
     # Add all subfolders
-    sys.path.append(confignator.get_option('paths', 'tst') + '/codeblockreusefeature')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/config_editor')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/confignator')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/doc')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/icon_univie')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/images')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/log_viewer')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/notes')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/progress_view')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/sketch_desk')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/test_specs')
-    sys.path.append(confignator.get_option('paths', 'tst') + '/testing_library')
+    sys.path.append(cfg.get('paths', 'tst') + '/codeblockreusefeature')
+    sys.path.append(cfg.get('paths', 'tst') + '/config_editor')
+    sys.path.append(cfg.get('paths', 'tst') + '/confignator')
+    sys.path.append(cfg.get('paths', 'tst') + '/doc')
+    sys.path.append(cfg.get('paths', 'tst') + '/icon_univie')
+    sys.path.append(cfg.get('paths', 'tst') + '/images')
+    sys.path.append(cfg.get('paths', 'tst') + '/log_viewer')
+    sys.path.append(cfg.get('paths', 'tst') + '/notes')
+    sys.path.append(cfg.get('paths', 'tst') + '/progress_view')
+    sys.path.append(cfg.get('paths', 'tst') + '/sketch_desk')
+    sys.path.append(cfg.get('paths', 'tst') + '/test_specs')
+    sys.path.append(cfg.get('paths', 'tst') + '/testing_library')
     # insert this to import the tst view.py, not the one in .local folder
-    sys.path.insert(0, confignator.get_option('paths', 'tst') + '/tst')
+    sys.path.insert(0, cfg.get('paths', 'tst') + '/tst')
 
     return
+
 
 class TestReport:
 
@@ -3754,7 +3768,7 @@ class TestReport:
                 pass  # TODO: abort step execution
 
         except KeyError:
-            print('"{}": no such step defined!'.format(str(step)))
+            logger.error('"{}": no such step defined!'.format(str(step)))
             return
 
     def verify_step(self, step):
@@ -3784,7 +3798,7 @@ class TestReport:
                 result = input(ver_msg + ':\n>')
 
         except KeyError:
-            print('"{}": no such step defined!'.format(str(step)))
+            logger.error('"{}": no such step defined!'.format(str(step)))
             return
 
         self.report[self.step_rowid[str(step)]][3] = result
@@ -3803,7 +3817,7 @@ class TestReport:
 
         with open(reportfile, 'w') as fd:
             fd.write(buf + '\n')
-        print('Report written to {}.'.format(reportfile))
+        logger.info('Report written to {}.'.format(reportfile))
 
 
 class TestReportGUI(Gtk.MessageDialog):
@@ -3916,7 +3930,7 @@ class TmParameterDecoderDialog(Gtk.Dialog):
 
 
 class TmDecoderDialog(Gtk.Dialog):
-    def __init__(self, cfg, logger, parameter_set=None, parent=None):
+    def __init__(self, logger, parameter_set=None, parent=None):
         Gtk.Dialog.__init__(self, "Build User Defined Packet", parent, 0)
         self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
 
@@ -3990,11 +4004,11 @@ class TmDecoderDialog(Gtk.Dialog):
         if parameter_set is not None:
 
             if self.cfg.has_option('ccs-user_defined_packets', parameter_set):
-                packet = json.loads(cfg['ccs-user_defined_packets'][parameter_set])
+                packet = json.loads(self.cfg['ccs-user_defined_packets'][parameter_set])
                 value = parameter_set
             else:
-                for pack in cfg['ccs-user_defined_packets']:
-                    pack_val = json.loads(cfg['ccs-user_defined_packets'][pack])
+                for pack in self.cfg['ccs-user_defined_packets']:
+                    pack_val = json.loads(self.cfg['ccs-user_defined_packets'][pack])
                     if pack_val[0] == parameter_set:
                         packet = pack_val
                         value = pack
@@ -4152,12 +4166,12 @@ class TmDecoderDialog(Gtk.Dialog):
             self.ok_button.set_sensitive(False)
 
 
-
 class AddUserParamerterDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, edit=None):
         Gtk.Dialog.__init__(self, "Add User Parameter", parent, 0,
                             buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
 
+        self.cfg = cfg
         self.set_border_width(5)
 
         box = self.get_content_area()
@@ -4217,7 +4231,7 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
         box.set_spacing(10)
 
         if edit is not None:
-            pars = json.loads(parent.cfg['ccs-plot_parameters'][edit])
+            pars = json.loads(self.cfg['ccs-plot_parameters'][edit])
             self.label.set_text(edit)
             if 'ST' in pars:
                 self.st.set_text(str(pars['ST']))
@@ -4263,6 +4277,7 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
             self.bitlen.set_sensitive(False)
             self.offbi.set_sensitive(False)
 
+
 class RemoveUserParameterDialog(Gtk.Dialog):
     def __init__(self, cfg, parent=None):
         Gtk.Dialog.__init__(self, "Remove User Defined Parameter", parent, 0)
@@ -4303,6 +4318,7 @@ class RemoveUserParameterDialog(Gtk.Dialog):
             self.ok_button.set_sensitive(True)
         else:
             self.ok_button.set_sensitive(False)
+
 
 class EditUserParameterDialog(Gtk.Dialog):
     def __init__(self, cfg, parent=None):
@@ -4490,6 +4506,7 @@ class ProjectDialog(Gtk.Dialog):
         self.project_selection = self._create_project_selection()
         self.idb_selection = self._create_idb_selection()
 
+        self.cfg = cfg
         ca = self.get_content_area()
         ca.set_spacing(2)
 
@@ -4522,7 +4539,7 @@ class ProjectDialog(Gtk.Dialog):
     def _create_project_selection():
         project_selection = Gtk.ComboBoxText()
 
-        ccs_path = confignator.get_option('paths', 'ccs')
+        ccs_path = cfg.get('paths', 'ccs')
         ccs_path += '/' if not ccs_path.endswith('/') else ''
         projects = glob.glob(ccs_path + PCPREFIX + '*')
 
@@ -4531,7 +4548,7 @@ class ProjectDialog(Gtk.Dialog):
         for p in projects:
             project_selection.append(p, p)
 
-        set_as = confignator.get_option('ccs-database', 'project')
+        set_as = cfg.get.get_option('ccs-database', 'project')
         project_selection.set_active_id(set_as)
 
         return project_selection
@@ -4546,7 +4563,7 @@ class ProjectDialog(Gtk.Dialog):
         for m in mibs:
             idb_selection.append(m, m)
 
-        set_as = confignator.get_option('ccs-database', 'idb_schema')
+        set_as = cfg.get('ccs-database', 'idb_schema')
         idb_selection.set_active_id(set_as)
 
         return idb_selection
@@ -4554,8 +4571,8 @@ class ProjectDialog(Gtk.Dialog):
     def _write_config(self, widget, data):
         if data == 1:
 
-            confignator.save_option('ccs-database', 'project', self.project_selection.get_active_text())
-            confignator.save_option('ccs-database', 'idb_schema', self.idb_selection.get_active_text())
+            self.cfg.save_option_to_file('ccs-database', 'project', self.project_selection.get_active_text())
+            self.cfg.save_option_to_file('ccs-database', 'idb_schema', self.idb_selection.get_active_text())
 
             self.destroy()
             Gtk.main_quit()
