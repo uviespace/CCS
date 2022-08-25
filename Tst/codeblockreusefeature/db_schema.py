@@ -17,7 +17,7 @@ schema_name = 'tst'
 
 
 def crt_ngn():
-    a_engine = create_engine(mysql_connection_string + '/' + schema_name, echo=True)
+    a_engine = create_engine(mysql_connection_string + '/' + schema_name, echo=False)
     return a_engine
 
 
@@ -25,7 +25,7 @@ engine = crt_ngn()
 
 
 def crt_schm():
-    a_engine = create_engine(mysql_connection_string, echo=True)
+    a_engine = create_engine(mysql_connection_string, echo=False)
     a_engine.execute('CREATE DATABASE IF NOT EXISTS {}'.format(schema_name))
     """
     If there comes up a access denied error, try following:
@@ -41,7 +41,7 @@ def drp_schm():
     """
     drop the database scheme
     """
-    a_engine = create_engine(mysql_connection_string, echo=True)
+    a_engine = create_engine(mysql_connection_string, echo=False)
     a_engine.execute('DROP DATABASE {}'.format(schema_name))
     return
 
