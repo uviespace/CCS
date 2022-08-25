@@ -1,17 +1,20 @@
-import pickle
-import struct
+# import pickle
+# import struct
 import sys
 import io
 import os
-import gi
+# import gi
 import dbus
 import dbus.service
+import logging
 import ccs_function_lib as cfl
 
-gi.require_version('Gtk', '3.0')
+# gi.require_version('Gtk', '3.0')
 
-import confignator
-cfg = confignator.get_config()
+# import confignator
+# cfg = confignator.get_config(check_interpolation=False)
+
+logging.getLogger().setLevel(logging.WARNING)
 
 dbus_type = dbus.SessionBus()
 
