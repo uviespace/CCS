@@ -41,13 +41,7 @@ import os
 import logging
 import logging.handlers
 
-# hardcoded stuff
-# INFO: path to confignator_cfg, has to be "../build..." if started with pycharm and confignator is marked as root
-# directory, otherwhise it has to be only "confignator.cfg". This is because normally the config file of the installed
-# python confignator package would be used (".local/lib.../confignator"), but if marked as root in pycharm, it first
-# searches for the config file in the confignator folder, where the cfg is in the given path...
 cfg = configparser.ConfigParser()
-#confignator_cfg = os.path.join(os.path.dirname(__file__), '../build/lib/confignator/confignator.cfg')
 confignator_cfg = os.path.join(os.path.dirname(__file__), 'confignator.cfg')
 cfg.read(confignator_cfg)
 basic_config = cfg.get('confignator-paths', 'basic-cfg')
@@ -148,7 +142,8 @@ module_logger.addHandler(hdlr=file_hdlr)
 # ---------------------------------------------------------------------------------------------------
 
 
-def get_config(file_path: str = None, logger: logging.Logger = module_logger, load_basic_files: bool = None, load_denoted_files: bool = None):
+def get_config(file_path: str = None, logger: logging.Logger = module_logger, load_basic_files: bool = None,
+               load_denoted_files: bool = None, check_interpolation: bool = True):
     """
     Two use cases:
 
@@ -162,6 +157,7 @@ def get_config(file_path: str = None, logger: logging.Logger = module_logger, lo
     :param logging.Logger logger: Logger passed as function argument
     :param bool load_basic_files: can be used to force to load the basic configuration files (confignator.cfg, egse.cfg)
     :param bool load_denoted_files: can be used to force to load the files listed in the section for config-files
+    :param bool check_interpolation: toggle checking of correct value interpolation
     :return: the parsed configuration
     :rtype: configparser.Config
     """
@@ -179,7 +175,8 @@ def get_config(file_path: str = None, logger: logging.Logger = module_logger, lo
         load_denoted = load_denoted_files
 
     try:
-        config = Config(file_path=file_path, logger=logger, load_basic_files=load_basic, load_denoted_files=load_denoted)
+        config = Config(file_path=file_path, logger=logger, load_basic_files=load_basic, load_denoted_files=load_denoted,
+                        check_interpolation=check_interpolation)
     except Exception as exception:
         config = None
         logger.error('could not read the configuration file: {}'.format(file_path))
@@ -199,7 +196,7 @@ def get_option(section: str, option: str, logger: logging.Logger = module_logger
     :rtype: str
     """
     try:
-        config = get_config(logger=logger)
+        config = get_config(logger=logger, check_interpolation=False)
         return config.get(section, option)
     except KeyError:
         logger.error('Confguration has no section {}'.format(section))
@@ -264,7 +261,8 @@ def save_option(section: str, option: str, value: str, logger: logging.Logger = 
 
 class Config(configparser.ConfigParser):
 
-    def __init__(self, file_path, logger=module_logger, load_basic_files=True, load_denoted_files=True,  *args, **kwargs):
+    def __init__(self, file_path, logger=module_logger, load_basic_files=True, load_denoted_files=True,
+                 check_interpolation=True, *args, **kwargs):
         """
         Init function of the derived ConfigParser class. If a file_path is provided, all configuration files are loaded.
         Does one or more of these files have a section 'config-files' all listed files are loaded too.
@@ -297,7 +295,8 @@ class Config(configparser.ConfigParser):
             self.load_config_files_section()
 
         # test all interpolations in the values
-        self.test_all_options()
+        if check_interpolation:
+            self.test_all_options()
 
     @property
     def load_denoted_files(self):
@@ -371,12 +370,12 @@ class Config(configparser.ConfigParser):
                     self.get(s, o)
                 except configparser.InterpolationError:
                     if ignore_failures is False:
-                        self.logger.info('failed interpolation of the option [{}][{}]'.format(s, o))
+                        self.logger.debug('failed interpolation of the option [{}][{}]'.format(s, o))
                     failed = True
         if failed is True:
-            self.logger.info('interpolation of options FAILED')
+            self.logger.warning('interpolation of options FAILED')
         if failed is False:
-            self.logger.info('interpolation of options was SUCCESSFUL')
+            self.logger.debug('interpolation of options was SUCCESSFUL')
         return failed
 
     def set_parameter(self, section, option, value):
@@ -417,30 +416,51 @@ class Config(configparser.ConfigParser):
         :param str value: value which should be saved
         """
         # find the file where the option is from
-        occourances = []
+        occurrence = []
         for file in self.files:
-            cfg = get_config(file_path=file, load_basic_files=False, load_denoted_files=False)
-            found = cfg.has_option(section=section, option=option)
+            tempcfg = get_config(file_path=file, load_basic_files=False, load_denoted_files=False, check_interpolation=False)
+            found = tempcfg.has_option(section=section, option=option)
             if found is True:
-                occourances.append(file)
-        if len(occourances) == 0:
+                occurrence.append(file)
+        if len(occurrence) == 0:
             self.logger.warning('No configuration files with the entry [{}[{}] found'.format(section, option))
             # ToDo: should it be saved as a new section & option? In which file?
             self.logger.critical('# ToDo: should it be saved as a new section & option?')
-        elif len(occourances) > 1:
-            self.logger.error('Found the entry [{}][{}] in more than one configuration file. Saving not possible. Occourances in: {}'.format(section, option, occourances))
-        elif len(occourances) == 1:
+        elif len(occurrence) > 1:
+            self.logger.error('Found the entry [{}][{}] in more than one configuration file. Saving not possible. Occurrences in: {}'.format(section, option, occurrence))
+        elif len(occurrence) == 1:
             # load the config (only the specified file, no other)
-            cfg = get_config(file_path=occourances[0], load_basic_files=False, load_denoted_files=False)
+            tempcfg = get_config(file_path=occurrence[0], load_basic_files=False, load_denoted_files=False, check_interpolation=False)
             # set the option
-            cfg.set(section=section, option=option, value=value)
+            tempcfg.set(section=section, option=option, value=value)
             # check if this entry has valid interpolations
-            try:
-                get_option(section=section, option=option)  # here the merged default config is used
-            except configparser.InterpolationError:
-                self.logger.error('The interpolation of the option [{}][{}] with the value [{}] failed.'.format(section, option, value))
+            # try:
+            #     get_option(section=section, option=option)  # here the merged default config is used
+            # except configparser.InterpolationError:
+            #     self.logger.error('The interpolation of the option [{}][{}] with the value [{}] failed.'.format(section, option, value))
             # save the config
-            cfg.save_to_file()
+            tempcfg.save_to_file()
+        self.reload_config_files()
+
+    def remove_option_from_file(self, section: str, option: str):
+        # find the file where the option is from
+        occurrence = []
+        for file in self.files:
+            tempcfg = get_config(file_path=file, load_basic_files=False, load_denoted_files=False,
+                                 check_interpolation=False)
+            found = tempcfg.has_option(section=section, option=option)
+            if found is True:
+                occurrence.append(file)
+        if len(occurrence) == 0:
+            self.logger.warning('No configuration files with the entry [{}[{}] found'.format(section, option))
+        else:
+            if len(occurrence) > 1:
+                self.logger.warning('Found the entry [{}][{}] in more than one configuration file: {}'.format(section, option, occurrence))
+            for occ in occurrence:
+                tempcfg = get_config(file_path=occ, load_basic_files=False, load_denoted_files=False, check_interpolation=False)
+                tempcfg.remove_option(section, option)
+                tempcfg.save_to_file()
+        self.reload_config_files()
 
     def save_to_file(self, file_path: str = None) -> str:
         """
@@ -465,8 +485,9 @@ class Config(configparser.ConfigParser):
                 for k in self.files:
                     configfile.write('#    {}\n'.format(k))
                 configfile.write('\n')
+                self.logger.info('A merged config was written to {}.'.format(file_path))
             self.write(configfile)
-        self.logger.debug('successful saved the configuration in the file {}'.format(file_path))
+        self.logger.debug('Successfully saved the configuration in the file {}'.format(file_path))
 
         return file_path
 
