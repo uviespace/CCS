@@ -8,14 +8,16 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, Gio, GtkSource, GLib, GdkPixbuf
 import confignator
+cfg = confignator.get_config()
+
 import sys
-sys.path.append(confignator.get_option('paths', 'ccs'))
+sys.path.append(cfg.get('paths', 'ccs'))
 import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
 import view
 import data_model
 import file_management
-import tst_logger
+# import tst_logger
 import generator
 import codeblockreuse
 import connect_apps
@@ -40,11 +42,11 @@ css_file = os.path.join(os.path.dirname(__file__), 'style/style.css')
 style_path = os.path.join(os.path.dirname(__file__), 'style')
 
 logger = logging.getLogger('tst_app_main')
-log_lvl = confignator.get_option(section='tst-logging', option='level')
+log_lvl = cfg.get(section='tst-logging', option='level')
 logger.setLevel(level=log_lvl)
 console_hdlr = toolbox.create_console_handler(hdlr_lvl=log_lvl)
 logger.addHandler(hdlr=console_hdlr)
-log_file = confignator.get_option(section='tst-logging', option='log-file-path')
+log_file = cfg.get(section='tst-logging', option='log-file-path')
 file_hdlr = toolbox.create_file_handler(file=log_file)
 logger.addHandler(hdlr=file_hdlr)
 
@@ -221,7 +223,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action.connect('activate', self.on_close)
         self.add_action(action)
 
-        show_json_view = confignator.get_bool_option('tst-preferences', 'show-json-view')
+        show_json_view = cfg.getboolean('tst-preferences', 'show-json-view')
         action = Gio.SimpleAction.new_stateful('model_viewer_toggle_hide', None,
                                                GLib.Variant.new_boolean(show_json_view))
         action.connect('change-state', self.model_viewer_toggle_hide)
@@ -273,7 +275,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_start_ccs_editor = Gtk.ToolButton()
         self.btn_start_ccs_editor.set_label('Start CCS')
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            confignator.get_option('paths', 'ccs') + '/pixmap/ccs_logo_2.svg', 28, 28)
+            cfg.get('paths', 'ccs') + '/pixmap/ccs_logo_2.svg', 28, 28)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.btn_start_ccs_editor.set_icon_widget(icon)
         self.btn_start_ccs_editor.set_tooltip_text('Start CCS-Editor')
@@ -312,7 +314,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         # logo
         self.unilogo = Gtk.ToolButton()
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 32, 32)
+            cfg.get('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 32, 32)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.unilogo.set_icon_widget(icon)
         self.unilogo.connect('clicked', self.on_about)
@@ -397,19 +399,19 @@ class TstAppWindow(Gtk.ApplicationWindow):
         # self.dev_open_example_json_file()
 
         # set the size (width and height) of the main window using the values of the configuration file
-        height_from_config = confignator.get_option('tst-preferences', 'main-window-height')
-        width_from_config = confignator.get_option('tst-preferences', 'main-window-width')
+        height_from_config = cfg.get('tst-preferences', 'main-window-height')
+        width_from_config = cfg.get('tst-preferences', 'main-window-width')
         if height_from_config is not None and width_from_config is not None:
             self.resize(int(width_from_config), int(height_from_config))
         else:
             self.maximize()
         # set the position of the Paned widget using the configuration file
-        paned_position = confignator.get_option('tst-preferences', 'paned-position')
+        paned_position = cfg.get('tst-preferences', 'paned-position')
         if paned_position is None:
             paned_position = self.get_size().width * 3 / 5
         self.work_desk.set_position(int(paned_position))
         # # set the position of the paned of the widget self.codeblockreuse
-        # paned_position_cbr = confignator.get_option('tst-preferences', 'paned-position-codeblockreuse')
+        # paned_position_cbr = cfg.get('tst-preferences', 'paned-position-codeblockreuse')
         # self.codeblockreuse.set_paned_position(int(paned_position_cbr))
 
         self.show_all()
@@ -568,14 +570,14 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                        Gtk.FileChooserAction.OPEN,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
         # using the last folder from history
-        last_folder = confignator.get_option('tst-history', 'last-folder')
+        last_folder = cfg.get('tst-history', 'last-folder')
         if os.path.isdir(last_folder):
             dialog.set_current_folder(last_folder)
         self.add_filters(dialog)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
-            confignator.save_option('tst-history', 'last-folder', os.path.dirname(file_selected))
+            cfg.save_option_to_file('tst-history', 'last-folder', os.path.dirname(file_selected))
             try:
                 json_type = True
                 data_from_file = file_management.open_file(file_name=file_selected)
@@ -636,19 +638,19 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                        self,
                                        Gtk.FileChooserAction.SAVE,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
-        dialog.set_current_folder(confignator.get_option(section='tst-history', option='last-folder'))
+        dialog.set_current_folder(cfg.get(section='tst-history', option='last-folder'))
         dialog.set_current_name('{}-TS-{}.json'.format(current_name, current_model.spec_version))
         self.add_filters(dialog)
         dialog.set_do_overwrite_confirmation(True)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
-            confignator.save_option('tst-history', 'last-folder', os.path.dirname(file_selected))
+            cfg.save_option_to_file('tst-history', 'last-folder', os.path.dirname(file_selected))
             file_management.save_file(file_path=file_selected, test_spec=current_model, file_extension='json',
                                       logger=self.logger)
             current_test.filename = file_selected
             file_name = file_selected.split('/')[-1]
-            #current_model.name = file_selected.split('/')[-1].split('.')[0].split('-TS-')[0]  # Get only the name
+            # current_model.name = file_selected.split('/')[-1].split('.')[0].split('-TS-')[0]  # Get only the name
             current_test.update_widget_data()
             self.notebook.set_tab_label(current_test, self.notebook_page_label(file_name))  # Update tab label
             self.show_all()
@@ -683,13 +685,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                        Gtk.FileChooserAction.OPEN,
                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
         # using the last folder from history
-        last_folder = confignator.get_option('tst-history', 'last-folder')
+        last_folder = cfg.get('tst-history', 'last-folder')
         if os.path.isdir(last_folder):
             dialog.set_current_folder(last_folder)
         # self.add_filters(dialog, filter_json=False)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
+            cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
             file_selected = dialog.get_filename()
             filename = file_selected.replace('.' + file_selected.split('.')[-1], '.json')
             data_from_file = spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False)
@@ -763,7 +765,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
         dialog.set_markup('Unsaved file {}, save?'.format(filename))
-        #dialog.format_secondary_text('{} at {} is unsaved'.format(filename, folder))
+        # dialog.format_secondary_text('{} at {} is unsaved'.format(filename, folder))
         response = dialog.run()
 
         if response == Gtk.ResponseType.YES:
@@ -785,10 +787,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
     def on_delete_event(self, *args):
         self.logger.info('save preferences')
         # saving the height and width of the main window
-        confignator.save_option('tst-preferences', 'main-window-height', str(self.get_size().height))
-        confignator.save_option('tst-preferences', 'main-window-width', str(self.get_size().width))
+        cfg.save_option_to_file('tst-preferences', 'main-window-height', str(self.get_size().height))
+        cfg.save_option_to_file('tst-preferences', 'main-window-width', str(self.get_size().width))
         # save the position of the paned widget
-        confignator.save_option('tst-preferences', 'paned-position', str(self.work_desk.get_position()))
+        cfg.save_option_to_file('tst-preferences', 'paned-position', str(self.work_desk.get_position()))
         # save the preferences of the CodeReuseFeature
         self.codeblockreuse.save_panes_positions()
         self.logger.info('Check for Unsaved Buffer')
@@ -825,11 +827,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
         model = self.current_model()
         if not model:
             logger.info('Test Files can not be generated without Steps')
-            print('Please add at least one test step')
+            logger.error('Please add at least one test step')
             return
         elif not model.name:
             logger.info('Test Files can not be generated if Test has no name!')
-            print('Please give the test a name')
+            logger.error('Please give the test a name')
             return
         self.product_paths = generator.make_all(model=model)
         # triggering the dialog after generation
@@ -851,18 +853,17 @@ class TstAppWindow(Gtk.ApplicationWindow):
             # current_json_filename = self.current_test_instance().filename
             current_model = self.current_model()
         else:
-            logger.info('Small Script can not be generated without jsonfile')
-            print('Small Script can not be generated without json file')
+            logger.error('Small Script can not be generated without json file')
             return
 
         outfile_basic = '{}-TS-{}.py'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
-        dialog.set_current_folder(confignator.get_option('tst-history', 'last-folder'))
+        dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename())
-            confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
+            cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
 
         dialog.destroy()
         return
@@ -884,17 +885,16 @@ class TstAppWindow(Gtk.ApplicationWindow):
             current_model = self.current_model()
         else:
             logger.info('CSV File can not be generated without json file')
-            print('CSV File can not be generated without json file')
             return
 
         outfile_basic = '{}-IASW-{}-TS-{}.csv_PIPE'.format(current_model.name, current_model.iasw_version, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
-        dialog.set_current_folder(confignator.get_option('tst-history', 'last-folder'))
+        dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             json_to_csv.run(current_model.encode_to_json(), dialog.get_filename())
-            confignator.save_option('tst-history', 'last-folder', dialog.get_current_folder())
+            cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
 
         dialog.destroy()
         return
@@ -989,13 +989,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         paths = {}
         current_instance = self.current_test_instance()
         if not current_instance:
-            self.logger.info('Progress Viewer started without running Test')
-            print('Progress Viewer started without running Test')
+            self.logger.warning('Progress Viewer started without running Test')
             return ''
         try:
             current_file_name = os.path.basename(current_instance.filename)
-            path_test_specs = confignator.get_option(section='tst-paths', option='tst_products')
-            path_test_runs = confignator.get_option(section='tst-logging', option='test_run')
+            path_test_specs = cfg.get(section='tst-paths', option='tst_products')
+            path_test_runs = cfg.get(section='tst-logging', option='test_run')
 
             json_file_path = os.path.join(path_test_specs, current_file_name)
             paths['json_file_path'] = json_file_path
@@ -1007,7 +1006,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             vrc_log_file_path = os.path.join(path_test_runs, name + testing_logger.vrc_log_auxiliary)
             paths['vrc_log_file_path'] = vrc_log_file_path
         except Exception as e:
-            self.logger.info('Json or Log Files could not be found')
+            self.logger.warning('Json or Log Files could not be found')
             return ''
         return paths
 
@@ -1198,7 +1197,7 @@ class ViewModelAsJson(Gtk.Box):
 
 
 def run():
-    bus_name = confignator.get_option('dbus_names', 'tst')
+    bus_name = cfg.get('dbus_names', 'tst')
     dbus.validate_bus_name(bus_name)
 
     applica = TstApp(bus_name, Gio.ApplicationFlags.FLAGS_NONE, logger=logger)

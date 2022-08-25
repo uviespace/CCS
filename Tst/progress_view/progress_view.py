@@ -7,9 +7,13 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, Gio, GLib
 import sys
 import confignator
-sys.path.append(confignator.get_option('paths', 'ccs'))
+
+cfg = confignator.get_config()
+sys.path.append(cfg.get('paths', 'ccs'))
+
 import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
+
 from testlib import analyse_command_log
 from testlib import analyse_verification_log
 from testlib import testing_logger
@@ -22,7 +26,7 @@ import toolbox
 import generator
 
 # create a logger
-log_file_path = confignator.get_option(section='progress-viewer-logging', option='log-file-path')
+log_file_path = cfg.get(section='progress-viewer-logging', option='log-file-path')
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.DEBUG)
@@ -226,8 +230,8 @@ class TestProgressView(Gtk.ApplicationWindow):
         Gtk.StyleContext.add_class(context, 'tst-css')
         self.on_apply_css()
         self.resize(
-            int(confignator.get_option(section='progress-viewer-window-size', option='basic-width-step-mode')),
-            int(confignator.get_option(section='progress-viewer-window-size', option='basic-height')))
+            int(cfg.get(section='progress-viewer-window-size', option='basic-width-step-mode')),
+            int(cfg.get(section='progress-viewer-window-size', option='basic-height')))
         self.sort_button.set_active(True)
         self.show_all()
         logger.debug('__init__ succeeded')
@@ -256,7 +260,7 @@ class TestProgressView(Gtk.ApplicationWindow):
                                        parent=self,
                                        action=Gtk.FileChooserAction.OPEN)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-        dialog.set_current_folder(confignator.get_option(section='progress-viewer-history', option='last-folder'))
+        dialog.set_current_folder(cfg.get(section='progress-viewer-history', option='last-folder'))
         self.add_filters(dialog)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
@@ -389,8 +393,8 @@ class TestProgressView(Gtk.ApplicationWindow):
         paths = {}
         try:
             current_file_name = os.path.basename(filename)
-            path_test_specs = confignator.get_option(section='tst-paths', option='tst_products')
-            path_test_runs = confignator.get_option(section='tst-logging', option='test_run')
+            path_test_specs = cfg.get(section='tst-paths', option='tst_products')
+            path_test_runs = cfg.get(section='tst-logging', option='test_run')
 
             json_file_path = os.path.join(path_test_specs, current_file_name)
             paths['json_file_path'] = json_file_path
@@ -548,14 +552,14 @@ class TestProgressView(Gtk.ApplicationWindow):
     def on_remake_treeview(self, *args):
         if self.sort_button.get_active():
             self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str, str, str, str)
-            self.scroll_win.set_min_content_width(int(confignator.get_option(section='progress-viewer-window-size', option='minimum-width-run-mode')))
-            if self.get_size()[0] == int(confignator.get_option(section='progress-viewer-window-size', option='basic-width-step-mode')):
-                self.resize(int(confignator.get_option(section='progress-viewer-window-size', option='basic-width-run-mode')), self.get_size()[1])
+            self.scroll_win.set_min_content_width(int(cfg.get(section='progress-viewer-window-size', option='minimum-width-run-mode')))
+            if self.get_size()[0] == int(cfg.get(section='progress-viewer-window-size', option='basic-width-step-mode')):
+                self.resize(int(cfg.get(section='progress-viewer-window-size', option='basic-width-run-mode')), self.get_size()[1])
         else:
             self.progress_tree_store = Gtk.TreeStore(str, str, str, str, str, str, str, str, str, str, str)
-            self.scroll_win.set_min_content_width(int(confignator.get_option(section='progress-viewer-window-size', option='minimum-width-step-mode')))
-            if self.get_size()[0] == int(confignator.get_option(section='progress-viewer-window-size', option='basic-width-run-mode')):
-                self.resize(int(confignator.get_option(section='progress-viewer-window-size', option='basic-width-step-mode')), self.get_size()[1])
+            self.scroll_win.set_min_content_width(int(cfg.get(section='progress-viewer-window-size', option='minimum-width-step-mode')))
+            if self.get_size()[0] == int(cfg.get(section='progress-viewer-window-size', option='basic-width-run-mode')):
+                self.resize(int(cfg.get(section='progress-viewer-window-size', option='basic-width-step-mode')), self.get_size()[1])
         self.sorted_model = Gtk.TreeModelSort(model=self.progress_tree_store)
         self.sorted_model.set_sort_column_id(1, Gtk.SortType.ASCENDING)
         self.view.set_model(self.sorted_model)
@@ -1299,7 +1303,7 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
 
         self.win = parent
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-        self.set_current_folder(confignator.get_option(section='tst-logging', option='output-file-path'))
+        self.set_current_folder(cfg.get(section='tst-logging', option='output-file-path'))
         #self.set_current_name('{}-IASW-{}TS-{}TR-{}'.format())
 
         area = self.get_content_area()
@@ -1314,7 +1318,7 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
 
         # Only shown if Log File path was not given (Found from loaded log File in main window)
         log_file_path_label = Gtk.Label(label='Use Basic Log File Path: ')
-        log_file_path_label.set_tooltip_text('Basic File Path: {}'.format(confignator.get_option('tst-logging', 'test_run')))
+        log_file_path_label.set_tooltip_text('Basic File Path: {}'.format(cfg.get('tst-logging', 'test_run')))
         self.log_file_path_check = Gtk.CheckButton()
         self.log_file_path_check.set_active(True)
 
@@ -1322,7 +1326,7 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
         json_file_path_label = Gtk.Label(label='Use Basic Json File Path: ')
         json_file_path_label.set_tooltip_text(
             'Basic File Path: {}, Also True if No Json File should be used (Specification Date in Output File will be empty)'.format(
-                confignator.get_option('tst-paths', 'tst_products')))
+                cfg.get('tst-paths', 'tst_products')))
         self.json_file_path_check = Gtk.CheckButton()
         self.json_file_path_check.set_active(True)
 
@@ -1379,11 +1383,11 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
             self.savedetailes.pack_end(self.test_name, False, True, 10)
             self.savedetailes.pack_end(name_label, False, True, 10)
 
-
         area.pack_start(self.savedetailes, False, True, 0)
 
         self.show_all()
         return
+
 
 class File_Path_Dialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None, file=None, is_json=None):
@@ -1395,9 +1399,9 @@ class File_Path_Dialog(Gtk.FileChooserDialog):
 
         self.win = parent
         if not is_json:
-            self.set_current_folder(confignator.get_option(section='tst-logging', option='test_run'))
+            self.set_current_folder(cfg.get(section='tst-logging', option='test_run'))
         else:
-            self.set_current_folder(confignator.get_option(section='tst-paths', option='tst_products'))
+            self.set_current_folder(cfg.get(section='tst-paths', option='tst_products'))
 
         if not is_json:
             area = self.get_content_area()
@@ -1407,8 +1411,9 @@ class File_Path_Dialog(Gtk.FileChooserDialog):
             area.pack_start(label, False, True, 0)
         self.show_all()
 
+
 def run():
-    bus_name = confignator.get_option('dbus_names', 'progress-view')
+    bus_name = cfg.get('dbus_names', 'progress-view')
     dbus.validate_bus_name(bus_name)
     appli = Application(application_id=bus_name,
                         flags=Gio.ApplicationFlags.FLAGS_NONE)
