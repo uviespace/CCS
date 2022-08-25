@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import configparser
 import queue
 import socket
 import signal
@@ -17,7 +18,7 @@ from gi.repository import Gtk
 class PortSplitter:
 
     def __init__(self, interactive=False):
-        self.poolmgr = pus.PUSDatapoolManager()
+        self.poolmgr = pus.DatapoolManager()
 
         self.sock_timeout_in = 10
         self.sock_timeout_out = 10
@@ -39,7 +40,7 @@ class PortSplitter:
                       'GUI mode with interactively configurable in/out connections')
                 sys.exit()
         else:
-            self.cfg = pus.configparser.ConfigParser()
+            self.cfg = configparser.ConfigParser()
             self.cfg.read(sys.argv[1])
 
         self.sock_timeout_in = float(self.cfg['misc']['sock_timeout_in'])

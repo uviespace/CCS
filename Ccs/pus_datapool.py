@@ -1,17 +1,11 @@
-# import datetime
 import io
-# import signal
-# import socket
-# import struct
 import sys
 import time
 import os
 import datetime
 import socket
-# import select
 import crcmod
 import struct
-# import traceback
 import DBus_Basic
 import dbus
 import dbus.service
@@ -27,25 +21,19 @@ from gi.repository.Gdk import RGBA
 
 import ccs_function_lib as cfl
 
-from log_server import Logging
+# from log_server import Logging
+# PersonalLogging = Logging()
 
-PersonalLogging = Logging()
 import threading
-
 import json
-
 from typing import NamedTuple
 from collections import deque
-
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker, FEEDataTelemetry, RMapTelemetry
-
 import importlib
 
-from confignator import config
 
-check_cfg = config.get_config()
-project = check_cfg.get('ccs-database', 'project')
-project = 'packet_config_' + str(project)
+cfg = confignator.get_config(check_interpolation=False)
+project = 'packet_config_{}'.format(cfg.get('ccs-database', 'project'))
 
 packet_config = importlib.import_module(project)
 
@@ -68,7 +56,7 @@ PLM_PKT_PREFIX_TC_SEND = packet_config.PLM_PKT_PREFIX_TC_SEND
 PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
 
 communication = {}
-for name in check_cfg['ccs-dbus_names']:
+for name in cfg['ccs-dbus_names']:
     communication[name] = 0
 
 ActivePoolInfo = NamedTuple(
@@ -111,28 +99,13 @@ class DatapoolManager:
     windowname = ' .Pool Manager'
 
     def __init__(self, given_cfg=None, cfilters='default', max_colour_rows=8000):
-        '''
-        self.logger = logging.getLogger(__name__)
-        print('DatapoolManager: __init__: handlers of self.logger:')
-        for hndlr in self.logger.handlers:
-            print('\t\t{}'.format(hndlr))
 
-        set_level(logger=self.logger)
-        create_console_handler(logger=self.logger)
-        create_file_handler(logger=self.logger)
-        print('DatapoolManager: __init__: handlers of self.logger:')
-        for hndlr in self.logger.handlers:
-            print('\t\t{}'.format(hndlr))
-        '''
         # initiate SpWDatapoolManager methods
         # super(DatapoolManager, self).__init__()
 
         Notify.init('poolmgr')
 
-        if isinstance(given_cfg, str):
-            self.cfg = confignator.get_config(file_path=given_cfg)
-        else:
-            self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+        self.cfg = confignator.get_config()
 
         self.commit_interval = float(self.cfg['ccs-database']['commit_interval'])
 
@@ -208,7 +181,7 @@ class DatapoolManager:
                 DbTelemetryPool, DbTelemetry.pool_id == DbTelemetryPool.iid).filter(
                 DbTelemetryPool.iid == iid)
         else:
-            print('Must give pool_name or iid')
+            self.logger.error('Must give pool_name or iid')
             return None
 
         if dump:
@@ -248,7 +221,7 @@ class DatapoolManager:
             new_session = self.session_factory_storage
             indb = new_session.execute('select * from tm_pool where pool_name="{}"'.format(pool_name))
             if len(indb.fetchall()) == 0:
-                print('POOL\n >{}<\nNOT IN DB!'.format(pool_name))
+                self.logger.error('POOL\n >{}<\nNOT IN DB!'.format(pool_name))
                 return
             new_session.execute(
                 'delete tm from tm inner join tm_pool on tm.pool_id=tm_pool.iid where tm_pool.pool_name="{}"'.format(
@@ -257,7 +230,7 @@ class DatapoolManager:
             # new_session.flush()
             new_session.commit()
             new_session.close()
-            print('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
+            self.lo('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
         return
 
     def _clear_db(self):
@@ -275,7 +248,7 @@ class DatapoolManager:
             # new_session.flush()
             new_session.commit()
             new_session.close()
-            print('>>> DELETED ALL POOLS FROM DB <<<')
+            self.logger.info('>>> DELETED ALL POOLS FROM DB <<<')
         return
 
     def _purge_db_logs(self, date=None):
@@ -501,7 +474,6 @@ class DatapoolManager:
                 sockfd.connect((host, port))
             except ConnectionRefusedError:
                 self.logger.error("Connection to {}:{} refused".format(host, port))
-                print("Connection to {}:{} refused".format(host, port))
                 return
 
         self.tc_sock = sockfd
@@ -561,10 +533,7 @@ class DatapoolManager:
         return
 
     # Function will disconnect both TC/TM connection if they have the same name
-    def disconnect(self, pool_name=None):
-        if pool_name is None:
-            print('Please give a connection name to delete')
-            return
+    def disconnect(self, pool_name):
 
         if pool_name in self.loaded_pools:
             self.loaded_pools[pool_name] = ActivePoolInfo(pool_name, self.loaded_pools[pool_name].modification_time,
@@ -971,7 +940,9 @@ class DatapoolManager:
     def tc_send(self, pool_name, buf):
 
         if pool_name not in self.tc_connections:
-            raise NameError('"{}" has no TC connection!'.format(pool_name))
+            self.logger.error('"{}" has no TC connection!'.format(pool_name))
+            return
+            # raise NameError('"{}" has no TC connection!'.format(pool_name))
 
         # check protocol of TC socket to append headers and stuff, this has to happen here, not in Tcsend_DB
         if self.tc_connections[pool_name]['protocol'].upper() == 'PLMSIM':
@@ -984,11 +955,16 @@ class DatapoolManager:
 
         if pool_name not in self.loaded_pools:
             self.logger.warning("Cannot add TC to {}. Pool not loaded.".format(pool_name))
-            # Notify.Notification.new("Cannot add TC to {}. Pool not loaded.".format(pool_name)).show()
             return
         # self.logger.debug('tc_send: tc_connections = {}'.format(self.tc_connections))
 
-        self.tc_connections[pool_name]['socket'].send(buf_to_send)
+        try:
+            self.tc_connections[pool_name]['socket'].send(buf_to_send)
+        except Exception as err:
+            self.logger.error('Failed to send packet of length {} to {} [{}].'.format(len(buf_to_send), pool_name,
+                                                                                      self.tc_connections[pool_name]['socket'].getpeername()))
+            return
+
         with self.lock:
             self.tc_databuflen += len(buf_to_send)
 
@@ -1043,26 +1019,15 @@ class DatapoolManager:
                 data=tmd[1],
                 raw=tm_raw)
             new_session.add(newTmRow)
-            # print("Recorded %d rows in %s..." % (self.state[0], pool_name))
+            # self.logger.debug("Recorded %d rows in %s..." % (self.state[0], pool_name))
             self.state[pool_row.pool_name] += 1
             new_session.commit()
-
-        """ buf must be in binary format """
-        # self.store_pus(buf, self.datapool[pool_name])
-
-        # NOT REQUIRED ANYMORE, separate variable used for sending
-        # check for PLMSIM protocol and remove before inserting into DB
-        # if buf.startswith(PLM_PKT_PREFIX_TC_SEND):
-        #    buf = bytes.fromhex(buf.strip(PLM_PKT_PREFIX_TC_SEND).strip(PLM_PKT_SUFFIX).decode())
 
         self.decode_tmdump_and_process_packets_internal(buf, process_tm)
         new_session.close()
         return
 
     def crc_check(self, pckt):
-        # if isinstance(pckt, (BitArray, BitStream, Bits, ConstBitStream)):
-        #     pckt = pckt.bytes
-
         # return bool(self.crcfunc(pckt))
         return bool(packet_config.puscrc(pckt))
 
@@ -1169,7 +1134,6 @@ class DatapoolManager:
             head_pars = header.bits
 
         except Exception as err:
-            print(' #!# Error unpacking packet: {}\n{}'.format(pckt, err))
             self.logger.warning('Error unpacking PUS packet: {}\n{}'.format(pckt, err))
             head_pars = None
             data = None
@@ -1185,7 +1149,7 @@ class DatapoolManager:
             else:
                 return ''
         except Exception as err:
-            #print(err)
+            self.logger.info(err)
             return ''
 
     def decode_tmdump_and_process_packets(self, filename, processor, brute=False):
@@ -1382,7 +1346,7 @@ class DatapoolManager:
                 del_thread.setDaemon(True)
                 del_thread.start()
 
-            print("Data not in DB - must import...")
+            self.logger.info("Data not in DB - must import...")
             # loadinfo = pv.Functions('LoadInfo')
             loadinfo = LoadInfo(parent=self)
             # loadinfo.spinner.start()
@@ -1429,7 +1393,7 @@ class DatapoolManager:
         return dbus.Struct(self.active_pool_info, signature='sisb')
 
     def timeout(self, sec):
-        print(sec)
+        self.logger.debug('timeout {} sec'.format(sec))
         time.sleep(sec)
         return
 
@@ -1882,7 +1846,7 @@ class DatapoolManager:
             # Both are not in the same project do not change
 
             if not conn.Variables('main_instance') == self.main_instance:
-                print('Both are not running in the same project, no change possible')
+                # print('Both are not running in the same project, no change possible')
                 self.logger.info('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return False
@@ -2186,7 +2150,7 @@ class PUSDatapoolManagerGUI(Gtk.ApplicationWindow):
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 24, 24)
+            self.cfg.get('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 24, 24)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
         univie_button.set_tooltip_text('Applications and About')
@@ -2254,15 +2218,14 @@ class PUSDatapoolManagerGUI(Gtk.ApplicationWindow):
             if options != '':
                 try:
                     opts = {i.split('=')[0].strip(): eval(i.split('=')[1]) for i in options.split(',')}
-                    # print(opts)
                 except IndexError:
-                    print('Unable to parse option string')
+                    self.pm.logger.error('Unable to parse option string')
                     self.statusbar.push(0, 'Unable to parse option string')
                     opts = {}
             else:
                 opts = {}
         except ValueError:
-            print('Invalid host/port')
+            self.pm.logger.error('Invalid host/port')
             self.statusbar.push(0, 'Invalid host/port')
             return
         self.connect_to(label, host, port, tmcon, options=opts)
@@ -2278,10 +2241,10 @@ class PUSDatapoolManagerGUI(Gtk.ApplicationWindow):
                 sockfd = self.pm.connect_tc(label, host, int(port), **options)
                 tmtc = 'TC'
             else:
-                print(
-                    'the argument kind was not provided, nor the radio button to decide which kind of PUS it is (TM or TC)')
+                sockfd = None
+                self.pm.logger.erro('"kind" was not provided, nor the radio button to decide which kind of PUS it is (TM or TC)')
         except Exception as err:
-            print(err)
+            self.pm.logger.error(err)
             self.statusbar.push(0, 'Failed to connect to {}:{} | {}'.format(host, port, err))
             return
         if sockfd is not None:
@@ -2391,8 +2354,7 @@ class PUSDatapoolManagerGUI(Gtk.ApplicationWindow):
                 new_pv_nbr = 1
 
             if new_pv_nbr == 0:
-                print('The maximum amount of Poolviewers has been reached')
-                self.logger.info('The maximum amount of Poolviewers has been reached')
+                self.pm.logger.warning('The maximum amount of Poolviewers has been reached')
                 return
 
             # Wait a maximum of 10 seconds to connect to the poolviewer
@@ -2476,11 +2438,9 @@ class CommonDatapoolManager(object):
     own_gui = None
     gui_running = False
 
-    def __init__(self, cfg=None, cfilters='default', max_colour_rows=8000):
-        if isinstance(cfg, str):
-            self.cfg = confignator.get_config(file_path=cfg)
-        else:
-            self.cfg = confignator.get_config()
+    def __init__(self, cfilters='default', max_colour_rows=8000):
+
+        self.cfg = confignator.get_config()
 
         self.commit_interval = float(self.cfg['database']['commit_interval'])
 
@@ -2578,22 +2538,13 @@ def run():
     Bus_Name = cfg.get('ccs-dbus_names', 'poolmanager')
     # DBusGMainLoop(set_as_default=True)
     DBus_Basic.MessageListener(pm, Bus_Name, *sys.argv)
-    if not '--nogui' in sys.argv:
+    if '--nogui' not in sys.argv:
         pm.start_gui()
 
     Gtk.main()
 
 
 if __name__ == "__main__":
-
-    given_cfg = None
-    for i in sys.argv:
-        if i.endswith('.cfg'):
-            given_cfg = i
-    if given_cfg:
-        cfg = confignator.get_config(file_path=given_cfg)
-    else:
-        cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
     # Important to tell Dbus that Gtk loop can be used before the first dbus command
     DBusGMainLoop(set_as_default=True)
