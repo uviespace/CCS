@@ -57,8 +57,8 @@ import confignator
 import toolbox
 
 logger = logging.getLogger(__name__)
-logger.setLevel(level=logging.DEBUG)
-console_hdlr = toolbox.create_console_handler(hdlr_lvl=logging.DEBUG)
+logger.setLevel(level=logging.WARNING)
+console_hdlr = toolbox.create_console_handler(hdlr_lvl=logging.WARNING)
 logger.addHandler(hdlr=console_hdlr)
 
 # using gettext for internationalization (i18n)
