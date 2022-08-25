@@ -11,7 +11,6 @@ gi.require_version('GtkSource', '3.0')
 from gi.repository import Gtk, Gdk, GtkSource
 # -------------------------------------------
 import data_model
-import generator
 import dnd_data_parser
 import toolbox
 import cairo
@@ -27,7 +26,7 @@ lm = GtkSource.LanguageManager()
 lngg = lm.get_language('python')
 
 logger = logging.getLogger(__name__)
-logger.setLevel(level=logging.DEBUG)
+logger.setLevel(level=logging.WARNING)
 console_hdlr = toolbox.create_console_handler()
 logger.addHandler(hdlr=console_hdlr)
 

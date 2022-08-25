@@ -7,7 +7,7 @@ import logging
 import toolbox
 
 logger = logging.getLogger(__name__)
-logger.setLevel(level=logging.DEBUG)
+logger.setLevel(level=logging.WARNING)
 console_hdlr = toolbox.create_console_handler()
 logger.addHandler(hdlr=console_hdlr)
 
