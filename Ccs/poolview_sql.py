@@ -1,4 +1,5 @@
 import os
+import importlib
 import json
 import struct
 import threading
@@ -19,6 +20,12 @@ import gi
 import matplotlib
 matplotlib.use('Gtk3Cairo')
 
+gi.require_version('Gtk', '3.0')
+gi.require_version('Notify', '0.7')
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
+
+from event_storm_squasher import delayed
+
 # from matplotlib.figure import Figure
 # from matplotlib.backends.backend_gtk3cairo import FigureCanvasGTK3Cairo as FigureCanvas
 # from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
@@ -28,22 +35,12 @@ matplotlib.use('Gtk3Cairo')
 from sqlalchemy.orm import load_only
 from database.tm_db import DbTelemetryPool, DbTelemetry, RMapTelemetry, FEEDataTelemetry, scoped_session_maker
 
-import importlib
-from confignator import config
-check_cfg = config.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
-project = check_cfg.get('ccs-database', 'project')
-project = 'packet_config_' + str(project)
+cfg = confignator.get_config(check_interpolation=False)
+
+project = 'packet_config_{}'.format(cfg.get('ccs-database', 'project'))
 packet_config = importlib.import_module(project)
 TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.PEC_LEN]
-
-gi.require_version('Gtk', '3.0')
-gi.require_version('Notify', '0.7')
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
-
-from event_storm_squasher import delayed
-
-# import logging.handlers
 
 ActivePoolInfo = NamedTuple(
     'ActivePoolInfo', [
@@ -54,7 +51,6 @@ ActivePoolInfo = NamedTuple(
 
 fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
-
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
@@ -115,7 +111,7 @@ class TMPoolView(Gtk.Window):
     shown_limit = 0
     only_scroll = False
 
-    def __init__(self, cfg=None, pool_name=None, cfilters='default', standalone=False):
+    def __init__(self, cfg=cfg, pool_name=None, cfilters='default', standalone=False):
         Gtk.Window.__init__(self, title="Pool View", default_height=800, default_width=1100)
 
         self.refresh_treeview_active = False
@@ -129,13 +125,8 @@ class TMPoolView(Gtk.Window):
 
         Notify.init('PoolViewer')
 
-        # self.dbustype = dbus.SessionBus()
-        if cfg is None:
-            self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
-        else:
-            self.cfg = cfg
-
-        #self.cfg.source = confignator.get_option('config-files', 'ccs').split('/')[-1] # Used to write into the config file
+        # self.cfg = confignator.get_config()
+        self.cfg = cfg
 
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, wide_handle=True, position=400)
 
@@ -427,8 +418,7 @@ class TMPoolView(Gtk.Window):
             # Both are not in the same project do not change
 
             if not cfl.Variables(conn, 'main_instance') == self.main_instance:
-                print('Both are not running in the same project, no change possible')
-                self.logger.info('Application {} is not in the same project as {}: Can not communicate'.format(
+                self.logger.warning('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return
 
@@ -1388,8 +1378,7 @@ class TMPoolView(Gtk.Window):
                 tm_row = [tm.idx, tm.type, tm.framecnt, tm.seqcnt, tm.raw.hex()]
                 tm_rows.append(tm_row)
         else:
-            print('Error in format_loaded_rows_poolviewer')
-            self.logger.error('Given Format is not valid')
+            self.logger.error('Error in format_loaded_rows_poolviewer, given Format is not valid')
 
         return tm_rows
 
@@ -1411,7 +1400,7 @@ class TMPoolView(Gtk.Window):
 
             path = model.get_path(treeiter)
 
-        print('SEL', time.time(), path, self.autoscroll, self.autoselect)
+        self.logger.debug('SEL', time.time(), path, self.autoscroll, self.autoselect)
         # I will probably be murdered in my sleep for doing this, but it works!
         entry = int(str(path))
         children = self.pool_liststore.iter_n_children() - 1
@@ -1465,7 +1454,7 @@ class TMPoolView(Gtk.Window):
         self.autoscroll = 0
 
     def scroll_child(self, widget, event, data=None):
-        print('Seems like I do not work')
+        self.logger.debug('Seems like I do not work')
         return
 
     def scroll_event(self, widget, event, data=None):
@@ -1645,9 +1634,9 @@ class TMPoolView(Gtk.Window):
                 try:
                     self.selection.select_path(model.get_path(model.get_iter(row[0] - self.offset - 1)))
                 except ValueError:
-                    print('valerr')
+                    self.logger.info('valerr')
                 except TypeError:
-                    print('typerr')
+                    self.logger.info('typerr')
 
     def unselect_bottom(self, widget=None):
         if widget.count_selected_rows() > 1:
@@ -1662,8 +1651,7 @@ class TMPoolView(Gtk.Window):
         elif self.decoding_type == 'FEE':
             return Gtk.ListStore('guint', 'guint', 'guint', 'guint', str)
         else:
-            print('Unkwown data type')
-            self.logger.info('Decoding Type is an unknown Value')
+            self.logger.error('Decoding Type is an unknown value')
             return
 
     def set_keybinds(self):
@@ -1766,7 +1754,7 @@ class TMPoolView(Gtk.Window):
         filter_value.connect('activate', self._add_to_rules, filter_value, column_name, operator, 'AND')
 
         #path_ccs = self.cfg.get(section='ccs-paths', option='ccs')
-        path_ccs = confignator.get_option('paths', 'ccs')
+        path_ccs = self.cfg.get('paths', 'ccs')
 
         add_to_rule_button_and = Gtk.Button()
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(path_ccs, 'pixmap/intersection_icon.svg'), 10, 10)
@@ -1964,7 +1952,7 @@ class TMPoolView(Gtk.Window):
 
     def _goto_timestamp(self, widget):
         if self.decoding_type != 'PUS':
-            print('No Timestamp in RMAP and FEE data')
+            self.logger.info('No Timestamp in RMAP and FEE data')
             return
 
         try:
@@ -2004,7 +1992,7 @@ class TMPoolView(Gtk.Window):
         menu.popup(None, None, None, None, 3, event.time)
 
     def menu_test(self, widget=None):
-        print('BALABALBLABLAL')
+        pass
 
     def check_structure_type(self):
 
@@ -2161,7 +2149,7 @@ class TMPoolView(Gtk.Window):
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 48, 48)
+            self.cfg.get('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 48, 48)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
         univie_button.set_tooltip_text('Applications and About')
@@ -2449,12 +2437,8 @@ class TMPoolView(Gtk.Window):
             return
 
         self.decoder_dict[label] = {'bytepos': bytepos, 'bytelen': bytelen}
-
-        self.cfg['ccs-user_decoders'][label] = json.dumps(self.decoder_dict[label])
         try:
-            self.cfg.save_to_file(file_path=confignator.get_option('config-files', 'ccs'))
-            #with open(self.cfg.source, 'w') as fdesc:
-            #    self.cfg.write(fdesc)
+            self.cfg.save_option_to_file('ccs-user_decoders', label, json.dumps(self.decoder_dict[label]))
         except AttributeError:
             self.logger.info('Could not save decoder to cfg')
 
@@ -2521,7 +2505,7 @@ class TMPoolView(Gtk.Window):
     @delayed(10)
     def set_tm_data_view(self, selection=None, event=None, change_columns=False):
         if not self.active_pool_info or not self.decoding_type == 'PUS':
-            print('Can not decode parameters for RMAP or FEE data packets')
+            self.logger.info('Can not decode parameters for RMAP or FEE data packets')
             buf = Gtk.TextBuffer(text='Parameter view not available for non-PUS packets')
             self.tm_header_view.set_buffer(buf)
             return
@@ -2732,7 +2716,7 @@ class TMPoolView(Gtk.Window):
         if filename is not None:
             self.load_pool(widget=None, filename=filename, protocol=protocol)
         else:
-            print('Please give a Filename')
+            self.logger.error('Please give a Filename')
             return 'Please give a Filename'
         return
 
@@ -2744,7 +2728,7 @@ class TMPoolView(Gtk.Window):
             cfl.start_pmgr(True, '--nogui')
             #path_pm = os.path.join(confignator.get_option('paths', 'ccs'), 'pus_datapool.py')
             #subprocess.Popen(['python3', path_pm, '--nogui'])
-            print('Poolmanager was started in the background')
+            self.logger.info('Poolmanager was started in the background')
 
             # Here we have a little bit of a tricky situation since when we start the Poolmanager it wants to tell the
             # Manager to which number it can talk to but it can only do this when PoolViewer is not busy...
@@ -2774,7 +2758,7 @@ class TMPoolView(Gtk.Window):
                 new_pmgr_nbr = 1
 
             if new_pmgr_nbr == 0:
-                print('The maximum amount of Poolviewers has been reached')
+                self.logger.warning('The maximum amount of Poolviewers has been reached')
                 return
 
             # Wait a maximum of 10 seconds to connect to the poolmanager
@@ -2786,7 +2770,6 @@ class TMPoolView(Gtk.Window):
                 else:
                     i += 1
                     time.sleep(0.1)
-
 
         if filename is not None and filename:
             pool_name = filename.split('/')[-1]
@@ -2828,7 +2811,7 @@ class TMPoolView(Gtk.Window):
                 if package_type not in ['PUS', 'PLMSIM']:
                     package_type == 'SPW'
 
-            ## package_type defines which type was selected by the user, if any was selected
+            # package_type defines which type was selected by the user, if any was selected
             new_pool = cfl.Functions(poolmgr, 'load_pool_poolviewer', pool_name, filename, isbrute, force_db_import,
                                          self.count_current_pool_rows(), self.my_bus_name[-1], package_type)
 
@@ -2963,7 +2946,6 @@ class TMPoolView(Gtk.Window):
             self.stop_butt.set_sensitive(False)
         refresh_rate = 1
 
-
         GLib.timeout_add(refresh_rate * 1000, self.show_data_rate, refresh_rate, instance, priority=GLib.PRIORITY_DEFAULT)
         return True
 
@@ -2971,7 +2953,7 @@ class TMPoolView(Gtk.Window):
         # selection = self.treeview.get_selection()
         # model, paths = selection.get_selected_rows()
         if not self.active_pool_info:
-            print('No pool to extract packets from')
+            self.logger.error('No pool to extract packets from')
             return
             ###############
             # If this is ever changed to all packet standards and not only PUS, be aware that further down the database is asced of ST and SST... only possible for PUS
@@ -3098,14 +3080,14 @@ class TMPoolView(Gtk.Window):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
             poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
         else:
-            path_pm = os.path.join(confignator.get_option('paths', 'ccs'), 'pus_datapool.py')
-            pmgr = subprocess.Popen(['python3', path_pm])
-            #print('Poolmanager has been started and is running in the background')
+            path_pm = os.path.join(self.cfg.get('paths', 'ccs'), 'pus_datapool.py')
+            subprocess.Popen(['python3', path_pm])
             return
 
         if poolmgr.Variables('gui_running'):
             poolmgr.Functions('raise_window')
             return
+
         # Ignore_reply is no problem here since only the gui is started
         poolmgr.Functions('start_gui', ignore_reply = True)
         return
@@ -3125,7 +3107,7 @@ class TMPoolView(Gtk.Window):
         # Not necessary done in Poolmanager
         # Dictionarie in Dictionaries are not very well supported over dbus connection
         # Get dictonary connections, key pool_name, key 'recording' set to False, True to change
-        #poolmgr.Dictionaries('connections', pool_name, 'recording', False, True)
+        # poolmgr.Dictionaries('connections', pool_name, 'recording', False, True)
 
         if self.active_pool_info.pool_name == pool_name:
             self.active_pool_info = ActivePoolInfo(pool_name, self.active_pool_info.modification_time, pool_name, False)
@@ -3136,9 +3118,8 @@ class TMPoolView(Gtk.Window):
             # Check if the pool name does exist
             try:
                 pinfo = poolmgr.Dictionaries('loaded_pools', pool_name)
-            except:
-                print('Please give correct pool name')
-                self.logger.info('Stop Recording: Not existing PoolName was given')
+            except (dbus.DBusException, KeyError):
+                self.logger.error("Can't stop recording: pool name not in loaded pools")
                 return
 
             pinfo_modification_time = int(pinfo[2])
@@ -3263,10 +3244,10 @@ class TMPoolView(Gtk.Window):
                 25
             ).all()
             # rr=[row for row in rows]
-            print('fetched', rows[-1].idx, cnt, 'at', time.time())
+            self.logger.info('fetched', rows[-1].idx, cnt, 'at', time.time())
             dbcon.close()
             time.sleep(sleep)
-        print('TEST ABORTED')
+        self.logger.warning('TEST ABORTED')
 
     def starttest(self, pool_name, sleep=0.1):
         t = threading.Thread(target=self.dbtest, args=[pool_name, sleep])
@@ -3290,23 +3271,7 @@ class TMPoolView(Gtk.Window):
         window.set_cursor(Gdk.Cursor.new_from_name(Gdk.Display.get_default(), name))
 
     def show_data_rate(self, refresh_rate=1, instance=1):
-        '''
-    # while self.is_visible():
-        if not self.is_visible():
-            return False
-        with self.pool.lock:
-            data_rate = self.pool.databuflen*refresh_rate
-            self.pool.databuflen = 0
-            tc_data_rate = self.pool.tc_databuflen*refresh_rate
-            self.pool.tc_databuflen = 0
-            if self.active_pool_info is not None:
-                try:
-                    trashbytes = self.pool.trashbytes[self.active_pool_info.filename]
-                except KeyError:
-                    trashbytes = 0
-            else:
-                trashbytes = 0
-        '''
+
         if not self.active_pool_info.live:
             return False
 
@@ -3317,10 +3282,10 @@ class TMPoolView(Gtk.Window):
             trashbytes, tc_data_rate, data_rate = pmgr.Functions('calc_data_rate', self.active_pool_info.filename, refresh_rate)
             self.statusbar.push(0, 'Trash: {:d} B | TC: {:7.3f} KiB/s | TM: {:7.3f} KiB/s'.format(
                 trashbytes, tc_data_rate/1024, data_rate/1024))
-        except:
-            pass
+        except Exception as err:
+            self.logger.debug(err)
+
         return True
-        # time.sleep(refresh_rate)
 
     def show_bigdata(self, *args):
         self.bigd = BigDataViewer(self)
@@ -3365,8 +3330,6 @@ class SavePoolDialog(Gtk.FileChooserDialog):
         super(SavePoolDialog, self).__init__(title="Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE)
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                                                       Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-        # Gtk.FileChooserDialog.__init__(self, "Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE, buttons=(
-        #     Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
 
         # self.set_transient_for(parent)
 
@@ -3541,9 +3504,6 @@ class BigDataViewer(Gtk.Window):
 
     def on_draw(self, widget, cr):
         poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        #res = poolmgr.Functions('_return_colour_list')
-        #print(res)
-        #print(type(res))
         check = poolmgr.Functions('_return_colour_list', 'try')
         if check is False:
             return
@@ -3633,14 +3593,6 @@ def run(pool_name):
 
 
 if __name__ == "__main__":
-    given_cfg = None
-    for i in sys.argv:
-        if i.endswith('.cfg'):
-            given_cfg = i
-    if given_cfg:
-        cfg = confignator.get_config(file_path=given_cfg)
-    else:
-        cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
     poolname = None
     if len(sys.argv) > 1:
