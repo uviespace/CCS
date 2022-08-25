@@ -15,8 +15,10 @@ from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker
 from sqlalchemy.sql.expression import func
 import ccs_function_lib as cfl
 
-INTERVAL = 1.
-MAX_AGE = 20.
+cfg = confignator.get_config(check_interpolation=False)
+
+INTERVAL = float(cfg.get('ccs-monitor', 'interval'))
+MAX_AGE = float(cfg.get('ccs-monitor', 'max_age'))
 
 
 class ParameterMonitor(Gtk.Window):
@@ -39,10 +41,7 @@ class ParameterMonitor(Gtk.Window):
         self.session_factory_idb = scoped_session_maker('idb')
         self.session_factory_storage = scoped_session_maker('storage')
 
-        if isinstance(given_cfg, str):
-            self.cfg = confignator.get_config(file_path=given_cfg)
-        else:
-            self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+        self.cfg = confignator.get_config()
 
         # Set up the logger
         self.logger = cfl.start_logging('ParameterMonitor')
@@ -111,10 +110,9 @@ class ParameterMonitor(Gtk.Window):
                     pool_name = pools[0][0].split('/')[-1]
                 self.set_pool(pool_name)
             else:
-                print('Could not determine which pool should be used')
-                self.logger.info('To many pools running in manager, could not determine which one to use')
-        except:
-            return
+                self.logger.warning('To many pools running in manager, could not determine which one to use')
+        except Exception as err:
+            self.logger.error(err)
 
     def set_pool(self, pool_name):
         self.pool_name = pool_name
@@ -170,7 +168,7 @@ class ParameterMonitor(Gtk.Window):
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 48, 48)
+            self.cfg.get('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 48, 48)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
         univie_button.set_tooltip_text('Applications and About')
@@ -524,9 +522,8 @@ class ParameterMonitor(Gtk.Window):
                 parameters.append([par[1] for par in model])
 
             parameter_set = dialog.label.get_active_text()
-            self.cfg['ccs-monitor_parameter_sets'][parameter_set] = json.dumps(parameters)
+            self.cfg.save_option_to_file('ccs-monitor_parameter_sets', parameter_set, json.dumps(parameters))
 
-            self.cfg.save_to_file()
             self.setup_grid(parameters)
             # self.set_pool(self.pool_name)
             dialog.destroy()
@@ -566,8 +563,7 @@ class ParameterMonitor(Gtk.Window):
             # Both are not in the same project do not change
 
             if not conn.Variables('main_instance') == self.main_instance:
-                print('Both are not running in the same project, no change possible')
-                self.logger.info('Application {} is not in the same project as {}: Can not communicate'.format(
+                self.logger.warning('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return
 
@@ -582,7 +578,7 @@ class ParameterMonitor(Gtk.Window):
 
         # Look if other applications are running in the same project group
         our_con = []
-        #Look for all connections starting with com, therefore only one loop over all connections is necessary
+        # Look for all connections starting with com, therefore only one loop over all connections is necessary
         for service in dbus.SessionBus().list_names():
             if service.startswith('com'):
                 our_con.append(service)
@@ -924,14 +920,6 @@ class MonitorSetupDialog(Gtk.Dialog):
 
 
 if __name__ == "__main__":
-    given_cfg = None
-    for i in sys.argv:
-        if i.endswith('.cfg'):
-            given_cfg = i
-    if given_cfg:
-        cfg = confignator.get_config(file_path=given_cfg)
-    else:
-        cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
 
     win = ParameterMonitor()
 

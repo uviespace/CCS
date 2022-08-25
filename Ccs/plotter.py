@@ -16,7 +16,6 @@ import gi
 import sys
 
 import matplotlib
-
 matplotlib.use('Gtk3Cairo')
 
 from matplotlib.figure import Figure
@@ -32,10 +31,9 @@ from sqlalchemy.sql.expression import func
 
 import importlib
 
-check_cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+cfg = confignator.get_config(check_interpolation=False)
 
-project = check_cfg.get('ccs-database', 'project')
-project = 'packet_config_' + str(project)
+project = 'packet_config_{}'.format(cfg.get('ccs-database', 'project'))
 packet_config = importlib.import_module(project)
 TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.PEC_LEN]
 
@@ -73,10 +71,7 @@ class PlotViewer(Gtk.Window):
         self.data_dict = {}
         self.max_datapoints = 0
 
-        if isinstance(given_cfg, str):
-            self.cfg = confignator.get_config(file_path=given_cfg)
-        else:
-            self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+        self.cfg = confignator.get_config()
 
         # Set up the logger
         self.logger = cfl.start_logging('ParameterPlotter')
@@ -121,7 +116,7 @@ class PlotViewer(Gtk.Window):
 
         self.liveplot = self.live_plot_switch.get_active()
 
-        self.connect('delete-event', self.write_cfg)
+        # self.connect('delete-event', self.write_cfg)
         self.connect('delete-event', self.live_plot_off)
 
         self.plot_parameters = parameters
@@ -552,7 +547,7 @@ class PlotViewer(Gtk.Window):
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            confignator.get_option('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 24, 24)
+            self.cfg.get('paths', 'ccs') + '/pixmap/Icon_Space_blau_en.png', 24, 24)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
         univie_button.set_tooltip_text('Applications and About')
@@ -999,19 +994,15 @@ class PlotViewer(Gtk.Window):
 
         datawin.show_all()
 
-    def write_cfg(self, widget=None, dummy=None):
-        try:
-            self.cfg.save_to_file()
-            #with open(self.cfg.source, 'w') as fdesc:
-            #    self.cfg.write(fdesc)
-
-        except AttributeError:
-            return
+    # def write_cfg(self, widget=None, dummy=None):
+    #     try:
+    #         self.cfg.save_to_file()
+    #
+    #     except AttributeError:
+    #         return
 
     def live_plot_off(self, widget, dummy):
         self.liveplot = False
-
-
 
     def select_pool(self, widget=None, pool=None):
         if not pool:
@@ -1138,8 +1129,7 @@ class PlotViewer(Gtk.Window):
             # Both are not in the same project do not change
 
             if not conn.Variables('main_instance') == self.main_instance:
-                print('Both are not running in the same project, no change possible')
-                self.logger.info('Application {} is not in the same project as {}: Can not communicate'.format(
+                self.logger.warning('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return
 
@@ -1154,7 +1144,7 @@ class PlotViewer(Gtk.Window):
 
         # Look if other applications are running in the same project group
         our_con = []
-        #Look for all connections starting with com, therefore only one loop over all connections is necessary
+        # Look for all connections starting with com, therefore only one loop over all connections is necessary
         for service in dbus.SessionBus().list_names():
             if service.startswith('com'):
                 our_con.append(service)
@@ -1417,7 +1407,7 @@ class SelectPoolDialog(Gtk.Dialog):
         self.bytebox = Gtk.HBox()
         self.pools = self.check_for_multiple_pools()
 
-        if self.pools != None:
+        if self.pools is not None:
             if len(self.pools) == 1:
                 self.make_buttons(self.pools[0])
             else:
@@ -1431,7 +1421,6 @@ class SelectPoolDialog(Gtk.Dialog):
             self.label = Gtk.Label()
             self.label.set_text("No Pools could be found")
             ok_button.set_sensitive(False)
-
 
         box.pack_start(self.explain_label, 0, 0, 0)
         box.pack_start(self.bytebox, 0, 0, 0)
@@ -1490,23 +1479,14 @@ class SelectPoolDialog(Gtk.Dialog):
         else:
             return None
 
+
 if __name__ == "__main__":
-    #cfg = confignator.get_config()
     if len(sys.argv) > 1:
         pool = sys.argv[1]
     else:
         pool = None
 
-    given_cfg = None
-    for i in sys.argv:
-        if i.endswith('.cfg'):
-            given_cfg = i
-    if given_cfg:
-        cfg = confignator.get_config(file_path=given_cfg)
-    else:
-        cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
-
-    # Important to tell Dbus that Gtk loop can be used befor the first dbus command
+    # Important to tell Dbus that Gtk loop can be used before the first dbus command
     DBusGMainLoop(set_as_default=True)
 
     if pool:
