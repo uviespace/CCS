@@ -20,7 +20,7 @@ translate = gettext.translation('handroll', localedir, fallback=True)
 _ = translate.gettext
 
 uni_grau = '#666666'
-uni_weiss = '#ffffff'
+uni_weiss = '#FFFFFF'
 uni_schwarz = '#000000'
 uni_blau = '#0063A6'
 
@@ -37,8 +37,10 @@ setting.set_boolean("enable-inspector-keybinding", True)
 menu_xml = os.path.join(os.path.dirname(__file__), 'menu.xml')
 css_file = os.path.join(os.path.dirname(__file__), 'style.css')
 
+cfg = confignator.get_config()
 
-log_file_path = confignator.get_option(section='codereuse-logging', option='log-file-path')
+
+log_file_path = cfg.get(section='codereuse-logging', option='log-file-path')
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.DEBUG)
@@ -47,7 +49,7 @@ logger.addHandler(hdlr=console_hdlr)
 file_hdlr = toolbox.create_file_handler(file=log_file_path)
 logger.addHandler(hdlr=file_hdlr)
 
-path_tst = confignator.get_option(section='paths', option='tst')
+path_tst = cfg.get(section='paths', option='tst')
 
 
 def apply_css(*args):
@@ -146,8 +148,8 @@ class AppWindow(Gtk.ApplicationWindow):
         self.box.pack_start(self.stat_bar, False, False, 0)
 
         # set the size (width and height) of the main window using the values of the configuration file
-        height_from_config = confignator.get_option('codereuse-preferences', 'main-window-height')
-        width_from_config = confignator.get_option('codereuse-preferences', 'main-window-width')
+        height_from_config = cfg.get('codereuse-preferences', 'main-window-height')
+        width_from_config = cfg.get('codereuse-preferences', 'main-window-width')
         if height_from_config is not None and width_from_config is not None:
             self.resize(int(width_from_config), int(height_from_config))
         else:
@@ -530,13 +532,13 @@ class CBRSearch(Gtk.Box):
         self.right_click_menu = TreeRightClickMenu(cruf=self)
 
         # set the position of the Paned widget using the configuration file
-        paned_position = confignator.get_option('codereuse-preferences', 'paned-position-search')
+        paned_position = cfg.get('codereuse-preferences', 'paned-position-search')
         self.set_paned_position(int(paned_position))
         # set the position of the paned of the widget self.codeblockreuse
-        paned_position_cc = confignator.get_option('codereuse-preferences', 'paned-position-command-code')
+        paned_position_cc = cfg.get('codereuse-preferences', 'paned-position-command-code')
         self.set_code_view_pane_position(int(paned_position_cc))
         # set teh position of the comment and vrc description windows
-        paned_position_comment = confignator.get_option('codereuse-preferences', 'paned-position-comment')
+        paned_position_comment = cfg.get('codereuse-preferences', 'paned-position-comment')
         self.set_comment_pane_position(int(paned_position_comment))
 
         self.show_all()
@@ -986,11 +988,11 @@ class TreeRightClickMenu(Gtk.Menu):
 
 
 def run(file_path=None):
-        bus_name = confignator.get_option('dbus_names', 'log-viewer')
+        bus_name = cfg.get('dbus_names', 'log-viewer')
         dbus.validate_bus_name(bus_name)
 
         if file_path is None:
-            confignator_log_file = confignator.get_option('confignator-paths', 'log-file')
+            confignator_log_file = cfg.get('confignator-paths', 'log-file')
             if os.path.isfile(confignator_log_file):
                 file_path = confignator_log_file
 
