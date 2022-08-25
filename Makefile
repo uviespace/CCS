@@ -1,30 +1,18 @@
-.PHONY: install-confignator install-confignator-userspace ccs-storage codeblockreusefeature install-testlib
+.PHONY: install-confignator ccs-storage codeblockreusefeature install-testlib
 
-all: install build-pc
+# all: install install-database-dev-env
 
 install: install-python-requirements install-confignator ccs-storage codeblockreusefeature
 
 databases: ccs-storage codeblockreusefeature
 
-# build-pc: build-fw-profile build-crplm build-cria build-crfee
-
 install-confignator:
 	@echo "+---------------------------------------+"
 	@echo "| installing confignator Python package |"
 	@echo "+---------------------------------------+"
-	    $(MAKE) build -C $(CURDIR)/Tst/confignator
-	    if [ -z $VIRTUAL_ENV ]; then pip install --user -U $(CURDIR)/Tst/confignator/dist/*.whl; else pip install -U $(CURDIR)/Tst/confignator/dist/*.whl; fi
-	@echo "+--------------------------------------+"
-	@echo "| installed confignator Python package |"
-	@echo "+--------------------------------------+"
-	@echo
-	
-install-confignator-userspace:
-	@echo "+---------------------------------------+"
-	@echo "| installing confignator Python package |"
-	@echo "+---------------------------------------+"
-	    $(MAKE) build -C $(CURDIR)/Tst/confignator
-	    pip install --user -U $(CURDIR)/Tst/confignator/dist/*.whl
+		$(MAKE) build -C $(CURDIR)/Tst/confignator
+	    if [ -z $VIRTUAL_ENV ]; then pip install --user -U --force-reinstall $(CURDIR)/Tst/confignator/dist/*.whl; else pip install -U --force-reinstall $(CURDIR)/Tst/confignator/dist/*.whl; fi
+		$(MAKE) build-doc -C $(CURDIR)/Tst/confignator
 	@echo "+--------------------------------------+"
 	@echo "| installed confignator Python package |"
 	@echo "+--------------------------------------+"
@@ -48,16 +36,6 @@ install-database-dev-env:
 	@echo "+---------------------------------------------------+"
 	@echo "| installed Python dev packages for the database    |"
 	@echo "+---------------------------------------------------+"
-	@echo
-	
-install-python-env:
-	@echo "+-----------------------------+"
-	@echo "| installing Python modules   |"
-	@echo "+-----------------------------+"
-	    python -m pip install --user -U numpy scipy matplotlib cairocffi mysqlclient sqlalchemy wheel sphinx sphinx_rtd_theme astropy crcmod psutil
-	@echo "+-----------------------------+"
-	@echo "| installed Python modules    |"
-	@echo "+-----------------------------+"
 	@echo
 
 install-python-requirements:

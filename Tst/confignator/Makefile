@@ -7,6 +7,8 @@ DOC_DST = "doc/source/_apidocfiles/"
 DOC_OPEN = $(CURDIR)/confignator/open_doc.py
 DIST_DIR = $(CURDIR)/dist
 
+LOG_LEVEL = "WARNING"
+
 .PHONY: build clean-build install uninstall reinstall build-doc clean-doc-build all open-doc
 
 all: clean build install build-doc open-doc
@@ -34,7 +36,7 @@ build:	clean
 		@echo "log-file = ''" >> $(CONFIGNATOR_CFG)
 		@echo >> $(CONFIGNATOR_CFG)
 		@echo "[confignator-logging]" >> $(CONFIGNATOR_CFG)
-		@echo "level = INFO" >> $(CONFIGNATOR_CFG)
+		@echo "level = $(LOG_LEVEL)" >> $(CONFIGNATOR_CFG)
 		@echo >> $(CONFIGNATOR_CFG)
 		# build the Python package
 		# python3 setup.py sdist;
