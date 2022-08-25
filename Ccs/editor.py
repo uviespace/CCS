@@ -6,7 +6,6 @@ gi.require_version('Vte', '2.91')
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, GtkSource, Pango, GLib, Vte, GObject
 import time
-import datetime
 import numpy as np
 import glob
 import sys
@@ -21,13 +20,15 @@ import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 import DBus_Basic
 
-import config_dialog
+# import config_dialog
 import ccs_function_lib as cfl
 
-pixmap_folder = confignator.get_option('ccs-paths', 'pixmap')
-action_folder = confignator.get_option('ccs-paths', 'actions')
+cfg = confignator.get_config()
 
-scripts = glob.glob(os.path.join(confignator.get_option('paths', 'ccs'), "scripts/*.py"))
+pixmap_folder = cfg.get('ccs-paths', 'pixmap')
+action_folder = cfg.get('ccs-paths', 'actions')
+
+scripts = glob.glob(os.path.join(cfg.get('paths', 'ccs'), "scripts/*.py"))
 script_actions = '\n'.join(["<menuitem action='{}' />".format(os.path.split(script)[-1][:-3]) for script in scripts])
 
 UI_INFO = """
@@ -98,7 +99,7 @@ class SearchDialog(Gtk.Dialog):
 
 class IPythonTerminal(Vte.Terminal):
 
-    ccs_path = confignator.get_option('paths', 'ccs')
+    ccs_path = cfg.get('paths', 'ccs')
     ipyloadcfg_path = os.path.join(ccs_path, '.ipyloadcfg.py')
     ipycfg_path = os.path.join(ccs_path, '.ipycfg.py')
 
@@ -135,9 +136,6 @@ class IPythonTerminal(Vte.Terminal):
 
 class CcsEditor(Gtk.Window):
 
-    tref = datetime.datetime(2000, 1, 1, 0, 0, 0)
-    tnow = datetime.datetime.utcnow
-
     def __init__(self, given_cfg=None):
         super(CcsEditor, self).__init__(title="CCS Editor")
 
@@ -145,22 +143,19 @@ class CcsEditor(Gtk.Window):
         self.set_default_size(1010, 1080)
         # self.set_default_size(1920, 1080) # samsung full screen
 
-        """ load config file """
-        if isinstance(given_cfg, str):
-            self.cfg = confignator.get_config(file_path=given_cfg)
-            self.cfg.source = given_cfg
-        else:
-            self.cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
-            self.cfg.source = confignator.get_option('config-files', 'ccs')
+        self.cfg = confignator.get_config()
+        self.cfg.source = self.cfg.get('config-files', 'ccs')
 
-        self.logdir = confignator.get_option('ccs-paths', 'log-file-dir')
+        # Set up the logger
+        self.logger = cfl.start_logging('Editor')
+        self.logdir = self.cfg.get('ccs-paths', 'log-file-dir')
+
+        if given_cfg:
+            self.logger.warning('{} is ignored! Change the configuration in ccs_main_config.cfg instead!'.format(given_cfg))
 
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
         self.paned.set_wide_handle(True)
         self.add(self.paned)
-
-        # Set up the logger
-        self.logger = cfl.start_logging('Editor')
 
         self.grid = Gtk.Grid()
         self.paned.add1(self.grid)
@@ -200,7 +195,7 @@ class CcsEditor(Gtk.Window):
         self.nb.append_page(self.logwin, tab_label=Gtk.Label(label='Log', angle=270))
         self.paned.add2(self.nb)
 
-        self.log_file = None    # save the shown text from the log file tab
+        self.log_file = None  # save the shown text from the log file tab
         # Update the log-file view window every 2 seconds
         GLib.timeout_add(2000, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
 
@@ -241,16 +236,16 @@ class CcsEditor(Gtk.Window):
             # Both are not in the same project do not change
 
             if not conn.Variables('main_instance') == self.main_instance:
-                print('Both are not running in the same project, no change possible')
+                # print('Both are not running in the same project, no change possible')
                 self.logger.warning('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return
 
-        #Change for terminal
+        # Change for terminal
         if int(instance) != int(cfl.communication[application]):
             self._to_console_via_socket("cfl.communication['"+str(application)+"'] = " + str(int(instance)))
 
-        #Local change
+        # Local change
         cfl.communication[application] = int(instance)
 
         return
@@ -259,18 +254,16 @@ class CcsEditor(Gtk.Window):
         return cfl.communication
 
     def checking(self):
-        self.logger.info('Hello')
-        #threading.Timer(1, self.checking).start()
-        return
+        self.logger.debug('Hello')
 
     def connect_to_all(self, My_Bus_Name, Count):
-        '''
+        """
         Function changes the cfl.communication variable (Which app instance to talk to), when the app is started, called
         by DBus_Basic
         @param My_Bus_Name: D-Bus name of the started app
         @param Count: Instance of the app
         @return: -
-        '''
+        """
 
         ######
         # This function exists in every app, but is different here, be careful!
@@ -278,7 +271,7 @@ class CcsEditor(Gtk.Window):
         self.my_bus_name = My_Bus_Name
         # Look if other applications are running in the same project group
         our_con = []
-        #Look for all connections starting with com, therefore only one loop over all connections is necessary
+        # Look for all connections starting with com, therefore only one loop over all connections is necessary
         for service in dbus.SessionBus().list_names():
             if service.startswith('com'):
                 our_con.append(service)
@@ -295,14 +288,13 @@ class CcsEditor(Gtk.Window):
 
                 conn = cfl.dbus_connection(conn_name, app[-1])
                 if conn.Variables('main_instance') == self.main_instance:
-                    #cfl.communication = conn.Functions('get_communication')
+                    # cfl.communication = conn.Functions('get_communication')
                     new_com = conn.Functions('get_communication')
                     cfl.communication[conn_name] = int(new_com[conn_name])
                     conn_com = conn.Functions('get_communication')
                     if conn_com[self.my_bus_name.split('.')[1]] == 0:
                         conn.Functions('change_communication', self.my_bus_name.split('.')[1], self.my_bus_name[-1], False)
                         # conn.Functions('change_communication', self.my_bus_name.split('.')[1], app[-1], False)
-
 
         if not cfl.communication[self.my_bus_name.split('.')[1]]:
             cfl.communication[self.my_bus_name.split('.')[1]] = int(self.my_bus_name[-1])
@@ -389,12 +381,11 @@ class CcsEditor(Gtk.Window):
                                                         "', '/MessageListener')")
         return
 
-
     def restart_terminal(self):
 
         # Kill the IPython Console
         self.ipython_view.destroy()
-        del(self.ipython_view)
+        self.ipython_view = None
 
         # Ćlose the socket connection
         self.is_editor_socket_active = False
@@ -404,11 +395,11 @@ class CcsEditor(Gtk.Window):
 
         # Open a new IPython Terminal and connect it to a new socket
         self.ipython_view = IPythonTerminal(scrollback_lines=int(self.cfg.get('ccs-editor', 'scrollback_lines')))
-        self.nb.insert_page(self.ipython_view, tab_label=Gtk.Label('Console', angle=270), position=0) # Append it to the GUI
+        self.nb.insert_page(self.ipython_view, tab_label=Gtk.Label('Console', angle=270), position=0)
 
         self.ipython_view.connect("size-allocate", self.console_autoscroll, self.ipython_view)
 
-        self.ed_host, self.ed_port = self.cfg.get('ccs-misc', 'editor_host'), int(self.cfg.get('ccs-misc', 'editor_ul_port')) # Get standart port
+        self.ed_host, self.ed_port = self.cfg.get('ccs-misc', 'editor_host'), int(self.cfg.get('ccs-misc', 'editor_ul_port'))  # Get standart port
 
         # Connect to standart port if possible otherwise use a random alternative
         try:
@@ -450,7 +441,7 @@ class CcsEditor(Gtk.Window):
             try:
                 pickle.dump(kwargs, fdesc)
             except:
-                self.logger.critical('Failed to create a file for the shared variables for iPython console')
+                self.logger.warning('Failed to create a file for the shared variables for iPython console')
             finally:
                 fdesc.close()
 
@@ -613,7 +604,7 @@ class CcsEditor(Gtk.Window):
         action_group = Gtk.ActionGroup(name="action_group")
         self.create_file_menu(action_group)
         self.create_edit_menu(action_group)
-        self.create_pool_menu(action_group)
+        # self.create_pool_menu(action_group)
         self.create_modules_menu(action_group)
         self.create_tools_menu(action_group)
         self.create_scripts_menu(action_group)
@@ -685,21 +676,21 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", cfl.start_config_editor)
         action_group.add_action(action)
 
-    def create_pool_menu(self, action_group):
-        action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None, sensitive=False)
-        action_group.add_action(action)
-
-        action = Gtk.Action(name="SelectConfig", label="_Select Configuration", tooltip=None, stock_id=None)
-        action.connect("activate", self._on_select_pool_config)
-        action_group.add_action(action)
-
-        action = Gtk.Action(name="EditConfig", label="_Edit Configuration", tooltip=None, stock_id=None)
-        action.connect("activate", self._on_edit_pool_config)
-        action_group.add_action(action)
-
-        action = Gtk.Action(name="CreateConfig", label="_Create Configuration", tooltip=None, stock_id=None)
-        action.connect("activate", self._on_create_pool_config)
-        action_group.add_action(action)
+    # def create_pool_menu(self, action_group):
+    #     action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None, sensitive=False)
+    #     action_group.add_action(action)
+    #
+    #     action = Gtk.Action(name="SelectConfig", label="_Select Configuration", tooltip=None, stock_id=None)
+    #     action.connect("activate", self._on_select_pool_config)
+    #     action_group.add_action(action)
+    #
+    #     action = Gtk.Action(name="EditConfig", label="_Edit Configuration", tooltip=None, stock_id=None)
+    #     action.connect("activate", self._on_edit_pool_config)
+    #     action_group.add_action(action)
+    #
+    #     action = Gtk.Action(name="CreateConfig", label="_Create Configuration", tooltip=None, stock_id=None)
+    #     action.connect("activate", self._on_create_pool_config)
+    #     action_group.add_action(action)
 
     def create_modules_menu(self, action_group):
         action = Gtk.Action(name="ModulesMenu", label="_Modules", tooltip=None, stock_id=None)
@@ -776,73 +767,38 @@ class CcsEditor(Gtk.Window):
     def _on_menu_file_new(self, widget=None, filename=None):
         self.notebook_open_tab()
 
-    """ TODO: apply actual configuration """
-
-    def _on_select_pool_config(self, action):
-
-        dialog = Gtk.FileChooserDialog(title="Load Configuration", parent=None,
-                                       action=Gtk.FileChooserAction.OPEN)
-
-        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                           Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-
-        dialog.set_transient_for(self)
-
-        response = dialog.run()
-
-        if response == Gtk.ResponseType.OK:
-            #self.cfg.source = dialog.get_filename()
-            cfg_path = confignator.get_option('paths', 'ccs') + '/' + dialog.get_filename()
-            #self.cfg.read(self.cfg.source)
-            self.cfg = confignator.get_config(file_path=cfg_path)
-
-            print('[TODO] cfg sections:' + str(self.cfg.sections()))
-
-            message = Gtk.MessageDialog(dialog, Gtk.DialogFlags.DESTROY_WITH_PARENT, Gtk.MessageType.INFO,
-                                        Gtk.ButtonsType.OK,
-                                        'Some changes might require a program restart to take effect.')
-            message.run()
-            message.destroy()
-
-            with open('ccs.py', 'r') as fdesc:
-                f = fdesc.read()
-                ind = f.find('cfgfile =')
-                linelen = len(f[ind:].split('\n')[0])
-                ff = f.replace(f[ind:ind + linelen], 'cfgfile = "{}"'.format(dialog.get_filename()))
-            with open('ccs.py', 'w') as fdesc:
-                fdesc.write(ff)
-
-        dialog.destroy()
-
-    def _on_edit_pool_config(self, action):
-        print('TODO')
-
-    def _on_create_pool_config(self, action):
-        cfg_dialog = config_dialog.CreateConfig(self)
-        response = cfg_dialog.run()
-
-        config = cfg_dialog.get_config()
-        cfg_dialog.destroy()
-
-        if response == Gtk.ResponseType.CANCEL:
-            return
-
-        dialog = Gtk.FileChooserDialog(title="Save file as", parent=None,
-                                       action=Gtk.FileChooserAction.SAVE)
-        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                           Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-
-        dialog.set_transient_for(self)
-
-        response = dialog.run()
-
-        if response == Gtk.ResponseType.OK:
-            filename = dialog.get_filename()
-            with open(filename, 'w') as fdesc:
-                config.write(fdesc)
-                fdesc.close()
-
-        dialog.destroy()
+    # def _on_select_pool_config(self, action):
+    #     print('TODO')
+    #
+    # def _on_edit_pool_config(self, action):
+    #     print('TODO')
+    #
+    # def _on_create_pool_config(self, action):
+    #     cfg_dialog = config_dialog.CreateConfig(self)
+    #     response = cfg_dialog.run()
+    #
+    #     config = cfg_dialog.get_config()
+    #     cfg_dialog.destroy()
+    #
+    #     if response == Gtk.ResponseType.CANCEL:
+    #         return
+    #
+    #     dialog = Gtk.FileChooserDialog(title="Save file as", parent=None,
+    #                                    action=Gtk.FileChooserAction.SAVE)
+    #     dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+    #                        Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+    #
+    #     dialog.set_transient_for(self)
+    #
+    #     response = dialog.run()
+    #
+    #     if response == Gtk.ResponseType.OK:
+    #         filename = dialog.get_filename()
+    #         with open(filename, 'w') as fdesc:
+    #             config.write(fdesc)
+    #             fdesc.close()
+    #
+    #     dialog.destroy()
 
     def _on_start_poolviewer(self, action):
         cfl.start_pv()
@@ -1165,7 +1121,6 @@ class CcsEditor(Gtk.Window):
 
         return toolbar
 
-
     def create_action_buttons(self, toolbar, targets, nbutt=10):
         for n in range(nbutt):
             button_action = Gtk.ToolButton()
@@ -1194,12 +1149,8 @@ class CcsEditor(Gtk.Window):
         filename = os.path.join(action_folder, widget.get_name() + '.py')
         with open(filename, 'w') as fdesc:
             fdesc.write(text)
-        self.cfg.set('ccs-actions', widget.get_name(), widget.get_name() + '.py')
 
-        self.cfg.save_to_file()
-
-        #with open(self.cfg.source, 'w') as fdesc:
-        #    self.cfg.write(fdesc)
+        self.cfg.save_option_to_file('ccs-actions', widget.get_name(), widget.get_name() + '.py')
 
         widget.set_tooltip_text(filename)
 
@@ -1707,40 +1658,28 @@ class CcsEditor(Gtk.Window):
             # self.ipython_view._processLine()
             self._to_console_via_socket(cmd)
             # exec(open(action,'r').read())
-            # print(action + ' executed')
         except Exception as err:
-            self.logger.warning(str(err))
+            self.logger.error(str(err))
 
         return action
 
-    def reload_config(self, widget):
-        cfg_path = confignator.get_option('paths', 'ccs') + '/' + self.cfg.source
-        self.cfg = confignator.get_config(file_path=cfg_path)
-
-        action_buttons = self.grid.get_children()[2].get_children()[7:17]
-        for button in action_buttons:
-            action_name = self.cfg.get('ccs-actions', button.get_name())
-            action_img = self.cfg.get('ccs-actions', button.get_name() + '_img')
-            button.set_tooltip_text(action_name)
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(action_img, 36, 36)
-            except:
-                pixmap_path = os.path.join(pixmap_folder, 'action.png')
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
-            button.set_icon_widget(Gtk.Image.new_from_pixbuf(pixbuf))
-        self.show_all()
-        return
-
-    # def reset_ns(self, widget):
-    #     cmd = 'get_ipython().reset()\n\n'
-    #     # self.ipython_view.text_buffer.insert_at_cursor(cmd, len(cmd))
-    #     # self.ipython_view._processLine()
-    #     self._to_console_via_socket(cmd)
-    #     # self.ipython_view.updateNamespace({'cfg': self.cfg})
-    #     # self.ipython_view.updateNamespace(globals())
-    #     self._to_console_via_socket('import configparser\n'
-    #                                 'cfg = configparser.ConfigParser()\n'
-    #                                 'cfg.read("{}")'.format(confignator.get_option('config-files', 'ccs').split('/')[-1]))
+    # def reload_config(self, widget):
+    #     # cfg_path = cfg.get('paths', 'ccs') + '/' + self.cfg.source
+    #     self.cfg = confignator.get_config()
+    #
+    #     action_buttons = self.grid.get_children()[2].get_children()[7:17]
+    #     for button in action_buttons:
+    #         action_name = self.cfg.get('ccs-actions', button.get_name())
+    #         action_img = self.cfg.get('ccs-actions', button.get_name() + '_img')
+    #         button.set_tooltip_text(action_name)
+    #         try:
+    #             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(action_img, 36, 36)
+    #         except:
+    #             pixmap_path = os.path.join(pixmap_folder, 'action.png')
+    #             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
+    #         button.set_icon_widget(Gtk.Image.new_from_pixbuf(pixbuf))
+    #     self.show_all()
+    #     return
 
     def create_log_window(self):
         logwin = Gtk.ScrolledWindow()
@@ -1755,11 +1694,14 @@ class CcsEditor(Gtk.Window):
 
         filelist = glob.glob(os.path.join(self.logdir, '*.log'))
         filelist.sort(reverse=True)
-        file = open(filelist[0], 'r')
-        file = file.read()
+        if not filelist:
+            self.logger.info('No log files to track!')
+            return True
+        with open(filelist[0], 'r') as fd:
+            file = fd.read()
         if self.log_file is None:
             logwin.remove(logwin.get_child())
-            buffer.set_text('Logs from all CCS applications:\n')
+            buffer.set_text('CCS Applications Log ({}):\n'.format(os.path.basename(filelist[0])))
             end = buffer.get_end_iter()
             buffer.insert(end, '\n')
             end = buffer.get_end_iter()
@@ -1782,7 +1724,7 @@ class UnsavedBufferDialog(Gtk.MessageDialog):
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES,
                                    Gtk.STOCK_NO, Gtk.ResponseType.NO,)
         head, message = self.get_message_area().get_children()
-        if msg == None:
+        if msg is None:
             head.set_text('There are unsaved changes. Save?')
         else:
             head.set_text(msg)
@@ -1825,15 +1767,7 @@ class ActionWindow(Gtk.Window):
 
 
 if __name__ == "__main__":
-    given_cfg = None
-    for i in sys.argv:
-        if i.endswith('.cfg'):
-            given_cfg = i
-    if given_cfg:
-        cfg = confignator.get_config(file_path=given_cfg)
-    else:
-        cfg = confignator.get_config(file_path=confignator.get_option('config-files', 'ccs'))
-    #pv = TMPoolView(cfg)
+
     DBusGMainLoop(set_as_default=True)
     ed = CcsEditor()
     if len(sys.argv) > 1:
@@ -1844,7 +1778,6 @@ if __name__ == "__main__":
         ed.notebook_open_tab()
 
     Bus_Name = cfg.get('ccs-dbus_names', 'editor')
-
     DBus_Basic.MessageListener(ed, Bus_Name, *sys.argv)
 
     Gtk.main()
