@@ -6,10 +6,11 @@ This file documents the required steps to get the UVIE EGSE software up and runn
     
 2) Required packages/devtools
     - make
-    - python-pip
     - gtk3
-    - python-gobject
     - gtksourceview3 [<=3.24.11-1]
+    - python-pip
+    - python-gobject
+    - dbus-python
     - mariadb
     - mysql-workbench (optional)
 
@@ -24,7 +25,8 @@ This file documents the required steps to get the UVIE EGSE software up and runn
 
 4) Install Python packages. To install the required modules with pip in userspace or a venv, run
    'make install-python-requirements' in the CCS base directory or use 'pip install [--user] -r requirements.txt'.
-   For details, see requirements.txt
+   If using a venv, it must have been created using the --system-site-packages option.
+   For more details, see requirements.txt
 
 
 # INSTALLATION
@@ -43,9 +45,3 @@ Use CCS/Ccs/tools/import_mib.py to import a set of SCOS2000 MIB files into the M
 # CCS & TST
 ./start_ccs: starts the CCS
 ./start_tst: starts the TST
-
-# TROUBLESHOOTING
-If working within a Python venv, you might need to install vext to access the system-site installation of gi:
-pip install vext
-pip install vext.gi
-
