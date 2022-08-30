@@ -341,8 +341,24 @@ class DatapoolManager:
         self.loaded_pools[pool_name] = ActivePoolInfo(pool_name, timestamp, pool_name, True)
         self.logger.info('Resuming recording from {}:{}'.format(*sockfd.getpeername()))
 
-    def connect(self, pool_name, host, port, return_socket=False, is_server=False, timeout=10, delete_abandoned=False,
-                try_delete=True, pckt_filter=None, options='', drop_rx=False, drop_tx=False, protocol='PUS'):
+    def connect(self, pool_name, host, port, protocol='PUS', is_server=False, timeout=10, delete_abandoned=False,
+                try_delete=True, pckt_filter=None, options='', drop_rx=False, drop_tx=False, return_socket=False,
+                override_with_options=False):
+
+        # override variables that are set in the options string
+        if bool(override_with_options):
+            self.logger.debug('Overriding kwargs with values from options string.')
+            override = eval(options)
+            protocol = override.get('protocol', protocol)
+            is_server = override.get('is_server', is_server)
+            timeout = override.get('timeout', timeout)
+            delete_abandoned = override.get('delete_abandoned', delete_abandoned)
+            try_delete = override.get('try_delete', try_delete)
+            pckt_filter = override.get('pckt_filter', pckt_filter)
+            drop_rx = override.get('drop_rx', drop_rx)
+            drop_tx = override.get('drop_tx', drop_tx)
+            return_socket = override.get('return_socket', return_socket)
+            # options = override.get('options', options)
 
         protocol = protocol.upper()
 
@@ -390,7 +406,7 @@ class DatapoolManager:
             self.logger.warning('"{}" is not a supported protocol, aborting.'.format(protocol))
             return
 
-        self.logger.info('Recording from new connection to ' + host + ':' + str(port) + '\n')
+        self.logger.info('Recording from new connection {}:{} to pool "{}" using {} protocol.'.format(host, port, protocol, pool_name))
         new_session = self.session_factory_storage
         while True:
             dbrow = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
@@ -432,23 +448,26 @@ class DatapoolManager:
         if self.own_gui:
             self.own_gui.disconnect_incoming_via_code(param=[pool_name, None, 'TM'])  # Updates the gui
 
-        #Tell the Poolviewer to stop updating
+        # Tell the Poolviewer to stop updating
         if cfl.is_open('poolviewer', cfl.communication['poolviewer']):
             pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
             cfl.Functions(pv, 'stop_recording_info', str(pool_name))
 
         return
 
-    def connect_tc(self, pool_name, host, port, drop_rx=True, protocol='PUS', timeout=10, is_server=False, options=''):
-        # self.logger.debug('connect_tc: type pool_name = {}'.format(type(pool_name)))
-        # self.logger.debug('connect_tc: type host = {}'.format(type(host)))
-        # self.logger.debug('connect_tc: type port = {}'.format(type(port)))
-        # if isinstance(pool_name, dbus.String):
-        #     pool_name = str(pool_name)
-        # if isinstance(host, dbus.String):
-        #     host = str(host)
-        # if isinstance(port, dbus.Int32):
-        #     port = int(port)
+    def connect_tc(self, pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, is_server=False, options='',
+                   override_with_options=False):
+
+        # override variables that are set in the options string
+        if bool(override_with_options):
+            self.logger.debug('Overriding kwargs with values from options string.')
+            override = eval(options)
+            protocol = override.get('protocol', protocol)
+            drop_rx = override.get('drop_rx', drop_rx)
+            timeout = override.get('timeout', timeout)
+            is_server = override.get('is_server', is_server)
+            # options = override.get('options', options)
+
         if is_server:
             socketserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             socketserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -466,9 +485,7 @@ class DatapoolManager:
             sockfd.settimeout(timeout)
 
             if pool_name in self.tc_connections:
-                # self.logger.info(self.tc_connections[pool_name])
-                # if self.tc_connections[pool_name]['recording']:
-                self.logger.warning('Pool "{}" already exists!'.format(pool_name))
+                self.logger.warning('Pool "{}" already has TC connection to {}!'.format(pool_name, self.tc_connections[pool_name]['socket'].getpeername()))
                 return
             try:
                 sockfd.connect((host, port))
@@ -479,6 +496,8 @@ class DatapoolManager:
         self.tc_sock = sockfd
         self.tc_name = pool_name
         self.tc_connections[pool_name] = {'socket': sockfd, 'protocol': protocol}
+
+        self.logger.info('Established TC connection to {}, using {} protocol.'.format(sockfd.getpeername(), protocol))
 
         if pool_name not in self.loaded_pools:
             self.loaded_pools[pool_name] = ActivePoolInfo(pool_name, 0, pool_name, True)
@@ -495,8 +514,9 @@ class DatapoolManager:
         # read data received on TC socket to prevent buffer overflow
         if drop_rx:
             tc_recv = threading.Thread(target=self.tc_receiver, kwargs={'sockfd': sockfd, 'protocol': protocol})
-            tc_recv.setDaemon(True)
-            tc_recv.name = 'TC-drop_rx'
+            # tc_recv.setDaemon(True)
+            tc_recv.daemon = True
+            tc_recv.name = 'TC-drop_rx-{}'.format(pool_name)
             tc_recv.start()
 
         if self.own_gui and self.tc_name is not None:
@@ -531,6 +551,15 @@ class DatapoolManager:
             cfl.Functions(pv, 'stop_recording_info', str(pool_name))
 
         return
+
+    def _is_tc_connection_active(self, pool_name):
+        """
+        Utility function to check whether a pool has an active TC connection to report back via DBus
+        """
+        if pool_name in self.tc_connections and not self.tc_connections[pool_name]['socket'].fileno() < 0:
+            return True
+        else:
+            return False
 
     # Function will disconnect both TC/TM connection if they have the same name
     def disconnect(self, pool_name):
@@ -703,7 +732,7 @@ class DatapoolManager:
                             elif drop_tx is False and pkt.startswith(PLM_PKT_PREFIX_TC.decode()):
                                 tm = bytes.fromhex(pkt.split(' ')[-3])
                             else:
-                                self.logger.info("Not a PUS packet: " + pkt)
+                                self.logger.warning("Not a PUS packet: " + pkt)
                                 continue
                             if self.crc_check(tm):
                                 self.logger.warning("Invalid CRC: " + pkt)
@@ -777,17 +806,17 @@ class DatapoolManager:
                     else:
                         self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=False)
             except socket.timeout as e:
-                self.logger.debug('Socket timeout')
+                self.logger.info('Socket timeout ({}:{})'.format(host, port))
                 new_session.commit()
                 continue
             except socket.error as e:
-                self.logger.error('Socket error')
+                self.logger.error('Socket error ({}:{})'.format(host, port))
                 self.logger.exception(e)
                 # self.logger.error('ERROR: socket error')
                 self.connections[pool_name]['recording'] = False
                 break
             except struct.error as e:
-                self.logger.error('Lost connection...')
+                self.logger.error('Lost connection to {}:{}'.format(host, port))
                 self.logger.exception(e)
                 self.connections[pool_name]['recording'] = False
                 break
@@ -919,6 +948,7 @@ class DatapoolManager:
                 with self.lock:
                     self.databuflen += len(buf)
             except socket.timeout:
+                self.logger.info('Socket timeout {}:{} [TC RX]'.format(host, port))
                 continue
             except socket.error:
                 self.logger.error('Socket error')
@@ -926,7 +956,7 @@ class DatapoolManager:
             except struct.error:
                 self.logger.error('Lost connection...')
                 break
-        self.logger.warning('Disconnected TC_recvr: ' + str(host) + ':' + str(port))
+        self.logger.warning('Disconnected TC RX: ' + str(host) + ':' + str(port))
         sockfd.close()
 
     # def set_commit_interval(self, pool_name, commit_interval):
@@ -940,9 +970,8 @@ class DatapoolManager:
     def tc_send(self, pool_name, buf):
 
         if pool_name not in self.tc_connections:
-            self.logger.error('"{}" has no TC connection!'.format(pool_name))
+            self.logger.error('"{}" is not connected to any TC socket!'.format(pool_name))
             return
-            # raise NameError('"{}" has no TC connection!'.format(pool_name))
 
         # check protocol of TC socket to append headers and stuff, this has to happen here, not in Tcsend_DB
         if self.tc_connections[pool_name]['protocol'].upper() == 'PLMSIM':
@@ -961,8 +990,8 @@ class DatapoolManager:
         try:
             self.tc_connections[pool_name]['socket'].send(buf_to_send)
         except Exception as err:
-            self.logger.error('Failed to send packet of length {} to {} [{}].'.format(len(buf_to_send), pool_name,
-                                                                                      self.tc_connections[pool_name]['socket'].getpeername()))
+            self.logger.error('Failed to send packet of length {} to {} [{}].'.format(
+                len(buf_to_send), pool_name, self.tc_connections[pool_name]['socket'].getpeername()))
             return
 
         with self.lock:

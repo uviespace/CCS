@@ -54,7 +54,7 @@ class MessageListener(dbus.service.Object):
         try:
             self.win.set_title(str(project) + ': ' + str(self.win.get_title()) + ' ' + str(counting - 1))
         except Exception as err:
-            print(err)
+            # print(err)
             # Looks like an odd title name but is reshaped in pus_datapool.py
             self.win.windowname = str(project) + ': @ ' + str(counting - 1)
 

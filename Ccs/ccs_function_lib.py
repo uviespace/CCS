@@ -330,7 +330,6 @@ def dbus_connection(name, instance=1):
         dbuscon = dbus_type.get_object(Bus_Name, '/MessageListener')
         return dbuscon
     except:
-        # print('Connection to ' + str(name) + ' is not possible')
         # print('Please start ' + str(name) + ' if it is not running')
         logger.warning('Connection to ' + str(name) + ' is not possible.')
         return False
@@ -1683,9 +1682,7 @@ def unpack_bytes(data, fmt, offbi=0):
         x = struct.unpack('>' + fmt, data)[0]
     return x
 '''
-def set_packet_list(packets):
-    packet_selection = packets
-    return packets
+
 
 def show_extracted_packet():
     """
@@ -1699,9 +1696,11 @@ def show_extracted_packet():
 
     return eval(pv.Functions('selected_packet'))
 
+
 def packet_selection():
     """Alias for show_extracted_packet call"""
     return show_extracted_packet()
+
 
 def get_module_handle(module_name, instance=1, timeout=5):
     """
@@ -1722,19 +1721,21 @@ def get_module_handle(module_name, instance=1, timeout=5):
             if module:
                 break
             else:
-                time.sleep(0.2)
-        except dbus.DBusException:
+                time.sleep(1.)
+        except dbus.DBusException as err:
+            logger.warning(err)
             module = False
-            time.sleep(0.2)
+            time.sleep(0.5)
 
     if module:
         return module
     else:
-        raise ValueError('No running {} instance found'.format(module_name.upper()))
-        return
+        logger.error('No running {} instance found'.format(module_name.upper()))
+        return False
 
 
-def connect(pool_name, host, port, protocol='PUS'):  #, return_socket=False, is_server=False, timeout=10, delete_abandoned=False, try_delete=True, pckt_filter=None, options='', drop_rx=False, drop_tx=False):
+def connect(pool_name, host, port, protocol='PUS', is_server=False, timeout=10, delete_abandoned=False, try_delete=True,
+            pckt_filter=None, options='', drop_rx=False, drop_tx=False):
     """
     Accessibility function for 'connect' in pus_datapool
     :param pool_name:
@@ -1754,20 +1755,28 @@ def connect(pool_name, host, port, protocol='PUS'):  #, return_socket=False, is_
     """
     pmgr = get_module_handle('poolmanager')
 
-    # None cannot be passed over DBUS
-    # if pckt_filter is None:
-    #     pckt_filter = False
+    if not pmgr:
+        return
+
+    kwarguments = str({'protocol': protocol,
+                       'is_server': is_server,
+                       'timeout': timeout,
+                       'delete_abandoned': delete_abandoned,
+                       'try_delete': try_delete,
+                       'pckt_filter': pckt_filter,
+                       'options': options,
+                       'drop_rx': drop_rx,
+                       'drop_tx': drop_tx})
 
     # kwarguments = {'return_socket': return_socket, 'is_server': is_server, 'timeout': timeout,
     #                'delete_abandoned': delete_abandoned, 'try_delete': try_delete, 'pckt_filter': pckt_filter,
     #                'options': options, 'drop_rx': drop_rx, 'drop_tx': drop_tx, 'protocol': protocol}
 
-    #TODO: passing the whole kwarg dict over DBUS does not work yet
-    pmgr.Functions('connect', pool_name, host, port, {'kwargs': dbus.Dictionary({'protocol': protocol})})
-    return
+    pmgr.Functions('connect', pool_name, host, port, {'kwargs': dbus.Dictionary({'options': kwarguments,
+                                                                                 'override_with_options': '1'})})
 
 
-def connect_tc(pool_name, host, port, protocol='PUS'):  #, drop_rx=True, timeout=10, is_server=False, options=''):
+def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, is_server=False, options=''):
     """
     Accessibility function for 'connect_tc' in pus_datapool
     :param pool_name:
@@ -1782,11 +1791,17 @@ def connect_tc(pool_name, host, port, protocol='PUS'):  #, drop_rx=True, timeout
     """
     pmgr = get_module_handle('poolmanager')
 
-    # TODO: passing the whole kwarg dict over DBUS does not work yet
-    # kwarguments = {'is_server': is_server, 'timeout': timeout, 'options': options, 'drop_rx': drop_rx, 'protocol': protocol}
+    if not pmgr:
+        return
 
-    pmgr.Functions('connect_tc', pool_name, host, port, {'kwargs': dbus.Dictionary({'protocol': protocol})})
-    return
+    kwarguments = str({'protocol': protocol,
+                       'is_server': is_server,
+                       'timeout': timeout,
+                       'options': options,
+                       'drop_rx': drop_rx})
+
+    pmgr.Functions('connect_tc', pool_name, host, port, {'kwargs': dbus.Dictionary({'options': kwarguments,
+                                                                                    'override_with_options': '1'})})
 
 
 ##
@@ -2457,6 +2472,18 @@ def get_last_pckt_time(pool_name='LIVE', string=True):
     return cuc
 
 
+def _has_tc_connection(pool_name, pmgr_handle):
+    try:
+        if not pmgr_handle.Functions('_is_tc_connection_active', pool_name):
+            logger.error('"{}" is not connected to any TC socket!'.format(pool_name))
+            return False
+        else:
+            return True
+    except Exception as err:
+        logger.error(err)
+        return False
+
+
 def Tcsend_bytes(tc_bytes, pool_name='LIVE'):
 
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
@@ -2465,10 +2492,7 @@ def Tcsend_bytes(tc_bytes, pool_name='LIVE'):
         return False
 
     # check if pool is connected
-    try:
-        pmgr.Dictionaries('tc_connections', pool_name)
-    except (dbus.DBusException, KeyError):
-        logger.error('"{}" has no TC connection!'.format(pool_name))
+    if not _has_tc_connection(pool_name, pmgr):
         return False
 
     # Tell dbus with signature = that you send a byte array (ay), otherwise does not allow null bytes
@@ -2489,18 +2513,20 @@ def Tcsend_bytes(tc_bytes, pool_name='LIVE'):
 #  @param pool_name Name of the pool bound to the socket for CnC/TC communication
 #  @param cmd         Command string to be sent to C&C socket
 def CnCsend(cmd, pool_name=None):
-    global counters # One can only Change variable as global since we are static
+    global counters  # One can only Change variable as global since we are static
 
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
     if pool_name is None:
         pool_name = pmgr.Variables('tc_name')
+
     packed_data = CnCpack(data=cmd, sc=counters.setdefault(1804, 1))
+
+    logger.info('[CNC sent:]' + str(packed_data))
     received = pmgr.Functions('socket_send_packed_data', packed_data, pool_name, signature='says')
     if received is not None:
         counters[1804] += 1
-        received = bytes(received) # convert dbus type to python type
-    # print('[CNC Response:]' + str(received))
-    logger.info('[CNC Response:]' + str(received))
+        received = bytes(received)  # convert dbus type to python type
+    logger.info('[CNC response:]' + str(received))
 
     return received
 
@@ -2538,8 +2564,12 @@ def CnCpack(data=b'', version=0b011, typ=1, dhead=0, pid=112, cat=12, gflags=0b1
 #  @param pool_name Name of pool bound to Python socket for CnC/TC communication
 def Datasend(data, pool_name):
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
-    pmgr.Functions('tc_send', pool_name, data)
-    return
+
+    if not pmgr:
+        return
+
+    if _has_tc_connection(pool_name, pmgr):
+        pmgr.Functions('tc_send', pool_name, data)
 
 
 ##
@@ -2625,7 +2655,6 @@ def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0., ack=None, p
 
     slices = [data[i:i + slicesize] for i in range(0, len(data), slicesize)]
     if slicesize > 1000:
-        # print('SLICESIZE > 1000 bytes, this is not gonna work!')
         logger.warning('SLICESIZE > 1000 bytes, this is not gonna work!')
     slicount = 1
 
@@ -2633,7 +2662,7 @@ def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0., ack=None, p
         t1 = time.time()
         parts = struct.unpack(len(sli) * 'B', sli)
         Tcsend_DB(cmd, memid, mempos, len(parts), *parts, ack=ack, pool_name=pool_name)
-        sys.stdout.write('%i / %i packets sentto {}\r'.format(slicount, len(slices), memid))
+        sys.stdout.write('%i / %i packets sent to {}\r'.format(slicount, len(slices), memid))
         logger.info('%i / %i packets sent to {}'.format(slicount, len(slices), memid))
         slicount += 1
         dt = time.time() - t1
