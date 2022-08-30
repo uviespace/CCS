@@ -1412,12 +1412,12 @@ def get_txp_altxt(pcf_name, alval, dbcon=None):
 #  @param tmlist    List of TM packets
 #  @param mode      Save as "binary" file or "hex" values with one packet per line
 #  @param st_filter Save only packets of this service type
-def Tmdump(filename, tmlist, mode='hex', st_filter=None, crccheck=False):
+def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
     if st_filter is not None:
         tmlist = Tm_filter_st(tmlist, *st_filter)
 
-    if crccheck:
-        tmlist = (tm for tm in tmlist if not crccheck(tm))
+    if check_crc:
+        tmlist = (tm for tm in tmlist if not crc_check(tm))
 
     if mode.lower() == 'hex':
         with open(filename, 'w') as f:
@@ -1440,6 +1440,7 @@ def Tmdump(filename, tmlist, mode='hex', st_filter=None, crccheck=False):
         with open(filename, 'w') as f:
             f.write('\n'.join(txtlist))
 
+
 ##
 #  Filter by service (sub-)type
 #
@@ -1455,26 +1456,27 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
     if (st is not None) and (sst is not None):
         tmlist = [tm for tm in tmlist if ((tm[7], tm[8]) == (st, sst))]
 
-    if sid != None:
+    if sid is not None:
         tmlist = [tm for tm in list(tmlist) if (tm[TM_HEADER_LEN] == sid or tm[TM_HEADER_LEN] + tm[TM_HEADER_LEN + 1] == sid)] # two possibilities for SID because of  different definition (length) for SMILE and CHEOPS
 
-    if apid != None:
+    if apid is not None:
         tmlist = [tm for tm in list(tmlist) if ((struct.unpack('>H', tm[:2])[0] & 2047) == (apid))]
 
-    if eventId != None:
+    if eventId is not None:
         tmlist = [tm for tm in list(tmlist) if (struct.unpack('>H', tm[TM_HEADER_LEN:TM_HEADER_LEN + 2])[0] == eventId)]
 
-    if procId != None:
+    if procId is not None:
         tmlist = [tm for tm in list(tmlist) if
                   (struct.unpack('>H', tm[TM_HEADER_LEN + 2:TM_HEADER_LEN + 4])[0] == procId)]
 
-    if time_from != None:
+    if time_from is not None:
         tmlist = [tm for tm in list(tmlist) if (time_from <= get_cuctime(tm))]
 
-    if time_to != None:
+    if time_to is not None:
         tmlist = [tm for tm in list(tmlist) if (get_cuctime(tm) <= time_to)]
 
     return tmlist
+
 
 ##
 #  CRC check
@@ -1482,8 +1484,9 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
 #  Perform a CRC check on the _packet_. Returns True if CRC!=0.
 #  @param packet TM/TC packet or any bytestring or bitstring object to be CRCed.
 def crc_check(packet):
-    #if isinstance(packet, (BitArray, BitStream, Bits, ConstBitStream)):
-    #    packet = packet.bytes
+    """
+    This function returns True if the CRC result is non-zero
+    """
     return bool(crc(packet))
 
 
@@ -1520,6 +1523,7 @@ def get_cuctime(tml):
         cuc_timestamp = ct + ft / resolution
 
     return cuc_timestamp
+
 
 def get_pool_rows(pool_name, dbcon=None):
     dbcon = scoped_session_storage
@@ -3669,12 +3673,11 @@ def savepool(filename, pool_name, mode='binary', st_filter=None):
     logger.info('Saving pool content to disk...')
     tmlist = list(get_packets_from_pool(pool_name))
 
-    Tmdump(filename, tmlist, mode=mode, st_filter=st_filter, crccheck=False)
+    Tmdump(filename, tmlist, mode=mode, st_filter=st_filter, check_crc=False)
     logger.info('Pool {} saved as {} in {} mode'.format(pool_name, filename, mode.upper()))
 
-    return
 
-def get_packets_from_pool(pool_name, indices=[], st=None, sst=None, apid=None, dbsession=None):
+def get_packets_from_pool(pool_name, indices=[], st=None, sst=None, apid=None, **kwargs):
     """
     @param pool_name:
     @param indices:

@@ -2612,7 +2612,7 @@ class TMPoolView(Gtk.Window):
         self.tm_data_view.thaw_child_notify()
 
     def save_pool(self, widget):
-        dialog = SavePoolDialog(parent=self)
+        dialog = SavePoolDialog(parent=self, decoding_type=self.decoding_type)
 
         response = dialog.run()
 
@@ -2642,7 +2642,7 @@ class TMPoolView(Gtk.Window):
                 tmlist = self.get_packets_from_indices(filtered=dialog.save_filtered.get_active(), merged_tables=merge)
 
             crc = dialog.crccheck.get_active()
-            cfl.Tmdump(filename, tmlist, mode=mode, st_filter=None, crccheck=crc)
+            cfl.Tmdump(filename, tmlist, mode=mode, st_filter=None, check_crc=crc)
             self.logger.info(
                 '{} packets from {} saved as {} in {} mode (CRC {})'.format(len(list(tmlist)),
                                                                             self.get_active_pool_name(),
@@ -2653,32 +2653,24 @@ class TMPoolView(Gtk.Window):
         dialog.destroy()
 
     def save_pool_in_db(self, filename, timestamp, indices=None):
+        # this function only works for PUS packets at the moment
+        if self.decoding_type != 'PUS':
+            self.logger.error('Save to DB not supported for {} protocol.'.format(self.decoding_type))
+            return
+
         new_session = self.session_factory_storage
-        #new_session.execute(
-        #    'delete tm from tm inner join tm_pool on tm.pool_id=tm_pool.iid where tm_pool.pool_name="{}"'.format(
-        #        filename))
-
-
-        new_session.query(
-            Telemetry[self.decoding_type]
-        ).join(
-            DbTelemetryPool,
-            Telemetry[self.decoding_type].pool_id == DbTelemetryPool.iid
-        ).filter(
-            DbTelemetryPool.pool_name == self.active_pool_info.filename
-        ).delete()
+        self.logger.info('Deleting any existing DB entries associated with {}'.format(filename))
+        new_session.execute(
+           'DELETE tm FROM tm INNER JOIN tm_pool ON tm.pool_id=tm_pool.iid WHERE tm_pool.pool_name="{}"'.format(
+               filename))
+        new_session.execute('DELETE tm_pool FROM tm_pool WHERE tm_pool.pool_name="{}"'.format(filename))
         new_session.commit()
+        self.logger.debug('...deleted')
 
+        self.logger.info('Storing current pool {} in DB for {}'.format(self.active_pool_info.pool_name, filename))
 
-        new_session.query(
-            DbTelemetryPool
-        ).filter(
-            DbTelemetryPool.pool_name == filename
-        ).delete()
-        new_session.commit()
-        newPoolRow = DbTelemetryPool(
-            pool_name=filename,
-            modification_time=timestamp)
+        newPoolRow = DbTelemetryPool(pool_name=filename, protocol='PUS', modification_time=timestamp)
+
         new_session.add(newPoolRow)
         new_session.flush()
         rows = new_session.query(
@@ -2692,20 +2684,22 @@ class TMPoolView(Gtk.Window):
             rows = rows.filter(Telemetry[self.decoding_type].idx.in_(indices))
         for idx, row in enumerate(rows, 1):
             new_session.add(Telemetry[self.decoding_type](pool_id=newPoolRow.iid,
-                                        idx=idx,
-                                        is_tm=row.is_tm,
-                                        apid=row.apid,
-                                        seq=row.seq,
-                                        len_7=row.len_7,
-                                        stc=row.stc,
-                                        sst=row.sst,
-                                        destID=row.destID,
-                                        timestamp=row.timestamp,
-                                        data=row.data,
-                                        raw=row.raw))
+                                                          idx=idx,
+                                                          is_tm=row.is_tm,
+                                                          apid=row.apid,
+                                                          seq=row.seq,
+                                                          len_7=row.len_7,
+                                                          stc=row.stc,
+                                                          sst=row.sst,
+                                                          destID=row.destID,
+                                                          timestamp=row.timestamp,
+                                                          data=row.data,
+                                                          raw=row.raw))
+
         # new_session.flush()
         new_session.commit()
         new_session.close()
+
     '''
     # Poolmgr can call the LoadInfo Window via dbus, needed for the load_pool function
     def LoadInfo(self):
@@ -2813,7 +2807,7 @@ class TMPoolView(Gtk.Window):
 
             # package_type defines which type was selected by the user, if any was selected
             new_pool = cfl.Functions(poolmgr, 'load_pool_poolviewer', pool_name, filename, isbrute, force_db_import,
-                                         self.count_current_pool_rows(), self.my_bus_name[-1], package_type)
+                                     self.count_current_pool_rows(), self.my_bus_name[-1], package_type)
 
             dialog.destroy()
 
@@ -3326,7 +3320,7 @@ class ExtractionDialog(Gtk.MessageDialog):
 
 
 class SavePoolDialog(Gtk.FileChooserDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, decoding_type='PUS'):
         super(SavePoolDialog, self).__init__(title="Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE)
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                                                       Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
@@ -3353,6 +3347,8 @@ class SavePoolDialog(Gtk.FileChooserDialog):
         self.crccheck.set_tooltip_text('Save only packets that pass CRC')
         self.store_in_db = Gtk.CheckButton.new_with_label('Store in DB')
         self.store_in_db.set_tooltip_text('Permanently store pool in DB - THIS MAY TAKE A WHILE FOR LARGE DATASETS!')
+        if decoding_type != 'PUS':
+            self.store_in_db.set_sensitive(False)
         self.save_filtered = Gtk.CheckButton.new_with_label('Apply packet filter')
         self.save_filtered.set_tooltip_text('Save only packets according to the currently active poolview filter')
         self.merge_tables = Gtk.CheckButton.new_with_label('Merge tables')
