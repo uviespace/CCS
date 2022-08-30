@@ -2017,10 +2017,10 @@ class LoadInfo(Gtk.Window):
         # pixbuf = Gtk.gdk.pixbuf_new_from_file('pixmap/Icon_Space_weiß_en.png')
         # pixbuf = pixbuf.scale_simple(100, 100, Gtk.gdk.INTERP_BILINEAR)
         # logo = Gtk.image_new_from_pixbuf(pixbuf)
-        logo = Gtk.Image.new_from_file('pixmap/Icon_Space_weiß_en.png')
+        logo = Gtk.Image.new_from_file('pixmap/ccs_logo_2.svg')
 
         self.spinner = Gtk.Spinner()
-        self.spinner.set_size_request(32, 32)
+        self.spinner.set_size_request(48, 48)
         self.spinner.start()
         self.log = Gtk.Label()
         self.ok_button = Gtk.Button.new_with_label('OK')
