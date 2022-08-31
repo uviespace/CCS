@@ -27,9 +27,9 @@ class ParameterMonitor(Gtk.Window):
                     'green': Gdk.RGBA(0.913725, 0.913725, 0.913725, 1.)}
     parameter_types = {"S": "s", "N": ".3G"}
 
-    def __init__(self, given_cfg=None, pool_name=None, parameter_set=None, interval=INTERVAL, max_age=MAX_AGE, user_limits=None):
+    def __init__(self, pool_name=None, parameter_set=None, interval=INTERVAL, max_age=MAX_AGE, user_limits=None):
 
-        Gtk.Window.__init__(self, title="Parameter Monitor (Pool: {:})".format(pool_name))
+        Gtk.Window.__init__(self, title="Parameter Monitor - {} - {}".format(pool_name, parameter_set))
         self.set_border_width(10)
         self.set_resizable(True)
 
@@ -68,13 +68,10 @@ class ParameterMonitor(Gtk.Window):
         self.evt_check_enabled = True
         self.evt_check_tocnt = 0
 
+        self.pool_name = pool_name
         self.parameter_set = parameter_set
         self.parameters = {}
         self.monitored_pkts = None
-
-        # Is now done in the __name__ == __main__ part
-        #if parameter_set is not None:
-        #    self.set_parameter_view(parameter_set)
 
         hbox.pack_start(self.evt_cnt, 0, 0, 0)
         hbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), 0, 1, 0)
@@ -86,12 +83,8 @@ class ParameterMonitor(Gtk.Window):
 
         hbox.set_spacing(20)
 
-        # Is now done in the __name__ == __main__ part
-        #if pool_name is not None:
-        #    self.set_pool(pool_name)
-        #self.update_parameter_view(interval=interval, max_age=max_age)
-
-        self.connect('destroy', self.destroy_monitor)
+        # self.connect('destroy', self.destroy_monitor)
+        self.connect("delete-event", self.quit_func)
 
         self.show_all()
 
@@ -109,16 +102,27 @@ class ParameterMonitor(Gtk.Window):
                 if '/' in pools[0][0]:
                     pool_name = pools[0][0].split('/')[-1]
                 self.set_pool(pool_name)
+                return 1
             else:
-                self.logger.warning('To many pools running in manager, could not determine which one to use')
+                self.logger.error('Failed to open a pool.')
+                return 0
         except Exception as err:
             self.logger.error(err)
+            return 0
 
     def set_pool(self, pool_name):
         self.pool_name = pool_name
-        self.set_title("Parameter Monitor (Pool: {:})".format(pool_name))
+
+        # check if pool exists in DB
+        n_pools = len(self.session_factory_storage.execute('SELECT pool_name FROM tm_pool WHERE (protocol="PUS" OR protocol="PLMSIM") AND pool_name="{}"'.format(pool_name)).fetchall())
+        if n_pools == 0:
+            self.logger.error('No pool "{}" to monitor.'.format(pool_name))
+            return n_pools
+
+        self.set_title("Parameter Monitor - {} - {}".format(pool_name, self.parameter_set))
         self.update_parameter_view(interval=self.interval, max_age=self.max_age)
         # self.tmlist = self.ccs.get_pool_pckts_list(self.poolmgr.loaded_pools[self.pool_name], dbcon=self.dbcon)
+        return n_pools
 
     def create_event_counter(self):
         evt_cnt = Gtk.VBox()
@@ -231,11 +235,13 @@ class ParameterMonitor(Gtk.Window):
             parameters = json.loads(self.cfg['ccs-monitor_parameter_sets'][parameter_set])
             self.setup_grid(parameters)
         else:
-            self.logger.warning('Parameter Set "{}" does not exist'.format(parameter_set))
-        return
+            self.logger.warning('Parameter set "{}" does not exist'.format(parameter_set))
 
     def setup_grid(self, parameters):
-        [self.grid.remove(cell) for cell in self.grid.get_children()]
+
+        for cell in self.grid.get_children():
+            self.grid.remove(cell)
+
         dbcon = self.session_factory_idb
         for ncol, col in enumerate(parameters):
             for nrow, parameter in enumerate(col):
@@ -621,7 +627,7 @@ class ParameterMonitor(Gtk.Window):
 
         return
 
-    #Tell all terminals that app is closing
+    # Tell all terminals that app is closing
     def quit_func(self, *args):
         for service in dbus.SessionBus().list_names():
             if service.startswith(self.cfg['ccs-dbus_names']['editor']):
@@ -633,17 +639,17 @@ class ParameterMonitor(Gtk.Window):
                     editor.Functions('_to_console_via_socket', 'del(monitor'+str(nr)+')')
 
         self.update_all_connections_quit()
-        Gtk.main_quit()
-        return
+        if Gtk.main_level():
+            Gtk.main_quit()
 
     def update_all_connections_quit(self):
-        '''
+        """
         Tells all running applications that it is not longer availabe and suggests another main communicatior if one is
         available
         :return:
-        '''
-        our_con = [] # All connections to running applications without communicions form the same applications as this
-        my_con = [] # All connections to same applications as this
+        """
+        our_con = []  # All connections to running applications without communicions form the same applications as this
+        my_con = []  # All connections to same applications as this
         for service in dbus.SessionBus().list_names():
             if service.split('.')[1] in self.cfg['ccs-dbus_names']:   # Check if connection belongs to CCS
                 if service == self.my_bus_name:     #If own allplication do nothing
@@ -664,6 +670,8 @@ class ParameterMonitor(Gtk.Window):
             if str(comm[self.my_bus_name.split('.')[1]]) == self.my_bus_name[-1]:
                 conn.Functions('change_communication', self.my_bus_name.split('.')[1], instance, False)
         return
+
+
 class MonitorSetupDialog(Gtk.Dialog):
     def __init__(self, logger, nslots=3, parameter_set=None, parent=None):
         Gtk.Dialog.__init__(self, "Monitoring Setup", parent, 0)
@@ -714,7 +722,7 @@ class MonitorSetupDialog(Gtk.Dialog):
                         slotbox.pack_start(slot, 1, 1, 0)
                         self.slots.append([slot, sw, tv, pl])
             else:
-                self.logger.warning('Parameter Set "{}" does not exist'.format(parameter_set))
+                self.logger.warning('Parameter set "{}" does not exist'.format(parameter_set))
                 for n in range(nslots):
                     slot, sw, tv, pl = self.create_slot()
                     slotbox.pack_start(slot, 1, 1, 0)
@@ -726,7 +734,6 @@ class MonitorSetupDialog(Gtk.Dialog):
                 self.slots.append([slot, sw, tv, pl])
 
         self.label = Gtk.ComboBoxText.new_with_entry()
-        #self.label.set_tooltip_text('Label')
         self.label_entry = self.label.get_child()
         self.label_entry.set_placeholder_text('Label for the current configuration')
         self.label_entry.set_width_chars(5)
@@ -742,10 +749,6 @@ class MonitorSetupDialog(Gtk.Dialog):
         label_box.pack_start(self.label, True, True, 0)
         label_box.pack_start(self.load_button, 0, 0, 0)
 
-        #self.label = Gtk.Entry()
-        #self.label.set_placeholder_text('Label for the current configuration')
-        #self.label.connect('changed', self.check_label)
-
         box = Gtk.VBox()
         box.pack_start(parameter_view, 1, 1, 5)
         box.pack_start(slotbox, 1, 1, 2)
@@ -759,7 +762,6 @@ class MonitorSetupDialog(Gtk.Dialog):
         for decoder in self.monitor.cfg['ccs-monitor_parameter_sets'].keys():
             model.append([decoder])
         return model
-
 
     def create_param_view(self):
         self.treeview = Gtk.TreeView(model=self.create_parameter_model())
@@ -921,11 +923,12 @@ class MonitorSetupDialog(Gtk.Dialog):
 
 if __name__ == "__main__":
 
-    win = ParameterMonitor()
-
     # Important to tell Dbus that Gtk loop can be used before the first dbus command
     DBusGMainLoop(set_as_default=True)
     Bus_Name = cfg.get('ccs-dbus_names', 'monitor')
+
+    win = ParameterMonitor()
+
     DBus_Basic.MessageListener(win, Bus_Name, *sys.argv)
 
     for arg in sys.argv:
@@ -934,16 +937,23 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 2:
         win.pool_name = sys.argv[1]
-        win.set_pool(sys.argv[1])
+        is_pool = win.set_pool(sys.argv[1])
 
-    elif len(sys.argv) == 3:
+    elif len(sys.argv) >= 3:
+
+        if len(sys.argv) > 3:
+            win.logger.warning('Too many arguments, ignoring {}'.format(sys.argv[3:]))
+
         win.pool_name = sys.argv[1]
         win.parameter_set = sys.argv[2]
-        win.set_parameter_view(sys.argv[2])
-        win.set_pool(sys.argv[1])
-    else:
-        win.check_for_pools()
+        win.set_parameter_view(win.parameter_set)
+        is_pool = win.set_pool(win.pool_name)
 
-    win.connect("delete-event", win.quit_func)
-    win.show_all()
+    elif len(sys.argv) == 1:
+        is_pool = win.check_for_pools()
+
+    if is_pool == 0:
+        win.quit_func()
+        sys.exit()
+
     Gtk.main()
