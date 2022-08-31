@@ -133,12 +133,15 @@ def get_scoped_session_storage():
     return scoped_session_maker('storage')
 
 
-def start_app(console, file_path, wd, *args):
+def start_app(file_path, wd, *args, console=False, **kwargs):
     # gui argument only used for poolmanager since it does not have an automatic gui
     if not os.path.isfile(file_path):
-        raise FileNotFoundError('The file could not be found: {}'.format(file_path))
+        raise FileNotFoundError('File not found: {}'.format(file_path))
 
-    if console is True:
+    if kwargs:
+        logger.info('{}: some parameters are not handled: {}'.format(file_path, kwargs))
+
+    if not console:
         command = ''
         command += 'nohup python3 '
         command += file_path
@@ -146,150 +149,117 @@ def start_app(console, file_path, wd, *args):
             command += ' '
             command += arg
         command += ' >/dev/null 2>&1 &'
-        logger.debug('command which will be executed: {}'.format(command))
+        logger.debug('Command to be executed: {}'.format(command))
         os.system(command)
     else:
         subprocess.Popen(['python3', file_path, *args], cwd=wd)
 
-    return
 
 # Start the poolviewer
-# Argumnet gives the possibility to run file in the console to see print comands
-def start_pv(console=True, *args):
+def start_pv(pool_name=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Poolviewer and executes it
     :param console: If False will be run in Console, otherwise will be run in seperate Environment
     :return:
     """
 
-    '''
-    if argument is False:
-        file_path = os.path.join(os.path.dirname(__file__), 'startpv.py')
-        pop_pv_pmgr = subprocess.Popen(['python3', file_path])
-    else:
-        pop_pv_pmgr = os.system('nohup python3 startpv.py </dev/null >/dev/null 2>&1 &')
-    return
-    '''
-    # This check is done because if somebody wants to set a flag like name of group one can only type
-    # cfl.start_pv(-smile-)
-    if not isinstance(console, bool):
-        args += (console,)
-        console = True
-
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'poolview_sql.py')
-    start_app(console, file_path, directory, *args)
+    start_app(file_path, directory, pool_name, console=console, **kwargs)
 
-    return
 
 # Start only PoolManager
-def start_pmgr(console=True, *args):
+def start_pmgr(gui=True, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Poolmanager and executes it
     :param console: If False will be run in Console, otherwise will be run in seperate Environment
     :return:
     """
 
-    if not isinstance(console, bool):
-        args += (console,)
-        console = True
-
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'pus_datapool.py')
-    start_app(console, file_path, directory, *args)
 
-    return
+    if not gui:
+        start_app(file_path, directory, '--nogui', console=console, **kwargs)
+    else:
+        start_app(file_path, directory, console=console, **kwargs)
 
 
 # Start Editor
 # Argumnet gives the possibility to run file in the console to see print comands
-def start_editor(console=True, *args):
+def start_editor(*files, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Editor and executes it
     :param console: If False will be run in Console, otherwise will be run in seperate Environment
     :return:
     """
 
-    if not isinstance(console, bool):
-        args += (console,)
-        console = True
-
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'editor.py')
 
-    if '--terminal' in args:
-        args = list(args)
-        args.remove('--terminal')
-        os.system(' '.join(['python3', file_path, *args]))
-    else:
-        start_app(console, file_path, directory, *args)
+    start_app(file_path, directory, *files, console=console, **kwargs)
 
-    return
 
 # Start Parameter Monitor
 # Argumnet gives the possibility to run file in the console to see print comands
-def start_monitor(console= True, *args):
+def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Monitor and executes it
     :param console: If False will be run in Console, otherwise will be run in seperate Environment
     :return:
     """
 
-    if not isinstance(console, bool):
-        args += (console,)
-        console = True
-
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'monitor.py')
-    start_app(console, file_path, directory, *args)
 
-    return
+    if pool_name is not None and parameter_set is not None:
+        start_app(file_path, directory, pool_name, parameter_set, console=console, **kwargs)
+    elif pool_name is not None:
+        start_app(file_path, directory, pool_name, console=console, **kwargs)
+    else:
+        start_app(file_path, directory, console=console, **kwargs)
+
 
 # Start Parameter Plotter
 # Argumnet gives the possibility to run file in the console to see print comands
-def start_plotter(console= True, *args):
+def start_plotter(pool_name=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Plotter and executes it
     :param console: If False will be run in Console, otherwise will be run in seperate Environment
     :return:
     """
 
-    if not isinstance(console, bool):
-        args += (console,)
-        console = True
-
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'plotter.py')
-    start_app(console, file_path, directory, *args)
 
-    return
+    if pool_name is not None:
+        start_app(file_path, directory, pool_name, console=console, **kwargs)
+    else:
+        start_app(file_path, directory, console=console, **kwargs)
 
-def start_tst(console=False, *args):
+
+def start_tst(console=False, **kwargs):
     directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'tst/main.py')
-    start_app(console, file_path, directory, *args)
-    return
+    start_app(file_path, directory, console=console, **kwargs)
 
 
-def start_progress_view(console=False, *args):
+def start_progress_view(console=False, **kwargs):
     directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'progress_view/progress_view.py')
-    start_app(console, file_path, directory, *args)
-    return
+    start_app(file_path, directory, console=console, **kwargs)
 
 
-def start_log_viewer(console=False, *args):
+def start_log_viewer(console=False, **kwargs):
     directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'log_viewer/log_viewer.py')
-    start_app(console, file_path, directory, *args)
-    return
+    start_app(file_path, directory, console=console, **kwargs)
 
 
-def start_config_editor(console=False, *args):
+def start_config_editor(console=False, **kwargs):
     file_path = cfg.get('start-module', 'config-editor')
     directory = os.path.dirname(file_path)
-    start_app(console, file_path, directory, *args)
-    return
+    start_app(file_path, directory, console=console, **kwargs)
 
 
 # This sets up a logging client for the already running TCP-logging Server,
