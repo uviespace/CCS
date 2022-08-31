@@ -2839,6 +2839,9 @@ def get_tm_id(pcf_descr=None):
 
 
 def get_data_pool_items(pcf_descr=None, src_file=None):
+    if not isinstance(src_file, str):
+        raise TypeError('src_file must be str, is {}.'.format(type(src_file)))
+
     if src_file:
         with open(src_file, 'r') as fd:
             lines = fd.readlines()
@@ -2850,7 +2853,7 @@ def get_data_pool_items(pcf_descr=None, src_file=None):
                 if len(dp_item) == 6:
                     data_pool.append(dp_item[:2][::-1] + dp_item[2:])
                 else:
-                    raise Exception
+                    raise ValueError('Wrong format of input line in {}.'.format(src_file))
 
         return data_pool
 

@@ -27,7 +27,7 @@ def reload_dp_data():
 
     try:
         dictionary_of_data_pool = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
-    except FileNotFoundError:
+    except (FileNotFoundError, ValueError):
         logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
         dictionary_of_data_pool = cfl.get_data_pool_items()
 
@@ -58,7 +58,7 @@ def get_data_pool_sublist():
 data_pool_sublist = []
 try:
     dictionary_of_data_pool = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
-except FileNotFoundError:
+except (FileNotFoundError, ValueError):
     logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
     dictionary_of_data_pool = cfl.get_data_pool_items()
 
