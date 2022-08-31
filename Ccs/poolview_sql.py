@@ -175,16 +175,6 @@ class TMPoolView(Gtk.Window):
         self.session_factory_idb = scoped_session_maker('idb')
         self.session_factory_storage = scoped_session_maker('storage')
 
-        # self.check_pmgr_pool()
-
-        # Check if pool from poolmanagers should be loaded, default is True
-        # No done in connect_to_all function
-        #check_for_pools = True
-        #if '--not_load' in sys.argv:
-        #    check_for_pools = False
-        #if check_for_pools:
-        #    self.set_pool_from_pmgr()
-
         # Set up the logging module
         self.logger = cfl.start_logging('Poolviewer')
 
@@ -196,41 +186,6 @@ class TMPoolView(Gtk.Window):
         self.connect("delete-event", self.quit_func)
         self.show_all()
 
-        '''
-        if standalone is not False:
-            # This is the Gtk.main command which is used, therefore D_Bus has to be started here
-            # Tell DBus to use the Gtk Main loop
-            # Get the DBus Name from the cfg file and set up the Bus
-            Bus_Name = self.cfg.get('ccs-dbus_names', 'poolviewer')
-            DBusGMainLoop(set_as_default=True)
-            DBus_Basic.MessageListener(self, Bus_Name, sys.argv)
-
-            # Set up the logging module
-            self.logger = cfl.start_logging('Poolviewer')
-
-            if pool_name is not None:
-                self.set_pool(pool_name)
-            elif check_for_pools:
-                self.set_pool_from_pmgr()
-
-            self.connect("delete-event", self.quit_func)
-            self.show_all()
-
-            Gtk.main()
-
-        else:
-            # Set up the logging module
-            self.logger = cfl.start_logging('Poolviewer')
-
-            if pool_name is not None:
-                self.set_pool(pool_name)
-            elif check_for_pools:
-                self.set_pool_from_pmgr()
-
-            self.connect("delete-event", self.quit_func)
-            self.show_all()
-        '''
-
     def checking(self):
         self.adj.set_value(60)
         return
@@ -240,7 +195,8 @@ class TMPoolView(Gtk.Window):
         if not cfl.is_open('poolmanager', cfl.communication['poolmanager']):
             self.close_terminal_connection()
             self.update_all_connections_quit()
-            Gtk.main_quit()
+            if Gtk.main_level():
+                Gtk.main_quit()
             return False
 
         pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
@@ -248,7 +204,8 @@ class TMPoolView(Gtk.Window):
         if cfl.Variables(pmgr, 'gui_running'):
             self.close_terminal_connection()
             self.update_all_connections_quit()
-            Gtk.main_quit()
+            if Gtk.main_level():
+                Gtk.main_quit()
             return False
 
         # Ask if Poolmanager should be cloosed too
@@ -1682,7 +1639,8 @@ class TMPoolView(Gtk.Window):
 
         self.pool_selector.connect('changed', self.select_pool)
 
-        plot_butt = Gtk.Button(image=Gtk.Image.new_from_file('pixmap/func.png'), tooltip_text='Parameter Plotter')
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/func.png')
+        plot_butt = Gtk.Button(image=Gtk.Image.new_from_file(icon_path), tooltip_text='Parameter Plotter')
         plot_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
         plot_butt.connect('clicked', self.plot_parameters)
         dump_butt = Gtk.Button.new_from_icon_name('gtk-save', Gtk.IconSize.LARGE_TOOLBAR)
@@ -1753,7 +1711,6 @@ class TMPoolView(Gtk.Window):
         filter_value.set_width_chars(14)
         filter_value.connect('activate', self._add_to_rules, filter_value, column_name, operator, 'AND')
 
-        #path_ccs = self.cfg.get(section='ccs-paths', option='ccs')
         path_ccs = self.cfg.get('paths', 'ccs')
 
         add_to_rule_button_and = Gtk.Button()
