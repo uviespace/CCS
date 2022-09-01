@@ -3036,14 +3036,7 @@ class TMPoolView(Gtk.Window):
         #    print('Cannot open plot window without pool!')
         #    return
 
-        cfl.start_plotter(False, str(self.active_pool_info.pool_name))
-
-        # Delete the logger = self.logger part if the plotter is a standalone process
-        #pv = PlotViewer(loaded_pool=self.active_pool_info, cfg=self.cfg, parameters=parameters,
-        #                start_live=start_live)
-        # pv.set_transient_for(self)
-        #pv.set_title('Parameter Viewer')
-        return
+        cfl.start_plotter(pool_name=self.active_pool_info.pool_name)
 
     def start_recording(self, widget=None):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
