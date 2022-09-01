@@ -280,35 +280,51 @@ class TMPoolView(Gtk.Window):
     def set_pool_from_pmgr(self):
         try:
             poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+            if not poolmgr:
+                return
+
             pools = cfl.Functions(poolmgr, 'loaded_pools_export_func')
+
+            if not pools:
+                self.logger.warning('No loaded pools found, nothing to view.')
+                return
+
             for pool in pools:
                 self.set_pool(pool[0])
-        except:
-            return
+
+        except Exception as err:
+            self.logger.exception(err)
 
     def set_pool(self, pool_name, pmgr_pools=None, instance=None):
+        if pool_name is None:
+            return
+
         if not pmgr_pools:
             try:
                 poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
                 if not poolmgr:
-                    raise TypeError
-                self.Active_Pool_Info_append(cfl.Dictionaries(poolmgr, 'loaded_pools', pool_name))
-                cfl.Functions(poolmgr, 'loaded_pools_func', self.active_pool_info.pool_name, self.active_pool_info)
-            except:
-                if '/' in pool_name:
-                    pool_name = pool_name.split('/')[-1]
+                    raise TypeError('No poolmanager instance found.')
+                try:
+                    self.Active_Pool_Info_append(cfl.Dictionaries(poolmgr, 'loaded_pools', pool_name))
+                except (dbus.DBusException, KeyError):
+                    raise ValueError('No loaded pool {} found.'.format(pool_name))
 
+                cfl.Functions(poolmgr, 'loaded_pools_func', self.active_pool_info.pool_name, self.active_pool_info)
+            except Exception as err:
+                self.logger.warning(err)
+                if '/' in pool_name:
+                    pool_path = str(os.path.realpath(pool_name))
+                    # pool_name = pool_name.split('/')[-1]
+                else:
+                    pool_path = pool_name
                 # change_error
-                attribute = [str(os.path.realpath(pool_name)), int(round(time.time())), str(pool_name), False]
+                attribute = [pool_path, int(round(time.time())), str(pool_name), False]
                 self.Active_Pool_Info_append(attribute)
         else:
             for pool in pmgr_pools:
                 if pool_name == pool[2]:
                     self.Active_Pool_Info_append(list(pool))
-            #self.Active_Pool_Info_append(pmgr_pools[pool_name])
-        #print(self.active_pool_info)
-        #print(type(self.active_pool_info))
-
+            # self.Active_Pool_Info_append(pmgr_pools[pool_name])
 
         self._set_pool_list_and_display(instance=instance)
         if self.active_pool_info.live:
@@ -320,7 +336,7 @@ class TMPoolView(Gtk.Window):
             # thread = threading.Thread(target = self.update_packets)
             # thread.daemon = True
             # thread.start()
-        return
+
     # def set_queue(self, pool_name, pckt_queue):
     #
     #     self.queues.update({pool_name: pckt_queue})
@@ -1452,6 +1468,7 @@ class TMPoolView(Gtk.Window):
             upper_limit = self.adj.get_upper() - self.adj.get_page_size()
             self.offset = int(min(upper_limit, self.adj.get_value() + scroll_lines))
         else:
+            position = 0
             for x, row in enumerate(self.shown_all_rows, start=0):
                 if row[0] >= self.offset:
                     position = x
@@ -1997,6 +2014,7 @@ class TMPoolView(Gtk.Window):
             self.decoding_type = 'RMAP'
         new_session.close()
         return
+
     # def get_pool_names(self, widget):
     #     if self.pool is None:
     #         return
@@ -2847,7 +2865,7 @@ class TMPoolView(Gtk.Window):
 
     # Only to use Glib idle add and ignore_reply keyword at the same time
     def _set_list_and_display_Glib_idle_add(self, active_pool_info_mgr=None, instance=None):
-        if active_pool_info_mgr != None:
+        if active_pool_info_mgr is not None:
             GLib.idle_add(self._set_pool_list_and_display(active_pool_info_mgr, instance))
         else:
             GLib.idle_add(self._set_pool_list_and_display(instance=instance))
@@ -3137,8 +3155,7 @@ class TMPoolView(Gtk.Window):
 
         self.refresh_treeview_active = True
         self.n_pool_rows = 0
-        GLib.timeout_add(self.pool_refresh_rate * 1000, self.refresh_treeview_worker2,
-                         pool_name)  # , priority=GLib.PRIORITY_HIGH)
+        GLib.timeout_add(self.pool_refresh_rate * 1000, self.refresh_treeview_worker2, pool_name)  # priority=GLib.PRIORITY_HIGH)
 
     # def refresh_treeview_worker(self, pool_name):
     #     poolmgr = cfl.dbus_connection('poolmanager', cfl.communication ['poolmanager'])
@@ -3538,10 +3555,12 @@ def run(pool_name):
 
     DBusGMainLoop(set_as_default=True)
 
-    pv = TMPoolView(pool_name=pool_name)
+    pv = TMPoolView()
 
     DBus_Basic.MessageListener(pv, bus_name, *sys.argv)
 
+    if pool_name is not None:
+        pv.set_pool(pool_name)
     Gtk.main()
 
 
