@@ -165,7 +165,10 @@ def start_pv(pool_name=None, console=False, **kwargs):
 
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'poolview_sql.py')
-    start_app(file_path, directory, pool_name, console=console, **kwargs)
+    if pool_name is not None:
+        start_app(file_path, directory, pool_name, console=console, **kwargs)
+    else:
+        start_app(file_path, directory, console=console, **kwargs)
 
 
 # Start only PoolManager
@@ -2839,7 +2842,7 @@ def get_tm_id(pcf_descr=None):
 
 
 def get_data_pool_items(pcf_descr=None, src_file=None):
-    if not isinstance(src_file, str):
+    if not isinstance(src_file, (str, type(None))):
         raise TypeError('src_file must be str, is {}.'.format(type(src_file)))
 
     if src_file:
