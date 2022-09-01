@@ -287,7 +287,7 @@ class Board(Gtk.Box):
             if not found:
                 msg = 'Given Pre-Condition Name could not be found/loaded'
                 self.logger.warning(msg)
-                self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
+                # self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
                 self.on_precon_changed(self.precon_selection)
 
         # set the post-condition name
@@ -300,7 +300,7 @@ class Board(Gtk.Box):
             if not found:
                 msg = 'Given Post-Condition Name could not be found/loaded'
                 self.logger.warning(msg)
-                self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
+                # self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
                 self.on_postcon_changed(self.precon_selection)
 
         # Set the test comment
@@ -308,8 +308,6 @@ class Board(Gtk.Box):
 
         # Set the Locked STep numeration
         self.text_meta_data_test_is_locked.set_active(self.model.primary_counter_locked)
-
-
 
     def collapse_all_steps(self, button):
         """ Close all expander of the steps """

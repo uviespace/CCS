@@ -947,14 +947,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
             for pth in file_list:
                 pth = os.path.abspath(pth)
                 try:
-                    self.logger.info('Opening in the CCS-Editor the file: {}'.format(pth))
+                    self.logger.info('Opening file {} in the CCS-Editor'.format(pth))
                     editor.Functions('open_file', pth)
                 except dbus.exceptions.DBusException as e:
                     message = 'Could not find the file: {}'.format(pth)
-                    self.logger.error('Could not find the file: {}'.format(pth))
+                    self.logger.error(message)
                     self.logger.exception(e)
-                    self.add_info_bar(message_type=Gtk.MessageType.ERROR,
-                                      message=message)
+                    self.add_info_bar(message_type=Gtk.MessageType.ERROR, message=message)
 
     def on_generate_products_message_dialog(self, paths):
         """
@@ -1027,20 +1026,18 @@ class TstAppWindow(Gtk.ApplicationWindow):
             self.logger.error(message)
             self.logger.exception(e)
             # add a info bar message that the starting of the CCS-Editor failed.
-            self.add_info_bar(message_type=Gtk.MessageType.ERROR,
-                              message=message)
+            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message=message)
 
     def on_start_ccs_editor(self, *args):
         try:
             self.logger.info('Starting CCS-Editor application.')
             cfl.start_editor()
         except Exception as e:
-            message = 'Could not start CCS-Editor. Further information probably can be found in the tst.log file.'
+            message = 'Could not start CCS-Editor.'
             self.logger.error(message)
             self.logger.exception(e)
             # add a info bar message that the starting of the CCS-Editor failed.
-            self.add_info_bar(message_type=Gtk.MessageType.ERROR,
-                              message=message)
+            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message=message)
 
     def on_apply_css(self, *args):
         style_provider = Gtk.CssProvider()
