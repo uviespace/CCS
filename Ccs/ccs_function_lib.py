@@ -1835,7 +1835,7 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, **kwa
         raise NameError('Unknown command "{}"'.format(cmd))
 
     if ack is None:
-        ack = bin(Tcack(cmd))
+        ack = bin(Tcack(cmd))  # TODO: get ack in query above
 
     if npars == 0:
         pdata = b''
@@ -1925,10 +1925,12 @@ def encode_pus(params, *values, params_as_fmt_string=False):
         fmt_string = '>'+''.join(fmts)
         return struct.pack(fmt_string, *values)
 
-    except struct.error:
+    except struct.error as err:
+        logger.debug(err)
         # proper insertion of spares
         vals_iter = iter(values)
         return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+
 
 def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
 
@@ -1948,10 +1950,18 @@ def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
             return shifted
 
     elif fmt.startswith('oct'):
-        x = struct.pack('>' + fmt[3:], bytes(value))
+        if not isinstance(value, (bytes, bytearray)):
+            raise TypeError('Value packed with fmt "{}" is not an octet string: {} {}!'.format(fmt, value, type(value)))
+        if len(value) != int(fmt[3:-1]):
+            logger.warning('Length of octet string ({}) does not match format {}!'.format(len(value), fmt))
+        x = struct.pack('>' + fmt[3:], value)
 
     elif fmt.startswith('ascii'):
-        x = struct.pack('>' + fmt[5:], value.encode())
+        if not isinstance(value, str):
+            raise TypeError('Value packed with fmt "{}" is not a string: {} {}!'.format(fmt, value, type(value)))
+        if len(value) != int(fmt[5:-1]):
+            logger.warning('Length of string ({}) does not match format {}!'.format(len(value), fmt))
+        x = struct.pack('>' + fmt[5:], value.encode(encoding='ascii'))
 
     elif fmt == timepack[0]:
         x = calc_timestamp(value, sync=None, return_bytes=True)
@@ -2223,9 +2233,7 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
 #  @param data    application data
 def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1, gflags=0b11, sc=None,
            tmv=PUS_VERSION, ack=0b1001, pktl=None, chksm=None, **kwargs):
-    #global crc
     if pktl is None:
-        # pktl = len(data) * 8 + (TC_HEADER_LEN + PEC_LEN - 7)  # 7=-1(convention)+6(datahead)+2(CRC) # len(data) *8, data in bytes has to be bits
         pktl = len(data) + (TC_HEADER_LEN + PEC_LEN - 7)  # 7=-1(convention)+6(datahead)+2(CRC)
 
     if sc is None:
@@ -2240,7 +2248,6 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
         chksm = crc(tc)
 
     tc += chksm.to_bytes(2, 'big')  # 16 bit CRC
-    #tc += io.BytesIO(bytes(chksm))  # 16 bit CRC
 
     return tc
 
