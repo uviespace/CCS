@@ -12,8 +12,11 @@ import getpass
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-FNAME = 'scos2000db.json'
-WBSQL = 'mk_scos2000_schema.wbsql'
+
+sdir = os.path.dirname(os.path.abspath(__file__))
+
+FNAME = os.path.join(sdir, 'scos2000db.json')
+WBSQL = os.path.join(sdir, 'mk_scos2000_schema.wbsql')
 
 ssd = json.load(open(FNAME, 'r'))
 
