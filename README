@@ -19,12 +19,18 @@ This file documents the required steps to get the UVIE EGSE software up and runn
     $> sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
     $> sudo systemctl enable --now mariadb
     $> sudo mariadb-secure-installation  (optional)
+
+    To create a MariaDB user, in the CCS base directory execute
+
+    $> make db-user USER=<user> PW=<password>
+
+    Alternatively, execute the following SQL statements:
     mysql> CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
     mysql> GRANT ALL PRIVILEGES ON * . * TO 'user'@'localhost';
     mysql> FLUSH PRIVILEGES;
 
 4) Install Python packages. To install the required modules with pip in userspace or a venv, run
-   'make install-python-requirements' in the CCS base directory or use 'pip install [--user] -r requirements.txt'.
+   'make python-requirements' in the CCS base directory or use 'pip install [--user] -r requirements.txt'.
    If using a venv, it must have been created using the --system-site-packages option.
    For more details, see requirements.txt
 
@@ -35,9 +41,8 @@ In the CCS base directory,
     - first configure the [database] section in egse.cfg!
     - then execute:
     
-    $> make install-confignator
-    $> make ccs-storage
-    $> make codeblockreusefeature
+    $> make confignator
+    $> make databases
     
 # MIB
 Use CCS/Ccs/tools/import_mib.py to import a set of SCOS2000 MIB files into the MySQL mib-schema set in egse.cfg
