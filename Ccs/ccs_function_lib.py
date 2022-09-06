@@ -32,7 +32,25 @@ cfg = confignator.get_config(check_interpolation=False)
 
 PCPREFIX = 'packet_config_'
 
+# Set up logger
 CFL_LOGGER_NAME = 'cfl'
+logger = logging.getLogger(CFL_LOGGER_NAME)
+logger.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
+# sh = logging.StreamHandler()
+# sh.setFormatter(logging.Formatter('%(levelname)s %(message)s'))
+# logger.addHandler(sh)
+
+communication = {name: 0 for name in cfg['ccs-dbus_names']}
+
+scoped_session_idb = scoped_session_maker('idb', idb_version=None)
+scoped_session_storage = scoped_session_maker('storage')
+
+# check if MIB schema exists
+try:
+    scoped_session_idb.execute('show schemas').fetchall()
+except SQLOperationalError as err:
+    logger.critical(err)
+    sys.exit()
 
 project = cfg.get('ccs-database', 'project')
 project_cfg = PCPREFIX + str(project)
@@ -49,39 +67,10 @@ PLM_PKT_PREFIX_TC_SEND = packet_config.PLM_PKT_PREFIX_TC_SEND
 PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
 
 FMT_TYPE_PARAM = packet_config.FMT_TYPE_PARAM
-
-if cfg.has_section('ccs-user_defined_packets'):
-    user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
-else:
-    user_tm_decoders = {}
-
-used_user_defined_parameter = None
-
-# CRCTYPE = 'crc-ccitt-false'
-# crc = crcmod.predefined.mkCrcFun(CRCTYPE)
-
 SREC_MAX_BYTES_PER_LINE = 250
 
-# Set up logger
-logger = logging.getLogger(CFL_LOGGER_NAME)
-logger.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
-
-counters = {}  # keeps track of PUS TC packet sequence counters (one per APID)
 
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
-
-communication = {name: 0 for name in cfg['ccs-dbus_names']}
-
-scoped_session_idb = scoped_session_maker('idb', idb_version=None)
-scoped_session_storage = scoped_session_maker('storage')
-
-# check if MIB schema exists
-try:
-    scoped_session_idb.execute('show schemas').fetchall()
-except SQLOperationalError as err:
-    logger.critical(err)
-    sys.exit()
-
 
 fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
@@ -93,14 +82,30 @@ fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
 
 # get format and offset of HK SID
 SID_FORMAT = {1: '>B', 2: '>H', 4: '>I'}
-sidfmt = scoped_session_idb.execute('SELECT PIC_PI1_OFF,PIC_PI1_WID FROM mib_smile_sxi.pic where PIC_TYPE=3 and PIC_STYPE=25').fetchall()
-if len(sidfmt) != 0:
-    SID_OFFSET, SID_BITSIZE = sidfmt[0]
+_sidfmt = scoped_session_idb.execute('SELECT PIC_PI1_OFF,PIC_PI1_WID FROM mib_smile_sxi.pic where PIC_TYPE=3 and PIC_STYPE=25').fetchall()
+if len(_sidfmt) != 0:
+    SID_OFFSET, SID_BITSIZE = _sidfmt[0]
     SID_SIZE = int(SID_BITSIZE / 8)
 else:
     SID_SIZE = 2
     SID_OFFSET = TM_HEADER_LEN
     logger.warning('HK SID definition not found in MIB, using default: OFFSET={}, SIZE={}!'.format(SID_OFFSET, SID_SIZE))
+
+# get names of TC parameters that carry data pool IDs, i.e. have CPC_CATEG=P
+DATA_POOL_ID_PARAMETERS = [par[0] for par in scoped_session_idb.execute('SELECT cpc_pname FROM cpc WHERE cpc_categ="P"').fetchall()]
+
+# create local look-up tables for data pool items from MIB
+_pid_query = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr FROM pcf WHERE pcf_pid IS NOT NULL').fetchall()
+DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _pid_query}
+DP_ITEMS_TO_IDS = {k[1]: int(k[0]) for k in _pid_query}
+
+
+counters = {}  # keeps track of PUS TC packet sequence counters (one per APID)
+
+if cfg.has_section('ccs-user_defined_packets'):
+    user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
+else:
+    user_tm_decoders = {}
 
 Notify.init('cfl')
 
@@ -127,6 +132,7 @@ def set_scoped_session_idb_version(idb_version=None):
     global scoped_session_idb
     scoped_session_idb.close()
     scoped_session_idb = scoped_session_maker('idb', idb_version=idb_version)
+    logger.info('MIB SQL reconnect ({})'.format(idb_version))
 
 
 def get_scoped_session_storage():
@@ -536,49 +542,25 @@ def set_monitor(pool_name=None, param_set=None):
     return
 
 
-def ptt_reverse(type):
+def ptt_reverse(typ):
 
     """
     Returns the ptc location (first layer) of a Type stored in s2k_partypes 'ptt'
-    :param type: Has to be a type given in s2k_partypes 'ptt'
+    :param typ: Has to be a type given in s2k_partypes 'ptt'
     :return: ptc location
     """
-
-    if type.startswith('oct'):
-        return [7, type[3:]]
-    elif type.startswith('ascii'):
-        return [8, type[5:]]
+    # TODO: adapt to new ptt
+    if typ.startswith('oct'):
+        return [7, typ[3:]]
+    elif typ.startswith('ascii'):
+        return [8, typ[5:]]
 
     for i in ptt: # First Section
         for j in ptt[i]: # Second Section
-            if ptt[i][j] == type: # Check for type
+            if ptt[i][j] == typ: # Check for type
                 return [i, j]
 
     return False
-
-
-'''
-def ptt_reverse_pfc(type):
-
-    """
-    Returns the pfc location (second layer) of a Type stored in s2k_partypes 'ptt'
-    :param type: Has to be a type given in s2k_partypes 'ptt'
-    :return: pfc location
-    """
-
-    if type.startswith('oct'):
-        return type[3:]
-    elif type.startswith('ascii'):
-        return type[5:]
-
-    for i in ptt: # First Section
-        for j in ptt[i]: # Second Section
-            if ptt[i][j] == type: # Check for type
-                return j
-
-    return False
-
-'''
 
 
 def user_tm_decoders_func():
@@ -872,29 +854,6 @@ def parameter_ptt_type_tc_read(par):
 def none_to_empty(s):
     return '' if s is None else s
 
-'''
-###### Now in packet_config_PROJECT
-##
-#  Timecal
-#
-#  Returns the decoded time for specific Timestamp package
-#  @param s Input ByteArray or ByteObject
-def timecal(data, string=False):
-    data = int.from_bytes(data, 'big')
-    coarse = data >> 16
-    fine = ((data & 0xffff) >> 1) / 2 ** 15
-    if string:
-        sync = ['U', 'S'][data & 1]
-        return '{:.6f}{}'.format(coarse + fine, sync)
-    else:
-        return coarse + fine
-'''
-'''
-# Timecal function is now in packet_config_PROJECT
-def timecal(bintime, timestr):
-    coarse, fine, sync = bintime.unpack(timestr)
-    return '{:.6f}'.format(coarse + fine / 2 ** 15)
-'''
 
 def Tm_header_formatted(tm, detailed=False):
     '''unpack APID, SEQCNT, PKTLEN, TYPE, STYPE, SOURCEID'''
@@ -1265,8 +1224,8 @@ def tc_param_alias_reverse(paf, cca, val, pname=None):
         dbcon.close()
         alval = np.interp(val, yvals, xvals)
         return alval
-    # get name for ParamID if datapool item (CHEOPS only)
-    elif pname in ('DPP70004', 'DPP70043'):
+    # get name for ParamID if datapool item (in MIB)
+    elif pname in DATA_POOL_ID_PARAMETERS:
         return get_pid_name(pidfmt_reverse(val))
     else:
         return val
@@ -1275,14 +1234,16 @@ def tc_param_alias_reverse(paf, cca, val, pname=None):
 def get_pid_name(pid):
     if isinstance(pid, str):
         return pid
-    que = 'SELECT pcf_descr from pcf where pcf_pid="{}"'.format(pid)
-    dbcon = scoped_session_idb
-    fetch = dbcon.execute(que).fetchall()
-    dbcon.close()
-    if len(fetch) != 0:
-        return fetch[0][0]
+    # que = 'SELECT pcf_descr from pcf where pcf_pid="{}"'.format(pid)
+    # dbcon = scoped_session_idb
+    # fetch = dbcon.execute(que).fetchall()
+    # dbcon.close()
+    # if len(fetch) != 0:
+    #     return fetch[0][0]
+    if pid in DP_IDS_TO_ITEMS:
+        return DP_IDS_TO_ITEMS[pid]
     else:
-        logger.error('Unknown datapool ID: {}'.format(pid))
+        logger.warning('Unknown datapool ID: {}'.format(pid))
         return pid
 
 
@@ -2869,11 +2830,11 @@ def get_data_pool_items(pcf_descr=None, src_file=None):
 
     elif pcf_descr is None and not src_file:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
-                                               'FROM pcf WHERE pcf_pid <> 0').fetchall()
+                                               'FROM pcf WHERE pcf_pid IS NOT NULL').fetchall()
 
     else:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
-                                               'FROM pcf WHERE pcf_pid <> 0 AND pcf_descr="{}"'.format(pcf_descr)).fetchall()
+                                               'FROM pcf WHERE pcf_pid IS NOT NULL AND pcf_descr="{}"'.format(pcf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -2885,15 +2846,15 @@ def get_data_pool_items(pcf_descr=None, src_file=None):
     return data_pool_dict
 
 
-def get_dp_items(source='mib'):
-    fmt = {3: {4: 'UINT8', 12: 'UINT16', 14: 'UINT32'}, 4: {4: 'INT8', 12: 'INT16', 14: 'INT32'}, 5: {1: 'FLOAT'}, 9: {18: 'CUC'}, 7: {1: '1OCT'}}
-
-    if source.lower() == 'mib':
-        dp = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc FROM pcf WHERE pcf_pid IS NOT NULL ORDER BY pcf_pid').fetchall()
-        dp_ed = [(*i[:2], fmt[i[2]][i[3]]) for i in dp]
-        return dp_ed
-    else:
-        raise NotImplementedError
+# def get_dp_items(source='mib'):
+#     fmt = {3: {4: 'UINT8', 12: 'UINT16', 14: 'UINT32'}, 4: {4: 'INT8', 12: 'INT16', 14: 'INT32'}, 5: {1: 'FLOAT'}, 9: {18: 'CUC'}, 7: {1: '1OCT'}}
+#
+#     if source.lower() == 'mib':
+#         dp = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc FROM pcf WHERE pcf_pid IS NOT NULL ORDER BY pcf_pid').fetchall()
+#         dp_ed = [(*i[:2], fmt[i[2]][i[3]]) for i in dp]
+#         return dp_ed
+#     else:
+#         raise NotImplementedError
 
 
 def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
