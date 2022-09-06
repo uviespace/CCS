@@ -1065,6 +1065,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         return
 
     def on_set_idb_version(self, *args):
+        self.reconnect_mib()
         dialog = IDBChooser()
         dialog.set_transient_for(self)
 
@@ -1103,6 +1104,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
         dpt.reload_dp_data()
         self.data_pool_tab = dpt.DataPoolTable()
         self.feature_area.insert_page(self.data_pool_tab, self.label_widget_data_pool, 3)
+
+    @staticmethod
+    def reconnect_mib():
+        cfl.scoped_session_idb.close()
 
 
 class IDBChooser(Gtk.Dialog):
