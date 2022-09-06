@@ -40,7 +40,7 @@ def reload_dp_data():
 
 def get_data_pool_sublist():
     for counter in list_of_data_pool:
-        pcf_pid = str(counter[0])
+        pcf_pid = str(int(counter[0]))  # cast PID to int in case data type is wrong in MIB SQL (e.g. in CHEOPS)
         pcf_descr = str(counter[1])
         pcf_ptc = counter[2]
         pcf_pfc = counter[3]
