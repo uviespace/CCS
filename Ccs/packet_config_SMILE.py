@@ -66,7 +66,7 @@ TC_SECONDARY_HEADER = [
     ("SOURCE_ID", ctypes.c_uint8, 8)
 ]
 
-# [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of sync flag]
+# [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of extra sync flag in bytes]
 timepack = [ptt[9][18], 8, 1e6, 1]
 CUC_EPOCH = datetime.datetime(2018, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
@@ -106,30 +106,40 @@ def timecal(data, string=False):
         return coarse + fine
 
 
-def calc_timestamp(time, sync=0, return_bytes=False):
+def calc_timestamp(time, sync=None, return_bytes=False):
+
     if isinstance(time, (float, int)):
         ctime = int(time)
         ftime = round(time % 1 * timepack[2])
+        if ftime == timepack[2]:
+            ctime += 1
+            ftime = 0
 
     elif isinstance(time, str):
-        if time[:-1] in ['U', 'S']:
+        if time[-1].upper() in ['U', 'S']:
             t = float(time[:-1])
         else:
             t = float(time)
         ctime = int(t)
         ftime = round(t % 1 * timepack[2])
+        if ftime == timepack[2]:
+            ctime += 1
+            ftime = 0
         sync = 0b101 if time[-1].upper() == 'S' else 0
 
     elif isinstance(time, bytes):
         ctime = int.from_bytes(time[:4], 'big')
-        ftime = int.from_bytes(time[4:-1], 'big')
-        sync = time[-1]
+        ftime = int.from_bytes(time[4:7], 'big')
+        if len(time) == timepack[1]:
+            sync = time[-1]
+        else:
+            sync = None
 
     else:
         raise TypeError('Unsupported input for time ({})'.format(type(time)))
 
     if return_bytes:
-        if sync is None:
+        if sync is None or sync is False:
             return ctime.to_bytes(4, 'big') + ftime.to_bytes(3, 'big')
         else:
             return ctime.to_bytes(4, 'big') + ftime.to_bytes(3, 'big') + sync.to_bytes(1, 'big')
