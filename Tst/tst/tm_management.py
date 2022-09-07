@@ -61,9 +61,8 @@ def get_tm_type_sublist(tm_descr):
 
                 if pcf_ptc is None:
                     data_type = "None"
-                    pass
                 else:
-                    data_type = s2k.ptt[pcf_ptc][pcf_pfc]
+                    data_type = s2k.ptt(pcf_ptc, pcf_pfc)
 
                 tm_type_sub_list.append([pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offpy, data_type])
 
@@ -239,7 +238,7 @@ class TmSecondaryTable(Gtk.Box):
         self.parameter_liststore.clear()
         for i, par in enumerate(parlist):
             par = list(par)
-            self.parameter_liststore.append([i+1] + par[:3] + [s2k.ptt[par[3]][par[4]]])
+            self.parameter_liststore.append([i+1] + par[:3] + [s2k.ptt(par[3], par[4])])
 
     def parameter_selected(self, selection):
         model, row = selection.get_selected()

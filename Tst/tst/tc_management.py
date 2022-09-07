@@ -91,11 +91,11 @@ def get_cpc_descr(tc_type):
             if eltype == 'A':
                 cpc_descr.append(['', key[3], '{} bit'.format(key[4]), False, Pango.Style.ITALIC])
             elif eltype == 'F':
-                cpc_descr.append([*key[6:8], s2k.ptt[ptc][pfc], True, Pango.Style.ITALIC])
+                cpc_descr.append([*key[6:8], s2k.ptt(ptc, pfc), True, Pango.Style.ITALIC])
             elif eltype is None:
                 pass
             else:
-                cpc_descr.append([*key[6:8], s2k.ptt[ptc][pfc], True, Pango.Style.NORMAL])
+                cpc_descr.append([*key[6:8], s2k.ptt(ptc, pfc), True, Pango.Style.NORMAL])
 
     return cpc_descr
 
@@ -139,7 +139,7 @@ def get_calibrations(tc_type, cpc_descr):
                 if cpc_ptc == "None":
                     data_type = "None"
                 else:
-                    data_type = s2k.ptt[cpc_ptc][cpc_pfc]
+                    data_type = s2k.ptt(cpc_ptc, cpc_pfc)
 
                 treeview_tuple = tuple([prv_minval, prv_maxval, pas_altxt, pas_alval])
                 treeview_tuple_list.append(treeview_tuple)

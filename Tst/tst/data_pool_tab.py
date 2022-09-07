@@ -48,7 +48,7 @@ def get_data_pool_sublist():
         if pcf_ptc is None:
             data_type = "None"
         else:
-            data_type = s2k.ptt[pcf_ptc][pcf_pfc]
+            data_type = s2k.ptt(pcf_ptc, pcf_pfc)
 
         data_pool_sublist.append([pcf_pid, pcf_descr, data_type, '', '', ''])
 

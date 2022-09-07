@@ -67,7 +67,7 @@ TC_SECONDARY_HEADER = [
 ]
 
 # [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of extra sync flag in bytes]
-timepack = [ptt[9][18], 8, 1e6, 1]
+timepack = [ptt(9, 18), 8, 1e6, 1]
 CUC_EPOCH = datetime.datetime(2018, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 

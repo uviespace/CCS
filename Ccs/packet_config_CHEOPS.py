@@ -62,7 +62,7 @@ TC_SECONDARY_HEADER = [
     ("SOURCE_ID", ctypes.c_uint8, 8)
 ]
 # [Format of time Packet, Amount of Bytes in Time Packet, Factor for Finetime, length of extra sync flag
-timepack = [ptt[9][17], 6, 2 ** 15, 0]
+timepack = [ptt(9, 17), 6, 2**15, 0]
 CUC_EPOCH = datetime.datetime(2000, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 
