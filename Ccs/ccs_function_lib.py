@@ -1747,7 +1747,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 #  @param cmd  CCF_DESCR string of the requested TC
 #  @param args Parameters required by the cmd
 #  @param ack  Override the I-DB TC acknowledment value (4-bit binary string, e.g., '0b1011')
-def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, **kwargs):
+def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, **kwargs):
     # with self.poolmgr.lock:
     que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
           'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
@@ -1823,6 +1823,9 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, **kwa
                 values = hack_value
 
             pdata = encode_pus(params, *values)
+
+            if source_data_only:
+                return pdata
 
     return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
 
@@ -2139,6 +2142,7 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
     tm += struct.pack('>H', chksm)
 
     return tm
+
 
 ##
 #  Generate PUS packet
@@ -2522,6 +2526,20 @@ def str_to_num(string, fmt=None):
     else:
         return string
     return num
+
+
+def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
+    """
+    Calculates the CRC over the packet source data (excluding the checksum parameter).
+    Uses the same CRC algo as packet CRC and assumes the checksum is at the end of the packet source data.
+    @param cmd:
+    @param args:
+    @param no_check:
+    @param hack_value:
+    @return:
+    """
+    pdata = Tcbuild(cmd, *args, no_check=no_check, hack_value=hack_value, source_data_only=True)
+    return crc(pdata[:-PEC_LEN])
 
 
 def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0., ack=None, pool_name='LIVE'):
