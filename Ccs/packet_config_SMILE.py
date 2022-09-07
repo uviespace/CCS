@@ -128,6 +128,8 @@ def calc_timestamp(time, sync=None, return_bytes=False):
         sync = 0b101 if time[-1].upper() == 'S' else 0
 
     elif isinstance(time, bytes):
+        if len(time) not in [timepack[1], timepack[1]-timepack[3]]:
+            raise ValueError('Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
         ctime = int.from_bytes(time[:4], 'big')
         ftime = int.from_bytes(time[4:7], 'big')
         if len(time) == timepack[1]:

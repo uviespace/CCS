@@ -105,6 +105,8 @@ def calc_timestamp(time, sync=0, return_bytes=False):
             ftime = 0
         sync = 1 if time[-1].upper() == 'S' else 0
     elif isinstance(time, bytes):
+        if len(time) not in [timepack[1], timepack[1]-timepack[3]]:
+            raise ValueError('Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
         ctime = int.from_bytes(time[:4], 'big')
         ftime = int.from_bytes(time[4:6], 'big') >> 1
         sync = time[-1] & 1

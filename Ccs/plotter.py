@@ -622,7 +622,6 @@ class PlotViewer(Gtk.Window):
         dbcon.close()
         return sid_search
 
-
     def plot_parameter(self, widget=None, parameter=None):
         if parameter is not None:
             hk, parameter = parameter
@@ -643,7 +642,7 @@ class PlotViewer(Gtk.Window):
             st, sst, sid = dbres.fetchall()[0]
 
             rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst,
-                               DbTelemetry.raw.like(self.sid_position_query(st,sst,sid)))
+                               DbTelemetry.raw.like(self.sid_position_query(st, sst, sid)))
             #if sid == 0:
             #    rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst)
             #else:
@@ -659,14 +658,14 @@ class PlotViewer(Gtk.Window):
             #rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst,
             #                   DbTelemetry.data.like(struct.pack('>B', sid) + b'%'))#
             rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst,
-                               DbTelemetry.data.like(self.sid_position_query(st,sst,sid)))
+                               DbTelemetry.data.like(self.sid_position_query(st, sst, sid)))
         else:
             userpar = json.loads(self.cfg['ccs-plot_parameters'][parameter])
             rows = rows.filter(DbTelemetry.stc == userpar['ST'], DbTelemetry.sst == userpar['SST'],
                                DbTelemetry.apid == userpar['APID'])
             if 'SID' in userpar and userpar['SID']:
                 #rows = rows.filter(DbTelemetry.data.like(struct.pack('>B', int(userpar['SID'])) + b'%'))
-                rows = rows.filter(DbTelemetry.raw.like(self.sid_position_query(userpar['ST'],userpar['SST'],userpar['SID'])))
+                rows = rows.filter(DbTelemetry.raw.like(self.sid_position_query(userpar['ST'], userpar['SST'], userpar['SID'])))
         if not self.filter_tl2.get_active():
             rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > 2.)
         try:
