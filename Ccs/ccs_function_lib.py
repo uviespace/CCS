@@ -56,6 +56,9 @@ project = cfg.get('ccs-database', 'project')
 project_cfg = PCPREFIX + str(project)
 packet_config = importlib.import_module(project_cfg)
 
+if project.upper() == 'SMILE':
+    fee_id = packet_config.fee_id
+
 PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack,\
 timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc = \
     [packet_config.PUS_VERSION, packet_config.TMHeader, packet_config.TCHeader, packet_config.PHeader,

@@ -72,7 +72,6 @@ CUC_EPOCH = datetime.datetime(2018, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.u
 
 
 def timecal(data, string=False):
-
     if not isinstance(data, bytes):
         try:
             return data[0]
@@ -107,7 +106,6 @@ def timecal(data, string=False):
 
 
 def calc_timestamp(time, sync=None, return_bytes=False):
-
     if isinstance(time, (float, int)):
         ctime = int(time)
         ftime = round(time % 1 * timepack[2])
@@ -128,8 +126,9 @@ def calc_timestamp(time, sync=None, return_bytes=False):
         sync = 0b101 if time[-1].upper() == 'S' else 0
 
     elif isinstance(time, bytes):
-        if len(time) not in [timepack[1], timepack[1]-timepack[3]]:
-            raise ValueError('Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
+        if len(time) not in [timepack[1], timepack[1] - timepack[3]]:
+            raise ValueError(
+                'Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
         ctime = int.from_bytes(time[:4], 'big')
         ftime = int.from_bytes(time[4:7], 'big')
         if len(time) == timepack[1]:
@@ -411,18 +410,63 @@ class FeeDataTransferHeader(ctypes.Union):
 # FEE utility functions #
 #########################
 
+# look-up table for FEE parameters (DP IDs & internal IDs) (20220908)
+fee_id = {'vstart': {'pid': 345544373, 'idx': 1},
+          'vend': {'pid': 345544372, 'idx': 2},
+          'charge_injection_width': {'pid': 345544348, 'idx': 3},
+          'charge_injection_gap': {'pid': 345544347, 'idx': 4},
+          'parallel_toi_period': {'pid': 345544366, 'idx': 5},
+          'parallel_clk_overlap': {'pid': 345544365, 'idx': 6},
+          'n_final_dump': {'pid': 345544363, 'idx': 7},
+          'h_end': {'pid': 345544359, 'idx': 8},
+          'packet_size': {'pid': 345544364, 'idx': 9},
+          'int_period': {'pid': 345544362, 'idx': 10},
+          'readout_node_sel': {'pid': 345544368, 'idx': 11},
+          'h_start': {'pid': 345544360, 'idx': 12},
+          'ccd2_e_pix_threshold': {'pid': 345544327, 'idx': 13},
+          'ccd2_f_pix_threshold': {'pid': 345544328, 'idx': 14},
+          'ccd4_e_pix_threshold': {'pid': 345544334, 'idx': 15},
+          'ccd4_f_pix_threshold': {'pid': 345544335, 'idx': 16},
+          'full_sun_pix_threshold': {'pid': 345544358, 'idx': 17},
+          'ccd1_readout': {'pid': 345544325, 'idx': 18},
+          'ccd2_readout': {'pid': 345544329, 'idx': 19},
+          'charge_injection': {'pid': 345544346, 'idx': 20},
+          'tri_level_clk': {'pid': 345544371, 'idx': 21},
+          'img_clk_dir': {'pid': 345544361, 'idx': 22},
+          'reg_clk_dir': {'pid': 345544369, 'idx': 23},
+          'sync_sel': {'pid': 345544370, 'idx': 24},
+          'digitise_en': {'pid': 345544353, 'idx': 25},
+          'correction_bypass': {'pid': 345544351, 'idx': 26},
+          'dg_en': {'pid': 345544352, 'idx': 27},
+          'clear_full_sun_counters': {'pid': 345544350, 'idx': 28},
+          'edu_wandering_mask_en': {'pid': 345544354, 'idx': 29},
+          'ccd2_vod_config': {'pid': 345544331, 'idx': 30},
+          'ccd4_vod_config': {'pid': 345544337, 'idx': 31},
+          'ccd2_vrd_config': {'pid': 345544332, 'idx': 32},
+          'ccd4_vrd_config': {'pid': 345544338, 'idx': 33},
+          'ccd2_vgd_config': {'pid': 345544330, 'idx': 34},
+          'ccd4_vgd_config': {'pid': 345544336, 'idx': 35},
+          'ccd_vog_config': {'pid': 345544345, 'idx': 36},
+          'event_detection': {'pid': 345544355, 'idx': 37},
+          'clear_error_flag': {'pid': 345544349, 'idx': 38},
+          'event_pkt_limit': {'pid': 345544356, 'idx': 39},
+          'execute_op': {'pid': 345544357, 'idx': 40},
+          'ccd_mode_config': {'pid': 345544342, 'idx': 41},
+          'ccd_mode2_config': {'pid': 345544341, 'idx': 42},
+          'pix_offset': {'pid': 345544367, 'idx': 43}}
+
 # FEE RW registers (SMILE-MSSL-PL-Register_map_v0.20)
 
-FEE_CFG_REG_0  = 0x00000000
-FEE_CFG_REG_1  = 0x00000004
-FEE_CFG_REG_2  = 0x00000008
-FEE_CFG_REG_3  = 0x0000000C
-FEE_CFG_REG_4  = 0x00000010
-FEE_CFG_REG_5  = 0x00000014
-FEE_CFG_REG_6  = 0x00000018  # unused
-FEE_CFG_REG_7  = 0x0000001C  # unused
-FEE_CFG_REG_8  = 0x00000020  # unused
-FEE_CFG_REG_9  = 0x00000024  # unused
+FEE_CFG_REG_0 = 0x00000000
+FEE_CFG_REG_1 = 0x00000004
+FEE_CFG_REG_2 = 0x00000008
+FEE_CFG_REG_3 = 0x0000000C
+FEE_CFG_REG_4 = 0x00000010
+FEE_CFG_REG_5 = 0x00000014
+FEE_CFG_REG_6 = 0x00000018  # unused
+FEE_CFG_REG_7 = 0x0000001C  # unused
+FEE_CFG_REG_8 = 0x00000020  # unused
+FEE_CFG_REG_9 = 0x00000024  # unused
 FEE_CFG_REG_10 = 0x00000028  # unused
 FEE_CFG_REG_11 = 0x0000002C  # unused
 FEE_CFG_REG_12 = 0x00000030  # unused
@@ -441,19 +485,18 @@ FEE_CFG_REG_24 = 0x00000060
 FEE_CFG_REG_25 = 0x00000064
 FEE_CFG_REG_26 = 0x00000068
 
-
 # FEE  RO registers (SMILE-MSSL-PL-Register_map_v0.20)
 
-FEE_HK_REG_0  = 0x00000700  # reserved
-FEE_HK_REG_1  = 0x00000704  # reserved
-FEE_HK_REG_2  = 0x00000708  # reserved
-FEE_HK_REG_3  = 0x0000070C  # reserved
-FEE_HK_REG_4  = 0x00000710
-FEE_HK_REG_5  = 0x00000714
-FEE_HK_REG_6  = 0x00000718
-FEE_HK_REG_7  = 0x0000071C
-FEE_HK_REG_8  = 0x00000720
-FEE_HK_REG_9  = 0x00000724
+FEE_HK_REG_0 = 0x00000700  # reserved
+FEE_HK_REG_1 = 0x00000704  # reserved
+FEE_HK_REG_2 = 0x00000708  # reserved
+FEE_HK_REG_3 = 0x0000070C  # reserved
+FEE_HK_REG_4 = 0x00000710
+FEE_HK_REG_5 = 0x00000714
+FEE_HK_REG_6 = 0x00000718
+FEE_HK_REG_7 = 0x0000071C
+FEE_HK_REG_8 = 0x00000720
+FEE_HK_REG_9 = 0x00000724
 FEE_HK_REG_10 = 0x00000728
 FEE_HK_REG_11 = 0x0000072C
 FEE_HK_REG_12 = 0x00000730
@@ -483,46 +526,45 @@ FEE_HK_REG_35 = 0x0000078C
 FEE_HK_REG_36 = 0x00000790
 FEE_HK_REG_37 = 0x00000794
 
-
 # FEE modes
 # see MSSL-SMILE-SXI-IRD-0001  Draft A.14, req. MSSL-IF-17
 # also SMILE-MSSL-PL-Register_map_v0.22, as the IRD does not list all modes
 
-FEE_MODE_ID_ON	   = 0x0  # the thing is switched on
-FEE_MODE_ID_FTP	   = 0x1  # frame transfer pattern
-FEE_MODE_ID_STBY   = 0x2  # stand-by-mode
-FEE_MODE_ID_FT	   = 0x3  # frame transfer
-FEE_MODE_ID_FF	   = 0x4  # full frame
+FEE_MODE_ID_ON = 0x0  # the thing is switched on
+FEE_MODE_ID_FTP = 0x1  # frame transfer pattern
+FEE_MODE_ID_STBY = 0x2  # stand-by-mode
+FEE_MODE_ID_FT = 0x3  # frame transfer
+FEE_MODE_ID_FF = 0x4  # full frame
 FEE_CMD__ID_IMM_ON = 0x8  # immediate on-mode, this is a command, not a mode
-FEE_MODE_ID_FFSIM  = 0x9  # full frame simulation simulation
-FEE_MODE_ID_EVSIM  = 0xA  # event detection simulation
-FEE_MODE_ID_PTP1   = 0xB  # parallel trap pump mode 1
-FEE_MODE_ID_PTP2   = 0xC  # parallel trap pump mode 2
-FEE_MODE_ID_STP1   = 0xD  # serial trap pump mode 1
-FEE_MODE_ID_STP2   = 0xE  # serial trap pump mode 2
+FEE_MODE_ID_FFSIM = 0x9  # full frame simulation simulation
+FEE_MODE_ID_EVSIM = 0xA  # event detection simulation
+FEE_MODE_ID_PTP1 = 0xB  # parallel trap pump mode 1
+FEE_MODE_ID_PTP2 = 0xC  # parallel trap pump mode 2
+FEE_MODE_ID_STP1 = 0xD  # serial trap pump mode 1
+FEE_MODE_ID_STP2 = 0xE  # serial trap pump mode 2
 
-FEE_MODE2_NOBIN = 0x1	 # no binning mode
-FEE_MODE2_BIN6  = 0x2	 # 6x6 binning mode
-FEE_MODE2_BIN24 = 0x3	 # 24x4 binning mode
+FEE_MODE2_NOBIN = 0x1  # no binning mode
+FEE_MODE2_BIN6 = 0x2  # 6x6 binning mode
+FEE_MODE2_BIN24 = 0x3  # 24x4 binning mode
 
 # these identifiy the bits in the readout node selection register
-FEE_READOUT_NODE_E2	= 0b0010
-FEE_READOUT_NODE_F2	= 0b0001
-FEE_READOUT_NODE_E4	= 0b1000
-FEE_READOUT_NODE_F4	= 0b0100
+FEE_READOUT_NODE_E2 = 0b0010
+FEE_READOUT_NODE_F2 = 0b0001
+FEE_READOUT_NODE_E4 = 0b1000
+FEE_READOUT_NODE_F4 = 0b0100
 
 # see MSSL-SMILE-SXI-IRD-0001 Draft A.14, req. MSSL-IF-108
-FEE_CCD_SIDE_F = 0x0		 # left side
-FEE_CCD_SIDE_E = 0x1		 # right side
-FEE_CCD_INTERLEAVED = 0x2	 # F and E inverleaved
+FEE_CCD_SIDE_F = 0x0  # left side
+FEE_CCD_SIDE_E = 0x1  # right side
+FEE_CCD_INTERLEAVED = 0x2  # F and E inverleaved
 
 FEE_CCD_ID_2 = 0x0
 FEE_CCD_ID_4 = 0x1
 
-FEE_PKT_TYPE_DATA	= 0x0	 # any data
-FEE_PKT_TYPE_EV_DET = 0x1	 # event detection
-FEE_PKT_TYPE_HK		= 0x2	 # housekeeping
-FEE_PKT_TYPE_WMASK	= 0x3	 # wandering mask packet
+FEE_PKT_TYPE_DATA = 0x0  # any data
+FEE_PKT_TYPE_EV_DET = 0x1  # event detection
+FEE_PKT_TYPE_HK = 0x2  # housekeeping
+FEE_PKT_TYPE_WMASK = 0x3  # wandering mask packet
 
 
 class RMapCommandWrite(RMapCommandHeader):
@@ -669,12 +711,13 @@ class FeeDataTransfer(FeeDataTransferHeader):
         self.set_type_details()
         self.set_evt_data()
 
-    #@property
+    # @property
     def info(self):
         head = 'HEADER\n' + '\n'.join(['{}:\t{}'.format(key, self.type_details[key]) for key in self.type_details])
         if self.evt_data is not None:
             data = 'DATA\ncolumn: {}, row: {}\n\n{}'.format(self.evt_data['COLUMN'], self.evt_data['ROW'],
-                                                            str(self.evt_data['IMAGE']).replace('[', ' ').replace(']', ' '))
+                                                            str(self.evt_data['IMAGE']).replace('[', ' ').replace(']',
+                                                                                                                  ' '))
         else:
             data = 'DATA\n' + self.data.hex().upper()
 
@@ -696,7 +739,8 @@ class FeeDataTransfer(FeeDataTransferHeader):
             evtdata.bin[:] = self.data
             self.evt_data = {"COLUMN": evtdata.bits.column,
                              "ROW": evtdata.bits.row,
-                             "IMAGE": np.array(evtdata.bits.array)[::-1]}  # structure according to MSSL-SMILE-SXI-IRD-0001
+                             "IMAGE": np.array(evtdata.bits.array)[
+                                      ::-1]}  # structure according to MSSL-SMILE-SXI-IRD-0001
         else:
             self.evt_data = None
 
