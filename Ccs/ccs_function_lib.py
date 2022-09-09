@@ -53,23 +53,15 @@ except SQLOperationalError as err:
     sys.exit()
 
 project = cfg.get('ccs-database', 'project')
-project_cfg = PCPREFIX + str(project)
-packet_config = importlib.import_module(project_cfg)
+pc = importlib.import_module(PCPREFIX + str(project).upper())
 
-if project.upper() == 'SMILE':
-    fee_id = packet_config.fee_id
+PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack, \
+    timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc, PLM_PKT_PREFIX_TC_SEND, PLM_PKT_SUFFIX, FMT_TYPE_PARAM = \
+    [pc.PUS_VERSION, pc.TMHeader, pc.TCHeader, pc.PHeader,
+     pc.TM_HEADER_LEN, pc.TC_HEADER_LEN, pc.P_HEADER_LEN, pc.PEC_LEN,
+     pc.MAX_PKT_LEN, pc.timepack, pc.timecal, pc.calc_timestamp,
+     pc.CUC_OFFSET, pc.CUC_EPOCH, pc.puscrc, pc.PLM_PKT_PREFIX_TC_SEND, pc.PLM_PKT_SUFFIX, pc.FMT_TYPE_PARAM]
 
-PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack,\
-timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc = \
-    [packet_config.PUS_VERSION, packet_config.TMHeader, packet_config.TCHeader, packet_config.PHeader,
-     packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.P_HEADER_LEN, packet_config.PEC_LEN,
-     packet_config.MAX_PKT_LEN, packet_config.timepack, packet_config.timecal, packet_config.calc_timestamp,
-     packet_config.CUC_OFFSET, packet_config.CUC_EPOCH, packet_config.puscrc]
-
-PLM_PKT_PREFIX_TC_SEND = packet_config.PLM_PKT_PREFIX_TC_SEND
-PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
-
-FMT_TYPE_PARAM = packet_config.FMT_TYPE_PARAM
 SREC_MAX_BYTES_PER_LINE = 250
 
 
@@ -143,6 +135,13 @@ def get_scoped_session_storage():
 
 
 def start_app(file_path, wd, *args, console=False, **kwargs):
+    """
+    @param file_path:
+    @param wd:
+    @param args:
+    @param console:
+    @param kwargs:
+    """
     # gui argument only used for poolmanager since it does not have an automatic gui
     if not os.path.isfile(file_path):
         raise FileNotFoundError('File not found: {}'.format(file_path))
@@ -1430,7 +1429,7 @@ def get_cuctime(tml):
             return timecal(tml[CUC_OFFSET:CUC_OFFSET + timepack[1]], string=False)
             #ct, ft = struct.unpack('>IH', tml[TM_HEADER_LEN - 7:TM_HEADER_LEN - 1])
             #ft >>= 1
-        elif isinstance(tml, packet_config.TMHeaderBits):
+        elif isinstance(tml, pc.TMHeaderBits):
             ct = tml.CTIME
             ft = tml.FTIME
         elif isinstance(tml, list):
