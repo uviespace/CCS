@@ -8,7 +8,7 @@ import db_interaction
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
-from gi.repository import Gtk, Gdk, GtkSource
+from gi.repository import Gtk, Gdk, GtkSource, GdkPixbuf
 # -------------------------------------------
 import data_model
 import dnd_data_parser
@@ -174,13 +174,12 @@ class Board(Gtk.Box):
         self.lbl_box_comment.pack_start(self.label_comment, False, False, 0)
         # Make the area where the real command is entered
         self.comment_scrolled_window = Gtk.ScrolledWindow()
-        #self.comment_scrolled_window.set_size_request(200, 100)
+        # self.comment_scrolled_window.set_size_request(200, 100)
         self.test_meta_data_comment = Gtk.TextView.new()
         self.comment_scrolled_window.add(self.test_meta_data_comment)
 
         self.test_comment_box.pack_start(self.lbl_box_comment, False, False, 0)
         self.test_comment_box.pack_start(self.comment_scrolled_window, True, True, 0)
-
 
         # add the meta data
         self.test_meta_data_box.pack_start(self.test_meta_data_labels, False, True, 0)
@@ -193,21 +192,31 @@ class Board(Gtk.Box):
         # making the toolbar
         self.btn_add_step = Gtk.ToolButton()
         self.btn_add_step.set_label(_('Add step'))
+        self.btn_add_step.set_tooltip_text(_('Add step'))
+        self.btn_add_step.set_icon_name('list-add')
         self.btn_add_step.connect('clicked', self.on_btn_clicked_add_step)
         self.btn_collapse_all_steps = Gtk.ToolButton()
         self.btn_collapse_all_steps.set_label(_('Collapse all steps'))
+        self.btn_collapse_all_steps.set_tooltip_text(_('Collapse all steps'))
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(ccs_path + '/pixmap/collapse.svg', 24, 24)
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+        self.btn_collapse_all_steps.set_icon_widget(icon)
         self.btn_collapse_all_steps.connect('clicked', self.collapse_all_steps)
         self.btn_expand_all_steps = Gtk.ToolButton()
         self.btn_expand_all_steps.set_label(_('Expand all steps'))
+        self.btn_expand_all_steps.set_tooltip_text(_('Expand all steps'))
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(ccs_path + '/pixmap/expand.svg', 24, 24)
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+        self.btn_expand_all_steps.set_icon_widget(icon)
         self.btn_expand_all_steps.connect('clicked', self.expand_all_steps)
-        #self.btn_add_parallel = Gtk.ToolButton()
-        #self.btn_add_parallel.set_label(_('Add parallel sequence'))
-        #self.btn_add_parallel.connect('clicked', self.on_btn_clicked_add_parallel)
+        # self.btn_add_parallel = Gtk.ToolButton()
+        # self.btn_add_parallel.set_label(_('Add parallel sequence'))
+        # self.btn_add_parallel.connect('clicked', self.on_btn_clicked_add_parallel)
         self.toolbar = Gtk.Toolbar()
         self.toolbar.insert(self.btn_add_step, 0)
         self.toolbar.insert(self.btn_collapse_all_steps, 1)
         self.toolbar.insert(self.btn_expand_all_steps, 2)
-        #self.toolbar.insert(self.btn_add_parallel, 3)
+        # self.toolbar.insert(self.btn_add_parallel, 3)
         self.pack_start(self.toolbar, False, True, 0)
 
         # add the grid for steps
@@ -326,7 +335,7 @@ class Board(Gtk.Box):
 
         :param: step_number: number of a step
         """
-        step_to_add = StepWidget(model=self.model, step_number=step_number, app=self.app, board=self, logger=self.logger)
+        step_to_add = StepWidget(model=self.model, step_number=step_number, app=self.app, board=self, logger=self.logger)  # TODO: seq_num parameter??
         # find the next free grid cell
         number_of_existing_steps = len(self.view.grid.get_children())
         row = number_of_existing_steps - 1
@@ -648,7 +657,7 @@ class StepWidget(Gtk.EventBox):
         self.detail_box = Gtk.Box()
         self.detail_box.set_orientation(Gtk.Orientation.VERTICAL)
         self.detail_box.connect('show', self.on_detail_box_show)
-        #self.detail_box.set_homogeneous(True)
+        # self.detail_box.set_homogeneous(True)
         Gtk.StyleContext.add_class(self.detail_box.get_style_context(), 'step-detail-box')  # for CSS styling
 
         self.vbox.pack_start(self.detail_box, True, True, 0)
@@ -658,7 +667,7 @@ class StepWidget(Gtk.EventBox):
         # area for the commands
         self.whole_description_box = Gtk.Grid()
         self.whole_description_box.set_column_homogeneous(True)
-        #self.whole_commands_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        # self.whole_commands_box.set_orientation(Gtk.Orientation.HORIZONTAL)
 
         # field for the description
         self.lbl_box_desc = Gtk.Box()
@@ -666,10 +675,10 @@ class StepWidget(Gtk.EventBox):
         self.desc_label = Gtk.Label.new()
         self.desc_label.set_text(_('Description'))
         self.lbl_box_desc.pack_start(self.desc_label, False, True, 0)
-        #self.detail_box.pack_start(self.lbl_box_desc, True, True, 0)
+        # self.detail_box.pack_start(self.lbl_box_desc, True, True, 0)
         self.desc_scrolled_window = Gtk.ScrolledWindow()
-        #self.desc_scrolled_window.set_size_request(50, 100)
-        #self.detail_box.pack_start(self.desc_scrolled_window, False, True, 0)
+        # self.desc_scrolled_window.set_size_request(50, 100)
+        # self.detail_box.pack_start(self.desc_scrolled_window, False, True, 0)
         self.desc_text_view = Gtk.TextView.new()
         self.desc_text_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.desc_text_view.set_accepts_tab(False)
@@ -685,14 +694,14 @@ class StepWidget(Gtk.EventBox):
         self.lbl_box_step_comment.pack_start(self.step_label_comment, False, False, 0)
         # Make the area where the real command is entered
         self.step_comment_scrolled_window = Gtk.ScrolledWindow()
-        #self.step_comment_scrolled_window.set_size_request(200, 100)
+        # self.step_comment_scrolled_window.set_size_request(200, 100)
         self.step_comment_view = GtkSource.View()
         self.step_comment_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.step_comment_view.set_show_line_numbers(False)
         self.step_comment_scrolled_window.add(self.step_comment_view)
         self.step_comment_buffer = self.step_comment_view.get_buffer()
 
-        #ADD everything to the whole grid
+        # ADD everything to the whole grid
         self.whole_description_box.set_column_spacing(10)
         self.whole_description_box.attach(self.lbl_box_desc, 0, 0, 3, 1)
         self.whole_description_box.attach(self.desc_scrolled_window, 0, 1, 3, 5)
@@ -741,7 +750,6 @@ class StepWidget(Gtk.EventBox):
         self.commands_buffer.set_language(lngg)
         # self.commands_buffer.set_style_scheme(self.board.current_scheme)
         self.commands_scrolled_window.add(self.commands_view)
-
 
         self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
         self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)

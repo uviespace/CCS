@@ -1064,9 +1064,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
         about_dialog.present()
         return
 
-    def on_set_idb_version(self, *args):
+    def on_set_idb_version(self, widget):
         self.reconnect_mib()
-        dialog = IDBChooser()
+        # get current MIB name
+        mibname = widget.get_label_widget().get_text().replace('IDB: ', '')
+        dialog = IDBChooser(mibname)
         dialog.set_transient_for(self)
 
         response = dialog.run()
@@ -1111,7 +1113,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
 
 class IDBChooser(Gtk.Dialog):
-    def __init__(self):
+    def __init__(self, cur_mibname):
         super(IDBChooser, self).__init__(title='Select MIB')
         self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
         self.set_size_request(300, 200)
@@ -1126,6 +1128,10 @@ class IDBChooser(Gtk.Dialog):
         tv = Gtk.TreeView(model=idb_selection)
         self.selection = tv.get_selection()
         self.selection.set_mode(Gtk.SelectionMode.SINGLE)
+
+        for i, row in enumerate(idb_selection):
+            if row[0] == cur_mibname:
+                self.selection.select_path(idb_selection.get_path(idb_selection.get_iter(i)))
 
         col = Gtk.TreeViewColumn('SCHEMA NAME', Gtk.CellRendererText(), text=0)
         tv.append_column(col)
