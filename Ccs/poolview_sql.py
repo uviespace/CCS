@@ -562,7 +562,7 @@ class TMPoolView(Gtk.Window):
         self.scrolled_treelist.get_vscrollbar().set_visible(False)
 
         self.selection = self.treeview.get_selection()
-        self.selection.set_mode(Gtk.SelectionMode.MULTIPLE)
+        self.selection.set_mode(Gtk.SelectionMode.SINGLE)
         # self.selection.connect('changed', self.tree_selection_changed)
         self.selection.connect('changed', self.set_tm_data_view)
         # self.selection.connect('changed', self.unselect_bottom)
@@ -2362,7 +2362,6 @@ class TMPoolView(Gtk.Window):
 
     def add_new_user_package(self, widget):
         cfl.add_tm_decoder(parentwin=self)
-
 
     def set_decoding_order(self, widget):
 
