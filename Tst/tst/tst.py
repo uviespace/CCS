@@ -724,12 +724,25 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         return
 
+    def existing_file_dialog(self, filepath):
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
+        dialog.set_markup('Overwrite existing file?')
+        dialog.format_secondary_text('{} already exists. Overwrite?'.format(filepath))
+        response = dialog.run()
+        if response == Gtk.ResponseType.YES:
+            dialog.destroy()
+            return True
+        else:
+            dialog.destroy()
+            return False
+
     def existing_json_warn_dialog(self, filepath):
         filename = filepath.split('/')[-1]
         folder = filepath[:-len(filename)-1]
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK)
-        dialog.set_markup('CSV converted Json File already Exists'.format(filename))
+        dialog.set_markup('CSV converted JSON file already exists'.format(filename))
         dialog.format_secondary_text('{} at {} already exists, temporarily saved in TST \nBe careful during saving'.format(filename, folder))
         dialog.run()
         dialog.destroy()
@@ -839,10 +852,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
     def on_generate_barescript(self, *args):
         """
-        Generates a small python test file without all the additional stuff from on_generate_scripts
+        Generates a compact python test file without all the additional stuff from on_generate_scripts
         """
         dialog = Gtk.FileChooserDialog(
-            title="Save Script AS", parent=self, action=Gtk.FileChooserAction.SAVE)
+            title="Save script as", parent=self, action=Gtk.FileChooserAction.SAVE)
         dialog.add_buttons(
             Gtk.STOCK_CANCEL,
             Gtk.ResponseType.CANCEL,
@@ -853,7 +866,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             # current_json_filename = self.current_test_instance().filename
             current_model = self.current_model()
         else:
-            logger.error('Small Script can not be generated without json file')
+            logger.error('Small Script can not be generated without JSON file')
             return
 
         outfile_basic = '{}-TS-{}.py'.format(current_model.name, current_model.spec_version)
@@ -861,9 +874,14 @@ class TstAppWindow(Gtk.ApplicationWindow):
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
 
         response = dialog.run()
-        if response == Gtk.ResponseType.OK:
+        while response == Gtk.ResponseType.OK:
+            if os.path.exists(dialog.get_filename()):
+                if not self.existing_file_dialog(dialog.get_filename()):
+                    response = dialog.run()
+                    continue
             json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename())
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
+            break
 
         dialog.destroy()
         return
@@ -873,7 +891,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         Generates a CSV Test Specification file
         """
         dialog = Gtk.FileChooserDialog(
-            title="Save CSV AS", parent=self, action=Gtk.FileChooserAction.SAVE)
+            title="Save CSV as", parent=self, action=Gtk.FileChooserAction.SAVE)
         dialog.add_buttons(
             Gtk.STOCK_CANCEL,
             Gtk.ResponseType.CANCEL,
@@ -884,17 +902,22 @@ class TstAppWindow(Gtk.ApplicationWindow):
             # current_json_filename = self.current_test_instance().filename
             current_model = self.current_model()
         else:
-            logger.info('CSV File can not be generated without json file')
+            logger.info('CSV File can not be generated without JSON file')
             return
 
-        outfile_basic = '{}-IASW-{}-TS-{}.csv_PIPE'.format(current_model.name, current_model.iasw_version, current_model.spec_version)
+        outfile_basic = '{}-TS-{}.csv_PIPE'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
 
         response = dialog.run()
-        if response == Gtk.ResponseType.OK:
+        while response == Gtk.ResponseType.OK:
+            if os.path.exists(dialog.get_filename()):
+                if not self.existing_file_dialog(dialog.get_filename()):
+                    response = dialog.run()
+                    continue
             json_to_csv.run(current_model.encode_to_json(), dialog.get_filename())
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
+            break
 
         dialog.destroy()
         return
