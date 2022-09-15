@@ -447,17 +447,19 @@ class CBRSearch(Gtk.Box):
         self.comment_label_box = Gtk.Box()
         self.comment_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.comment_label = Gtk.Label()
-        self.comment_label.set_text(_('Comment:'))
-        self.comment_label_box.pack_start(self.comment_label, False, False, 0)
+        self.comment_label.set_markup(_('<b>Comment</b>'))
+        self.comment_label_box.pack_start(self.comment_label, False, False, 4)
 
         self.comment_scrolled_window = Gtk.ScrolledWindow()
         self.comment_code_view = GtkSource.View()
+        self.comment_code_view.set_editable(False)
+        self.comment_code_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.comment_code_view_buffer = self.comment_code_view.get_buffer()
-        self.comment_code_view_buffer.set_language(self.lm.get_language('json'))
-        self.comment_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.comment_code_view_buffer.set_language(self.lm.get_language('text'))
+        # self.comment_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
         self.comment_scrolled_window.add(self.comment_code_view)
 
-        self.comment_box.pack_start(self.comment_label_box, False, False, 0)
+        self.comment_box.pack_start(self.comment_label_box, False, False, 4)
         self.comment_box.pack_start(self.comment_scrolled_window, True, True, 0)
         self.comment_command_paned.pack2(self.comment_box)
 
@@ -467,17 +469,19 @@ class CBRSearch(Gtk.Box):
         self.cc_label_box = Gtk.Box()
         self.cc_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.cc_label = Gtk.Label()
-        self.cc_label.set_text(_('Command code:'))
-        self.cc_label_box.pack_start(self.cc_label, False, False, 0)
+        self.cc_label.set_markup(_('<b>Command code</b>'))
+        self.cc_label_box.pack_start(self.cc_label, False, False, 4)
 
         self.cc_scrolled_window = Gtk.ScrolledWindow()
         self.cc_code_view = GtkSource.View()
+        self.cc_code_view.set_editable(False)
+        self.cc_code_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.cc_code_view_buffer = self.cc_code_view.get_buffer()
-        self.cc_code_view_buffer.set_language(self.lm.get_language('json'))
-        self.cc_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.cc_code_view_buffer.set_language(self.lm.get_language('python3'))
+        # self.cc_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
         self.cc_scrolled_window.add(self.cc_code_view)
 
-        self.cc_box.pack_start(self.cc_label_box, False, False, 0)
+        self.cc_box.pack_start(self.cc_label_box, False, False, 4)
         self.cc_box.pack_start(self.cc_scrolled_window, True, True, 0)
         self.comment_command_paned.pack1(self.cc_box)
 
@@ -488,17 +492,19 @@ class CBRSearch(Gtk.Box):
         self.vc_label_box = Gtk.Box()
         self.vc_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.vc_label = Gtk.Label()
-        self.vc_label.set_text(_('Verification code:'))
-        self.vc_label_box.pack_start(self.vc_label, False, False, 0)
+        self.vc_label.set_markup(_('<b>Verification code</b>'))
+        self.vc_label_box.pack_start(self.vc_label, False, False, 4)
 
         self.vc_scrolled_window = Gtk.ScrolledWindow()
         self.vc_code_view = GtkSource.View()
+        self.vc_code_view.set_editable(False)
+        self.vc_code_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.vc_code_view_buffer = self.vc_code_view.get_buffer()
-        self.vc_code_view_buffer.set_language(self.lm.get_language('json'))
-        self.vc_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.vc_code_view_buffer.set_language(self.lm.get_language('python3'))
+        # self.vc_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
         self.vc_scrolled_window.add(self.vc_code_view)
 
-        self.vc_box.pack_start(self.vc_label_box, False, False, 0)
+        self.vc_box.pack_start(self.vc_label_box, False, False, 4)
         self.vc_box.pack_start(self.vc_scrolled_window, True, True, 0)
         self.verification_paned.pack1(self.vc_box)
 
@@ -507,17 +513,19 @@ class CBRSearch(Gtk.Box):
         self.vrc_descr_label_box = Gtk.Box()
         self.vrc_descr_label_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.vrc_descr_label = Gtk.Label()
-        self.vrc_descr_label.set_text(_('Verification Description:'))
-        self.vrc_descr_label_box.pack_start(self.vrc_descr_label, False, False, 0)
+        self.vrc_descr_label.set_markup(_('<b>Verification description</b>'))
+        self.vrc_descr_label_box.pack_start(self.vrc_descr_label, False, False, 4)
 
         self.vrc_descr_scrolled_window = Gtk.ScrolledWindow()
         self.vrc_descr_code_view = GtkSource.View()
+        self.vrc_descr_code_view.set_editable(False)
+        self.vrc_descr_code_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.vrc_descr_code_view_buffer = self.vrc_descr_code_view.get_buffer()
-        self.vrc_descr_code_view_buffer.set_language(self.lm.get_language('json'))
-        self.vrc_descr_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
+        self.vrc_descr_code_view_buffer.set_language(self.lm.get_language('text'))
+        # self.vrc_descr_code_view_buffer.set_style_scheme(self.style_manager.get_scheme('darcula'))
         self.vrc_descr_scrolled_window.add(self.vrc_descr_code_view)
 
-        self.vrc_descr_box.pack_start(self.vrc_descr_label_box, False, False, 0)
+        self.vrc_descr_box.pack_start(self.vrc_descr_label_box, False, False, 4)
         self.vrc_descr_box.pack_start(self.vrc_descr_scrolled_window, True, True, 0)
         self.verification_paned.pack2(self.vrc_descr_box)
 
@@ -585,6 +593,7 @@ class CBRSearch(Gtk.Box):
         model, my_iter = treeselection.get_selected()
         path = model.get_path(my_iter)
         # retrieve the data from the tree-view row and build a string to set into the selection data object
+        # data_type = model[path][1]
         desc = model[path][2]
         comment = model[path][3]
         command_code = model[path][4]
@@ -630,8 +639,6 @@ class CBRSearch(Gtk.Box):
 
     def get_comment_pane_position(self):
         return self.verification_paned.get_position()
-
-
 
     def save_panes_positions(self):
         """

@@ -45,6 +45,7 @@ logger = logging.getLogger('tst_app_main')
 log_lvl = cfg.get(section='tst-logging', option='level')
 logger.setLevel(level=log_lvl)
 console_hdlr = toolbox.create_console_handler(hdlr_lvl=log_lvl)
+console_hdlr.setLevel(level=logging.WARNING)
 logger.addHandler(hdlr=console_hdlr)
 log_file = cfg.get(section='tst-logging', option='log-file-path')
 file_hdlr = toolbox.create_file_handler(file=log_file)
@@ -711,8 +712,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
         folder = filepath[:-len(filename)-1]
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
-        dialog.set_markup('Overwrite existing File?')
-        dialog.format_secondary_text('{} at {} already exists'.format(filename, folder))
+        dialog.set_title('Overwrite existing file')
+        dialog.format_secondary_text('{} at {} already exists. Overwrite?'.format(filename, folder))
         response = dialog.run()
 
         if response == Gtk.ResponseType.YES:
@@ -727,7 +728,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
     def existing_file_dialog(self, filepath):
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
-        dialog.set_markup('Overwrite existing file?')
+        dialog.set_title('Overwrite existing file')
+        # dialog.set_markup('Overwrite existing file?')
         dialog.format_secondary_text('{} already exists. Overwrite?'.format(filepath))
         response = dialog.run()
         if response == Gtk.ResponseType.YES:
@@ -754,6 +756,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         folder = filepath[:-len(filename)-1]
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
+        dialog.set_title('Unsaved Buffer')
         dialog.set_markup('Unsaved changes in {}, Overwrite?'.format(filename))
         dialog.format_secondary_text('{} at {} already exists'.format(filename, folder))
         response = dialog.run()
@@ -777,6 +780,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             filename = 'New Test'
         dialog = Gtk.MessageDialog()
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_YES, Gtk.ResponseType.YES, Gtk.STOCK_NO, Gtk.ResponseType.NO)
+        dialog.set_title('Unsaved buffer')
         dialog.set_markup('Unsaved file {}, save?'.format(filename))
         # dialog.format_secondary_text('{} at {} is unsaved'.format(filename, folder))
         response = dialog.run()

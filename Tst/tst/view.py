@@ -710,7 +710,7 @@ class StepWidget(Gtk.EventBox):
         self.detail_box.pack_start(self.whole_description_box, True, True, 0)
 
         # fields for commands and verification
-        lm = GtkSource.LanguageManager()
+        # lm = GtkSource.LanguageManager()
 
         # Area for the commands
         self.whole_commands_box = Gtk.Box()
@@ -1629,6 +1629,7 @@ class StepRightClickMenu(Gtk.Menu):
         step_clicked_on = step_widget.step_number
         step_widget.model.get_sequence(step_widget.sequence).add_step_below(reference_step_position=step_clicked_on)
         self.step_widget.board.update_widget_data()
+
 
 class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
     def __init__(self, parent, pre_post, selection):
