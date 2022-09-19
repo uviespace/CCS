@@ -1,6 +1,6 @@
 # !/usr/bin/env python3
 import gi
-
+import os
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GtkSource", "3.0")
@@ -9,6 +9,7 @@ from gi.repository.GdkPixbuf import Pixbuf
 import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
+sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 
@@ -23,19 +24,45 @@ import DBus_Basic
 from typing import NamedTuple
 import confignator
 import gi
+# print(sys.path)
+import inspect
 
 
-import verification as ver
+import tm
+
+Verification_1 = "tm." + tm.get_tc_acknow.__name__ + str(inspect.signature((tm.get_tc_acknow)))
+Verification_2 = "tm." + tm.await_tc_acknow.__name__ + str(inspect.signature((tm.await_tc_acknow)))
+Verification_3 = "tm." + tm.get_5_1_tc_acknow.__name__ + str(inspect.signature((tm.get_5_1_tc_acknow)))
+tc_identifier = "identified_tc = tm." + tm.get_tc_identifier.__name__ + str(inspect.signature((tm.get_tc_identifier)))
+Verification_4 = "tm." + tm.get_frequency_of_hk.__name__ + str(inspect.signature((tm.get_frequency_of_hk)))
+Verification_5 = "tm." + tm.get_dpu_mode.__name__ + str(inspect.signature((tm.get_dpu_mode)))
+Verification_6 = "tm." + tm.get_packet_length.__name__ + str(inspect.signature((tm.get_packet_length)))
+Verification_7 = "tm." + tm.get_version_number.__name__ + str(inspect.signature((tm.get_version_number)))
+
+
 
 
 verification_list = [
-    ("Get TC Verification", 1, 7),
-    ("Await TC Verification", 1, 7)
+    ("Get TC Verification", 1, 7, "descr", Verification_1),
+    ("Await TC Verification", 1, 7, "descr", tc_identifier + "\n" + Verification_2),
+    ("Get TC Verification", 5, 1, "descr", Verification_3),
+    ("Get HK frequency", None, None, "descr", Verification_4),
+    ("Get DPU Mode", None, None, "descr", Verification_5),
+    ("Get Packet Length", None, None, "descr", Verification_6),
+    ("Get Version Number", None, None, "descr", Verification_7)
 ]
 
 
 
 
+
+
+def translate_drag_data(data):
+
+
+    translated = "kla"
+
+    return translated
 
 
 class VerificationTable(Gtk.Grid):
@@ -51,7 +78,7 @@ class VerificationTable(Gtk.Grid):
         self.add(self.grid)
 
         # Creating ListStore model
-        self.verification_liststore = Gtk.ListStore(str, int, int)
+        self.verification_liststore = Gtk.ListStore(str, int, int, str, str)
         for verification_ref in verification_list:
             self. verification_liststore.append(list(verification_ref))
         self.current_filter_verification = None
@@ -64,7 +91,7 @@ class VerificationTable(Gtk.Grid):
         # Creating treeview
         self.treeview = Gtk.TreeView(model=self.verification_filter)
         for i, column_title in enumerate(
-            ["Verification", "ST", "SST"]
+            ["Verification", "ST", "SST", "Description"]
         ):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
@@ -116,19 +143,27 @@ class VerificationTable(Gtk.Grid):
             global verification_name
             global ST
             global SST
+            global descr
+            global name_string
 
             verification_name = model[row][0]
             ST = model[row][1]
             SST = model[row][2]
+            descr = model[row][3]
+            name_string = model[row][4]
+
             global selected_data_for_drag_drop
+            # print(verification_name)
+            # print(name_string)
 
-
-            selected_data_for_drag_drop = ver.verification_template("Verification_1")
+            selected_data_for_drag_drop = name_string
+            # selected_data_for_drag_drop = cfl.verification_template(name_string)
                 # str(verification_name) + "\n ST = " + str(ST) + "\n SST = " + str(SST) + "\n Time = 2"
             # selected_data_for_drag_drop = "{} ({}, {})".format((name, ST, SST))
 
         else:
             pass
+
 
 
 
@@ -140,111 +175,9 @@ class VerificationTable(Gtk.Grid):
 
 
 
+
     def on_drag_begin(self, *args):
         pass
-
-
-
-
-
-
-
-
-
-
-"""
-
-def make_verification_template(pool_name="LIVE", preamble="verification.Verification", options="", comment=False):
-
-
-    prcfg = ""
-
-    return
-    
-    
-    def verification(self):
-
-        # if st_variable == 1 and sst_variable == 7:
-
-            pool_rows = cfl.get_pool_rows("PLM")
-
-            system_time = time.clock_gettime(0)
-
-            entry_1_data = pool_rows.all()[-1]
-
-            time_1 = entry_1_data.timestamp
-
-            if time_1 == "":
-
-                first_raw_digits = ""  # this string will contain the first bytes of raw data
-
-                telecommand = entry_1_data
-                telecommand_time = telecommand.timestamp
-                telecommand_raw = telecommand.raw.hex()
-
-                # Variable to generate new telecommand timestamp, other than telecommand_time
-                telecommand_verification_timestamp = time.clock_gettime(0)
-                verification_time = telecommand_verification_timestamp + 2
-
-                for i in telecommand_raw:
-                    first_raw_digits += str(i)
-                    if len(first_raw_digits) > 7:
-                        break
-
-                # print("After Loop telecommand_first_digits: ", first_raw_digits)
-
-                while system_time < verification_time and system_time != verification_time:
-                    system_time = time.clock_gettime(0)
-
-                    if system_time >= verification_time:
-                        verification_running = self.type_comparison(first_raw_digits)
-
-
-
-
-
-    def type_comparison(comparison_data):
-        pool_rows = cfl.get_pool_rows("PLM")
-
-        st_list = []
-        sst_list = []
-        x = 0
-        header_counter = 0
-        while header_counter < 2:
-            x += 1
-            entry = pool_rows.all()[-x]
-
-            if entry.data.hex() == comparison_data:
-                st_list.append(entry.stc)
-                sst_list.append(entry.sst)
-
-                # print("ST Entry_" + str(x) + ": ", entry.stc)
-                # print("SST Entry_" + str(x) + ": ", entry.sst)
-                # print("Timestamp entry_" + str(x) + ": ", entry.timestamp)
-                header_counter += 1
-
-
-        st_list_reverse = [st_list[1], st_list[0]]
-        sst_list_reverse = [sst_list[1], sst_list[0]]
-
-        if sst_list_reverse == [1, 7]:
-            print("Verification successful")
-        else:
-            print("Verification unsuccessful")
-
-        return False
-
-
-    def get_drop_verification(self):
-        global verification_name
-        global ST
-        global SST
-
-        return
-
-    def verification_table(self, name, subtype, subsubtype):
-
-"""
 
 
 
