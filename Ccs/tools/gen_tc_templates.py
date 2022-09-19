@@ -9,12 +9,12 @@ import ccs_function_lib as cfl
 
 
 def export(outfile, sep):
-    project = cfl.project.split('_')[-1]
+    # project = cfl.project.split('_')[-1]
     mib = cfl.scoped_session_idb.get_bind().url.database
     date = datetime.datetime.now().strftime('%Y-%m-%d')
-    vers = '{}.{}.{}'.format(*cfl.scoped_session_idb.execute('select * from vdf').fetchall()[0][2:])
+    vers = '{}.{}'.format(*cfl.scoped_session_idb.execute('select * from vdf').fetchall()[0][3:])
 
-    header = '# {} TC templates generated from schema {} (VDF:{})\n# Date: {}\n\n'.format(project, mib, vers, date)
+    header = '# TC templates generated from schema {} (VDF:{})\n# Date: {}\n\n'.format(mib, vers, date)
 
     temps = []
     for tc in cfl.get_tc_list():
@@ -23,7 +23,7 @@ def export(outfile, sep):
     with open(outfile, 'w') as fd:
         fd.write(header + sep.join(temps))
 
-    print('TC templates exported to {}.'.format(outfile))
+    print('TC templates exported from {} to {}.'.format(mib, outfile))
 
 
 if __name__ == '__main__':
