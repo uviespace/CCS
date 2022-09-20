@@ -2347,6 +2347,7 @@ def get_last_pckt_time(pool_name='LIVE', string=True):
         DbTelemetry.idx.desc()
     ).first()
     dbcon.close()
+
     if row is not None:
         packet = row.raw
     else:
@@ -2653,6 +2654,21 @@ def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_lin
     # print('Data written to file: "{}"'.format(outfile))
     logger.info('Data written to file: "{}"'.format(outfile))
 
+"""
+Test Function to get tm and tc from database tm
+"""
+def get_acute_tm_tc(description=None):
+
+    if description is None:
+        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
+                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
+    else:
+        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
+                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
+
+"""
+Test function ends
+"""
 
 def get_tc_list(ccf_descr=None):
 

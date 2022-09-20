@@ -61,8 +61,10 @@ import ccs_function_lib as cfl
 
 from database import tm_db
 
-from . import idb
-from . import tools
+# from . import idb
+# from . import tools
+import tools
+import idb
 
 # create a logger
 logger = logging.getLogger(__name__)
@@ -112,13 +114,14 @@ def filter_chain(query, pool_name, is_tm=True, st=None, sst=None, apid=None, seq
         # ToDo database has the CUC timestamp as string. Here the timestamps are floats.
         # Does this comparison operations work?
         t_from_string = str(t_from) + 'U'  # the timestamps in the database are saved as string
-        query = query.filter(tm_db.DbTelemetry.timestamp >= t_from_string)  # ToDo check if the change from > to >= breaks something!
+        query = query.filter(tm_db.DbTelemetry.timestamp >= t_from)  # ToDo check if the change from > to >= breaks something!
+        # ToDo: Funktion Cast verwenden um String auf Double zu casten
         # query = query.filter(tm_db.DbTelemetry.timestamp > t_from)  # <- comparison with float
     if t_to is not None:
         # ToDo database has the CUC timestamp as string. Here the timestamps are floats.
         # Does this comparison operations work?
         t_to_string = str(t_to) + 'U'  # the timestamps in the database are saved as string
-        query = query.filter(tm_db.DbTelemetry.timestamp <= t_to_string)
+        query = query.filter(tm_db.DbTelemetry.timestamp <= t_to) # ToDo: Funktion Cast verwenden um String auf Double zu casten
         # query = query.filter(tm_db.DbTelemetry.timestamp <= end)  # <- comparison with float
     if dest_id is not None:
         query = query.filter(tm_db.DbTelemetry.destID == dest_id)
@@ -136,6 +139,7 @@ def highest_cuc_timestamp(tm_list):
     :rtype: PUS packet || None
     """
     highest = None
+    timestamp = None
     if isinstance(tm_list, list) and len(tm_list) > 0:
         cuc = 0
         for i in range(len(tm_list)):
@@ -147,7 +151,8 @@ def highest_cuc_timestamp(tm_list):
             if tstamp > cuc:
                 cuc = tstamp
                 highest = tm_list[i]
-    return highest
+                timestamp = tstamp
+    return highest, timestamp
 
 
 def lowest_cuc_timestamp(pool_name, tm_list):
@@ -622,11 +627,13 @@ def get_tm(pool_name, st=None, sst=None, apid=None, ssc=None, duration=5, t_from
         of decoded telemetry packets or []
     """
 
+
     # set the time interval
     t_from, t_to = set_time_interval(pool_name=pool_name, t_from=t_from, t_to=t_to, duration=duration)
 
     # for the case that t_to is in future, wait
     current_cuc = cfl.get_last_pckt_time(pool_name=pool_name, string=False)
+
     if t_to > current_cuc:
         difference = t_to - current_cuc
         time.sleep(difference)
@@ -972,14 +979,14 @@ def extract_apid_from_packetid(packet_id):
     return apid
 
 
-def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
+def get_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_st=1, tm_sst=None):
     """
     Check if for the TC acknowledgement packets can be found in the database.
     This function makes a single database query.
     :param pool_name: str
         Name of the TM pool in the database
     :param t_tc_sent: float
-        CUC timestamp of the telecommand
+        CUC timestamp from which search for telecommand should start
     :param tc_apid: int or str
         Application process ID of the sent TC. Can be provided as integer or hexadecimal string
     :param tc_ssc: int
@@ -1002,7 +1009,7 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
 
     # make database query
     packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent - 1)
-
+    # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
     # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
     ack_tms = []
     for i in range(len(packets)):
@@ -1069,7 +1076,7 @@ def get_tc_acknow(pool_name, t_tc_sent, tc_apid, tc_ssc, tm_st=1, tm_sst=None):
     return result, ack_tms
 
 
-def await_tc_acknow(pool_name, tc_identifier, duration=10, tm_st=1, tm_sst=None):
+def await_tc_acknow(tc_identifier, pool_name="LIVE", duration=10, tm_st=1, tm_sst=None):
     """ Waiting to receive the acknowledgement packet of a sent telecommand (TC) for a given duration.
     As soon as acknowledgement packets were found the function returns.
     
@@ -1148,6 +1155,279 @@ def await_tc_acknow(pool_name, tc_identifier, duration=10, tm_st=1, tm_sst=None)
                     .format(tc_st, tc_sst, tc_apid, tc_ssc))
     return result, ack_list
 
+
+def get_5_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_st=5, tm_sst=None):
+    """
+        Check if for the TC acknowledgement packets can be found in the database.
+        This function makes a single database query.
+        :param pool_name: str
+            Name of the TM pool in the database
+        :param t_tc_sent: float
+            CUC timestamp from which search for telecommand should start
+        :param tc_apid: int or str
+            Application process ID of the sent TC. Can be provided as integer or hexadecimal string
+        :param tc_ssc: int
+            Source sequence counter of the sent TC
+        :return: (boolean, list)
+            boolean:
+                True if one or up to all acknowledgement packets TM(5,1), TM(5,3), TM(5,7) were found
+                False if one or all of TM(5,2), TM(5,4), TM(5,8) were found
+            list:
+                List of the acknowledgement TM packets for the TC,
+                [] if no acknowledgement TM packets could be found in the database
+        """
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    result = None
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, (int, str))
+    assert isinstance(t_tc_sent, (float, int))
+
+    # if the tc_apid is provided as hexadecimal number, convert it to and integer
+    tc_apid = tools.convert_apid_to_int(apid=tc_apid)
+
+    # make database query
+    packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent)
+    # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
+    # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
+    ack_tms = []
+    for i in range(len(packets)):
+        if packets[i][1] is not None and packets[i][1][0] is not None:
+            # get the data entries for APID and SSC
+            # pac_apid = packets[i][0][3]  # TODO: not compatible anymore
+            pac_apid = packets[i][0][0].APID
+            if pac_apid == 961:  # for acknowledgements from SEM
+                name_apid = 'PAR_CMD_APID'
+                name_psc = 'PAR_CMD_SEQUENCE_COUNT'
+            else:
+                name_apid = 'TcPcktId'
+                name_psc = 'TcPcktSeqCtrl'
+            para = get_tm_data_entries(tm_packet=packets[i], data_entry_names=[name_apid, name_psc])
+            if name_apid in para and name_psc in para:
+                # extract the SSC from the PSC
+                ssc = extract_ssc_from_psc(psc=para[name_psc])
+                apid = extract_apid_from_packetid(packet_id=para[name_apid])
+                if pac_apid == 961:  # acknowledgement packets from SEM have the PID in the field 'PAR_CMD_APID'
+                    tc_pid = tools.extract_pid_from_apid(tc_apid)
+                    if apid == tc_pid and ssc == tc_ssc:
+                        ack_tms.append(packets[i])
+                else:
+                    if apid == tc_apid and ssc == tc_ssc:
+                        ack_tms.append(packets[i])
+        else:
+            logger.debug('get_tc_acknow: could not read the data from the TM packet')
+
+    # treat with the result from the database query
+    if len(ack_tms) > 0:
+        # get the ST and SST of the TC for logging purposes
+        tc_st, tc_sst = get_st_and_sst(pool_name=pool_name,
+                                       apid=tc_apid,
+                                       ssc=tc_ssc,
+                                       is_tm=False,
+                                       t_from=t_tc_sent)
+        logger.info('Received acknowledgement TM packets for TC({},{}) apid={} ssc={}:'
+                    .format(tc_st, tc_sst, tc_apid, tc_ssc))
+
+        # check if there was a failure, the result becomes False if a failure occurred
+        for i in range(len(ack_tms)):
+            head = ack_tms[i][0][0]
+            data = ack_tms[i][1]
+            if result is not False:
+                if head.SERV_SUB_TYPE in [1, 3, 7]:
+                    logger.info('TM({},{}) @ {}'.format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                    result = True
+                elif head.SERV_SUB_TYPE in [2, 4, 8]:
+                    if head.SERV_SUB_TYPE == 2:
+                        logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of acceptance check for a command.'
+                                    .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                        logger.debug('Data of the TM packet: {}'.format(data))
+                    if head.SERV_SUB_TYPE == 4:
+                        logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of start check for a command.'
+                                    .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                        logger.debug('Data of the TM packet: {}'.format(data))
+                    if head.SERV_SUB_TYPE == 8:
+                        logger.info(
+                            'TM({},{}) @ {} FAILURE: Acknowledge failure of termination check for a command.'
+                            .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                        logger.debug('Data of the TM packet: {}'.format(data))
+                    result = False
+
+    return result, ack_tms
+    pass
+
+def get_8_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_st=8, tm_sst=None):
+    """
+        Check if for the TC acknowledgement packets can be found in the database.
+        This function makes a single database query.
+        :param pool_name: str
+            Name of the TM pool in the database
+        :param t_tc_sent: float
+            CUC timestamp from which search for telecommand should start
+        :param tc_apid: int or str
+            Application process ID of the sent TC. Can be provided as integer or hexadecimal string
+        :param tc_ssc: int
+            Source sequence counter of the sent TC
+        :return: (boolean, list)
+            boolean:
+                True if one or up to all acknowledgement packets TM(5,1), TM(5,3), TM(5,7) were found
+                False if one or all of TM(5,2), TM(5,4), TM(5,8) were found
+            list:
+                List of the acknowledgement TM packets for the TC,
+                [] if no acknowledgement TM packets could be found in the database
+        """
+    result = None
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, (int, str))
+    assert isinstance(t_tc_sent, (float, int))
+
+    # if the tc_apid is provided as hexadecimal number, convert it to and integer
+    tc_apid = tools.convert_apid_to_int(apid=tc_apid)
+
+    # make database query
+    packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent)
+    # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
+    # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
+    ack_tms = []
+    for i in range(len(packets)):
+        if packets[i][1] is not None and packets[i][1][0] is not None:
+            # get the data entries for APID and SSC
+            # pac_apid = packets[i][0][3]  # TODO: not compatible anymore
+            pac_apid = packets[i][0][0].APID
+            if pac_apid == 961:  # for acknowledgements from SEM
+                name_apid = 'PAR_CMD_APID'
+                name_psc = 'PAR_CMD_SEQUENCE_COUNT'
+            else:
+                name_apid = 'TcPcktId'
+                name_psc = 'TcPcktSeqCtrl'
+            para = get_tm_data_entries(tm_packet=packets[i], data_entry_names=[name_apid, name_psc])
+            if name_apid in para and name_psc in para:
+                # extract the SSC from the PSC
+                ssc = extract_ssc_from_psc(psc=para[name_psc])
+                apid = extract_apid_from_packetid(packet_id=para[name_apid])
+                if pac_apid == 961:  # acknowledgement packets from SEM have the PID in the field 'PAR_CMD_APID'
+                    tc_pid = tools.extract_pid_from_apid(tc_apid)
+                    if apid == tc_pid and ssc == tc_ssc:
+                        ack_tms.append(packets[i])
+                else:
+                    if apid == tc_apid and ssc == tc_ssc:
+                        ack_tms.append(packets[i])
+        else:
+            logger.debug('get_tc_acknow: could not read the data from the TM packet')
+
+    # treat with the result from the database query
+    if len(ack_tms) > 0:
+        # get the ST and SST of the TC for logging purposes
+        tc_st, tc_sst = get_st_and_sst(pool_name=pool_name,
+                                       apid=tc_apid,
+                                       ssc=tc_ssc,
+                                       is_tm=False,
+                                       t_from=t_tc_sent)
+        logger.info('Received acknowledgement TM packets for TC({},{}) apid={} ssc={}:'
+                    .format(tc_st, tc_sst, tc_apid, tc_ssc))
+
+        # check if there was a failure, the result becomes False if a failure occurred
+        for i in range(len(ack_tms)):
+            head = ack_tms[i][0][0]
+            data = ack_tms[i][1]
+            if result is not False:
+                if head.SERV_SUB_TYPE in [1, 3, 7]:
+                    logger.info('TM({},{}) @ {}'.format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                    result = True
+                elif head.SERV_SUB_TYPE in [2, 4, 8]:
+                    if head.SERV_SUB_TYPE == 2:
+                        logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of acceptance check for a command.'
+                                    .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                        logger.debug('Data of the TM packet: {}'.format(data))
+                    if head.SERV_SUB_TYPE == 4:
+                        logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of start check for a command.'
+                                    .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                        logger.debug('Data of the TM packet: {}'.format(data))
+                    if head.SERV_SUB_TYPE == 8:
+                        logger.info(
+                            'TM({},{}) @ {} FAILURE: Acknowledge failure of termination check for a command.'
+                            .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
+                        logger.debug('Data of the TM packet: {}'.format(data))
+                    result = False
+
+    return result, ack_tms
+    pass
+
+def get_sid_of_tm(packet):
+    """
+    Gets SID from raw packet data.
+    :param packet: bytes
+        Packet whose SID should be extracted
+    :param decoded_packet: str
+        Decoded information of packet
+    :param header: str
+        extract header from raw data
+
+    """
+
+    decoded_packet = packet.hex()
+    header = decoded_packet[36:124]
+    return int(header[3])
+
+
+
+
+def get_frequency_of_hk(duration=60., frequency=20, SID=1, pool_name="LIVE"):
+    """
+           Check the time passing between TM packets during a given duration.
+           This function makes a multiple database queries.
+           :param pool_name: str
+               Name of the TM pool in the database
+           :param duration: float
+               timeslot in which the incoming packages are checked for their cuc-timestamp
+    """
+
+
+    assert isinstance(duration, (float, int))
+    assert isinstance(frequency, int)
+    assert isinstance(SID, int)
+
+
+    list_of_timestamps = []
+    last_telemetry_packet = cfl.get_pool_rows(pool_name)[-1].raw
+    timestamp = cfl.get_cuctime(last_telemetry_packet)
+    # last_packet_sid = get_sid_of_tm(last_telemetry_packet)
+    current_timestamp = 0.0
+    end_time = timestamp + duration
+
+    while current_timestamp <= end_time:
+
+        current_telemetry_packet = cfl.get_pool_rows(pool_name)[-1].raw
+        current_timestamp = cfl.get_cuctime(current_telemetry_packet)
+        current_packet_sid = get_sid_of_tm((current_telemetry_packet))
+        if current_timestamp not in list_of_timestamps and current_packet_sid == SID:
+            list_of_timestamps.append(current_timestamp)
+        else:
+            continue
+
+    list_of_differences = [j-i for i, j in zip(list_of_timestamps[:-1], list_of_timestamps[1:])]
+
+    first_element = round(list_of_differences[0])
+    chk = True
+
+    for item in list_of_differences:
+        if first_element != round(item):
+            chk = False
+            break
+
+    if chk == True:
+        # print(round(list_of_differences[0]))
+        print(first_element)
+        if first_element == frequency:
+            print(True)
+            return True
+    else:
+        print("Didn't work")
+        return False
+
+
+
+
+
+# get_frequency_of_hk()
 
 def check_acknowledgement(pool_name, tc_identifier, duration=10):
     """
@@ -1530,6 +1810,125 @@ def get_acquisition(pool_name, tm_21_3):
         for i in range(len(meta_data)):
             logger.info(meta_data[i])
     return result
+
+def get_dpu_mode(pool_name="LIVE"):
+    """
+    Get the data from the last entry in the database and check its DPU Mode.
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param dpu_mode: dict
+        DPU Mode of the packet
+
+    """
+
+    data_packet = cfl.get_pool_rows(pool_name)[-1].raw
+    dpu_mode = get_tm_data_entries(data_packet,"DpuMode")
+    print(dpu_mode)
+
+def get_packet_length(pool_name="LIVE"):
+    """
+    Get the data from the last entry in the database and check its length.
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param data_packet: bit
+        data in the last entry in database
+    :param packet_length: int
+        Length of data_packet
+
+    """
+
+    data_packet = cfl.get_pool_rows(pool_name)[-1].raw
+    packet_length = len(data_packet)
+    print(packet_length)
+
+def get_version_number(version_number="0x0112", pool_name="LIVE"):
+    """
+    Get the version number of the newest TM packet.
+    :param version_number: str
+        version number which should be verified
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param data_packet: bytes
+        Data in Packet
+    :param packet_version_number_dic: dic
+        dictionary containing the version number
+    :param packet_version_number: str
+        version number converted into hex
+    """
+
+    assert isinstance(version_number, str)
+
+    data_packet = cfl.get_pool_rows(pool_name)[-1].raw
+    packet_version_number_dic = get_tm_data_entries(data_packet, "VersionNumber")
+    # print(packet_version_number)
+    packet_version_number = hex(packet_version_number_dic["VersionNumber"])
+    if packet_version_number == version_number:
+        print(True)
+        return True
+    else:
+        print(False)
+        return False
+
+
+def await_tc_identifier(pool_name, tc_apid, tc_ssc):
+    """
+    Gather the data necessary to identify the newest telecommand and put it in tuple.
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param tc_apid: int or str
+        APID of the TC
+    :param tc_ssc: int
+        Sequence number of TC
+    :param last_tm_timestamp: float
+        Timestamp of the latest TM in datapool
+    :return: tc_identifier: tuple
+        Tuple with data to identify TC
+
+    """
+
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, int) or isinstance(tc_apid, str)
+    assert isinstance(tc_ssc, int)
+
+    last_tm_timestamp = cfl.get_pool_rows(pool_name)[-1].timestamp
+    length_last_tm_timestamp = len(last_tm_timestamp)
+    last_tm_timestamp = last_tm_timestamp[:length_last_tm_timestamp - 1]
+    last_tm_timestamp = float(last_tm_timestamp)
+
+    tc_identifier = (tc_apid, tc_ssc, last_tm_timestamp)
+
+    return tc_identifier
+
+
+def get_tc_identifier(pool_name="LIVE", tc_apid=321, tc_ssc=1, tc_time=0.):
+    """
+    Gather the data necessary to identify the newest telecommand and put it in tuple.
+    :param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    :param tc_apid: int or str
+        APID of the TC
+    :param tc_ssc: int
+        Sequence number of TC
+    :param tc_time: float or int
+        Timestamp of the latest TM in datapool
+    :return: tc_identifier: tuple
+        Tuple with data to identify TC
+
+    """
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, int) or isinstance(tc_apid, str)
+    assert isinstance(tc_ssc, int)
+    assert isinstance(tc_time, int) or isinstance(tc_time, float)
+
+    tc_time = float(tc_time)
+
+    tc_identifier = (tc_apid, tc_ssc, tc_time)
+
+    return tc_identifier
+
+
+
+
 
 if __name__ == '__main__':
     sys.path.append('.')
