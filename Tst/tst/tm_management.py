@@ -175,8 +175,7 @@ class TmTable(Gtk.Grid):
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
-        # selection_data.set_text(cfl.make_tc_template(descr, comment=False), -1)
-        selection_data.set_text('', -1)
+        selection_data.set_text(model[my_iter][-1], -1)
 
     def on_drag_begin(self, *args):
         pass
@@ -202,6 +201,13 @@ class TmSecondaryTable(Gtk.Box):
                 column.set_visible(False)
             self.parameter_treeview.append_column(column)
         self.parameter_treeview.set_tooltip_column(1)
+
+        # Set up Drag and Drop
+        self.parameter_treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+        self.parameter_treeview.drag_source_set_target_list(None)
+        self.parameter_treeview.drag_source_add_text_targets()
+
+        self.parameter_treeview.connect("drag-data-get", self.on_drag_data_get)
 
         # item selection
         self.selected_row = self.parameter_treeview.get_selection()
@@ -231,6 +237,13 @@ class TmSecondaryTable(Gtk.Box):
 
         self.scrollable_secondary_tm_treelist = Gtk.ScrolledWindow()
         self.pack_start(self.scrollable_secondary_tm_treelist, True, True, 0)
+
+        # Set up Drag and Drop
+        self.secondary_treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+        self.secondary_treeview.drag_source_set_target_list(None)
+        self.secondary_treeview.drag_source_add_text_targets()
+
+        self.secondary_treeview.connect("drag-data-get", self.on_drag_data_get_cal)
 
         self.scrollable_secondary_tm_treelist.add(self.secondary_treeview)
 
@@ -265,3 +278,14 @@ class TmSecondaryTable(Gtk.Box):
         # for tm_type_sub_ref in tm_type_sub_list:
         #     self.secondary_liststore.append(list(tm_type_sub_ref))
         # self.secondary_treeview.set_model(self.secondary_liststore)
+
+    def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+        # selection_data.set_text(cfl.make_tc_template(descr, comment=False), -1)
+        selection_data.set_text(model[my_iter][2], -1)
+
+    def on_drag_data_get_cal(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+        selection_data.set_text(model[my_iter][-1], -1)

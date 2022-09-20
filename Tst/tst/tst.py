@@ -241,6 +241,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.create_make_menu()
 
         self.set_icon_from_file(path_icon)
+        self.set_keybinds()
 
         # GUI
         self.box = Gtk.Box()
@@ -434,6 +435,14 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action = Gio.SimpleAction.new('generate_csv', None)
         action.connect('activate', self.on_generate_csv)
         self.add_action(action)
+
+    def set_keybinds(self):
+        accel = Gtk.AccelGroup()
+        accel.connect(Gdk.keyval_from_name('c'), Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK, 0, self.copy_pid_name)
+        self.add_accel_group(accel)
+
+    def copy_pid_name(self, *args):
+        self.data_pool_tab.copy_cell_content(1)
 
     def add_info_bar(self, message_type, message):
         """

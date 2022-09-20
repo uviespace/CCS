@@ -860,7 +860,7 @@ class CcsEditor(Gtk.Window):
             label.set_text(filename.split('/')[-1])
             label.set_tooltip_text(filename)
 
-        img = Gtk.Image.new_from_icon_name(Gtk.STOCK_CLOSE, Gtk.IconSize.MENU)
+        img = Gtk.Image.new_from_icon_name('window-close-symbolic', Gtk.IconSize.MENU)
 
         button = Gtk.Button()
         button.set_image(img)

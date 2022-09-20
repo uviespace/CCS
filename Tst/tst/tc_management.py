@@ -328,6 +328,13 @@ class CommandDescriptionBox(Gtk.Box):
             column.colnumbr = i
             self.cal_treeview.append_column(column)
 
+        # Set up Drag and Drop
+        self.cal_treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+        self.cal_treeview.drag_source_set_target_list(None)
+        self.cal_treeview.drag_source_add_text_targets()
+
+        self.cal_treeview.connect("drag-data-get", self.on_drag_data_get_cal)
+
         self.scrollable_calibrations_treelist = Gtk.ScrolledWindow()
         self.pack_start(self.scrollable_calibrations_treelist, True, True, 0)
 
@@ -370,3 +377,8 @@ class CommandDescriptionBox(Gtk.Box):
                 self.cal_liststore.append(list(cal_ref))
 
         self.cal_treeview.set_model(self.cal_liststore)
+
+    def on_drag_data_get_cal(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+        selection_data.set_text(model[my_iter][2], -1)

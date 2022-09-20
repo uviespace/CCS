@@ -118,9 +118,22 @@ class DataPoolTable(Gtk.Grid):
         self.treeview.drag_source_add_text_targets()
 
         self.treeview.connect("drag-data-get", self.on_drag_data_get)
-        self.treeview.connect("drag-begin", self.on_drag_begin)
+
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        self.rcl_menu = TreeRightClickMenu(cruf=self)
+        self.treeview.connect("button-press-event", self.on_treeview_clicked)
 
         self.show_all()
+
+    def on_treeview_clicked(self, widget, event):
+        if event.button == 3:
+            self.rcl_menu.popup_at_pointer()
+
+    def copy_cell_content(self, cell_idx):
+        treeselection = self.treeview.get_selection()
+        model, it = treeselection.get_selected()
+        if model is not None and it is not None:
+            self.clipboard.set_text(model[it][cell_idx], -1)
 
     def on_pid_combo_changed(self, combo):
         combo_iter = combo.get_active_iter()
@@ -156,5 +169,22 @@ class DataPoolTable(Gtk.Grid):
         if model is not None and my_iter is not None:
             selection_data.set_text(model[my_iter][0], -1)
 
-    def on_drag_begin(self, *args):
-        pass
+
+class TreeRightClickMenu(Gtk.Menu):
+    def __init__(self, cruf):
+        super(TreeRightClickMenu, self).__init__()
+
+        entry_1 = Gtk.MenuItem('Copy PID')
+        self.attach(entry_1, 0, 1, 0, 1)
+        entry_1.show()
+        entry_2 = Gtk.MenuItem('Copy NAME')
+        self.attach(entry_2, 0, 1, 1, 2)
+        entry_2.show()
+        entry_1.connect('activate', self.on_copy_pid, cruf)
+        entry_2.connect('activate', self.on_copy_name, cruf)
+
+    def on_copy_pid(self, menu_item, cruf, *args):
+        cruf.copy_cell_content(0)
+
+    def on_copy_name(self, menu_item, cruf, *args):
+        cruf.copy_cell_content(1)

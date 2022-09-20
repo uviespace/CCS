@@ -578,6 +578,14 @@ class TMPoolView(Gtk.Window):
         scrollbar.connect('button-press-event', self.scroll_bar)
         # scrollbar.connect('value_changed', self.reselect_rows)
 
+
+        # Set up Drag and Drop
+        self.treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+        self.treeview.drag_source_set_target_list(None)
+        self.treeview.drag_source_add_text_targets()
+
+        self.treeview.connect("drag-data-get", self.on_drag_data_get)
+
         hbox = Gtk.HBox()
         hbox.pack_start(self.scrolled_treelist, 1, 1, 0)
         hbox.pack_start(scrollbar, 0, 0, 0)
@@ -623,7 +631,7 @@ class TMPoolView(Gtk.Window):
         self.reselect_rows()
 
     def resize_treeview(self, widget, event):
-        if (Gdk.WindowState.MAXIMIZED == event.new_window_state):
+        if Gdk.WindowState.MAXIMIZED == event.new_window_state:
             self.set_number_of_treeview_rows()
 
     # @delayed(10)
@@ -676,6 +684,24 @@ class TMPoolView(Gtk.Window):
         new_session.close()
         return rows
 
+    def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+
+        if model is not None and my_iter is not None:
+            new_session = self.session_factory_storage
+            row = new_session.query(
+                Telemetry[self.decoding_type]
+            ).join(
+                DbTelemetryPool,
+                Telemetry[self.decoding_type].pool_id == DbTelemetryPool.iid
+            ).filter(
+                DbTelemetryPool.pool_name == self.active_pool_info.filename
+            ).filter(
+                Telemetry[self.decoding_type].idx == model[my_iter][0]
+            )
+            selection_data.set_text(str(row.first().raw), -1)
+            new_session.close()
 
     def fetch_lines_from_db(self, offset=0, limit=None, sort=None, order='asc', buffer=10, rows=None, scrolled=False,
                             force_import=False):
