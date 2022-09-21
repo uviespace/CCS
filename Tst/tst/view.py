@@ -15,13 +15,15 @@ import dnd_data_parser
 import toolbox
 import cairo
 import sys
-import verification
+
 
 import confignator
 ccs_path = confignator.get_option('paths', 'ccs')
 sys.path.append(ccs_path)
+sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
 
 import ccs_function_lib as cfl
+import tm
 
 lm = GtkSource.LanguageManager()
 lngg = lm.get_language('python')
@@ -632,6 +634,12 @@ class StepWidget(Gtk.EventBox):
         self.btn_execute_step.set_tooltip_text(_('Execute step'))
         self.btn_execute_step.connect('clicked', self.on_execute_step)
 
+        # TODO: find better suited icon for execute verification button
+        self.btn_execute_verification = Gtk.ToolButton()
+        self.btn_execute_verification.set_icon_name("media-playback-start-symbolic-down")
+        self.btn_execute_verification.set_tooltip_text(_("Execute Verification"))
+        self.btn_execute_verification.connect("clicked", self.on_execute_verification)
+
         self.text_label_event_box = Gtk.EventBox()
         self.text_label_event_box.set_visible_window(False)
         self.text_label_event_box.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
@@ -651,6 +659,7 @@ class StepWidget(Gtk.EventBox):
         self.tbox.pack_end(self.btn_delete_step, False, False, 0)
         self.tbox.pack_end(self.is_active, False, False, 0)
         self.tbox.pack_end(self.btn_execute_step, False, False, 0)
+        self.tbox.pack_end(self.btn_execute_verification, False, False, 0)
 
         self.vbox.pack_start(self.tbox, True, True, 0)
 
@@ -771,7 +780,7 @@ class StepWidget(Gtk.EventBox):
         # self.lbl_box_verification.pack_start(self.btn_exec_verification, False, False, 0)
         #self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
         self.verification_scrolled_window = Gtk.ScrolledWindow()
-        #self.verification_scrolled_window.set_size_request(50, 100)
+        self.verification_scrolled_window.set_size_request(50, 200)
         self.verification_view = GtkSource.View()
         self.verification_view.set_auto_indent(True)
         self.verification_view.set_show_line_numbers(True)
@@ -1300,6 +1309,7 @@ class StepWidget(Gtk.EventBox):
         # Connect to the editor and send the commands to the terminal via D-Bus
         ed = cfl.dbus_connection('editor')
         cfl.Functions(ed, '_to_console_via_socket', commands)
+
         #import editor
         #x = editor.CcsEditor()
         #x._to_console_via_socket(commands)
@@ -1307,8 +1317,32 @@ class StepWidget(Gtk.EventBox):
     def on_exec_verification(self, button):
         # get the code of the commands out of the buffer of the widget
         verification = self.get_verification_from_widget()
+
+        # Check if CCS is open
+        if not cfl.is_open('editor'):
+            print('CCS-Editor has to be started first')
+            logger.info('CCS-Editor has to be running if a step should be executed')
+            return
         #ack = misc.to_console_via_socket(verification)
         #print(ack)
+
+    def on_execute_verification(self, *args):
+        if not cfl.is_open("editor"):
+            print('CCS-Editor has to be started first')
+            logger.info('CCS-Editor has to be running if a step should be executed')
+            return
+
+        commands = str(self.get_verification_from_widget())
+
+        if len(commands) == 0:
+            return
+
+        # execute_function = exec(commands)
+        # print(execute_function)
+
+
+        ed = cfl.dbus_connection("editor")
+        cfl.Functions(ed, "_to_console_via_socket", commands)
 
     def on_execute_step(self, *args):
         if not cfl.is_open('editor'):
@@ -1325,9 +1359,6 @@ class StepWidget(Gtk.EventBox):
 
         # if len(commands2) == 0:
         #    return
-        # print("Commands: ", commands)
-        # print("Verification: ", commands2)
-        # print(type(commands2))
 
         # verification.read_verification(commands2)
 

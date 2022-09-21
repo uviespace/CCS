@@ -2845,6 +2845,7 @@ def get_data_pool_items(pcf_descr=None, src_file=None):
 def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     try:
         cmd, pars = list(get_tc_list(ccf_descr).items())[0]
+        # print("pars: ", pars)
     except IndexError:
         raise IndexError('"{}" not found in IDB.'.format(ccf_descr))
     # print(tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=True))

@@ -27,105 +27,136 @@ from database.tm_db import DbTelemetryPool, DbTelemetry, RMapTelemetry, FEEDataT
 import importlib
 from confignator import config
 check_cfg = config.get_config(file_path=confignator.get_option('config-files', 'ccs'))
+# import tm
 
 
-def type_comparison(comparison_data, sst_1=1, sst_2=7, st_=1, st_2=1,):
-    pool_rows = cfl.get_pool_rows("PLM")
+# test = tm.get_tc_acknow(pool_name="PLM", t_tc_sent=1020., tc_apid=321, tc_ssc=1, tm_st=1, tm_sst=None)
 
-    st_list = []
-    sst_list = []
-    x = 0
-    header_counter = 0
-    while header_counter < 2:
-        x += 1
-        entry = pool_rows.all()[-x]
+"""
+def verification_template(verification_descr, pool_name="LIVE", ST_1=None, ST_2=None, SST_1=None, SST_2=None, time=2,
+                          comment="", preamble="Ver.verification", add_parcfg=False):
 
-        if entry.data.hex() == comparison_data:
-
-            st_list.append(entry.stc)
-            sst_list.append(entry.sst)
-
-            # print("ST Entry_" + str(x) + ": ", entry.stc)
-            # print("SST Entry_" + str(x) + ": ", entry.sst)
-            # print("Timestamp entry_" + str(x) + ": ", entry.timestamp)
-            header_counter += 1
-
-
-    st_list_reverse = [st_list[1], st_list[0]]
-    sst_list_reverse = [sst_list[1], sst_list[0]]
-
-
-    if sst_list_reverse == [sst_1, sst_2]:
-        print("Verification successful")
+    if comment:
+        commentstr = "# TC({}, {}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
+        newline = "\n"
     else:
-        print("Verification unsuccessful")
+        commentstr = ""
+        newline = ""
 
-    return False
+    parcfg = ''
+    if add_parcfg:
+        for par in pars:
+            if par[2] == 'E':
+                if par[4] is not None:
+                    if par[5] == 'E':
+                        parval = '"{}"'.format(par[4])
+                    elif par[6] == 'H':
+                        parval = '0x{}'.format(par[4])
+                    else:
+                        parval = par[4]
+                else:
+                    parval = par[4]
+                line = '{} = {}  # {}\n'.format(par[0], parval, par[3])
+            elif par[2] == 'F':
+                line = '# {} = {}  # {} [NOT EDITABLE]\n'.format(par[0], par[4], par[3])
+            else:
+                line = ''
+            parcfg += line
 
-
-def Verification( st_1=1, sst_1=1, st_2=1, sst_2=7, pool_name="PLM", verification_duration=2):
-    verification_running = True
-
-    print("RUNNING!!")
-
-    print("Variables: ")
-    print(st_1)
-    print(sst_1)
-    print(st_2)
-    print(sst_2)
-    print(pool_name)
-    print(verification_duration)
-
-
-    while verification_running == True:
-
-        # while running the script checks the last three entries of the database and keeps them up to date
-        # to recognize a tc it checks the time
-
-        pool_rows = cfl.get_pool_rows(pool_name)
-
-        system_time = time.clock_gettime(0)
-
-        entry_1_data = pool_rows.all()[-1]
-        # entry_2_data = pool_rows.all()[-2]
-        # entry_3_data = pool_rows.all()[-3]
-
-        time_1 = entry_1_data.timestamp
-        # time_2 = entry_2_data.timestamp
-        # time_3 = entry_3_data.timestamp
-
-        # in this script the number 1 after a variable name always refers to data from the last entry
-        # number 2 refers to second last entry, number 3 to third last entry and so on
-        # this part triggers as soon as a tc has arrived in the database
-
-        if time_1 == "":
-
-            first_raw_digits = ""           # this string will contain the first bytes of raw data
-
-            telecommand = entry_1_data
-            telecommand_time = telecommand.timestamp
-            telecommand_raw = telecommand.raw.hex()
-            # telecommand_data = telecommand.data.hex()
-            # Variable to generate new telecommand timestamp, other than telecommand_time
-            telecommand_verification_timestamp = time.clock_gettime(0)
-            verification_time = telecommand_verification_timestamp + verification_duration
-
-            for i in telecommand_raw:
-                first_raw_digits += str(i)
-                if len(first_raw_digits) > 7:
-                    break
-
-            # print("After Loop telecommand_first_digits: ", first_raw_digits)
+    parstr = ', '.join(parsinfo_to_str(pars))
+    if len(parstr) > 0:
+        parstr = ', ' + parstr
 
 
-            while system_time < verification_time and system_time != verification_time:
-                system_time = time.clock_gettime(0)
+    exe = "{}('{}', ST_1={}, SST_1={}, ST_2={}, SST_2={}, pool_name='{}', time={})".format(preamble, verification_descr,
+                                                                                  ST_1, SST_1, ST_2, SST_2,
+                                                                                  pool_name, time)
+    return commentstr + exe + newline
+"""
 
-                if system_time >= verification_time:
+# verification template nach Stefan
+"""
+def verification_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
 
-                    verification_running = type_comparison(first_raw_digits, sst_1, sst_2)
+    if comment:
+        commentstr = "# TC({}, {}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
+        newline = "\n"
+    else:
+        commentstr = ""
+        newline = ""
+    
+    parcfg = ''
+    if add_parcfg:
+        for par in pars:
+            if par[2] == 'E':
+                if par[4] is not None:
+                    if par[5] == 'E':
+                        parval = '"{}"'.format(par[4])
+                    elif par[6] == 'H':
+                        parval = '0x{}'.format(par[4])
+                    else:
+                        parval = par[4]
+                else:
+                    parval = par[4]
+                line = '{} = {}  # {}\n'.format(par[0], parval, par[3])
+            elif par[2] == 'F':
+                line = '# {} = {}  # {} [NOT EDITABLE]\n'.format(par[0], par[4], par[3])
+            else:
+                line = ''
+            parcfg += line
+
+    parstr = ', '.join(parsinfo_to_str(pars))
+    if len(parstr) > 0:
+        parstr = ', ' + parstr
+    
+    
+    exe = "{}('{}'{}, pool_name='{}'{})".format(preamble, cmd[1], parstr, pool_name, options)
+    return commentstr + parcfg + exe + newline
+    
+"""
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
 
 def verification_template(verification_descr, pool_name="LIVE", ST_1=None, ST_2=None, SST_1=None, SST_2=None, time=2,
                           comment="", preamble="Ver.verification"):
@@ -141,7 +172,7 @@ def verification_template(verification_descr, pool_name="LIVE", ST_1=None, ST_2=
                                                                                   pool_name, time)
     return commentstr + exe + newline
 
-
+"""
 # def  new_verification_template(verification_descr, pool_name="LIVE", comment="", preamble=):
 
 
@@ -213,6 +244,147 @@ def read_verification(verification_string):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
+def type_comparison(comparison_data, sst_1=1, sst_2=7, st_=1, st_2=1,):
+    pool_rows = cfl.get_pool_rows("PLM")
+
+    st_list = []
+    sst_list = []
+    x = 0
+    header_counter = 0
+    while header_counter < 2:
+        x += 1
+        entry = pool_rows.all()[-x]
+
+        if entry.data.hex() == comparison_data:
+
+            st_list.append(entry.stc)
+            sst_list.append(entry.sst)
+
+            # print("ST Entry_" + str(x) + ": ", entry.stc)
+            # print("SST Entry_" + str(x) + ": ", entry.sst)
+            # print("Timestamp entry_" + str(x) + ": ", entry.timestamp)
+            header_counter += 1
+
+
+    st_list_reverse = [st_list[1], st_list[0]]
+    sst_list_reverse = [sst_list[1], sst_list[0]]
+
+
+    if sst_list_reverse == [sst_1, sst_2]:
+        print("Verification successful")
+    else:
+        print("Verification unsuccessful")
+
+    return False
+
+
+def Verification( st_1=1, sst_1=1, st_2=1, sst_2=7, pool_name="PLM", verification_duration=2):
+    verification_running = True
+
+    print("RUNNING!!")
+
+    print("Variables: ")
+    print(st_1)
+    print(sst_1)
+    print(st_2)
+    print(sst_2)
+    print(pool_name)
+    print(verification_duration)
+
+
+    while verification_running == True:
+
+        # while running the script checks the last three entries of the database and keeps them up to date
+        # to recognize a tc it checks the time
+
+        pool_rows = cfl.get_pool_rows(pool_name)
+
+        system_time = time.clock_gettime(0)
+
+        entry_1_data = pool_rows.all()[-1]
+        # entry_2_data = pool_rows.all()[-2]
+        # entry_3_data = pool_rows.all()[-3]
+
+        time_1 = entry_1_data.timestamp
+
+        if time_1 == "":
+
+            first_raw_digits = ""           # this string will contain the first bytes of raw data
+
+            telecommand = entry_1_data
+            telecommand_time = telecommand.timestamp
+            telecommand_raw = telecommand.raw.hex()
+            # telecommand_data = telecommand.data.hex()
+            # Variable to generate new telecommand timestamp, other than telecommand_time
+            telecommand_verification_timestamp = time.clock_gettime(0)
+            verification_time = telecommand_verification_timestamp + verification_duration
+
+            for i in telecommand_raw:
+                first_raw_digits += str(i)
+                if len(first_raw_digits) > 7:
+                    break
+
+            # print("After Loop telecommand_first_digits: ", first_raw_digits)
+
+
+            while system_time < verification_time and system_time != verification_time:
+                system_time = time.clock_gettime(0)
+
+                if system_time >= verification_time:
+
+                    verification_running = type_comparison(first_raw_digits, sst_1, sst_2)
+
+
+
+"""
 
 
 

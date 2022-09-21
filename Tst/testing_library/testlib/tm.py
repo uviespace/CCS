@@ -1156,7 +1156,7 @@ def await_tc_acknow(tc_identifier, pool_name="LIVE", duration=10, tm_st=1, tm_ss
     return result, ack_list
 
 
-def get_5_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_st=5, tm_sst=None):
+def get_5_1_tc_acknow(pool_name="LIVE", t_tc_sent=0.0, tc_apid=321, tc_ssc=1, tm_st=5, tm_sst=None):
     """
         Check if for the TC acknowledgement packets can be found in the database.
         This function makes a single database query.
@@ -1176,7 +1176,6 @@ def get_5_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_s
                 List of the acknowledgement TM packets for the TC,
                 [] if no acknowledgement TM packets could be found in the database
         """
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     result = None
     assert isinstance(pool_name, str)
     assert isinstance(tc_apid, (int, str))
@@ -1184,11 +1183,24 @@ def get_5_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_s
 
     # if the tc_apid is provided as hexadecimal number, convert it to and integer
     tc_apid = tools.convert_apid_to_int(apid=tc_apid)
-
+    evtid_list = []
+    data_list = []
     # make database query
     packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent)
+    return packets
+    """
+    for packet in packets:
+        evtid = get_tm_data_entries(packet, "EvtId")
+        evtid_list.append(evtid)
+        data = packet[0][1].hex()
+        data_list.append(data)
+    print(evtid_list)
+    print(data_list)
+    """
     # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
     # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
+
+    """
     ack_tms = []
     for i in range(len(packets)):
         if packets[i][1] is not None and packets[i][1][0] is not None:
@@ -1253,103 +1265,8 @@ def get_5_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_s
 
     return result, ack_tms
     pass
-
-def get_8_1_tc_acknow(pool_name="LIVE", t_tc_sent=0, tc_apid=321, tc_ssc=1, tm_st=8, tm_sst=None):
     """
-        Check if for the TC acknowledgement packets can be found in the database.
-        This function makes a single database query.
-        :param pool_name: str
-            Name of the TM pool in the database
-        :param t_tc_sent: float
-            CUC timestamp from which search for telecommand should start
-        :param tc_apid: int or str
-            Application process ID of the sent TC. Can be provided as integer or hexadecimal string
-        :param tc_ssc: int
-            Source sequence counter of the sent TC
-        :return: (boolean, list)
-            boolean:
-                True if one or up to all acknowledgement packets TM(5,1), TM(5,3), TM(5,7) were found
-                False if one or all of TM(5,2), TM(5,4), TM(5,8) were found
-            list:
-                List of the acknowledgement TM packets for the TC,
-                [] if no acknowledgement TM packets could be found in the database
-        """
-    result = None
-    assert isinstance(pool_name, str)
-    assert isinstance(tc_apid, (int, str))
-    assert isinstance(t_tc_sent, (float, int))
 
-    # if the tc_apid is provided as hexadecimal number, convert it to and integer
-    tc_apid = tools.convert_apid_to_int(apid=tc_apid)
-
-    # make database query
-    packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent)
-    # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
-    # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
-    ack_tms = []
-    for i in range(len(packets)):
-        if packets[i][1] is not None and packets[i][1][0] is not None:
-            # get the data entries for APID and SSC
-            # pac_apid = packets[i][0][3]  # TODO: not compatible anymore
-            pac_apid = packets[i][0][0].APID
-            if pac_apid == 961:  # for acknowledgements from SEM
-                name_apid = 'PAR_CMD_APID'
-                name_psc = 'PAR_CMD_SEQUENCE_COUNT'
-            else:
-                name_apid = 'TcPcktId'
-                name_psc = 'TcPcktSeqCtrl'
-            para = get_tm_data_entries(tm_packet=packets[i], data_entry_names=[name_apid, name_psc])
-            if name_apid in para and name_psc in para:
-                # extract the SSC from the PSC
-                ssc = extract_ssc_from_psc(psc=para[name_psc])
-                apid = extract_apid_from_packetid(packet_id=para[name_apid])
-                if pac_apid == 961:  # acknowledgement packets from SEM have the PID in the field 'PAR_CMD_APID'
-                    tc_pid = tools.extract_pid_from_apid(tc_apid)
-                    if apid == tc_pid and ssc == tc_ssc:
-                        ack_tms.append(packets[i])
-                else:
-                    if apid == tc_apid and ssc == tc_ssc:
-                        ack_tms.append(packets[i])
-        else:
-            logger.debug('get_tc_acknow: could not read the data from the TM packet')
-
-    # treat with the result from the database query
-    if len(ack_tms) > 0:
-        # get the ST and SST of the TC for logging purposes
-        tc_st, tc_sst = get_st_and_sst(pool_name=pool_name,
-                                       apid=tc_apid,
-                                       ssc=tc_ssc,
-                                       is_tm=False,
-                                       t_from=t_tc_sent)
-        logger.info('Received acknowledgement TM packets for TC({},{}) apid={} ssc={}:'
-                    .format(tc_st, tc_sst, tc_apid, tc_ssc))
-
-        # check if there was a failure, the result becomes False if a failure occurred
-        for i in range(len(ack_tms)):
-            head = ack_tms[i][0][0]
-            data = ack_tms[i][1]
-            if result is not False:
-                if head.SERV_SUB_TYPE in [1, 3, 7]:
-                    logger.info('TM({},{}) @ {}'.format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
-                    result = True
-                elif head.SERV_SUB_TYPE in [2, 4, 8]:
-                    if head.SERV_SUB_TYPE == 2:
-                        logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of acceptance check for a command.'
-                                    .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
-                        logger.debug('Data of the TM packet: {}'.format(data))
-                    if head.SERV_SUB_TYPE == 4:
-                        logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of start check for a command.'
-                                    .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
-                        logger.debug('Data of the TM packet: {}'.format(data))
-                    if head.SERV_SUB_TYPE == 8:
-                        logger.info(
-                            'TM({},{}) @ {} FAILURE: Acknowledge failure of termination check for a command.'
-                            .format(head.SERV_TYPE, head.SERV_SUB_TYPE, cfl.get_cuctime(head)))
-                        logger.debug('Data of the TM packet: {}'.format(data))
-                    result = False
-
-    return result, ack_tms
-    pass
 
 def get_sid_of_tm(packet):
     """
