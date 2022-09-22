@@ -1728,6 +1728,29 @@ def get_acquisition(pool_name, tm_21_3):
             logger.info(meta_data[i])
     return result
 
+
+def get_time_of_last_tc(pool_name="LIVE"):
+    """
+    Finds the newest Telecommand in database with the Telemetry just before.
+    param pool_name: str
+        Name of the pool for TM/TC packets in the database
+    """
+
+
+    tm_pool = cfl.get_pool_rows(pool_name)
+    # last_telecommand = None
+    tm_before_tc = None
+    for i in range(-1, -100, -1):
+        if tm_pool[i].timestamp == "":
+            # last_telecommand = tm_pool[i]
+            tm_before_tc = tm_pool[i-1]
+            break
+    timestamp = tm_before_tc.timestamp
+    timestamp_length = len(timestamp)
+    timestamp = float(timestamp[:timestamp_length -1])
+    return timestamp
+
+
 def get_dpu_mode(pool_name="LIVE"):
     """
     Get the data from the last entry in the database and check its DPU Mode.

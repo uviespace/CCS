@@ -38,6 +38,7 @@ Verification_4 = "tm." + tm.get_frequency_of_hk.__name__ + str(inspect.signature
 Verification_5 = "tm." + tm.get_dpu_mode.__name__ + str(inspect.signature((tm.get_dpu_mode)))
 Verification_6 = "tm." + tm.get_packet_length.__name__ + str(inspect.signature((tm.get_packet_length)))
 Verification_7 = "tm." + tm.get_version_number.__name__ + str(inspect.signature((tm.get_version_number)))
+Verification_8 = "tm." + tm.get_time_of_last_tc.__name__ + str(inspect.signature((tm.get_time_of_last_tc)))
 
 
 
@@ -49,7 +50,8 @@ verification_list = [
     ("Get HK frequency", None, None, "descr", Verification_4),
     ("Get DPU Mode", None, None, "descr", Verification_5),
     ("Get Packet Length", None, None, "descr", Verification_6),
-    ("Get Version Number", None, None, "descr", Verification_7)
+    ("Get Version Number", None, None, "descr", Verification_7),
+    ("Get Time before last TC", None, None, "descr", Verification_8)
 ]
 
 
