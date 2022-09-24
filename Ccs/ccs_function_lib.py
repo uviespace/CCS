@@ -78,7 +78,7 @@ fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
 
 # get format and offset of HK SID
 SID_FORMAT = {1: '>B', 2: '>H', 4: '>I'}
-_sidfmt = scoped_session_idb.execute('SELECT PIC_PI1_OFF,PIC_PI1_WID FROM mib_smile_sxi.pic where PIC_TYPE=3 and PIC_STYPE=25').fetchall()
+_sidfmt = scoped_session_idb.execute('SELECT PIC_PI1_OFF,PIC_PI1_WID FROM {}.pic where PIC_TYPE=3 and PIC_STYPE=25'.format(cfg.get('ccs-database', 'idb_schema'))).fetchall()
 if len(_sidfmt) != 0:
     SID_OFFSET, SID_BITSIZE = _sidfmt[0]
     SID_SIZE = int(SID_BITSIZE / 8)
@@ -2588,7 +2588,7 @@ def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0., ack=None, p
 
 
 def get_tc_descr_from_stsst(st, sst):
-    res = scoped_session_idb.execute('SELECT ccf_descr FROM mib_smile_sxi.ccf where ccf_type={} and ccf_stype={}'.format(st, sst)).fetchall()
+    res = scoped_session_idb.execute('SELECT ccf_descr FROM {}.ccf where ccf_type={} and ccf_stype={}'.format(cfg.get('ccs-database', 'idb_schema'), st, sst)).fetchall()
     return [x[0] for x in res]
 
 
