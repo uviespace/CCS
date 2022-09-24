@@ -2281,6 +2281,14 @@ class TMPoolView(Gtk.Window):
         if create:
             listview = Gtk.TreeView()
             listview.set_model(tm_data_model)
+
+            # Set up Drag and Drop
+            listview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+            listview.drag_source_set_target_list(None)
+            listview.drag_source_add_text_targets()
+
+            listview.connect("drag-data-get", self.on_drag_tmdata_get)
+
         else:
             listview = self.tm_data_view
             for c in listview.get_columns():
@@ -2306,7 +2314,7 @@ class TMPoolView(Gtk.Window):
             listview.set_tooltip_column(3)
 
         else:
-            for i, column_title in enumerate(['bytepos', 'hex', 'decimal', 'ascii']):
+            for i, column_title in enumerate(['BYTEPOS', 'HEX', 'DEC', 'ASCII']):
                 render = Gtk.CellRendererText()
                 column = Gtk.TreeViewColumn(column_title, render, text=i)
                 # column.set_cell_data_func(render, self.text_colour2)
@@ -2315,6 +2323,11 @@ class TMPoolView(Gtk.Window):
 
         if create:
             return listview
+
+    def on_drag_tmdata_get(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+        selection_data.set_text('{} = {}'.format(*model[my_iter][:2]), -1)
 
     def create_decoder_bar(self):
         box = Gtk.VBox()
@@ -2487,7 +2500,8 @@ class TMPoolView(Gtk.Window):
                 hexa.set_label(byts.hex().upper())
                 uint.set_label(str(int.from_bytes(byts, 'big')))
                 bina.set_label(bin(int.from_bytes(byts, 'big'))[2:])
-            except:
+            except Exception as err:
+                self.logger.info(err)
                 hexa.set_label('###')
                 uint.set_label('###')
                 bina.set_label('###')
@@ -2497,15 +2511,12 @@ class TMPoolView(Gtk.Window):
             model, treepath = widget.get_selected_rows()
             if treepath:
                 value = model[treepath[0]][3]
-                #print(list(model[treepath[0]]))
-                #print(value)
-                #print(type(value))
                 self.hexview.set_text(value)
 
     @delayed(10)
     def set_tm_data_view(self, selection=None, event=None, change_columns=False):
         if not self.active_pool_info or not self.decoding_type == 'PUS':
-            self.logger.info('Can not decode parameters for RMAP or FEE data packets')
+            self.logger.warning('Cannot decode parameters for RMAP or FEE data packets')
             buf = Gtk.TextBuffer(text='Parameter view not available for non-PUS packets')
             self.tm_header_view.set_buffer(buf)
             return
