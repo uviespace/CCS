@@ -31,6 +31,7 @@ import importlib
 cfg = confignator.get_config(check_interpolation=False)
 
 PCPREFIX = 'packet_config_'
+CFG_SECT_PLOT_PARAMETERS = 'ccs-plot_parameters'
 
 # Set up logger
 CFL_LOGGER_NAME = 'cfl'
@@ -943,7 +944,7 @@ def parameter_tooltip_text(x):
         h = struct.pack('>f', x).hex().upper()
     else:
         h = str(x)
-    return 'HEX: {}\nDEC: {}'.format(h, x)
+    return 'HEX: 0x{}\nDEC: {}'.format(h, x)
 
 
 def Tcdata(tm, *args):
@@ -1541,7 +1542,7 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
         #ufmt = ptt['hk'][ptc][pfc]
         ufmt = ptt(ptc, pfc)
     else:
-        userpar = json.loads(cfg['ccs-plot_parameters'][param])
+        userpar = json.loads(cfg[CFG_SECT_PLOT_PARAMETERS][param])
         if ('SID' not in userpar.keys()) or (userpar['SID'] is None):
             tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'])[-last:]
         else:
@@ -3302,13 +3303,14 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
                 bytepos, fmt = int(dialog.bytepos.get_text(), 0), fmtlist[dialog.format.get_active_text()]
                 if fmt == 'bit':
                     fmt += dialog.bitlen.get_text()
-            except:
+            except Exception as err:
+                logger.error(err)
                 dialog.destroy()
                 return None
 
-            if not cfg.has_section('ccs-plot_parameters'):
-                cfg.add_section('ccs-plot_parameters')
-            cfg.save_option_to_file('ccs-plot_parameters', label, json.dumps(
+            if not cfg.has_section(CFG_SECT_PLOT_PARAMETERS):
+                cfg.add_section(CFG_SECT_PLOT_PARAMETERS)
+            cfg.save_option_to_file(CFG_SECT_PLOT_PARAMETERS, label, json.dumps(
                 {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi}))
 
             dialog.destroy()
@@ -3367,10 +3369,10 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
         logger.error('Please give all arameters correctly')
         return
     # Add the created Parameter to the config file egse.cfg
-    if not cfg.has_section('ccs-plot_parameters'):
-        cfg.add_section('ccs-plot_parameters')
+    if not cfg.has_section(CFG_SECT_PLOT_PARAMETERS):
+        cfg.add_section(CFG_SECT_PLOT_PARAMETERS)
 
-    cfg.save_option_to_file('ccs-plot_parameters', label, json.dumps(
+    cfg.save_option_to_file(CFG_SECT_PLOT_PARAMETERS, label, json.dumps(
         {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi}))
 
     return label, apid, st, sst, sid, bytepos, fmt, offbi
@@ -3379,8 +3381,8 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
 # Removes a user defined Parameter
 def remove_user_parameter(parname=None, parentwin=None):
     # If a Parameter is given delete the parameter
-    if parname and cfg.has_option('ccs-plot_parameters', parname):
-        cfg.remove_option_from_file('ccs-plot_parameters', parname)
+    if parname and cfg.has_option(CFG_SECT_PLOT_PARAMETERS, parname):
+        cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, parname)
 
         return parname
 
@@ -3391,7 +3393,7 @@ def remove_user_parameter(parname=None, parentwin=None):
         if response == Gtk.ResponseType.OK:
             param = dialog.remove_name.get_active_text()
 
-            cfg.remove_option_from_file('ccs-plot_parameters', param)
+            cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, param)
 
             return param
 
@@ -3409,11 +3411,11 @@ def remove_user_parameter(parname=None, parentwin=None):
 
 
 # Edit an existing user defined Parameter
-def edit_user_parameter(parentwin = None, parname = None):
+def edit_user_parameter(parentwin=None, parname=None):
 
-    # If a Existing Parameter is given, open same Window as for adding a parameter, but pass along the existing information
-    # Simply overwrite the existing parameter with the new one
-    if parname and cfg.has_option('ccs-plot_parameters', parname):
+    # if an existing parameter is given, open same window as for adding a parameter, but pass along the existing information
+    # simply overwrite the existing parameter with the new one
+    if parname and cfg.has_option(CFG_SECT_PLOT_PARAMETERS, parname):
         dialog = AddUserParamerterDialog(parentwin, parname)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
@@ -3432,11 +3434,15 @@ def edit_user_parameter(parentwin = None, parname = None):
             except ValueError as error:
                 logger.error(error)
                 dialog.destroy()
-                return None
+                return
 
-            if not cfg.has_section('ccs-plot_parameters'):
-                cfg.add_section('ccs-plot_parameters')
-            cfg.save_option_to_file('ccs-plot_parameters', label, json.dumps(
+            # TODO: replace param if label changed
+            if label != parname:
+                cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, parname)
+
+            if not cfg.has_section(CFG_SECT_PLOT_PARAMETERS):
+                cfg.add_section(CFG_SECT_PLOT_PARAMETERS)
+            cfg.save_option_to_file(CFG_SECT_PLOT_PARAMETERS, label, json.dumps(
                 {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi}))
 
             dialog.destroy()
@@ -3444,13 +3450,13 @@ def edit_user_parameter(parentwin = None, parname = None):
             return label, apid, st, sst, sid, bytepos, fmt, offbi
         else:
             dialog.destroy()
-            return None
+            return
 
     # Else Open a Window to select a parameter and call the same function again with an existing parameter
     # The upper code will be executed
     else:
         if parname is not None:
-            logger.warning('Selected User Defined Paramter could not be found please select a new one')
+            logger.warning('User defined parameter "{}" could not be found, please select a new one'.format(parname))
 
         dialog = EditUserParameterDialog(cfg, parentwin)
         response = dialog.run()
@@ -4119,7 +4125,7 @@ class TmDecoderDialog(Gtk.Dialog):
 
 class AddUserParamerterDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, edit=None):
-        Gtk.Dialog.__init__(self, "Add User Parameter", parent, 0,
+        Gtk.Dialog.__init__(self, "Edit User Parameter", parent, 0,
                             buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
 
         self.cfg = cfg
@@ -4139,7 +4145,7 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
         self.sst.set_placeholder_text('Service Subtype')
         self.sid = Gtk.Entry()
         self.sid.set_placeholder_text('SID')
-        self.sid.set_tooltip_text('First byte in source data (optional)')
+        self.sid.set_tooltip_text('Further discriminant (i.e. PI1VAL)')
 
         hbox.pack_start(self.apid, 0, 0, 0)
         hbox.pack_start(self.st, 0, 0, 0)
@@ -4182,7 +4188,7 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
         box.set_spacing(10)
 
         if edit is not None:
-            pars = json.loads(self.cfg['ccs-plot_parameters'][edit])
+            pars = json.loads(self.cfg[CFG_SECT_PLOT_PARAMETERS][edit])
             self.label.set_text(edit)
             if 'ST' in pars:
                 self.st.set_text(str(pars['ST']))
@@ -4258,14 +4264,14 @@ class RemoveUserParameterDialog(Gtk.Dialog):
     def create_remove_model(self):
         model = Gtk.ListStore(str)
 
-        for decoder in self.cfg['ccs-plot_parameters'].keys():
+        for decoder in self.cfg[CFG_SECT_PLOT_PARAMETERS].keys():
             model.append([decoder])
         return model
 
     def fill_remove_mask(self, widget):
         decoder = widget.get_active_text()
 
-        if self.cfg.has_option('ccs-plot_parameters', decoder):
+        if self.cfg.has_option(CFG_SECT_PLOT_PARAMETERS, decoder):
             self.ok_button.set_sensitive(True)
         else:
             self.ok_button.set_sensitive(False)
@@ -4299,14 +4305,14 @@ class EditUserParameterDialog(Gtk.Dialog):
     def create_edit_model(self):
         model = Gtk.ListStore(str)
 
-        for decoder in self.cfg['ccs-plot_parameters'].keys():
+        for decoder in self.cfg[CFG_SECT_PLOT_PARAMETERS].keys():
             model.append([decoder])
         return model
 
     def fill_edit_mask(self, widget):
         decoder = widget.get_active_text()
 
-        if self.cfg.has_option('ccs-plot_parameters', decoder):
+        if self.cfg.has_option(CFG_SECT_PLOT_PARAMETERS, decoder):
             self.ok_button.set_sensitive(True)
         else:
             self.ok_button.set_sensitive(False)
