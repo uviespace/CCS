@@ -42,7 +42,6 @@ gi.require_version('Notify', '0.7')
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
 
 # from event_storm_squasher import delayed
-# import logging.handlers
 
 ActivePoolInfo = NamedTuple(
     'ActivePoolInfo', [
@@ -57,8 +56,7 @@ fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i',
 
 class PlotViewer(Gtk.Window):
 
-    def __init__(self, loaded_pool=None, parent=None, poolmgr=None, given_cfg=None, refresh_rate=1, parameters={},
-                 start_live=False, logger=None):
+    def __init__(self, loaded_pool=None, refresh_rate=1, parameters=None, start_live=False, **kwargs):
         Gtk.Window.__init__(self)
 
         Notify.init('PlotViewer')
@@ -84,9 +82,9 @@ class PlotViewer(Gtk.Window):
 
         self.refresh_rate = refresh_rate
 
-        if not self.cfg.has_section('ccs-plot_parameters'):
-            self.cfg.add_section('ccs-plot_parameters')
-        self.user_parameters = self.cfg['ccs-plot_parameters']
+        if not self.cfg.has_section(cfl.CFG_SECT_PLOT_PARAMETERS):
+            self.cfg.add_section(cfl.CFG_SECT_PLOT_PARAMETERS)
+        self.user_parameters = self.cfg[cfl.CFG_SECT_PLOT_PARAMETERS]
 
         self.session_factory_idb = scoped_session_maker('idb')
         self.session_factory_storage = scoped_session_maker('storage')
@@ -118,6 +116,9 @@ class PlotViewer(Gtk.Window):
 
         # self.connect('delete-event', self.write_cfg)
         self.connect('delete-event', self.live_plot_off)
+
+        if parameters is None:
+            parameters = {}
 
         self.plot_parameters = parameters
         if len(parameters) != 0:
@@ -366,7 +367,7 @@ class PlotViewer(Gtk.Window):
 
         # add user defined PARAMETERS
         self.useriter = parameter_model.append(None, ['User defined'])
-        for userpar in self.cfg['ccs-plot_parameters']:
+        for userpar in self.cfg[cfl.CFG_SECT_PLOT_PARAMETERS]:
             parameter_model.append(self.useriter, [userpar])
 
         return parameter_model
@@ -484,7 +485,7 @@ class PlotViewer(Gtk.Window):
     def add_user_parameter(self, widget, treeview):
         parameter_model = treeview.get_model()
 
-        param_values = cfl.add_user_parameter(parentwin = self)
+        param_values = cfl.add_user_parameter(parentwin=self)
 
         if param_values:
             label, apid, st, sst, sid, bytepos, fmt, offbi = param_values
@@ -497,45 +498,54 @@ class PlotViewer(Gtk.Window):
 
         selection = treeview.get_selection()
         model, parpath = selection.get_selected_rows()
-        parameter_model = treeview.get_model()
+        # parameter_model = treeview.get_model()
 
         try:
-            parent = model[parpath].parent[0]  # Check if selection is an object or the parent tab is selected
-            parname = model[parpath][0]
-            param_values = cfl.remove_user_parameter(parname)
+            if model[parpath].parent is not None and model[parpath].parent[0] == 'User defined':  # Check if selection is an object or the parent tab is selected
+                parname = model[parpath][0]
+                param_values = cfl.remove_user_parameter(parname)
+            else:
+                param_values = None
 
-        except:
-            param_values = cfl.remove_user_parameter(parentwin=self)
+        except Exception as err:
+            self.logger.warning(err)
+            # param_values = cfl.remove_user_parameter(parentwin=self)
+            return
 
         if param_values:
             parameter_model = self.treeview.get_model()
             self.user_parameters.pop(param_values)
             parameter_model.remove(self.useriter)
             self.useriter = self.store.append(None, ['User defined'])
-            for userpar in self.cfg['ccs-plot_parameters']:
+            for userpar in self.cfg[cfl.CFG_SECT_PLOT_PARAMETERS]:
                 parameter_model.append(self.useriter, [userpar])
-
-        return
 
     def edit_user_parameter(self, widget, treeview):
         selection = treeview.get_selection()
         model, parpath = selection.get_selected_rows()
-        try:
-            parent = model[parpath].parent[0]  # Check if selection is an object or the parent tab is selected
-            parname = model[parpath][0]
-            param_values = cfl.edit_user_parameter(self, parname)
-            if param_values:
-                label, apid, st, sst, sid, bytepos, fmt, offbi = param_values
-                self.user_parameters[label] = json.dumps(
-                    {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
-        except:
-            param_values = cfl.edit_user_parameter(self)
-            if param_values:
-                label, apid, st, sst, sid, bytepos, fmt, offbi = param_values
-                self.user_parameters[label] = json.dumps(
-                    {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
 
-        return
+        try:
+            if model[parpath].parent is not None and model[parpath].parent[0] == 'User defined':  # Check if selection is an object or the parent tab is selected
+                parname = model[parpath][0]
+                param_values = cfl.edit_user_parameter(self, parname)
+                if param_values:
+                    label, apid, st, sst, sid, bytepos, fmt, offbi = param_values
+                    self.user_parameters[label] = json.dumps(
+                        {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
+
+                    model[parpath][0] = label  # TODO: update listview when edit changed parname
+
+            else:
+                return
+                # param_values = cfl.edit_user_parameter(self)
+                # if param_values:
+                #     label, apid, st, sst, sid, bytepos, fmt, offbi = param_values
+                #     self.user_parameters[label] = json.dumps(
+                #         {'APID': apid, 'ST': st, 'SST': sst, 'SID': sid, 'bytepos': bytepos, 'format': fmt, 'offbi': offbi})
+
+        except Exception as err:
+            self.logger.warning(err)
+            return
 
     def create_univie_box(self):
         """
@@ -660,7 +670,7 @@ class PlotViewer(Gtk.Window):
             rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst,
                                DbTelemetry.data.like(self.sid_position_query(st, sst, sid)))
         else:
-            userpar = json.loads(self.cfg['ccs-plot_parameters'][parameter])
+            userpar = json.loads(self.cfg[cfl.CFG_SECT_PLOT_PARAMETERS][parameter])
             rows = rows.filter(DbTelemetry.stc == userpar['ST'], DbTelemetry.sst == userpar['SST'],
                                DbTelemetry.apid == userpar['APID'])
             if 'SID' in userpar and userpar['SID']:
@@ -1128,7 +1138,7 @@ class PlotViewer(Gtk.Window):
             # Both are not in the same project do not change
 
             if not conn.Variables('main_instance') == self.main_instance:
-                self.logger.warning('Application {} is not in the same project as {}: Can not communicate'.format(
+                self.logger.error('Application {} is not in the same project as {}: Can not communicate'.format(
                     self.my_bus_name, self.cfg['ccs-dbus_names'][application] + str(instance)))
                 return
 
