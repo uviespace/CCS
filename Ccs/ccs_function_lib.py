@@ -4520,7 +4520,7 @@ class ProjectDialog(Gtk.Dialog):
         for m in mibs:
             idb_selection.append(m, m)
 
-        set_as = cfg.get('ccs-database', 'idb_schema')
+        set_as = cfg.get('database', 'mib-schema')
         idb_selection.set_active_id(set_as)
 
         return idb_selection
@@ -4528,8 +4528,8 @@ class ProjectDialog(Gtk.Dialog):
     def _write_config(self, widget, data):
         if data == 1:
 
-            self.cfg.save_option_to_file('ccs-database', 'project', self.project_selection.get_active_text())
-            self.cfg.save_option_to_file('ccs-database', 'idb_schema', self.idb_selection.get_active_text())
+            self.cfg.save_option_to_file('project', 'name', self.project_selection.get_active_text())
+            self.cfg.save_option_to_file('database', 'mib-schema', self.idb_selection.get_active_text())
 
             self.destroy()
             Gtk.main_quit()
