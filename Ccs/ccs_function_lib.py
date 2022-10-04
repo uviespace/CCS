@@ -4505,7 +4505,7 @@ class ProjectDialog(Gtk.Dialog):
         for p in projects:
             project_selection.append(p, p)
 
-        set_as = cfg.get.get_option('ccs-database', 'project')
+        set_as = cfg.get('ccs-database', 'project')
         project_selection.set_active_id(set_as)
 
         return project_selection
