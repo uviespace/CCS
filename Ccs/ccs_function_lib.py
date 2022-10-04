@@ -76,16 +76,21 @@ personal_fmtlist = ['uint', 'ascii', 'oct']
 fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
                  'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
 
-# get format and offset of HK SID
-SID_FORMAT = {1: '>B', 2: '>H', 4: '>I'}
-_sidfmt = scoped_session_idb.execute('SELECT PIC_PI1_OFF,PIC_PI1_WID FROM {}.pic where PIC_TYPE=3 and PIC_STYPE=25'.format(cfg.get('ccs-database', 'idb_schema'))).fetchall()
-if len(_sidfmt) != 0:
-    SID_OFFSET, SID_BITSIZE = _sidfmt[0]
-    SID_SIZE = int(SID_BITSIZE / 8)
-else:
-    SID_SIZE = 2
-    SID_OFFSET = TM_HEADER_LEN
-    logger.warning('HK SID definition not found in MIB, using default: OFFSET={}, SIZE={}!'.format(SID_OFFSET, SID_SIZE))
+# get format and offset of SIDs/discriminants
+SID_FORMAT = {8: '>B', 16: '>H', 32: '>I'}
+try:
+    _sidfmt = scoped_session_idb.execute('SELECT PIC_TYPE,PIC_STYPE,PIC_APID,PIC_PI1_OFF,PIC_PI1_WID FROM pic').fetchall()
+    if len(_sidfmt) != 0:
+        SID_LUT = {tuple(k[:3]): tuple(k[3:]) for k in _sidfmt}
+    else:
+        SID_LUT = {}
+        logger.warning('SID definitions not found in MIB!')
+except SQLOperationalError:
+    APID_FALLBACK = 322
+    _sidfmt = scoped_session_idb.execute('SELECT PIC_TYPE,PIC_STYPE,PIC_PI1_OFF,PIC_PI1_WID FROM pic').fetchall()
+    SID_LUT = {tuple([*k[:2], APID_FALLBACK]): tuple(k[2:]) for k in _sidfmt}
+    logger.warning('MIB structure not compatible, using fallback APID ({}). This will impact packet decoding.'.format(APID_FALLBACK))
+
 
 # get names of TC parameters that carry data pool IDs, i.e. have CPC_CATEG=P
 DATA_POOL_ID_PARAMETERS = [par[0] for par in scoped_session_idb.execute('SELECT cpc_pname FROM cpc WHERE cpc_categ="P"').fetchall()]

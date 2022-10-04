@@ -42,13 +42,15 @@ TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN
      packet_config.TC_HEADER_LEN, packet_config.P_HEADER_LEN, packet_config.PEC_LEN, packet_config.MAX_PKT_LEN,
      packet_config.timepack, packet_config.timecal]
 
-RMapCommandHeader, RMapReplyWriteHeader, RMapReplyReadHeader = packet_config.RMapCommandHeader, \
-                                                               packet_config.RMapReplyWriteHeader, \
-                                                               packet_config.RMapReplyReadHeader
+# RMAP and FEE protocols are only supported in SMILE
+if project.endswith('SMILE'):
+    RMapCommandHeader, RMapReplyWriteHeader, RMapReplyReadHeader = packet_config.RMapCommandHeader, \
+                                                                   packet_config.RMapReplyWriteHeader, \
+                                                                   packet_config.RMapReplyReadHeader
 
-RMAP_COMMAND_HEADER_LEN, RMAP_REPLY_WRITE_HEADER_LEN, RMAP_REPLY_READ_HEADER_LEN, RMAP_PEC_LEN = \
-    packet_config.RMAP_COMMAND_HEADER_LEN, packet_config.RMAP_REPLY_WRITE_HEADER_LEN, \
-    packet_config.RMAP_REPLY_READ_HEADER_LEN, packet_config.RMAP_PEC_LEN
+    RMAP_COMMAND_HEADER_LEN, RMAP_REPLY_WRITE_HEADER_LEN, RMAP_REPLY_READ_HEADER_LEN, RMAP_PEC_LEN = \
+        packet_config.RMAP_COMMAND_HEADER_LEN, packet_config.RMAP_REPLY_WRITE_HEADER_LEN, \
+        packet_config.RMAP_REPLY_READ_HEADER_LEN, packet_config.RMAP_PEC_LEN
 
 PLM_PKT_PREFIX_TM = packet_config.PLM_PKT_PREFIX_TM
 PLM_PKT_PREFIX_TC = packet_config.PLM_PKT_PREFIX_TC
