@@ -1729,6 +1729,8 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
 #  loop to prevent too many packets are being sent over the socket in a too short time interval.
 def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, **kwargs):
 
+    t1 = time.time()
+
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
     if not pmgr:
         return
@@ -1741,7 +1743,12 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
     if pool_name is None:
         pool_name = pmgr.Variables('tc_name')
 
-    return _tcsend_common(tc, apid, st, sst, sleep=sleep, pool_name=pool_name, pkt_time=pkt_time)
+    sent = _tcsend_common(tc, apid, st, sst, pool_name=pool_name, pkt_time=pkt_time)
+
+    dt = time.time() - t1
+    time.sleep(max(sleep - dt, 0))
+
+    return sent
 
 
 ##
@@ -2351,7 +2358,7 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
     log_dict = dict([('st', st),('sst', sst),('ssc', ssc),('apid', apid),('timestamp', t)])
     json_string = '{} {}'.format('#SENT TC', json.dumps(log_dict))
     logger.info(json_string)
-    time.sleep(sleep)
+    # time.sleep(sleep)
     return apid, ssc, t
 
 
@@ -2690,6 +2697,9 @@ def srectohex(fname, memid, memaddr, segid, tcsend=False, outname=None, linesper
 
     linecount = 0
     while linecount < len(f) - 1:
+
+        t1 = time.time()
+
         linepacklist = []
         for n in range(linesperpack):
             if linecount >= (len(lines) - 1):
@@ -2717,12 +2727,13 @@ def srectohex(fname, memid, memaddr, segid, tcsend=False, outname=None, linesper
             memaddr += len(data)
             continue
         packetdata = struct.pack('>HII', memid, memaddr, len(data)) + data
-        PUS = Tcpack(data=packetdata, st=6, sst=2, sc=pcount, ack=0b1001)
+        PUS = Tcpack(data=packetdata, st=6, sst=2, sc=pcount, apid=apid, ack=0b1001)
         if len(PUS) > 1024:
             logger.warning('Packet length ({:}) exceeding 1024 bytes!'.format(len(PUS)))
         if tcsend:
             Tcsend_bytes(PUS, pool_name=tcsend)
-            time.sleep(sleep)
+            dt = time.time() - t1
+            time.sleep(max(sleep - dt, 0))
         else:
             with open(outname + '%04i.tc' % pcount, 'w') as ofile:
                 # ofile.write(PUS.hex.upper())
@@ -2740,7 +2751,7 @@ def srectohex(fname, memid, memaddr, segid, tcsend=False, outname=None, linesper
             fd.write('\n'.join(source_list))
         return
     packetdata = struct.pack('>HII', memid, memaddr, 12) + bytes(12)
-    PUS = Tcpack(data=packetdata, st=6, sst=2, sc=pcount, ack=0b1001)
+    PUS = Tcpack(data=packetdata, st=6, sst=2, sc=pcount, apid=apid, ack=0b1001)
     if tcsend:
         Tcsend_bytes(PUS, pool_name=tcsend)
     else:
@@ -2787,6 +2798,9 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
 
     linecount = 0
     while linecount < len(f) - 1:
+
+        t1 = time.time()
+
         linepacklist = []
         for n in range(linesperpack):
             if linecount >= (len(lines) - 1):
@@ -2815,7 +2829,8 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
             logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
 
         Tcsend_bytes(puspckt, pool_name=pool_name)
-        time.sleep(sleep)
+        dt = time.time() - t1
+        time.sleep(max(sleep - dt, 0))
 
         startaddr = newstartaddr
         memaddr += len(data)
