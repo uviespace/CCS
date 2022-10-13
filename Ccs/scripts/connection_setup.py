@@ -11,5 +11,6 @@ cfl.connect_tc('LIVE', '', 5571, protocol='PUS')
 cfl.start_pv()
 
 #! CCS.BREAKPOINT
+### Monitor ###
 cfl.start_monitor('LIVE')
-# cfl.set_monitor('LIVE')
+
