@@ -131,7 +131,8 @@ class IPythonTerminal(Vte.Terminal):
             else:
                 return self.feed_child(msg, len(msg))
         else:
-            return self.feed_child_binary(msg.encode())
+            msg_enc = msg.encode('utf-8') if msg is not None else msg
+            return self.feed_child(msg_enc)
 
 
 class CcsEditor(Gtk.Window):
@@ -560,16 +561,20 @@ class CcsEditor(Gtk.Window):
         #     line += '\n--\n'
         # if len(line.split('\n')) > 2:
         if line.count('\n') > 2:
-            if VTE_VERSION < '0.52.3':
-                self.ipython_view.feed_child('%cpaste\n', 8)
-                time.sleep(0.2)  # wait for interpreter to return before feeding new code
-                self.ipython_view.feed_child(line, len(line))
-                self.ipython_view.feed_child('--\n', 3)
-            else:
-                self.ipython_view.feed_child_binary('%cpaste\n'.encode())
-                time.sleep(0.2)  # wait for interpreter to return before feeding new code
-                self.ipython_view.feed_child_binary(line.encode())
-                self.ipython_view.feed_child_binary('--\n'.encode())
+            self.ipython_view.feed_child_compat('%cpaste\n')
+            time.sleep(0.2)  # wait for interpreter to return before feeding new code
+            self.ipython_view.feed_child_compat(line)
+            self.ipython_view.feed_child_compat('--\n')
+            # if VTE_VERSION < '0.52.3':
+            #     self.ipython_view.feed_child('%cpaste\n', 8)
+            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
+            #     self.ipython_view.feed_child(line, len(line))
+            #     self.ipython_view.feed_child('--\n', 3)
+            # else:
+            #     self.ipython_view.feed_child('%cpaste\n'.encode('utf-8'))
+            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
+            #     self.ipython_view.feed_child(line.encode('utf-8'))
+            #     self.ipython_view.feed_child('--\n'.encode('utf-8'))
             # self.ipython_view.feed_child('%cpaste\n'+line+'--\n', len(line)+11)
             # for line in line.split('\n'):
             #     while 1:
@@ -580,10 +585,11 @@ class CcsEditor(Gtk.Window):
             #         else:
             #             time.sleep(0.01)
         else:
-            if VTE_VERSION < '0.52.3':
-                self.ipython_view.feed_child(line, len(line))
-            else:
-                self.ipython_view.feed_child_binary(line.encode())
+            self.ipython_view.feed_child_compat(line)
+            # if VTE_VERSION < '0.52.3':
+            #     self.ipython_view.feed_child(line, len(line))
+            # else:
+            #     self.ipython_view.feed_child(line.encode('utf-8'))
 
     def create_mark_attributes(self):
         self.mark_play = GtkSource.MarkAttributes()
