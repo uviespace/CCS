@@ -1989,10 +1989,18 @@ def tc_param_alias(param, val, no_check=False):
         else:
             # subtract offset from PID to be compatible with IASW (CHEOPS only)
             if param in ['DPP70004', 'DPP70043']:
-                val -= pid_offset
+                try:
+                    val -= pid_offset
+                except TypeError:
+                    val = DP_ITEMS_TO_IDS[val]
+                    val -= pid_offset
     else:
         if param in ['DPP70004', 'DPP70043']:
-            val -= pid_offset
+            try:
+                val -= pid_offset
+            except TypeError:
+                val = DP_ITEMS_TO_IDS[val]
+                val -= pid_offset
 
     if paf is not None:
 
