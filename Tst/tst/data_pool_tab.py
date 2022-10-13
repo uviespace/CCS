@@ -11,12 +11,9 @@ sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 
-try:
-    DP_ITEMS_SRC_FILE = confignator.get_option('database', 'datapool-items')
-except confignator.config.configparser.NoOptionError:
-    DP_ITEMS_SRC_FILE = None
 
 logger = logging.getLogger()
+DP_ITEMS_SRC_FILE = cfl.DP_ITEMS_SRC_FILE
 
 
 def reload_dp_data():
@@ -100,6 +97,8 @@ class DataPoolTable(Gtk.Grid):
             column.set_sort_column_id(i)
             self.treeview.append_column(column)
 
+        # self.treeview.set_tooltip_text('Right-click for copy menu')
+
         # Handle selection
         self.selected_row = self.treeview.get_selection()
         #self.selected_row.connect("changed", self.item_selected)
@@ -129,11 +128,14 @@ class DataPoolTable(Gtk.Grid):
         if event.button == 3:
             self.rcl_menu.popup_at_pointer()
 
-    def copy_cell_content(self, cell_idx):
+    def copy_cell_content(self, cell_idx, as_string=False):
         treeselection = self.treeview.get_selection()
         model, it = treeselection.get_selected()
         if model is not None and it is not None:
-            self.clipboard.set_text(model[it][cell_idx], -1)
+            if as_string:
+                self.clipboard.set_text('"{}"'.format(model[it][cell_idx]), -1)
+            else:
+                self.clipboard.set_text(model[it][cell_idx], -1)
 
     def on_pid_combo_changed(self, combo):
         combo_iter = combo.get_active_iter()
@@ -155,10 +157,7 @@ class DataPoolTable(Gtk.Grid):
 
     def data_pool_filter_func(self, model, iter, data):
 
-        if (
-                self.current_filter_data_pool is None
-                or self.current_filter_data_pool == "None"
-        ):
+        if self.current_filter_data_pool is None or self.current_filter_data_pool == "None":
             return True
         else:
             return model[iter][0] == self.current_filter_data_pool
@@ -180,11 +179,18 @@ class TreeRightClickMenu(Gtk.Menu):
         entry_2 = Gtk.MenuItem('Copy NAME')
         self.attach(entry_2, 0, 1, 1, 2)
         entry_2.show()
+        entry_3 = Gtk.MenuItem('Copy NAME as string')
+        self.attach(entry_3, 0, 1, 2, 3)
+        entry_3.show()
         entry_1.connect('activate', self.on_copy_pid, cruf)
         entry_2.connect('activate', self.on_copy_name, cruf)
+        entry_3.connect('activate', self.on_copy_name_as_string, cruf)
 
     def on_copy_pid(self, menu_item, cruf, *args):
         cruf.copy_cell_content(0)
 
     def on_copy_name(self, menu_item, cruf, *args):
         cruf.copy_cell_content(1)
+
+    def on_copy_name_as_string(self, menu_item, cruf, *args):
+        cruf.copy_cell_content(1, as_string=True)
