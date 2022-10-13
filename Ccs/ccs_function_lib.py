@@ -32,6 +32,7 @@ cfg = confignator.get_config(check_interpolation=False)
 
 PCPREFIX = 'packet_config_'
 CFG_SECT_PLOT_PARAMETERS = 'ccs-plot_parameters'
+CFG_SECT_DECODE_PARAMETERS = 'ccs-decode_parameters'
 
 # Set up logger
 CFL_LOGGER_NAME = 'cfl'
@@ -86,19 +87,13 @@ try:
         SID_LUT = {}
         logger.warning('SID definitions not found in MIB!')
 except SQLOperationalError:
-    APID_FALLBACK = 322
     _sidfmt = scoped_session_idb.execute('SELECT PIC_TYPE,PIC_STYPE,PIC_PI1_OFF,PIC_PI1_WID FROM pic').fetchall()
-    SID_LUT = {tuple([*k[:2], APID_FALLBACK]): tuple(k[2:]) for k in _sidfmt}
-    logger.warning('MIB structure not compatible, using fallback APID ({}). This will impact packet decoding.'.format(APID_FALLBACK))
+    SID_LUT = {tuple([*k[:2], None]): tuple(k[2:]) for k in _sidfmt}
+    logger.warning('MIB structure not fully compatible, no APID in PIC for SID format definition.')
 
 
 # get names of TC parameters that carry data pool IDs, i.e. have CPC_CATEG=P
 DATA_POOL_ID_PARAMETERS = [par[0] for par in scoped_session_idb.execute('SELECT cpc_pname FROM cpc WHERE cpc_categ="P"').fetchall()]
-
-# create local look-up tables for data pool items from MIB
-_pid_query = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr FROM pcf WHERE pcf_pid IS NOT NULL').fetchall()
-DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _pid_query}
-DP_ITEMS_TO_IDS = {k[1]: int(k[0]) for k in _pid_query}
 
 
 counters = {}  # keeps track of PUS TC packet sequence counters (one per APID)
@@ -299,7 +294,7 @@ def start_logging(name):
 # This returns a dbus connection to a given Application-Name
 def dbus_connection(name, instance=1):
     if instance == 0:
-        logger.error('No instance of {} found.'.format(name))
+        logger.warning('No instance of {} found.'.format(name))
         return False
 
     if not instance:
@@ -625,9 +620,7 @@ def Tmdata(tm, UDEF=False, *args):
     # This will be used to first check if an UDEF exists and used this to decode, if not the ÍDB will be checked
     if UDEF:
         try:
-            # with poolmgr.lock:
             header, data, crc = Tmread(tm)
-            # data = tm_list[-2]
             st, sst, apid = header.SERV_TYPE, header.SERV_SUB_TYPE, header.APID
             que = 'SELECT pic_pi1_off,pic_pi1_wid from pic where pic_type=%s and pic_stype=%s' % (st, sst)
             dbres = dbcon.execute(que)
@@ -1322,6 +1315,7 @@ def get_cap_yval(pcf_name, xval, properties=None, dbcon=None):
         dbcon.close()
     return format(yval, 'g')
 
+
 ##
 #  Textual calibration
 #
@@ -1757,13 +1751,15 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 #  @param ack  Override the I-DB TC acknowledment value (4-bit binary string, e.g., '0b1011')
 def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, **kwargs):
     # with self.poolmgr.lock:
-    que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
-          'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
-          'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-          'WHERE BINARY ccf_descr="%s"' % cmd
-    dbcon = scoped_session_idb
-    params = dbcon.execute(que).fetchall()
-    dbcon.close()
+    # que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
+    #       'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
+    #       'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
+    #       'WHERE BINARY ccf_descr="%s"' % cmd
+    # dbcon = scoped_session_idb
+    # params = dbcon.execute(que).fetchall()
+    # dbcon.close()
+
+    params = _get_tc_params(cmd)
 
     try:
         st, sst, apid, npars = params[0][:4]
@@ -1836,6 +1832,17 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
                 return pdata
 
     return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
+
+
+def _get_tc_params(cmd):
+    que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
+          'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
+          'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
+          'WHERE BINARY ccf_descr="%s"' % cmd
+    dbcon = scoped_session_idb
+    params = dbcon.execute(que).fetchall()
+    dbcon.close()
+    return params
 
 
 def encode_pus(params, *values, params_as_fmt_string=False):
@@ -2020,6 +2027,7 @@ def tc_param_alias(param, val, no_check=False):
 
         return val
 
+
 ##
 #  Get PID
 #
@@ -2064,6 +2072,17 @@ def get_pid(parnames):
         logger.error(msg)
         # print(msg)
         return None
+
+
+def get_sid(st, sst, apid):
+    if (st, sst, apid) in SID_LUT:
+        return SID_LUT[(st, sst, apid)]
+    else:
+        try:
+            return SID_LUT[(st, sst, None)]
+        except KeyError:
+            return None
+
 
 ##
 #  Parameter range check
@@ -2569,22 +2588,24 @@ def tc_load_to_memory(data, memid, mempos, slicesize=1000, sleep=0., ack=None, p
         if isinstance(data, str):
             data = open(data, 'rb').read()
         else:
-            data = data.bytes
+            raise TypeError
 
     cmd = get_tc_descr_from_stsst(6, 2)[0]
 
     slices = [data[i:i + slicesize] for i in range(0, len(data), slicesize)]
-    if slicesize > 1000:
-        logger.warning('SLICESIZE > 1000 bytes, this is not gonna work!')
+    if slicesize > (MAX_PKT_LEN - TC_HEADER_LEN - PEC_LEN):
+        logger.warning('SLICESIZE > {} bytes, this is not gonna work!'.format(MAX_PKT_LEN - TC_HEADER_LEN - PEC_LEN))
     slicount = 1
 
     for sli in slices:
         t1 = time.time()
-        parts = struct.unpack(len(sli) * 'B', sli)
-        Tcsend_DB(cmd, memid, mempos, len(parts), *parts, ack=ack, pool_name=pool_name)
-        sys.stdout.write('%i / %i packets sent to {}\r'.format(slicount, len(slices), memid))
+        #parts = struct.unpack(len(sli) * 'B', sli)
+        #parts = *sli
+        Tcsend_DB(cmd, memid, mempos, len(sli), *sli, ack=ack, pool_name=pool_name)
+        # sys.stdout.write('%i / %i packets sent to {}\r'.format(slicount, len(slices), memid))
         logger.info('%i / %i packets sent to {}'.format(slicount, len(slices), memid))
         slicount += 1
+        mempos += len(sli)
         dt = time.time() - t1
         if dt < sleep:
             time.sleep(sleep - dt)
@@ -2607,7 +2628,164 @@ def bin_to_hex(fname, outfile):
         logger.info('Wrote {} bytes as HEX-ASCII to {}.'.format(len(bindata), outfile))
 
 
-def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_line=32):
+#######################################################
+##
+#  Convert srec file to sequence of PUS packets (TM6,2) and save them in hex-files or send them to socket _tcsend_
+#  @param fname        Input srec file
+#  @param outname      Root name ouf the output files, if _None_, _fname_ is used
+#  @param memid        Memory ID packets are destined to, number or name (e.g. "DPU_RAM")
+#  @param memaddr      Memory start address where packets are patched to
+#  @param segid        Segment ID
+#  @param tcsend       Name of pool bound to TC socket to send the packets to, files are created instead if _False_
+#  @param linesperpack Number of lines in srec file to concatenate in one PUS packet
+#  @param pcount       Initial sequence counter for packets
+#  @param sleep        Timeout after each packet if packets are sent directly to socket
+def srectohex(fname, outname=None, memid=0x0002, memaddr=0x40180000, segid=0x200B0101, tcsend=False,
+              linesperpack=61, pcount=0, sleep=0.2, source_only=False, add_memaddr_to_source=False):
+
+    source_list = []
+    if outname is None:
+        outname = fname.replace('.srec', '')
+    if not isinstance(memid, int):
+        dbcon = scoped_session_idb
+        dbres = dbcon.execute('SELECT pas_alval from pas where pas_numbr="DPKT9007" and pas_altxt="%s"' % memid)
+        try:
+            memid, = dbres.fetchall()[0]
+        except IndexError:
+            raise ValueError('MemID "{}" does not exist. Aborting.'.format(memid))
+        finally:
+            dbcon.close()
+        memid = int(memid)
+    f = open(fname, 'r').readlines()[1:]
+    lines = [p[12:-3] for p in f]
+    startaddr = int(f[0][4:12], 16)
+
+    # npacks=len(lines)//int(linesperpack)
+    if not isinstance(pcount, int):
+        pcount = 0
+
+    linecount = 0
+    while linecount < len(f) - 1:
+        linepacklist = []
+        for n in range(linesperpack):
+            if linecount >= (len(lines) - 1):
+                break
+            linepacklist.append(lines[linecount])
+            linelength = len(lines[linecount]) // 2
+            if int(f[linecount + 1][4:12], 16) != (int(f[linecount][4:12], 16) + linelength):
+                linecount += 1
+                newstartaddr = int(f[linecount][4:12], 16)
+                break
+            else:
+                linecount += 1
+                newstartaddr = int(f[linecount][4:12], 16)
+
+        linepack = bytes.fromhex(''.join(linepacklist))
+        dlen = len(linepack)
+        data = struct.pack('>III', segid, startaddr, dlen // 4) + linepack + b'\x00\x00'
+        data = data + struct.pack('>H', crc(data))
+        if source_only:
+            if add_memaddr_to_source:
+                source_list.append(prettyhex(memaddr.to_bytes(4, 'big') + data))
+            else:
+                source_list.append(prettyhex(data))
+            startaddr = newstartaddr
+            memaddr += len(data)
+            continue
+        packetdata = struct.pack('>HII', memid, memaddr, len(data)) + data
+        PUS = Tcpack(data=packetdata, st=6, sst=2, sc=pcount, ack=0b1001)
+        if len(PUS) > 1024:
+            logger.warning('Packet length ({:}) exceeding 1024 bytes!'.format(len(PUS)))
+        if tcsend:
+            Tcsend_bytes(PUS, pool_name=tcsend)
+            time.sleep(sleep)
+        else:
+            with open(outname + '%04i.tc' % pcount, 'w') as ofile:
+                # ofile.write(PUS.hex.upper())
+                ofile.write(prettyhex(PUS))
+        startaddr = newstartaddr
+        # startaddr += dlen
+        memaddr += len(data)
+        pcount += 1
+    if source_only:
+        if add_memaddr_to_source:
+            source_list.append(prettyhex(memaddr.to_bytes(4, 'big') + bytes(12)))
+        else:
+            source_list.append(prettyhex(bytes(12)))
+        with open(outname + '_source.TC', 'w') as fd:
+            fd.write('\n'.join(source_list))
+        return
+    packetdata = struct.pack('>HII', memid, memaddr, 12) + bytes(12)
+    PUS = Tcpack(data=packetdata, st=6, sst=2, sc=pcount, ack=0b1001)
+    if tcsend:
+        Tcsend_bytes(PUS, pool_name=tcsend)
+    else:
+        with open(outname + '%04i.tc' % pcount, 'w') as ofile:
+            # ofile.write(PUS.hex.upper())
+            ofile.write(prettyhex(PUS))
+
+
+def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61):
+    """
+    Repack source data from srec file into 'DBS structure' and save it to new srec file.
+    @param input_srec:
+    @param output_srec:
+    @param imageaddr:
+    @param linesperpack:
+    @return:
+    """
+    # get source data from original srec and add memory address
+    srectohex(input_srec, outname='srec_binary', memaddr=0xDEADBEEF, source_only=True, linesperpack=linesperpack)
+
+    # write source data to new srec
+    source_to_srec('srec_binary_source.TC', output_srec, memaddr=imageaddr)
+
+#######################################################
+
+
+def segment_data(data, segid, addr, seglen=480):
+    """
+    Split data into segments (as defined in IWF DPU HW SW ICD) with segment header and CRC.
+    Segment data has to be two-word aligned.
+    Return list of segments.
+    """
+    SEG_HEADER_LEN = 12
+    SEG_SPARE_LEN = 2
+    SEG_CRC_LEN = 2
+    
+    if isinstance(data, str):
+        data = open(data, 'rb').read()
+
+    if not isinstance(data, bytes):
+        raise TypeError
+        
+    datalen = len(data)
+    if datalen % 4:
+            raise ValueError('Data length is not two-word aligned')
+    data = io.BytesIO(data)
+    
+    segments = []
+    segaddr = addr
+    
+    while data.tell() < datalen:
+        chunk = data.read(seglen - (SEG_HEADER_LEN + SEG_SPARE_LEN + SEG_CRC_LEN))
+        chunklen = len(chunk)
+
+        if chunklen % 4:
+            raise ValueError('Segment data length is not two-word aligned')
+            
+        sdata = struct.pack('>III', segid, segaddr, chunklen // 4) + chunk
+        sdata += bytes(SEG_SPARE_LEN) + crc(sdata).to_bytes(SEG_CRC_LEN, 'big')
+        segments.append(sdata)
+        segaddr += chunklen
+
+    # add 12 byte termination segment
+    segments.append(bytes(SEG_HEADER_LEN))
+    
+    return segments
+
+
+def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32):
     """
     Generate srec file from source data
     :param data:
@@ -2622,17 +2800,17 @@ def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_lin
         return sum(bytes.fromhex(x)) & 0xff ^ 0xff
 
     if bytes_per_line > SREC_MAX_BYTES_PER_LINE:
-        logger.error("Maximum number of bytes per line is {}!".format(SREC_MAX_BYTES_PER_LINE))
-        return
+        raise ValueError("Maximum number of bytes per line is {}!".format(SREC_MAX_BYTES_PER_LINE))
 
     if isinstance(data, str):
-        with open(data, 'r') as fd:
-            textdata = fd.read()
-        data = bytes.fromhex(textdata.replace('\n', ' '))
+        data = open(data, 'rb').read()
+        
+    if not isinstance(data, bytes):
+        raise TypeError
 
     if header is None:
         fname = outfile.split('/')[-1][-60:]
-        header = 'S0{:02X}{:}'.format(len(fname.encode()) + 3, fname.encode().hex().upper())
+        header = 'S0{:02X}0000{:}'.format(len(fname.encode('ascii')) + 3, fname.encode('ascii').ljust(24).hex().upper())
         header += '{:02X}'.format(srec_chksum(header[2:]))
 
     datalen = len(data)
@@ -2656,7 +2834,7 @@ def source_to_srec(data, outfile, memaddr=0x40180000, header=None, bytes_per_lin
         fd.write('\n'.join(sreclist) + '\n')
         fd.write(terminator)
 
-    # print('Data written to file: "{}"'.format(outfile))
+    print('Data written to file: "{}"'.format(outfile))
     logger.info('Data written to file: "{}"'.format(outfile))
 
 
@@ -4542,3 +4720,20 @@ class ProjectDialog(Gtk.Dialog):
         else:
             self.close()
             sys.exit()
+
+
+# create local look-up tables for data pool items from MIB
+try:
+    DP_ITEMS_SRC_FILE = cfg.get('database', 'datapool-items')
+    if DP_ITEMS_SRC_FILE:
+        # get DP from file
+        _dp_items = get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
+    else:
+        raise ValueError
+except (FileNotFoundError, ValueError, confignator.config.configparser.NoOptionError):
+    DP_ITEMS_SRC_FILE = None
+    logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
+    _dp_items = get_data_pool_items()
+finally:
+    DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _dp_items}
+    DP_ITEMS_TO_IDS = {k[1]: int(k[0]) for k in _dp_items}
