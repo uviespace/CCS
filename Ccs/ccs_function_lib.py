@@ -1973,14 +1973,21 @@ def Tcack(cmd):
 #  @param param CPC_PNAME
 #  @param val   Parameter value
 def tc_param_alias(param, val, no_check=False):
-    que = 'SELECT cpc_prfref,cpc_ccaref,cpc_pafref,cpc_descr from cpc where cpc_pname="%s"' % param
+    que = 'SELECT cpc_prfref,cpc_ccaref,cpc_pafref,cpc_descr,cpc_categ from cpc where cpc_pname="%s"' % param
     dbcon = scoped_session_idb
-    prf, cca, paf, pdesc = dbcon.execute(que).fetchall()[0]
+    prf, cca, paf, pdesc, categ = dbcon.execute(que).fetchall()[0]
     # this is a workaround for datapool items not being present in PAF/PAS table # DEPRECATED!
     # if param in ['DPP70004', 'DPP70043']:  # DataItemID in TC(211,1)
     #     val = get_pid(val)
     # else:
     #     pass
+
+    # check if parameter holds a data pool ID (categ=P) and look up numerical value in case it is given as string
+    if categ == 'P' and isinstance(val, str):
+        try:
+            val = DP_ITEMS_TO_IDS[val]
+        except KeyError:
+            raise KeyError('Unknown data pool item "{}"'.format(val))
 
     if (not no_check) and (prf is not None):
         in_range, error = tc_param_in_range(prf, val, pdesc)
@@ -1988,19 +1995,11 @@ def tc_param_alias(param, val, no_check=False):
             raise ValueError('Range check failed\n{}'.format(error))
         else:
             # subtract offset from PID to be compatible with IASW (CHEOPS only)
-            if param in ['DPP70004', 'DPP70043']:
-                try:
-                    val -= pid_offset
-                except TypeError:
-                    val = DP_ITEMS_TO_IDS[val]
-                    val -= pid_offset
+            if categ == 'P':
+                val -= pid_offset
     else:
-        if param in ['DPP70004', 'DPP70043']:
-            try:
-                val -= pid_offset
-            except TypeError:
-                val = DP_ITEMS_TO_IDS[val]
-                val -= pid_offset
+        if categ == 'P':
+            val -= pid_offset
 
     if paf is not None:
 
@@ -2038,48 +2037,50 @@ def tc_param_alias(param, val, no_check=False):
 
 ##
 #  Get PID
-#
-#  Translates name of Data pool variable to corresponding ID, based on I-DB entry
-#  @param paramname Name of the Data pool variables
+#  Translates name of data pool variable to corresponding ID, based on DP_ITEMS_TO_IDS look-up table
+#  @param paramname Name of the data pool variables
 def get_pid(parnames):
-    if isinstance(parnames, int):
-        return parnames
-    elif not isinstance(parnames, list):
+    # if isinstance(parnames, int):
+    #     return parnames
+    if isinstance(parnames, str):
         parnames = [parnames]
 
-    if len(set(parnames)) != len(parnames):
-        msg = "Duplicate parameters will be ignored! {}".format(set([p for p in parnames if parnames.count(p) > 1]))
-        logger.warning(msg)
-        # print(msg)
+    # if len(set(parnames)) != len(parnames):
+    #     msg = "Duplicate parameters will be ignored! {}".format(set([p for p in parnames if parnames.count(p) > 1]))
+    #     logger.warning(msg)
 
-    que = 'SELECT pcf_descr,pcf_pid from pcf where BINARY pcf_descr in ({})'.format(', '.join(['"{}"'.format(p) for p in parnames]))
-    dbcon = scoped_session_idb
-    fetch = dbcon.execute(que).fetchall()
-    dbcon.close()
+    pids = [DP_ITEMS_TO_IDS[parname] for parname in parnames]
 
-    if len(fetch) == 1 and len(parnames) == 1:
-        return int(fetch[0][1]) if fetch[0][1] is not None else None  # not since IDBv2.1: - 212010000
+    return pids if len(pids) > 1 else pids[0]
 
-    elif len(fetch) >= 1:
-        descr, pid = zip(*fetch)
-        nopcf = [name for name in parnames if name not in descr]
-        if nopcf:
-            raise NameError("The following parameters are not in the database: {}".format(nopcf))
-        nopid = [name for name, p in fetch if p is None]
-        if nopid:
-            msg = "The following parameters have no PID: {}".format(nopid)
-            logger.warning(msg)
-            # print(msg)
-        sort_order = [parnames.index(d) for d in descr]
-        descr, pid = zip(*[x for _, x in sorted(zip(sort_order, fetch), key=lambda x: x[0])])
-        return descr, pid
-
-    else:
-        msg = 'Unknown datapool item(s) {}'.format(parnames)
-        # raise NameError(msg)
-        logger.error(msg)
-        # print(msg)
-        return None
+    # que = 'SELECT pcf_descr,pcf_pid from pcf where BINARY pcf_descr in ({})'.format(', '.join(['"{}"'.format(p) for p in parnames]))
+    # dbcon = scoped_session_idb
+    # fetch = dbcon.execute(que).fetchall()
+    # dbcon.close()
+    #
+    # if len(fetch) == 1 and len(parnames) == 1:
+    #     return int(fetch[0][1]) if fetch[0][1] is not None else None  # not since IDBv2.1: - 212010000
+    #
+    # elif len(fetch) >= 1:
+    #     descr, pid = zip(*fetch)
+    #     nopcf = [name for name in parnames if name not in descr]
+    #     if nopcf:
+    #         raise NameError("The following parameters are not in the database: {}".format(nopcf))
+    #     nopid = [name for name, p in fetch if p is None]
+    #     if nopid:
+    #         msg = "The following parameters have no PID: {}".format(nopid)
+    #         logger.warning(msg)
+    #         # print(msg)
+    #     sort_order = [parnames.index(d) for d in descr]
+    #     descr, pid = zip(*[x for _, x in sorted(zip(sort_order, fetch), key=lambda x: x[0])])
+    #     return descr, pid
+    #
+    # else:
+    #     msg = 'Unknown datapool item(s) {}'.format(parnames)
+    #     # raise NameError(msg)
+    #     logger.error(msg)
+    #     # print(msg)
+    #     return None
 
 
 def get_sid(st, sst, apid):
