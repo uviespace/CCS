@@ -70,6 +70,7 @@ SEG_SPARE_LEN = 2
 SEG_CRC_LEN = 2
 
 SDU_PAR_LENGTH = 1
+S13_HEADER_LEN_TOTAL = 21  # length of PUS + source header in S13 packets (i.e. data to be removed when collecting S13)
 
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
 
@@ -3997,13 +3998,35 @@ def create_format_model():
     return store
 
 
-################### quick copy of S13 get data and ce_decompress functionality from old CCS ####################
-##
+def _get_displayed_pool_path(pool_name=None):
+    """Try to get name of pool currently displayed in poolviewer or loaded in current poolmanager session"""
+
+    if pool_name is None:
+        pv = get_module_handle('poolviewer', timeout=1)
+
+        if not pv:
+            return
+
+        return str(pv.Variables('active_pool_info')[0])
+
+    pmgr = get_module_handle('poolmanager', timeout=1)
+    if not pmgr:
+        return
+
+    pools = pmgr.Dictionaries('loaded_pools')
+    if pool_name in pools:
+        return str(pools[pool_name][0])
+    else:
+        return
+
+
 #  Collect TM13 packets
 def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=None, join=True, collect_all=False, sdu=None):
 
     # try fetching pool info from pools opened in viewer
-
+    pname = _get_displayed_pool_path(pool_name)
+    if pname:
+        pool_name = pname
 
     rows = get_pool_rows(pool_name)
 
@@ -4104,11 +4127,11 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
             k += 1
             continue
         else:
-            pkts = [a.raw[21:-2] for a in tm_132.filter(DbTelemetry.idx > i.idx, DbTelemetry.idx < j.idx)]
+            pkts = [a.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] for a in tm_132.filter(DbTelemetry.idx > i.idx, DbTelemetry.idx < j.idx)]
             if join:
-                ces[float(i.timestamp[:-1])] = i.raw[21:-2] + b''.join(pkts) + j.raw[21:-2]
+                ces[float(i.timestamp[:-1])] = i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] + b''.join(pkts) + j.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]
             else:
-                ces[float(i.timestamp[:-1])] = [i.raw[21:-2]] + [b''.join(pkts)] + [j.raw[21:-2]]
+                ces[float(i.timestamp[:-1])] = [i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]] + [b''.join(pkts)] + [j.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]]
             k += 2
 
     # for (i, j) in zip(tm_bounds[::2], tm_bounds[1::2]):
@@ -4138,7 +4161,7 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     for buf in ldt_dict:
         if ldt_dict[buf] is None:
             continue
-        obsid, time, ftime, ctr = struct.unpack('>IIHH', ldt_dict[buf][:12])
+        obsid, time, ftime, ctr = struct.unpack('>IIHH', ldt_dict[buf][:12])  # TODO this has to be configurable
         fname = os.path.join(outdir, "LDT_{:03d}_{:010d}_{:06d}.ce".format(obsid, time, ctr))
 
         with open(fname, "wb") as fdesc:
