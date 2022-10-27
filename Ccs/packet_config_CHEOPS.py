@@ -8,6 +8,8 @@ Author: Marko Mecina (MM)
 
 import ctypes
 import datetime
+import struct
+
 from s2k_partypes import ptt
 import crcmod
 
@@ -376,3 +378,15 @@ class EventDetectionData(ctypes.Union):
 
     def __init__(self):
         raise NotImplementedError('Not available in project CHEOPS')
+
+
+# S13 data header format, using python struct conventions
+S13_FMT_OBSID = 'I'
+S13_FMT_TIME = 'I'
+S13_FMT_FTIME = 'H'
+S13_FMT_COUNTER = 'H'
+_S13_HEADER_FMT = S13_FMT_OBSID + S13_FMT_TIME + S13_FMT_FTIME + S13_FMT_COUNTER
+
+
+def s13_unpack_data_header(buf):
+    return struct.unpack('>' + _S13_HEADER_FMT, buf[:struct.calcsize(_S13_HEADER_FMT)])

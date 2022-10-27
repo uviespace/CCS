@@ -13,10 +13,13 @@ cfg = confignator.get_config(check_interpolation=False)
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
 
+CE_COLLECT_TIMEOUT = 1
+LDT_MINIMUM_CE_GAP = 0.001
+
 ce_decompressors = {}
 
 
-def create_fits(data=None, header=None, filename=None):
+def create_fits(header=None, filename=None):
     hdulist = pyfits.HDUList()
     hdu = pyfits.PrimaryHDU()
     hdu.header = header
@@ -117,8 +120,8 @@ class CeDecompress:
         self.ce_decompression_on = False
         self.ce_thread = None
         self.last_ce_time = 0
-        self.ce_collect_timeout = 1
-        self.ldt_minimum_ce_gap = 0.001
+        self.ce_collect_timeout = CE_COLLECT_TIMEOUT
+        self.ldt_minimum_ce_gap = LDT_MINIMUM_CE_GAP
 
     def _ce_decompress(self):
         checkdir = os.path.dirname(self.outdir)

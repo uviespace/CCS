@@ -8,6 +8,7 @@ Author: Marko Mecina (MM)
 
 import ctypes
 import datetime
+import struct
 import numpy as np
 
 import crcmod
@@ -737,10 +738,10 @@ class FeeDataTransfer(FeeDataTransferHeader):
         if self.bits.PKT_TYPE == FEE_PKT_TYPE_EV_DET:
             evtdata = EventDetectionData()
             evtdata.bin[:] = self.data
+            # structure according to MSSL-SMILE-SXI-IRD-0001
             self.evt_data = {"COLUMN": evtdata.bits.column,
                              "ROW": evtdata.bits.row,
-                             "IMAGE": np.array(evtdata.bits.array)[
-                                      ::-1]}  # structure according to MSSL-SMILE-SXI-IRD-0001
+                             "IMAGE": np.array(evtdata.bits.array)[::-1]}
         else:
             self.evt_data = None
 
@@ -760,3 +761,15 @@ class EventDetectionData(ctypes.Union):
         ("bits", EventDetectionFields),
         ("bin", ctypes.c_ubyte * ctypes.sizeof(EventDetectionFields))
     ]
+
+
+# S13 data header format, using python struct conventions
+S13_FMT_OBSID = 'I'
+S13_FMT_TIME = 'I'
+S13_FMT_FTIME = 'H'
+S13_FMT_COUNTER = 'H'
+_S13_HEADER_FMT = S13_FMT_OBSID + S13_FMT_TIME + S13_FMT_FTIME + S13_FMT_COUNTER
+
+
+def s13_unpack_data_header(buf):
+    return struct.unpack('>' + _S13_HEADER_FMT, buf[:struct.calcsize(_S13_HEADER_FMT)])

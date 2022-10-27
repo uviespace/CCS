@@ -57,20 +57,24 @@ except SQLOperationalError as err:
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
 
-PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack, \
-    timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc, PLM_PKT_PREFIX_TC_SEND, PLM_PKT_SUFFIX, FMT_TYPE_PARAM = \
-    [pc.PUS_VERSION, pc.TMHeader, pc.TCHeader, pc.PHeader,
-     pc.TM_HEADER_LEN, pc.TC_HEADER_LEN, pc.P_HEADER_LEN, pc.PEC_LEN,
-     pc.MAX_PKT_LEN, pc.timepack, pc.timecal, pc.calc_timestamp,
-     pc.CUC_OFFSET, pc.CUC_EPOCH, pc.puscrc, pc.PLM_PKT_PREFIX_TC_SEND, pc.PLM_PKT_SUFFIX, pc.FMT_TYPE_PARAM]
+# project specific parameters, must be present in all packet_config_* files
+try:
+    PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack, \
+        timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc, PLM_PKT_PREFIX_TC_SEND, PLM_PKT_SUFFIX, FMT_TYPE_PARAM = \
+        [pc.PUS_VERSION, pc.TMHeader, pc.TCHeader, pc.PHeader,
+         pc.TM_HEADER_LEN, pc.TC_HEADER_LEN, pc.P_HEADER_LEN, pc.PEC_LEN,
+         pc.MAX_PKT_LEN, pc.timepack, pc.timecal, pc.calc_timestamp,
+         pc.CUC_OFFSET, pc.CUC_EPOCH, pc.puscrc, pc.PLM_PKT_PREFIX_TC_SEND, pc.PLM_PKT_SUFFIX, pc.FMT_TYPE_PARAM]
+
+    s13_unpack_data_header = pc.s13_unpack_data_header
+except AttributeError as err:
+    logger.critical(err)
+    raise err
 
 SREC_MAX_BYTES_PER_LINE = 250
 SEG_HEADER_LEN = 12
 SEG_SPARE_LEN = 2
 SEG_CRC_LEN = 2
-
-SDU_PAR_LENGTH = 1
-S13_HEADER_LEN_TOTAL = 21  # length of PUS + source header in S13 packets (i.e. data to be removed when collecting S13)
 
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
 
@@ -803,13 +807,13 @@ def read_stream(stream, fmt, pos=None, offbi=0):
     return x
 
 
-##
-#  csize
-#
-#  Returns the Amount of Bytes for the input format
-#  @param fmt Input String that defines the format
-#  @param offbi
 def csize(fmt, offbi=0):
+    """
+    Returns the amount of bytes required for the input format
+    @param fmt: Input String that defines the format
+    @param offbi:
+    @return:
+    """
     if fmt in ('i24', 'I24'):
         return 3
     elif fmt.startswith('uint'):
@@ -821,7 +825,10 @@ def csize(fmt, offbi=0):
     elif fmt.startswith('ascii'):
         return int(fmt[5:])
     else:
-        return struct.calcsize(fmt)
+        try:
+            return struct.calcsize(fmt)
+        except struct.error:
+            raise NotImplementedError(fmt)
 
 
 ##
@@ -855,7 +862,7 @@ def none_to_empty(s):
 
 
 def Tm_header_formatted(tm, detailed=False):
-    '''unpack APID, SEQCNT, PKTLEN, TYPE, STYPE, SOURCEID'''
+    """unpack APID, SEQCNT, PKTLEN, TYPE, STYPE, SOURCEID"""
 
     # if len(tm) < TC_HEADER_LEN:
     #     return 'Cannot decode header - packet has only {} bytes!'.format(len(tm))
@@ -1462,8 +1469,14 @@ def get_cuctime(tml):
     return cuc_timestamp
 
 
-def get_pool_rows(pool_name, dbcon=None):
+def get_pool_rows(pool_name, check_existence=False):
     dbcon = scoped_session_storage
+
+    if check_existence:
+        check = dbcon.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name)
+        if not check.count():
+            dbcon.close()
+            raise ValueError('Pool "{}" does not exist.'.format(pool_name))
 
     rows = dbcon.query(
         DbTelemetry
@@ -3037,9 +3050,9 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
     return calibrations_dict
 
 
-def get_tm_parameter_list(st, sst, apid, pi1val):
-    que = 'SELECT pid_spid, pid_tpsd FROM pid WHERE pid_type={} AND pid_stype={} AND pid_apid={} AND pid_pi1_val={}'.format(st, sst, apid, pi1val)
-    spid, tpsd = scoped_session_idb.execute(que).fetchall()[0]
+def get_tm_parameter_list(st, sst, apid=None, pi1val=0):
+
+    spid, tpsd = _get_spid(st, sst, apid=apid, pi1val=pi1val)
 
     if tpsd == -1:
         que = 'SELECT plf_name, pcf_descr, plf_offby, pcf_ptc, pcf_pfc FROM plf LEFT JOIN pcf ON plf_name=pcf_name WHERE plf_spid={} ORDER BY plf_offby, plf_offbi'.format(spid)
@@ -3052,7 +3065,8 @@ def get_tm_parameter_list(st, sst, apid, pi1val):
 
 
 def get_tm_parameter_info(pname):
-    que = 'SELECT ocp_lvalu, ocp_hvalu, ocp_type, txp_from, txp_altxt FROM pcf LEFT JOIN ocp ON pcf_name=ocp_name LEFT JOIN txp ON pcf_curtx=txp_numbr WHERE pcf_name="{}" ORDER BY txp_from, ocp_pos'.format(pname)
+    que = 'SELECT ocp_lvalu, ocp_hvalu, ocp_type, txp_from, txp_altxt FROM pcf LEFT JOIN ocp ON pcf_name=ocp_name ' \
+          'LEFT JOIN txp ON pcf_curtx=txp_numbr WHERE pcf_name="{}" ORDER BY txp_from, ocp_pos'.format(pname)
     res = scoped_session_idb.execute(que).fetchall()
 
     return res
@@ -3101,6 +3115,55 @@ def get_tm_id(pcf_descr=None):
         tms_dict.setdefault(row[0:5], []).append(row[5:])
 
     return tms_dict
+
+
+def get_tm_parameter_sizes(st, sst, apid=None, pi1val=0):
+    """
+    Returns a list of parameters and their sizes. For variable length TMs only the first fixed part is considered.
+    @param st:
+    @param sst:
+    @param apid:
+    @param pi1val:
+    @return:
+    """
+
+    spid, tpsd = _get_spid(st, sst, apid=apid, pi1val=pi1val)
+
+    if tpsd == -1:
+        que = 'SELECT plf_name, pcf_descr, pcf_ptc, pcf_pfc, NULL FROM plf LEFT JOIN pcf ON plf_name=pcf_name WHERE plf_spid={} ORDER BY plf_offby, plf_offbi'.format(spid)
+    else:
+        que = 'SELECT vpd_name, pcf_descr, pcf_ptc, pcf_pfc, vpd_grpsize FROM vpd LEFT JOIN pcf ON vpd_name=pcf_name WHERE vpd_tpsd={} ORDER BY vpd_pos'.format(tpsd)
+
+    res = scoped_session_idb.execute(que).fetchall()
+
+    pinfo = []
+    for p in res:
+        pinfo.append((p[1], csize(ptt(*p[2:4]))))
+        # break after first "counter" parameter
+        if p[-1] != 0:
+            break
+
+    return pinfo
+
+
+def _get_spid(st, sst, apid=None, pi1val=0):
+    """
+
+    @param st:
+    @param sst:
+    @param apid:
+    @param pi1val:
+    @return:
+    """
+    if apid is None:
+        apid = ''
+    else:
+        apid = ' AND pid_apid={}'.format(apid)
+
+    que = 'SELECT pid_spid, pid_tpsd FROM pid WHERE pid_type={} AND pid_stype={}{} AND pid_pi1_val={}'.format(st, sst, apid, pi1val)
+    spid, tpsd = scoped_session_idb.execute(que).fetchall()[0]
+
+    return spid, tpsd
 
 
 def get_data_pool_items(pcf_descr=None, src_file=None):
@@ -4147,13 +4210,15 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
 def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=False, sdu=None, startidx=None,
                     endidx=None):
     """
-    Dump 13,2 data to disk
-    @param endidx:
+    Dump 13,2 data to disk. For pools loaded from a file, pool_name must be the absolute path of that file.
     @param pool_name:
     @param starttime:
     @param endtime:
     @param outdir:
     @param dump_all:
+    @param sdu:
+    @param startidx:
+    @param endidx:
     """
     filedict = {}
     ldt_dict = collect_13(pool_name, starttime=starttime, endtime=endtime, join=True, collect_all=dump_all,
@@ -4161,13 +4226,18 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     for buf in ldt_dict:
         if ldt_dict[buf] is None:
             continue
-        obsid, time, ftime, ctr = struct.unpack('>IIHH', ldt_dict[buf][:12])  # TODO this has to be configurable
+
+        try:
+            obsid, time, ftime, ctr = s13_unpack_data_header(ldt_dict[buf])
+        except ValueError as err:
+            logger.error('Incompatible definition of S13 data header.')
+            raise err
+
         fname = os.path.join(outdir, "LDT_{:03d}_{:010d}_{:06d}.ce".format(obsid, time, ctr))
 
         with open(fname, "wb") as fdesc:
             fdesc.write(ldt_dict[buf])
             filedict[buf] = fdesc.name
-    # return list(ldt_dict.keys())
     return filedict
 
 
@@ -5046,6 +5116,8 @@ class ProjectDialog(Gtk.Dialog):
             sys.exit()
 
 
+# some default parameter definitions that require functions defined above
+
 # create local look-up tables for data pool items from MIB
 try:
     DP_ITEMS_SRC_FILE = cfg.get('database', 'datapool-items')
@@ -5061,3 +5133,14 @@ except (FileNotFoundError, ValueError, confignator.config.configparser.NoOptionE
 finally:
     DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _dp_items}
     DP_ITEMS_TO_IDS = {k[1]: int(k[0]) for k in _dp_items}
+
+# S13 header/offset info
+try:
+    _s13_info = get_tm_parameter_sizes(13, 1)
+    SDU_PAR_LENGTH = _s13_info[0][-1]
+    # length of PUS + source header in S13 packets (i.e. data to be removed when collecting S13)
+    S13_HEADER_LEN_TOTAL = TM_HEADER_LEN + sum([p[-1] for p in _s13_info])
+except (SQLOperationalError, NotImplementedError, IndexError):
+    logger.warning('Could not get S13 info from MIB, using default values')
+    SDU_PAR_LENGTH = 1
+    S13_HEADER_LEN_TOTAL = 21
