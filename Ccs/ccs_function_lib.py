@@ -1705,7 +1705,8 @@ def connect(pool_name, host, port, protocol='PUS', is_server=False, timeout=10, 
                                                                                  'override_with_options': '1'})})
 
 
-def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, is_server=False, options=''):
+def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, is_server=False, use_socket=None,
+               options=''):
     """
     Accessibility function for 'connect_tc' in pus_datapool
     :param pool_name:
@@ -1715,6 +1716,7 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
     :param protocol:
     :param timeout:
     :param is_server:
+    :param use_socket:
     :param options:
     :return:
     """
@@ -1727,7 +1729,8 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
                        'is_server': is_server,
                        'timeout': timeout,
                        'options': options,
-                       'drop_rx': drop_rx})
+                       'drop_rx': drop_rx,
+                       'use_socket': use_socket})
 
     pmgr.Functions('connect_tc', pool_name, host, port, {'kwargs': dbus.Dictionary({'options': kwarguments,
                                                                                     'override_with_options': '1'})})
