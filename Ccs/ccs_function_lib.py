@@ -949,11 +949,12 @@ def parameter_tooltip_text(x):
     if isinstance(x, int):
         h = hex(x)[2:].upper()
         if np.sign(x) == -1:
-            h = h.replace('x', '-') + '(THIS IS WRONG!)'
+            h = hex(x)[3:].upper()
     elif isinstance(x, float):
         h = struct.pack('>f', x).hex().upper()
     else:
-        h = str(x)
+        # h = str(x)
+        return str(x)
     return 'HEX: 0x{}\nDEC: {}'.format(h, x)
 
 
@@ -1293,6 +1294,8 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     if type_par == timepack[0]:
         #return timecal(rawval, 'uint:32,uint:15,uint:1')
         return timecal(rawval)
+    elif categ == 'T':
+        return rawval
     elif curtx is None:
         try:
             return rawval if isinstance(rawval, int) else rawval[0]
