@@ -800,7 +800,11 @@ def read_stream(stream, fmt, pos=None, offbi=0):
         x = struct.unpack('>{}s'.format(fmt[3:]), data)[0]
     elif fmt.startswith('ascii'):
         x = struct.unpack('>{}s'.format(fmt[5:]), data)[0]
-        x = x.decode()
+        try:
+            x = x.decode('ascii')
+        except UnicodeDecodeError as err:
+            logger.warning(err)
+            x = str(data)
     elif fmt == timepack[0]:
         x = timecal(data)
     else:
@@ -1296,12 +1300,14 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     if type_par == timepack[0]:
         #return timecal(rawval, 'uint:32,uint:15,uint:1')
         return timecal(rawval)
-    elif categ == 'T':
+    elif categ == 'T' or type_par.startswith('ascii'):
         return rawval
+    elif type_par.startswith('oct'):
+        return rawval.hex().upper()
     elif curtx is None:
         try:
             return rawval if isinstance(rawval, int) else rawval[0]
-        except:
+        except IndexError:
             return rawval
     elif curtx is not None and categ == 'N':
         # print('CALIBRATED!')
