@@ -67,6 +67,8 @@ try:
          pc.CUC_OFFSET, pc.CUC_EPOCH, pc.puscrc, pc.PLM_PKT_PREFIX_TC_SEND, pc.PLM_PKT_SUFFIX, pc.FMT_TYPE_PARAM]
 
     s13_unpack_data_header = pc.s13_unpack_data_header
+    SPW_PROTOCOL_IDS_R = {pc.SPW_PROTOCOL_IDS[key]: key for key in pc.SPW_PROTOCOL_IDS}
+
 except AttributeError as err:
     logger.critical(err)
     raise err
@@ -3916,7 +3918,13 @@ def get_spw_from_plm_gw(sock_plm, sock_gnd, strip_spw=4):
 
 
 def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'):
-
+    """
+    A router for the single-port HVS SpW Brick that handles the HVS and SpW protocol for the CCS
+    @param gw_hp:
+    @param gnd_hp:
+    @param tc_hp:
+    @param spw_head:
+    """
     gw = socket.socket()
     gw.settimeout(10)
     gw.connect(gw_hp)
@@ -3971,6 +3979,172 @@ def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'
     gnd.close()
     tcsock.close()
     gw.close()
+
+
+def _gresb_unpack(raw, hdr_endianess='big'):
+    pid = raw[0]
+    pktlen = int.from_bytes(raw[1:4], hdr_endianess)
+    return raw[4:], pktlen, pid
+
+
+def _gresb_pack(pkt, protocol_id=0, hdr_endianess='big'):
+    return protocol_id.to_bytes(1, hdr_endianess) + len(pkt).to_bytes(3, hdr_endianess) + pkt
+
+
+def get_gresb_pkt(gresb, gnd_s, hdr_endianess='big'):
+
+    data = b''
+    while len(data) < 4:
+        data += gresb.recv(4 - len(data))
+
+    spwdata, plen, pid = _gresb_unpack(data, hdr_endianess=hdr_endianess)
+    while len(spwdata) < plen:
+        spwdata += gresb.recv(plen - len(spwdata))
+
+    gnd_s.send(spwdata)
+
+    logger.debug(plen, len(spwdata), spwdata.hex())
+    print(plen, len(spwdata), spwdata.hex())
+
+
+def setup_gresb_routing(gresb_hp, gnd_hp, tc_hp=None, protocol_id=0, hdr_endianess='big'):
+    """
+    Handle GRESB protocol for CCS
+    @param gresb_hp:
+    @param gnd_hp:
+    @param tc_hp:
+    @param protocol_id:
+    @param hdr_endianess:
+    """
+    gresb = socket.socket()
+    gresb.settimeout(10)
+    gresb.connect(gresb_hp)
+
+    gnd = socket.socket()
+    gnd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    gnd.bind(gnd_hp)
+    gnd.listen()
+
+    if tc_hp is not None:
+        tcsock = socket.socket()
+        tcsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        tcsock.bind(tc_hp)
+        tcsock.listen()
+    else:
+        tcsock = gnd
+
+    while gresb.fileno() > 0:
+        logger.info(gresb, gnd)
+        gnd_s, addr = gnd.accept()
+        tc_s, addr2 = tcsock.accept()
+
+        while True:
+            try:
+                print('START')
+                r, w, e = select.select([gresb, tc_s], [], [])
+                print(r)
+                for sockfd in r:
+                    if sockfd == gresb:
+                        while select.select([gresb], [], [], 0)[0]:
+                            get_gresb_pkt(gresb, gnd_s, hdr_endianess=hdr_endianess)
+                    elif sockfd == tc_s:
+                        while select.select([tc_s], [], [], 0)[0]:
+                            rawtc = tc_s.recv(1024)
+                            if rawtc == b'':
+                                raise socket.error('Lost connection to port '.format(tc_s.getsockname()))
+                            else:
+                                logger.info('# TC:', rawtc)
+                                print('# TC:', rawtc)
+                                msg = _gresb_pack(rawtc, protocol_id=protocol_id, hdr_endianess=hdr_endianess)
+                                print(gresb)
+                                gresb.send(msg)
+                                print(msg)
+
+            except socket.timeout:
+                continue
+            except socket.error:
+                gnd_s.close()
+                tc_s.close()
+                logger.info('Closed TM/TC ports. Reopening...')
+                break
+            print('########')
+        time.sleep(1)
+
+    gnd.close()
+    tcsock.close()
+    gresb.close()
+
+
+def extract_spw(stream):
+    """
+    Read SpW packets from a byte stream
+    @param stream:
+    @return:
+    """
+
+    pkt_size_stream = b''
+    pckts = []
+    headers = []
+
+    while True:
+        pkt_size_stream += stream.read(2)
+        if len(pkt_size_stream) < 2:
+            break
+        tla, pid = pkt_size_stream[:2]
+        logger.debug(pid)
+
+        # if (tla == pc.SPW_DPU_LOGICAL_ADDRESS) and (pid in SPW_PROTOCOL_IDS_R):
+        if pid in SPW_PROTOCOL_IDS_R:
+            buf = pkt_size_stream
+        else:
+            pkt_size_stream = pkt_size_stream[1:]
+            continue
+
+        if SPW_PROTOCOL_IDS_R[pid] == "FEEDATA":
+            header = pc.FeeDataTransferHeader()
+        elif SPW_PROTOCOL_IDS_R[pid] == "RMAP":
+            while len(buf) < 3:
+                instruction = stream.read(1)
+                if not instruction:
+                    return pckts, buf
+                buf += instruction
+
+            instruction = buf[2]
+
+            if (instruction >> 6) & 1:
+                header = pc.RMapCommandHeader()
+            elif (instruction >> 5) & 0b11 == 0b01:
+                header = pc.RMapReplyWriteHeader()
+            elif (instruction >> 5) & 0b11 == 0b00:
+                header = pc.RMapReplyReadHeader()
+
+        hsize = header.__class__.bits.size
+
+        while len(buf) < hsize:
+            buf += stream.read(hsize - len(buf))
+
+        header.bin[:] = buf[:hsize]
+
+        if SPW_PROTOCOL_IDS_R[pid] == "FEEDATA":
+            pktsize = header.bits.DATA_LEN
+        elif (header.bits.PKT_TYPE == 1 and header.bits.WRITE == 0) or (
+                header.bits.PKT_TYPE == 0 and header.bits.WRITE == 1):
+            pktsize = hsize
+        else:
+            pktsize = hsize + header.bits.DATA_LEN# + pc.RMAP_PEC_LEN  # TODO: no data CRC from FEEsim?
+
+        while len(buf) < pktsize:
+            data = stream.read(pktsize - len(buf))
+            if not data:
+                return headers, pckts, pkt_size_stream
+            buf += data
+
+        buf = buf[:pktsize]
+        pkt_size_stream = buf[pktsize:]
+        pckts.append(buf)
+        headers.append(header)
+
+    return headers, pckts, pkt_size_stream
 
 
 ##
