@@ -286,7 +286,7 @@ RMAP_REPLY_READ_HEADER = [
     ("TRANSACTION_ID", ctypes.c_uint16, 16),
     ("RESERVED", ctypes.c_uint8, 8),
     ("DATA_LEN", ctypes.c_uint32, 24),
-    ("HEADER_CRC", ctypes.c_uint32, 8)
+    ("HEADER_CRC", ctypes.c_uint8, 8)
 ]
 
 # FEEDATA packet structure definitions
