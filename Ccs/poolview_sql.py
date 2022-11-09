@@ -23,7 +23,7 @@ matplotlib.use('Gtk3Cairo')
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify, Pango  # NOQA
 
 from event_storm_squasher import delayed
 
@@ -87,14 +87,12 @@ class TMPoolView(Gtk.Window):
     tmtc = {0: 'TM', 1: 'TC'}
     w_r = {0: 'R', 1: 'W'}
     cmd_repl = {0: 'rep', 1: 'cmd'}
-    autoscroll = 1
-    autoselect = 1
     sort_order = Gtk.SortType.ASCENDING
     pckt_queue = None
     queues = {}
     row_colour = ''
     colour_filters = {}
-    active_pool_info = None  # type: Union[None, ActivePoolInfo]
+    # active_pool_info = None  # type: Union[None, ActivePoolInfo]
     decoding_type = 'PUS'
     live_signal = {True: '[LIVE]', False: None}
     currently_selected = set()
@@ -130,6 +128,9 @@ class TMPoolView(Gtk.Window):
 
         # self.cfg = confignator.get_config()
         self.cfg = cfg
+
+        self.autoscroll = 1
+        self.autoselect = 1
 
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, wide_handle=True, position=400)
 
@@ -598,7 +599,7 @@ class TMPoolView(Gtk.Window):
     def create_treeview_columns(self):
         for i, (column_title, align) in enumerate(self.column_labels[self.decoding_type]):
             render = Gtk.CellRendererText(xalign=align)
-            if column_title == "Data":
+            if column_title in ('Data', 'RAW'):
                 render.set_property('font', 'Monospace')
 
             column = Gtk.TreeViewColumn(column_title, render, text=i)
@@ -627,7 +628,8 @@ class TMPoolView(Gtk.Window):
     def set_number_of_treeview_rows(self, widget=None, allocation=None):
         # alloc = widget.get_allocation()
         height = self.treeview.get_allocated_height()
-        cell = 25  #self.treeview.get_columns()[0].cell_get_size()[-1] + 2
+        cell = 25
+        # cell = self.treeview.get_columns()[0].cell_get_size()[-1] + 2
         nlines = height // cell
         self.adj.set_page_size(nlines - 1)
         # self._scroll_treeview()
@@ -1680,9 +1682,12 @@ class TMPoolView(Gtk.Window):
 
         self.pool_selector.set_model(pool_names)
 
-        cell = Gtk.CellRendererText(foreground='red')
-        self.pool_selector.pack_start(cell, 0)
-        self.pool_selector.add_attribute(cell, 'text', 1)
+        type_cell = Gtk.CellRendererText(foreground='gray', style=Pango.Style.ITALIC)
+        self.pool_selector.pack_start(type_cell, 0)
+        self.pool_selector.add_attribute(type_cell, 'text', 2)
+        state_cell = Gtk.CellRendererText(foreground='red')
+        self.pool_selector.pack_start(state_cell, 0)
+        self.pool_selector.add_attribute(state_cell, 'text', 1)
 
         self.pool_selector.connect('changed', self.select_pool)
 
