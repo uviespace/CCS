@@ -1079,7 +1079,6 @@ class DatapoolManager:
         elif self.tc_connections[pool_name]['protocol'].upper() == 'SPW':
             buf = io.BytesIO(buf)
             headers, pkts, _ = self.extract_spw(buf)
-            self.logger.critical(str(headers)+str(pkts))
             for header, pkt in zip(headers, pkts):
                 self.process_rmap(header, pkt, pool_name, pool_row=pool_row)
         else:

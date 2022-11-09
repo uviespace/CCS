@@ -895,6 +895,13 @@ def Tm_header_formatted(tm, detailed=False):
         return 'APID:{}|SEQ:{}|LEN:{}|TYPE:{}|STYPE:{}|CUC:{}{}'.format(
             head.APID, head.PKT_SEQ_CNT, head.PKT_LEN, head.SERV_TYPE, head.SERV_SUB_TYPE, mkcucstring(tm), details)
 
+
+def spw_header_formatted(spw_header):
+    buf = spw_header.__class__.__name__ + '\n\n'
+    buf += spw_header.raw.hex()
+    return buf
+
+
 def get_header_parameters_detailed(pckt):
     """
     Return values of all header elements
@@ -903,6 +910,7 @@ def get_header_parameters_detailed(pckt):
     head = Tmread(pckt)[0]
     hparams = [(x[0], getattr(head, x[0])) for x in head._fields_]
     return hparams
+
 
 ##
 # CUC timestring
@@ -4097,7 +4105,7 @@ def extract_spw(stream):
         if len(pkt_size_stream) < 2:
             break
         tla, pid = pkt_size_stream[:2]
-        logger.debug(pid)
+        logger.debug('{}, {}'.format(tla, pid))
 
         # if (tla == pc.SPW_DPU_LOGICAL_ADDRESS) and (pid in SPW_PROTOCOL_IDS_R):
         if pid in SPW_PROTOCOL_IDS_R:

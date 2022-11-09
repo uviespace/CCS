@@ -1,3 +1,4 @@
+import io
 import os
 import importlib
 import json
@@ -56,34 +57,36 @@ Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
 
 class TMPoolView(Gtk.Window):
-    # (label, data columnt alignment)
+    # (label, data column alignment)
 
     column_labels = {'PUS': [('#', 1), ('TM/TC', 1), ("APID", 1), ("SEQ", 1), ("len-7", 1), ("ST", 1), ("SST", 1),
                              ("Dest ID", 1), ("Time", 1), ("Data", 0)],
-                     'RMAP': [('#', 1), ('R/W', 1), ('Verify data', 1), ('Reply', 1), ('Key', 1), ('Transaction ID', 1),
-                              ('Address', 1), ('Data Length', 1), ('Raw', 0)],
-                     'FEE': [('#', 1), ('Type', 1), ('Frame cnt', 1), ('Seq cnt', 1), ('Raw', 0)]}
+                     'RMAP': [('#', 1), ('TYPE', 1), ('R/W', 1), ('VERIFY', 1), ('REPLY', 1), ('INCR', 1),
+                              ('KEY/STAT', 1), ('TA ID', 1), ('ADDRESS', 1), ('DATALEN', 1), ('RAW', 0)],
+                     'FEE': [('#', 1), ('TYPE', 1), ('FRAME CNT', 1), ('SEQ', 1), ('RAW', 0)]}
 
     tm_columns = {'PUS': {'#': [DbTelemetry.idx, 0, None], 'TM/TC': [DbTelemetry.is_tm, 0, None],
                           "APID": [DbTelemetry.apid, 0, None], "SEQ": [DbTelemetry.seq, 0, None],
                           "len-7": [DbTelemetry.len_7, 0, None], "ST": [DbTelemetry.stc, 0, None],
                           "SST": [DbTelemetry.sst, 0, None], "Dest ID": [DbTelemetry.destID, 0, None],
                           "Time": [DbTelemetry.timestamp, 0, None], "Data": [DbTelemetry.data, 0, None]},
-                  'RMAP': {'#': [RMapTelemetry.idx, 0, None], 'R/W': [RMapTelemetry.write, 0, None],
-                           "Verify data": [RMapTelemetry.verify, 0, None], "Reply": [RMapTelemetry.reply, 0, None],
-                           "Key": [RMapTelemetry.keystat, 0, None], "Transaction ID": [RMapTelemetry.taid, 0, None],
-                           "Address": [RMapTelemetry.addr, 0, None], "Data Length": [RMapTelemetry.datalen, 0, None],
-                           "Raw": [RMapTelemetry.raw, 0, None]},
-                  'FEE': {'#': [FEEDataTelemetry.idx, 0, None], 'Type': [FEEDataTelemetry.type, 0, None],
-                          "Frame cnt": [FEEDataTelemetry.framecnt, 0, None],
-                          "Seq cnt": [FEEDataTelemetry.seqcnt, 0, None],
-                          "Raw": [FEEDataTelemetry.raw, 0, None]}}
+                  'RMAP': {'#': [RMapTelemetry.idx, 0, None], 'TYPE': [RMapTelemetry.cmd, 0, None],
+                           'R/W': [RMapTelemetry.write, 0, None], "VERIFY": [RMapTelemetry.verify, 0, None],
+                           "REPLY": [RMapTelemetry.reply, 0, None], 'INCR': [RMapTelemetry.increment, 0, None],
+                           "KEY": [RMapTelemetry.keystat, 0, None], "TA ID": [RMapTelemetry.taid, 0, None],
+                           "ADDRESS": [RMapTelemetry.addr, 0, None], "DATALEN": [RMapTelemetry.datalen, 0, None],
+                           "RAW": [RMapTelemetry.raw, 0, None]},
+                  'FEE': {'#': [FEEDataTelemetry.idx, 0, None], 'TYPE': [FEEDataTelemetry.type, 0, None],
+                          "FRAME CNT": [FEEDataTelemetry.framecnt, 0, None],
+                          "SEQ": [FEEDataTelemetry.seqcnt, 0, None],
+                          "RAW": [FEEDataTelemetry.raw, 0, None]}}
 
     sort_order_dict = {0: Gtk.SortType.ASCENDING, 1: Gtk.SortType.ASCENDING, 2: Gtk.SortType.DESCENDING}
     filter_rules = {}
     rule_box = None
     tmtc = {0: 'TM', 1: 'TC'}
     w_r = {0: 'R', 1: 'W'}
+    cmd_repl = {0: 'rep', 1: 'cmd'}
     autoscroll = 1
     autoselect = 1
     sort_order = Gtk.SortType.ASCENDING
@@ -861,9 +864,6 @@ class TMPoolView(Gtk.Window):
         #print('TIME:::', time.time()-starttime)
         self.treeview.thaw_child_notify()
 
-
-        return
-
     def _filter_rows(self, rows):
         
         def f_rule(x):
@@ -1316,7 +1316,6 @@ class TMPoolView(Gtk.Window):
             #new_session.close()
             self.shown_lock.release()
 
-
         '''
         running = True
         self.shown_lock.acquire()
@@ -1352,13 +1351,12 @@ class TMPoolView(Gtk.Window):
                 print(2)
         self.dbrows_list = []
         '''
-        return
 
     def format_loaded_rows(self, dbrows):
         '''
         This function converts every packet into a readable form
-        @param dbrows: The rows gotten from SQL query
-        @return: Same Rows in readable form
+        @param dbrows: The rows from SQL query
+        @return: rows in readable form
         '''
 
         tm_rows = []
@@ -1369,17 +1367,24 @@ class TMPoolView(Gtk.Window):
                 tm_rows.append(tm_row)
         elif self.decoding_type == 'RMAP':
             for tm in dbrows:
-                tm_row = [tm.idx, self.w_r[tm.write], tm.verify, tm.reply, tm.keystat, tm.taid, tm.addr, tm.datalen,
-                          tm.raw.hex()]
+                tm_row = [tm.idx, self.cmd_repl[tm.cmd], self.w_r[tm.write], int(tm.verify), int(tm.reply),
+                          int(tm.increment), '0x{:02X}'.format(tm.keystat), tm.taid, self._addr_fmt_hex_str(tm.addr),
+                          tm.datalen, tm.raw.hex()]
                 tm_rows.append(tm_row)
         elif self.decoding_type == 'FEE':
             for tm in dbrows:
                 tm_row = [tm.idx, tm.type, tm.framecnt, tm.seqcnt, tm.raw.hex()]
                 tm_rows.append(tm_row)
         else:
-            self.logger.error('Error in format_loaded_rows_poolviewer, given Format is not valid')
-
+            self.logger.error('Unsupported packet format!')
         return tm_rows
+
+    @staticmethod
+    def _addr_fmt_hex_str(x):
+        if x is not None:
+            return '0x{:08X}'.format(x)
+        else:
+            return ''
 
     def tree_selection_changed(self, selection):
         mode = selection.get_mode()
@@ -1647,12 +1652,11 @@ class TMPoolView(Gtk.Window):
         if self.decoding_type == 'PUS':
             return Gtk.ListStore('guint', str, 'guint', 'guint', 'guint', 'guint', 'guint', 'guint', str, str)
         elif self.decoding_type == 'RMAP':
-            return Gtk.ListStore('guint', str, bool, bool, 'guint', 'guint', 'guint', 'guint', str)
+            return Gtk.ListStore('guint', str, str, 'guint', 'guint', 'guint', str, 'guint', str, 'guint', str)
         elif self.decoding_type == 'FEE':
             return Gtk.ListStore('guint', 'guint', 'guint', 'guint', str)
         else:
             self.logger.error('Decoding Type is an unknown value')
-            return
 
     def set_keybinds(self):
 
@@ -2515,10 +2519,15 @@ class TMPoolView(Gtk.Window):
 
     @delayed(10)
     def set_tm_data_view(self, selection=None, event=None, change_columns=False):
-        if not self.active_pool_info or not self.decoding_type == 'PUS':
-            self.logger.warning('Cannot decode parameters for RMAP or FEE data packets')
+        if not self.active_pool_info:
+            self.logger.warning('No active pool')
+            return
+
+        if self.decoding_type != 'PUS' and self.rawswitch.get_active():
+            self.logger.info('Cannot decode parameters for RMAP or FEE data packets')
             buf = Gtk.TextBuffer(text='Parameter view not available for non-PUS packets')
             self.tm_header_view.set_buffer(buf)
+            self.tm_data_view.get_model().clear()
             return
 
         if change_columns:
@@ -2559,7 +2568,6 @@ class TMPoolView(Gtk.Window):
             self.last_decoded_row = rowidx
 
         tm_index = model[treepath[0]][0]
-        # tm_index = self.active_row
         new_session = self.session_factory_storage
         raw = new_session.query(
             Telemetry[self.decoding_type].raw
@@ -2574,7 +2582,6 @@ class TMPoolView(Gtk.Window):
             new_session.close()
             return
         tm = raw[0]
-        # new_session.commit()
         new_session.close()
         self.set_decoder_view(tm)
 
@@ -2582,7 +2589,6 @@ class TMPoolView(Gtk.Window):
             self.tm_header_view.set_monospace(False)
             datamodel.clear()
             try:
-                # buf = Gtk.TextBuffer(text=self.ccs.Tmformatted(tm, sort_by_name=self.sortswitch.get_active()))
                 if self.UDEF:
                     data = cfl.Tmformatted(tm, textmode=False, UDEF=True)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
@@ -2594,15 +2600,22 @@ class TMPoolView(Gtk.Window):
 
             except Exception as error:
                 buf = Gtk.TextBuffer(text='Error in decoding packet data:\n{}\n'.format(error))
-                # print(traceback.format_exc())
 
         else:
             self.tm_header_view.set_monospace(False)
-            head = cfl.Tm_header_formatted(tm, detailed=True)
-            headlen = TC_HEADER_LEN if (tm[0] >> 4 & 1) else TM_HEADER_LEN
+
+            if self.decoding_type != 'PUS':
+                tmio = io.BytesIO(tm)
+                headers, _, _ = cfl.extract_spw(tmio)
+                header = headers[0].raw
+                headlen = len(header)
+                head = cfl.spw_header_formatted(headers[0])
+            else:
+                head = cfl.Tm_header_formatted(tm, detailed=True)
+                headlen = TC_HEADER_LEN if (tm[0] >> 4 & 1) else TM_HEADER_LEN
 
             tmsource = tm[headlen:]
-            byteview = [[str(n + headlen), '{:02X}'.format(i), str(i), ascii(chr(i)).strip("'")] for n, i in enumerate(tmsource[:-PEC_LEN])]
+            byteview = [[str(n + headlen), '{:02X}'.format(i), str(i), ascii(chr(i)).strip("'")] for n, i in enumerate(tmsource[:])]
             self._feed_tm_data_view_model(datamodel, byteview)
             buf = Gtk.TextBuffer(text=head + '\n')
 
@@ -2930,9 +2943,7 @@ class TMPoolView(Gtk.Window):
         else:
             # If not PUS open all other possible types but show RMAP
             for packet_type in Telemetry:
-                if packet_type == 'PUS':
-                    pass
-                elif packet_type == 'RMAP':
+                if packet_type == 'RMAP':
                     model = self.pool_selector.get_model()
                     iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], packet_type])
                     self.pool_selector.set_active_iter(iter)   # Always show the RMAP pool when created
