@@ -74,7 +74,8 @@ except AttributeError as err:
     raise err
 
 SREC_MAX_BYTES_PER_LINE = 250
-SEG_HEADER_LEN = 12
+SEG_HEADER_FMT = '>III'
+SEG_HEADER_LEN = struct.calcsize(SEG_HEADER_FMT)
 SEG_SPARE_LEN = 2
 SEG_CRC_LEN = 2
 
@@ -2756,8 +2757,8 @@ def srectohex(fname, memid, memaddr, segid, tcsend=False, outname=None, linesper
 
         linepack = bytes.fromhex(''.join(linepacklist))
         dlen = len(linepack)
-        data = struct.pack('>III', segid, startaddr, dlen // 4) + linepack + b'\x00\x00'
-        data = data + struct.pack('>H', crc(data))
+        data = struct.pack(SEG_HEADER_FMT, segid, startaddr, dlen // 4) + linepack + bytes(SEG_SPARE_LEN)
+        data = data + crc(data).to_bytes(SEG_CRC_LEN, 'big')
         if source_only:
             if add_memaddr_to_source:
                 source_list.append(prettyhex(memaddr.to_bytes(4, 'big') + data))
@@ -2816,10 +2817,23 @@ def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61
     source_to_srec('srec_binary_source.TC', output_srec, memaddr=imageaddr)
 
 
-def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=61, sleep=0.1):
-
+def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=30, sleep=0.125, max_pkt_size=MAX_PKT_LEN):
+    """
+    Upload data from an SREC file to _memid_ via S6,2
+    @param fname:
+    @param memid:
+    @param memaddr:
+    @param segid:
+    @param pool_name:
+    @param tcname:
+    @param linesperpack:
+    @param sleep:
+    @param max_pkt_size:
+    """
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
+    pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + SEG_HEADER_LEN + SEG_SPARE_LEN + SEG_CRC_LEN + len(endspares) + PEC_LEN
+    payload_len = max_pkt_size - pkt_overhead
 
     if not isinstance(memid, int):
         dbcon = scoped_session_idb
@@ -2827,7 +2841,9 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
         try:
             memid, = dbres.fetchall()[0]
         except IndexError:
-            raise ValueError('MemID "{}" does not exist. Aborting.'.format(memid))
+            que = 'SELECT pas_altxt from pas where pas_numbr="{}"'.format(memid_ref)
+            alvals = [x[0] for x in dbcon.execute(que).fetchall()]
+            raise ValueError('Invalid MemID "{}". Allowed values are: {}.'.format(memid, ', '.join(alvals)))
         finally:
             dbcon.close()
         memid = int(memid)
@@ -2845,6 +2861,10 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
         for n in range(linesperpack):
             if linecount >= (len(lines) - 1):
                 break
+
+            if (len(''.join(linepacklist)) + len(lines[linecount])) // 2 > payload_len:  # ensure max_pkt_size
+                break
+
             linepacklist.append(lines[linecount])
             linelength = len(lines[linecount]) // 2
             if int(f[linecount + 1][4:12], 16) != (int(f[linecount][4:12], 16) + linelength):
@@ -2858,12 +2878,13 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
         linepack = bytes.fromhex(''.join(linepacklist))
         dlen = len(linepack)
         # segment header, see IWF DBS HW SW ICD
-        data = struct.pack('>III', segid, startaddr, dlen // 4) + linepack + b'\x00\x00'
+        data = struct.pack(SEG_HEADER_FMT, segid, startaddr, dlen // 4) + linepack + bytes(SEG_SPARE_LEN)
         data = data + crc(data).to_bytes(SEG_CRC_LEN, 'big')
 
         # create PUS packet
         packetdata = struct.pack(fmt, memid, memaddr, len(data)) + data + endspares
-        puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=counters[apid], ack=0b1001)
+        seq_cnt = counters.setdefault(apid, 0)
+        puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=seq_cnt, ack=0b1001)
 
         if len(puspckt) > MAX_PKT_LEN:
             logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
@@ -2911,7 +2932,7 @@ def segment_data(data, segid, addr, seglen=480):
         if chunklen % 4:
             raise ValueError('Segment data length is not two-word aligned')
             
-        sdata = struct.pack('>III', segid, segaddr, chunklen // 4) + chunk + bytes(SEG_SPARE_LEN)
+        sdata = struct.pack(SEG_HEADER_FMT, segid, segaddr, chunklen // 4) + chunk + bytes(SEG_SPARE_LEN)
         sdata += crc(sdata).to_bytes(SEG_CRC_LEN, 'big')
         segments.append(sdata)
         segaddr += chunklen

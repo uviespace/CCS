@@ -34,7 +34,7 @@ RMAP_PEC_LEN = 1
 
 PUS_PKT_VERS_NUM = 0  # 0 for space packets
 PUS_VERSION = 1
-MAX_PKT_LEN = 1024  # bytes
+MAX_PKT_LEN = 886  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
