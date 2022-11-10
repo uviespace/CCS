@@ -284,6 +284,12 @@ def start_config_editor(console=False, **kwargs):
     start_app(file_path, directory, console=console, **kwargs)
 
 
+def start_tst(console=False, **kwargs):
+    file_path = os.path.join(cfg.get('paths', 'base'), 'start_tst')
+    directory = os.path.dirname(file_path)
+    start_app(file_path, directory, console=console, **kwargs)
+
+
 # This sets up a logging client for the already running TCP-logging Server,
 # The logger is returned with the given name an can be used like a normal logger
 def start_logging(name):

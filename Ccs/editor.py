@@ -60,6 +60,7 @@ UI_INFO = """
       <menuitem action='Poolmanager' />
       <menuitem action='Plotter' />
       <menuitem action='Monitor' />
+      <menuitem action='TST' />
     </menu>
     <menu action='ToolsMenu'>
       <menuitem action='ActionButtons' />
@@ -702,20 +703,24 @@ class CcsEditor(Gtk.Window):
         action = Gtk.Action(name="ModulesMenu", label="_Modules", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Poolviewer", label="_Start Poolviewer", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Poolviewer", label="_Poolviewer", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_poolviewer)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Poolmanager", label="_Start Poolmanager", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Poolmanager", label="_Poolmanager", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_poolmanager)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Plotter", label="_Start Plotter", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Plotter", label="_Plotter", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_plotter)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Monitor", label="_Start Monitor", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Monitor", label="_Monitor", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_monitor)
+        action_group.add_action(action)
+
+        action = Gtk.Action(name="TST", label="_Test Specification Tool", tooltip=None, stock_id=None)
+        action.connect("activate", self._on_start_tst)
         action_group.add_action(action)
 
     def create_tools_menu(self, action_group):
@@ -808,23 +813,21 @@ class CcsEditor(Gtk.Window):
 
     def _on_start_poolviewer(self, action):
         cfl.start_pv()
-        return
 
     def _on_start_poolmanager(self, action):
         cfl.start_pmgr()
-        return
 
     def _on_start_plotter(self, action):
         cfl.start_plotter()
-        return
 
     def _on_start_monitor(self, action):
         cfl.start_monitor()
-        return
+
+    def _on_start_tst(self, action):
+        cfl.start_tst()
 
     def _on_open_poolmanager_gui(self, action):
         cfl.start_pmgr()
-        return
 
     def _on_show_action_window(self, action):
         if hasattr(self, 'action_button_window'):
@@ -835,7 +838,6 @@ class CcsEditor(Gtk.Window):
 
     def _on_restart_terminal(self, action):
         self.restart_terminal()
-        return
 
     def _on_open_script(self, action, filename):
         if os.path.isfile(filename):
@@ -846,7 +848,6 @@ class CcsEditor(Gtk.Window):
 
     def _on_select_about_dialog(self, action):
         cfl.about_dialog(self)
-        return
 
     def _get_active_view(self):
         nbpage = self.editor_notebook.get_current_page()
@@ -1334,11 +1335,16 @@ class CcsEditor(Gtk.Window):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
             start_button = Gtk.Button.new_with_label("Start " + name.capitalize())  # + '   ')
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, True, True, 0)
+
+        # Add the TST option
+        conn_button = Gtk.Button.new_with_label('Test Specification Tool')
+        conn_button.connect("clicked", cfl.start_tst)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
