@@ -2476,16 +2476,25 @@ def _has_tc_connection(pool_name, pmgr_handle):
         return False
 
 
-def Tcsend_bytes(tc_bytes, pool_name='LIVE'):
-
+def _get_pmgr_handle(tc_pool=None):
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
     if not pmgr:
         return False
 
     # check if pool is connected
-    if not _has_tc_connection(pool_name, pmgr):
+    if tc_pool is not None and not _has_tc_connection(tc_pool, pmgr):
         return False
+
+    return pmgr
+
+
+def Tcsend_bytes(tc_bytes, pool_name='LIVE', pmgr_handle=None):
+
+    if not pmgr_handle:
+        pmgr = _get_pmgr_handle(pool_name)
+    else:
+        pmgr = pmgr_handle
 
     # Tell dbus with signature = that you send a byte array (ay), otherwise does not allow null bytes
     try:
@@ -2695,6 +2704,23 @@ def bin_to_hex(fname, outfile):
         logger.info('Wrote {} bytes as HEX-ASCII to {}.'.format(len(bindata), outfile))
 
 
+def get_mem_id(memid, memid_ref):
+    if not isinstance(memid, int):
+        dbcon = scoped_session_idb
+        dbres = dbcon.execute('SELECT pas_alval from pas where pas_numbr="{}" and pas_altxt="{}"'.format(memid_ref, memid))
+        try:
+            memid, = dbres.fetchall()[0]
+        except IndexError:
+            que = 'SELECT pas_altxt from pas where pas_numbr="{}"'.format(memid_ref)
+            alvals = [x[0] for x in dbcon.execute(que).fetchall()]
+            raise ValueError('Invalid MemID "{}". Allowed values are: {}.'.format(memid, ', '.join(alvals)))
+        finally:
+            dbcon.close()
+        memid = int(memid)
+
+    return memid
+
+
 #######################################################
 ##
 #  Convert srec file to sequence of PUS packets (TM6,2) and save them in hex-files or send them to socket _tcsend_
@@ -2817,7 +2843,8 @@ def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61
     source_to_srec('srec_binary_source.TC', output_srec, memaddr=imageaddr)
 
 
-def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=30, sleep=0.125, max_pkt_size=MAX_PKT_LEN):
+def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
+                max_pkt_size=MAX_PKT_LEN, progress=True):
     """
     Upload data from an SREC file to _memid_ via S6,2
     @param fname:
@@ -2829,30 +2856,27 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
     @param linesperpack:
     @param sleep:
     @param max_pkt_size:
+    @param progress:
     """
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
     pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + SEG_HEADER_LEN + SEG_SPARE_LEN + SEG_CRC_LEN + len(endspares) + PEC_LEN
     payload_len = max_pkt_size - pkt_overhead
 
-    if not isinstance(memid, int):
-        dbcon = scoped_session_idb
-        dbres = dbcon.execute('SELECT pas_alval from pas where pas_numbr="{}" and pas_altxt="{}"'.format(memid_ref, memid))
-        try:
-            memid, = dbres.fetchall()[0]
-        except IndexError:
-            que = 'SELECT pas_altxt from pas where pas_numbr="{}"'.format(memid_ref)
-            alvals = [x[0] for x in dbcon.execute(que).fetchall()]
-            raise ValueError('Invalid MemID "{}". Allowed values are: {}.'.format(memid, ', '.join(alvals)))
-        finally:
-            dbcon.close()
-        memid = int(memid)
+    memid = get_mem_id(memid, memid_ref)
+
+    # get permanent pmgr handle to avoid requesting one for each packet
+    pmgr = _get_pmgr_handle(tc_pool=pool_name)
 
     f = open(fname, 'r').readlines()[1:]
     lines = [p[12:-3] for p in f]
+    data_size = len(''.join(lines)) // 2
     startaddr = int(f[0][4:12], 16)
 
     linecount = 0
+    bcnt = 0
+    pcnt = 0
+    ptot = None
     while linecount < len(f) - 1:
 
         t1 = time.time()
@@ -2877,6 +2901,7 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
 
         linepack = bytes.fromhex(''.join(linepacklist))
         dlen = len(linepack)
+        bcnt += dlen
         # segment header, see IWF DBS HW SW ICD
         data = struct.pack(SEG_HEADER_FMT, segid, startaddr, dlen // 4) + linepack + bytes(SEG_SPARE_LEN)
         data = data + crc(data).to_bytes(SEG_CRC_LEN, 'big')
@@ -2889,7 +2914,13 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
         if len(puspckt) > MAX_PKT_LEN:
             logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
 
-        Tcsend_bytes(puspckt, pool_name=pool_name)
+        Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+        pcnt += 1
+        if progress:
+            if ptot is None:
+                ptot = int(np.ceil(data_size / dlen))  # packets needed to transfer SREC payload
+            print('{}/{} packets sent\r'.format(pcnt, ptot), end='')
+
         dt = time.time() - t1
         time.sleep(max(sleep - dt, 0))
 
@@ -2900,8 +2931,9 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
     # send all-zero termination segment of length 12
     packetdata = struct.pack(fmt, memid, memaddr, 12) + bytes(12) + endspares
     puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=counters[apid], ack=0b1001)
-    Tcsend_bytes(puspckt, pool_name=pool_name)
+    Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
     counters[apid] += 1
+    print('\nUpload finished, {} bytes sent in {}(+1) packets.'.format(bcnt, pcnt))
 
 
 def segment_data(data, segid, addr, seglen=480):
