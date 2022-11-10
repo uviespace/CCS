@@ -1278,7 +1278,7 @@ class CcsEditor(Gtk.Window):
 
         textview.set_wrap_mode(Gtk.WrapMode.WORD)
 
-        # textview.set_properties(insert_spaces_instead_of_tabs=True)
+        textview.set_properties(insert_spaces_instead_of_tabs=True)
         textview.set_properties(show_line_numbers=True)
         textview.set_properties(auto_indent=True)
         # textview.set_properties(highlight_current_line = True)
