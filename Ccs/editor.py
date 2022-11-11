@@ -1444,24 +1444,22 @@ class CcsEditor(Gtk.Window):
             mark = self.sourcemarks[textbuffer]
             start = textbuffer.get_iter_at_mark(mark)
         else:
-            start = textbuffer.get_start_iter()  # init
+            start = textbuffer.get_start_iter()
+            self._set_play_mark(view, start)
+            mark = self.sourcemarks[textbuffer]
 
-        #start = textbuffer.get_iter_at_line(iter.get_line())
-        #end = textbuffer.get_end_iter()
+        # bp = textbuffer.forward_iter_to_source_mark(stop, "break")
+        bp = mark.next()  # only works if no category is given!?
 
-        stop = start.copy()
-        bp = textbuffer.forward_iter_to_source_mark(stop, "break")  #TODO
-
-        if bp is False:
-            stop = textbuffer.get_end_iter()#end
+        if bp is not None:
+            stop = textbuffer.get_iter_at_mark(bp)
+        else:
+            stop = textbuffer.get_end_iter()
 
         """ dump line into console """
         line = textbuffer.get_text(start, stop, True)
         line += str('\n\n')
 
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
-        #self._to_console(line, editor_read=True)
         self._to_console_via_socket(line)
 
         self._set_play_mark(view, stop)
