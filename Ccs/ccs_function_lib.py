@@ -2981,15 +2981,15 @@ def segment_data(data, segid, addr, seglen=480):
     return segments
 
 
-def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32):
+def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_bytes=0):
     """
-    Generate srec file from source data
-    :param data:
-    :param outfile:
-    :param memaddr:
-    :param header:
-    :param bytes_per_line:
-    :return:
+    @param data:
+    @param outfile:
+    @param memaddr:
+    @param header:
+    @param bytes_per_line:
+    @param skip_bytes:
+    @return:
     """
 
     def srec_chksum(x):
@@ -2999,7 +2999,7 @@ def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32):
         raise ValueError("Maximum number of bytes per line is {}!".format(SREC_MAX_BYTES_PER_LINE))
 
     if isinstance(data, str):
-        data = open(data, 'rb').read()
+        data = open(data, 'rb').read()[skip_bytes:]
         
     if not isinstance(data, bytes):
         raise TypeError
@@ -3030,8 +3030,8 @@ def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32):
         fd.write('\n'.join(sreclist) + '\n')
         fd.write(terminator)
 
-    print('Data written to file: "{}"'.format(outfile))
-    logger.info('Data written to file: "{}"'.format(outfile))
+    print('Data written to file: "{}", skipped first {} bytes.'.format(outfile, skip_bytes))
+    logger.info('Data written to file: "{}", skipped first {} bytes.'.format(outfile, skip_bytes))
 
 
 def _get_upload_service_info(tcname=None):
