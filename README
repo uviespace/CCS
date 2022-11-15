@@ -7,7 +7,7 @@ This file documents the required steps to get the UVIE EGSE software up and runn
 2) Required packages/devtools
     - make
     - gtk3
-    - gtksourceview3 [<=3.24.11-1]
+    - gtksourceview3
     - python-pip
     - python-gobject
     - dbus-python
