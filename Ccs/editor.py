@@ -64,6 +64,7 @@ UI_INFO = """
     </menu>
     <menu action='ToolsMenu'>
       <menuitem action='ActionButtons' />
+      <menuitem action='ReconnectSQL' />
       <menuitem action='RestartTerminal' />
     </menu>
     <menu action='ScriptsMenu'>
@@ -731,6 +732,11 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self._on_show_action_window)
         action_group.add_action(action)
 
+        action = Gtk.Action(name="ReconnectSQL", label="_Reconnect SQL",
+                            tooltip="Reconnect, in case 'SQL server has gone away'", stock_id=None)
+        action.connect("activate", self._on_reconnect_sql)
+        action_group.add_action(action)
+
         action = Gtk.Action(name="RestartTerminal", label="_Restart Terminal", tooltip=None, stock_id=None)
         action.connect("activate", self._on_restart_terminal)
         action_group.add_action(action)
@@ -835,6 +841,9 @@ class CcsEditor(Gtk.Window):
                 self.action_button_window.present()
                 return
         self.action_button_window = ActionWindow(self)
+
+    def _on_reconnect_sql(self, action):
+        self._to_console('cfl.scoped_session_idb.close()')
 
     def _on_restart_terminal(self, action):
         self.restart_terminal()
@@ -1040,7 +1049,7 @@ class CcsEditor(Gtk.Window):
 
     def add_file_dialog_filters(self, dialog):
         filter_py = Gtk.FileFilter()
-        filter_py.set_name("All Python Files")
+        filter_py.set_name("Python Files")
         filter_py.add_mime_type("text/x-python")
         dialog.add_filter(filter_py)
 
@@ -1132,14 +1141,15 @@ class CcsEditor(Gtk.Window):
         for n in range(nbutt):
             button_action = Gtk.ToolButton()
 
-            button_img_path = os.path.join(pixmap_folder, self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
-            except:
-                self.logger.warning('Could not load image {}'.format(button_img_path))
-                pixmap_path = os.path.join(pixmap_folder, 'action.png')
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
-            icon = Gtk.Image.new_from_pixbuf(pixbuf)
+            # button_img_path = os.path.join(pixmap_folder, self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
+            # try:
+            #     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
+            # except:
+            #     self.logger.warning('Could not load image {}'.format(button_img_path))
+            #     pixmap_path = os.path.join(pixmap_folder, 'action.png')
+            #     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
+            # icon = Gtk.Image.new_from_pixbuf(pixbuf)
+            icon = self._get_toolbutton_icon(self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
             button_action.set_icon_widget(icon)
             button_action.set_name('action{}'.format(n + 1))
             button_action.set_tooltip_text(os.path.join(action_folder, self.cfg.get('ccs-actions', 'action{}'.format(n + 1))))
@@ -1161,18 +1171,25 @@ class CcsEditor(Gtk.Window):
 
         widget.set_tooltip_text(filename)
 
-    def action_context_menu(self, action):
+    def action_context_menu(self, action_button):
+        action = action_button.get_name()
         menu = Gtk.Menu()
 
         item = Gtk.MenuItem(label='Open action script file')
         item.connect('activate', self.show_action_script, action)
         menu.append(item)
+        item1 = Gtk.MenuItem(label='Set action script file')
+        item1.connect('activate', self._set_action_button_script, action_button)
+        menu.append(item1)
+        item2 = Gtk.MenuItem(label='Set button icon')
+        item2.connect('activate', self._set_action_button_icon, action_button)
+        menu.append(item2)
         return menu
 
     def show_action_context(self, widget, event):
         if event.button != 3:
             return
-        menu = self.action_context_menu(widget.get_name())
+        menu = self.action_context_menu(widget)
         menu.show_all()
         menu.popup(None, None, None, None, 3, event.time)
 
@@ -1180,7 +1197,58 @@ class CcsEditor(Gtk.Window):
         if action is None:
             return
         self.open_file(os.path.join(action_folder, self.cfg.get('ccs-actions', action)))
-        return
+
+    def _set_action_button_script(self, widget, action):
+        if action is None:
+            return
+
+        dialog = Gtk.FileChooserDialog('Select action script')
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        self.add_file_dialog_filters(dialog)
+        resp = dialog.run()
+
+        if resp == Gtk.ResponseType.OK:
+            fname = dialog.get_filename()
+            action.set_tooltip_text(fname)
+            if os.path.dirname(fname) == action_folder:
+                fname = os.path.basename(fname)
+
+            self.cfg.save_option_to_file('ccs-actions', action.get_name(), fname)
+
+        dialog.destroy()
+
+    def _set_action_button_icon(self, widget, action):
+        if action is None:
+            return
+
+        dialog = Gtk.FileChooserDialog(title='Select action icon')
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        resp = dialog.run()
+        if resp == Gtk.ResponseType.OK:
+            fname = dialog.get_filename()
+            if os.path.dirname(fname) == pixmap_folder:
+                fname = os.path.basename(fname)
+            icon = self._get_toolbutton_icon(fname)
+            action.set_icon_widget(icon)
+            action.show_all()
+            self.cfg.save_option_to_file('ccs-actions', action.get_name() + '_img', fname)
+
+        dialog.destroy()
+
+    def _get_toolbutton_icon(self, icon_path):
+        button_img_path = os.path.join(pixmap_folder, icon_path)
+
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
+        except Exception as err:
+            self.logger.debug(err)
+            self.logger.warning('Could not load image {}'.format(button_img_path))
+            pixmap_path = os.path.join(pixmap_folder, 'action.png')
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
+
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+
+        return icon
 
     def open_file(self, filename):
 
@@ -1458,9 +1526,10 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(start, stop, True)
-        line += str('\n\n')
+        # line += '\n'
 
-        self._to_console_via_socket(line)
+        # self._to_console_via_socket(line)
+        self._to_console(line)
 
         self._set_play_mark(view, stop)
 
@@ -1480,15 +1549,15 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(start, end, True)
-        line += str('\n\n')
+        # line += '\n'
 
         # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
         # self.ipython_view._processLine()
-        #self._to_console(line, editor_read=True)
-        self._to_console_via_socket(line)
+        # self._to_console(line, editor_read=True)
+        # self._to_console_via_socket(line)
+        self._to_console(line)
 
         self._set_play_mark(view, end)
-
 
     def _to_console_via_socket(self, buf):
         '''
@@ -1505,78 +1574,47 @@ class CcsEditor(Gtk.Window):
         editor_sock.close()
         return ack
 
-    #TODO: Very interesting behaviour by the editor console if every execution is done by the '_to_console' command,
-    # at the beginnig everything works fine, run all and run line by line, if a function is executed the same is true,
-    # but not if the function is first executed by run all and than by run line per line... the console just deletes
-    # the command befor it is executed, run all is now executed via socket everything works fine, changes would just be
-    # a visual plus, and the addvatage to use the built in command to communicate with the console,
-    # #### Additionally: using python 3.8 or newer, _to_console function does not yet work... but _to_conosle_via_socket
-    # works for every version, therefore it is used as long no solution is found
-
-
-    def _to_console(self, buf, execute=True, editor_read=False):
+    def _to_console(self, buf, execute=True, editor_read=False, protect_input=False):
         '''
         This function sends data to the IPython Terminal, Gtk.VteTerminal has a built in function to do this
         @param buf: String that should be sent
         @return: acknowledgment from the IPython Terminal
         '''
-        shown_length = 10   # This is the length execution line in the terminal has if no code was given
+        if protect_input:
+            shown_length = 10   # This is the length execution line in the terminal has if no code was given
 
-        last_row_pos = self.ipython_view.get_cursor_position()  # Get the last row
-        # Get the text that is written in the last row
-        terminal_text = self.ipython_view.get_text_range(last_row_pos[1], 0, last_row_pos[1] + 1, -1, None)[0]
-        entry_length = len(terminal_text)
+            last_row_pos = self.ipython_view.get_cursor_position()  # Get the last row
+            # Get the text that is written in the last row
+            terminal_text = self.ipython_view.get_text_range(last_row_pos[1], 0, last_row_pos[1] + 1, -1, None)[0]
+            entry_length = len(terminal_text)
 
-        # Check if code is entered into the terminal which was not executed yet
-        if len(terminal_text) > shown_length:
-            saved_text = terminal_text[8:-2]
+            # Check if code is entered into the terminal which was not executed yet
+            if len(terminal_text) > shown_length:
+                saved_text = terminal_text[8:-2]
+            else:
+                saved_text = ''
+
+            # If code was entered delete it, otherwise the new command would be added at the end
+            while entry_length > shown_length:
+                self.ipython_view.feed_child_compat('\b', len('\b'))
+                shown_length += 1
         else:
-            saved_text = ''
-
-        # If code was entered delete it, otherwise the new command would be added at the end
-        while entry_length > shown_length:
-            self.ipython_view.feed_child_compat('\b', len('\b'))
-            shown_length += 1
+            saved_text = None
 
         if not buf.endswith('\n'):
             buf += '\n'
 
         if buf.count('\n') > 2:
-            self.ipython_view.feed_child_compat('%cpaste\n')
+            self.ipython_view.feed_child_compat('%cpaste -q\n')
             time.sleep(0.2)
             self.ipython_view.feed_child_compat(buf)
-            ack = self.ipython_view.feed_child_compat('--\n', 3)
-
-            # if VTE_VERSION < '0.52.3':
-            #     self.ipython_view.feed_child('%cpaste\n', 8)
-            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
-            #     self.ipython_view.feed_child(buf, len(buf))
-            #     ack = self.ipython_view.feed_child('--\n', 3)
-            # else:
-            #     self.ipython_view.feed_child_binary('%cpaste\n'.encode())
-            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
-            #     self.ipython_view.feed_child_binary(buf.encode())
-            #     ack = self.ipython_view.feed_child_binary('--\n'.encode())
+            ack = self.ipython_view.feed_child_compat('--\n')
         else:
             ack = self.ipython_view.feed_child_compat(buf)
-
-            # if VTE_VERSION < '0.52.3':
-            #     ack = self.ipython_view.feed_child(buf, len(buf))
-            # else:
-            #     ack = self.ipython_view.feed_child_binary(buf.encode())
-
-        # execute = '\n'  # Without this command would be written to terminal but not executed
-        # ack = self.ipython_view.feed_child(buf + execute, len(buf + execute))
 
         # Write the previously deleted code back to the terminal
         if saved_text:
             self.ipython_view.feed_child_compat(saved_text, len(saved_text))
-
-        #editor_sock = socket.socket()
-        #editor_sock.connect((self.ed_host, self.ed_port))
-        #editor_sock.send(buf.encode())
-        #ack = editor_sock.recv(1024)
-        #editor_sock.close()
 
         return ack
 
