@@ -5,7 +5,7 @@ binary = '/path/to/binary'  # IASW binary
 srecfile = '/path/to/srec'  # SREC filename
 start_addr = 0x60040000  # start address of IASW in RAM
 
-cfl.source_to_srec(binary, srecfile, start_addr)
+cfl.source_to_srec(binary, srecfile, start_addr, skip_bytes=0)
 
 # upload the SREC content to DPU
 memid = 'MEM_WR_MRAM'  # memory ID, 'DPU_MRAM' or 'MEM_WR_MRAM', depending on whether DBS or IASW S6 is used
