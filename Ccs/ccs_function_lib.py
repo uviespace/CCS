@@ -2999,10 +2999,12 @@ def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_
         raise ValueError("Maximum number of bytes per line is {}!".format(SREC_MAX_BYTES_PER_LINE))
 
     if isinstance(data, str):
-        data = open(data, 'rb').read()[skip_bytes:]
+        data = open(data, 'rb').read()
         
     if not isinstance(data, bytes):
         raise TypeError
+
+    data = data[skip_bytes:]
 
     if header is None:
         fname = outfile.split('/')[-1][-60:]
