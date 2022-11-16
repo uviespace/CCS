@@ -2850,7 +2850,7 @@ def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61
 
 
 def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
-                max_pkt_size=MAX_PKT_LEN, progress=True):
+                max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
     """
     Upload data from an SREC file to _memid_ via S6,2
     @param fname:
@@ -2863,6 +2863,7 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
     @param sleep:
     @param max_pkt_size:
     @param progress:
+    @param image_crc:
     """
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
@@ -2879,10 +2880,12 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
     data_size = len(''.join(lines)) // 2
     startaddr = int(f[0][4:12], 16)
 
+    upload_bytes = b''
     linecount = 0
     bcnt = 0
     pcnt = 0
     ptot = None
+
     while linecount < len(f) - 1:
 
         t1 = time.time()
@@ -2921,7 +2924,10 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
             logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
 
         Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+        # collect all uploaded segments for CRC at the end
+        upload_bytes += data
         pcnt += 1
+
         if progress:
             if ptot is None:
                 ptot = int(np.ceil(data_size / dlen))  # packets needed to transfer SREC payload
@@ -2939,7 +2945,12 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
     puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=counters[apid], ack=0b1001)
     Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
     counters[apid] += 1
+
     print('\nUpload finished, {} bytes sent in {}(+1) packets.'.format(bcnt, pcnt))
+
+    if image_crc:
+        # return total length of uploaded data (without termination segment) and CRC over entire image, including segment headers
+        return len(upload_bytes), crc(upload_bytes)
 
 
 def segment_data(data, segid, addr, seglen=480):
