@@ -1830,6 +1830,9 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     if npars == 0:
         pdata = b''
 
+        if source_data_only:
+            return pdata
+
     else:
         # check for padded parameters
         padded, = np.where(np.array([i[5] for i in params]) == 'A')
@@ -1875,6 +1878,9 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
                 fix2 = b''
 
             pdata = fix + var + fix2
+
+            if source_data_only:
+                return pdata
 
         else:
             if hack_value is None:
