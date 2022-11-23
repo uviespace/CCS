@@ -82,9 +82,10 @@ SEG_CRC_LEN = 2
 pid_offset = int(cfg.get('ccs-misc', 'pid_offset'))
 
 fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
-           'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
+           'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'uint*': 'uint',
+           'ascii*': 'ascii', 'oct*': 'oct'}
 
-personal_fmtlist = ['uint', 'ascii', 'oct']
+personal_fmtlist = []
 
 fmtlengthlist = {'b': 1, 'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'q': 8,
                  'Q': 8, 'f': 4, 'd': 8, 'i24': 3, 'I24': 3}
@@ -114,8 +115,6 @@ if cfg.has_section('ccs-user_defined_packets'):
     user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
 else:
     user_tm_decoders = {}
-
-# Notify.init('cfl')
 
 
 def _add_log_socket_handler():
@@ -584,13 +583,10 @@ def set_monitor(pool_name=None, param_set=None):
 
 
 def user_tm_decoders_func():
-
     if cfg.has_section('ccs-user_defined_packets'):
-        user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k])
-                                 for k in cfg['ccs-user_defined_packets']}
+        user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
     else:
         user_tm_decoders = {}
-
     return user_tm_decoders
 
 
@@ -629,13 +625,11 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, UDEF=Fals
 #  Decode source data field of TM packet
 #  @param tm TM packet bytestring
 def Tmdata(tm, UDEF=False, *args):
-    tmdata = None
-    tmname = None
     tpsd = None
     params = None
     dbcon = scoped_session_idb
 
-    # This will be used to first check if an UDEF exists and used this to decode, if not the ÍDB will be checked
+    # This will be used to first check if an UDEF exists and used this to decode, if not the IDB will be checked
     if UDEF:
         try:
             header, data, crc = Tmread(tm)
@@ -702,6 +696,7 @@ def Tmdata(tm, UDEF=False, *args):
             if params is None:
                 dbres = dbcon.execute(que)
                 spid, tpsd, dfhsize = dbres.fetchall()[0]
+        # TODO: proper handling of super-commutated parameters
         if tpsd == -1 and params is None:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,plf_offby,plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,\
             pcf.pcf_unit,pcf.pcf_pid,pcf.pcf_width FROM plf LEFT JOIN pcf ON plf.plf_name=pcf.pcf_name WHERE \
@@ -709,7 +704,6 @@ def Tmdata(tm, UDEF=False, *args):
             ORDER BY plf_offby,plf_offbi'.format(spid)
             dbres = dbcon.execute(que)
             params = dbres.fetchall()
-            #o = data.unpack(','.join([ptt[i[4]][i[5]] for i in params]))
             vals_params = decode_pus(data, params)
             tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
@@ -721,7 +715,6 @@ def Tmdata(tm, UDEF=False, *args):
             else: #Decode according to given order, length is then 11
                 vals_params = read_variable_pckt(data, params)
 
-            #vals_params = decode_pus(data, params)
             tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
         else:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,\
@@ -742,7 +735,6 @@ def Tmdata(tm, UDEF=False, *args):
             tmname = ['USER DEFINED: {}'.format(user_label)]
     except Exception as failure:
         raise Exception('Packet data decoding failed: ' + str(failure))
-        # logger.info('Packet data decoding failed.' + str(failure))
     finally:
         dbcon.close()
     return tmdata, tmname
@@ -1300,7 +1292,7 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         fetch = dbres.fetchall()
         dbcon.close()
         if len(fetch) == 0:
-            return rawval[0]
+            return rawval if isinstance(rawval, int) else rawval[0]
 
         ptc, pfc, categ, curtx = fetch[0]
 
@@ -1310,7 +1302,10 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     try:
         type_par = ptt(ptc, pfc)
     except NotImplementedError:
-        type_par = None
+        try:
+            return rawval if isinstance(rawval, int) else rawval[0]
+        except IndexError:
+            return rawval
 
     if type_par == timepack[0]:
         #return timecal(rawval, 'uint:32,uint:15,uint:1')
@@ -1384,7 +1379,7 @@ def get_txp_altxt(pcf_name, alval, dbcon=None):
 #  @param st_filter Save only packets of this service type
 def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
     if st_filter is not None:
-        tmlist = Tm_filter_st(tmlist, *st_filter)
+        tmlist = Tm_filter_st(tmlist, **st_filter)
 
     if check_crc:
         tmlist = (tm for tm in tmlist if not crc_check(tm))
@@ -1405,39 +1400,32 @@ def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
         for tm in tmlist:
             try:
                 txtlist.append(Tmformatted(tm, separator='; '))
-            except:
+            except Exception as err:
+                # logger.warning(err)
                 txtlist.append(Tm_header_formatted(tm) + '; ' + str(tm[TM_HEADER_LEN:]))
         with open(filename, 'w') as f:
             f.write('\n'.join(txtlist))
 
 
-##
-#  Filter by service (sub-)type
-#
-#  Return list of TM packets filtered by service type and sub-type
-#  @param tmlist List of TM packets
-#  @param st     Service type
-#  @param        Service sub-type
-def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None, eventId=None,
-                 procId=None):
-    """From tmlist return list of packets with specified st,sst"""
-    # stsst=pack('2*uint:8',st,sst).bytes
-    # filtered=[tmlist[i] for i in np.argwhere([a==stsst for a in [i[7:9] for i in tmlist]]).flatten()]
-    if (st is not None) and (sst is not None):
-        tmlist = [tm for tm in tmlist if ((tm[7], tm[8]) == (st, sst))]
+def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None):
+    """From tmlist return list of packets with specified criteria"""
+    if st is not None:
+        tmlist = [tm for tm in tmlist if tm[7] == st]
 
-    if sid is not None:
-        tmlist = [tm for tm in list(tmlist) if (tm[TM_HEADER_LEN] == sid or tm[TM_HEADER_LEN] + tm[TM_HEADER_LEN + 1] == sid)] # two possibilities for SID because of  different definition (length) for SMILE and CHEOPS
+    if sst is not None:
+        tmlist = [tm for tm in tmlist if tm[8] == sst]
 
     if apid is not None:
-        tmlist = [tm for tm in list(tmlist) if ((struct.unpack('>H', tm[:2])[0] & 2047) == (apid))]
+        # tmlist = [tm for tm in list(tmlist) if ((struct.unpack('>H', tm[:2])[0] & 2047) == apid)]
+        tmlist = [tm for tm in list(tmlist) if (int.from_bytes(tm[:2], 'big') & 0x7FF) == apid]
 
-    if eventId is not None:
-        tmlist = [tm for tm in list(tmlist) if (struct.unpack('>H', tm[TM_HEADER_LEN:TM_HEADER_LEN + 2])[0] == eventId)]
+    if sid is not None:
+        if st is None or sst is None or apid is None:
+            raise ValueError('Must provide st, sst and apid if filtering by sid')
 
-    if procId is not None:
-        tmlist = [tm for tm in list(tmlist) if
-                  (struct.unpack('>H', tm[TM_HEADER_LEN + 2:TM_HEADER_LEN + 4])[0] == procId)]
+        sid_offset, sid_bitlen = get_sid(st, sst, apid)
+        tobyte = sid_offset + sid_bitlen // 8
+        tmlist = [tm for tm in list(tmlist) if int.from_bytes(tm[sid_offset:tobyte], 'big') == sid]
 
     if time_from is not None:
         tmlist = [tm for tm in list(tmlist) if (time_from <= get_cuctime(tm))]
@@ -1519,12 +1507,14 @@ def get_pool_rows(pool_name, check_existence=False):
 
 
 #  get values of parameter from HK packets
-def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
+def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None):
 
     if param is None:
         return
 
-    # with self.poolmgr.lock:
+    if tmlist is None and pool_name is not None:
+        tmlist = get_pool_rows(pool_name, check_existence=True)
+
     dbcon = scoped_session_idb
     if hk is None:
         que = 'SELECT plf.plf_name,plf.plf_spid,plf.plf_offby,plf.plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_unit,\
@@ -1535,8 +1525,9 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
             tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-                                   func.mid(DbTelemetry.data, SID_OFFSET - TM_HEADER_LEN + 1, SID_SIZE) == struct.pack(SID_FORMAT[SID_SIZE], sid)).order_by(
-                DbTelemetry.idx.desc())
+                                   func.mid(DbTelemetry.data, get_sid(st, sst, apid)[0] - TM_HEADER_LEN + 1,
+                                            get_sid(st, sst, apid)[1] // 8) == sid.to_bytes(get_sid(st, sst, apid)[1] // 8, 'big')
+                                   ).order_by(DbTelemetry.idx.desc())
             if tmlist is not None:
                 if last > 1:
                     tmlist_filt = [tm.raw for tm in tmlist[:last]]
@@ -1545,96 +1536,84 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False):
             else:
                 tmlist_filt = []
         else:
-            if (st, sst) == (3, 25):
-                tmlist_filt = Hk_filter(tmlist, st, sst, apid, sid)[-last:]
-            else:
-                tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid)[-last:]
-        #ufmt = ptt['hk'][ptc][pfc]
+            sid = None if sid == 0 else sid
+            tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+
         ufmt = ptt(ptc, pfc)
+
     elif hk != 'User defined' and not hk.startswith('UDEF|'):
-        if not isinstance(param, int):
-            pass  # param=self.get_pid(param)
         que = 'SELECT pid_descr, pid_type,pid_stype,pid_pi1_val,pid_apid,plf.plf_name,plf.plf_spid,plf.plf_offby,plf.plf_offbi,\
                    pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_unit,pcf.pcf_descr,pcf.pcf_pid from pid left join plf on\
                    pid.pid_spid=plf.plf_spid left join pcf on plf.plf_name=pcf.pcf_name where\
                    pcf.pcf_descr="%s" and pid.pid_descr="%s"' % (param, hk)
         dbres = dbcon.execute(que)
         hkdescr, st, sst, sid, apid, name, spid, offby, offbi, ptc, pfc, unit, descr, pid = dbres.fetchall()[0]
-        if sid == 0:
-            sid = None
-        tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:]
-        #ufmt = ptt['hk'][ptc][pfc]
+
+        sid = None if sid == 0 else sid
+        tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+
         ufmt = ptt(ptc, pfc)
 
     elif hk.startswith('UDEF|'):
-        label = hk.strip('UDEF|')
+        label = hk.replace('UDEF|', '')
         hkref = [k for k in user_tm_decoders if user_tm_decoders[k][0] == label][0]
         pktinfo = user_tm_decoders[hkref][1]
         parinfo = [x for x in pktinfo if x[1] == param][0]
         pktkey = hkref.split('-')
 
+        st = int(pktkey[0])
+        sst = int(pktkey[1])
         apid = int(pktkey[2]) if pktkey[2] != 'None' else None
-        sid = int(pktkey[3])
+        sid = int(pktkey[3]) if pktkey[3] != 'None' else None
         name, descr, _, offbi, ptc, pfc, unit, _, bitlen = parinfo
 
-        offby = sum(
-            [x[-1] for x in pktinfo[:pktinfo.index(parinfo)]]) // 8 + TM_HEADER_LEN  # +TM_HEADER_LEN for header!
-        st = 3
-        sst = 25
-        tmlist_filt = Hk_filter(tmlist, st, sst, apid, sid)[-last:]
-        #ufmt = ptt['hk'][ptc][pfc]
+        offby = sum([x[-1] for x in pktinfo[:pktinfo.index(parinfo)]]) // 8 + TM_HEADER_LEN  # +TM_HEADER_LEN for header
+        tmlist_filt = Tm_filter_st(tmlist, st, sst, apid, sid)[-last:] if tmfilter else tmlist[-last:]
         ufmt = ptt(ptc, pfc)
+
     else:
         userpar = json.loads(cfg[CFG_SECT_PLOT_PARAMETERS][param])
-        if ('SID' not in userpar.keys()) or (userpar['SID'] is None):
-            tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'])[-last:]
-        else:
-            tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'],
-                                            sid=userpar['SID'])[-last:]
+        sid = None if (('SID' not in userpar.keys()) or (userpar['SID'] is None)) else userpar['SID']
+        tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'], sid=sid)[-last:] if tmfilter else tmlist[-last:]
         offby, ufmt = userpar['bytepos'], userpar['format']
-        if 'offbi' in userpar:
-            offbi = userpar['offbi']
-        else:
-            offbi = 0
+        offbi = userpar['offbi'] if 'offbi' in userpar else 0
         descr, unit, name = param, None, None
 
     bylen = csize(ufmt)
-    #print(tmlist_filt)
-    #tms = io.BytesIO(tmlist_filt)
     if name is not None:
         que = 'SELECT pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % name
         dbres = dbcon.execute(que)
         fetch = dbres.fetchall()
+
+        if not fetch:
+            logger.error('Parameter {} not found in MIB.'.format(name))
+            return
+
         categ, curtx = fetch[0]
         xy = [(get_cuctime(tm),
                get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
-                                   properties=[ptc, pfc, categ, curtx], numerical=numerical)) for tm in tmlist_filt]
+                              properties=[ptc, pfc, categ, curtx], numerical=numerical)) for tm in tmlist_filt]
 
     else:
         xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]
     dbcon.close()
+
     try:
         return np.array(np.array(xy).T, dtype='float'), (descr, unit)
     except ValueError:
         return np.array(xy, dtype='float, U32'), (descr, unit)
 
 
-##
-#  Filter HK TMs by SID and APID
-#  @param tmlist List of TM(3,25) packets
-#  @param apid   APID by which to filter
-#  @param sid    SID by which to filter
 def Hk_filter(tmlist, st, sst, apid=None, sid=None):
-    # hks=self.Tm_filter_st(tmlist,3,25)
-    # hkfiltered=[tm for tm in hks if ccs.Tmread(tm)[3]==apid and tm[16]==sid]
 
-    if apid in (None, '') and sid not in (0, None):
-        return [tm for tm in tmlist if (
-                len(tm) > TM_HEADER_LEN and (tm[7], tm[8], tm[TM_HEADER_LEN]) == (st, sst, sid))]
-    elif sid not in (0, None):
-        return [tm for tm in tmlist if (
-                len(tm) > TM_HEADER_LEN and (tm[7], tm[8], struct.unpack('>H', tm[:2])[0] & 0b0000011111111111,
-                                             tm[TM_HEADER_LEN]) == (st, sst, apid, sid))]
+    # if apid in (None, '') and sid not in (0, None):
+    #     return [tm for tm in tmlist if (
+    #             len(tm) > TM_HEADER_LEN and (tm[7], tm[8], tm[TM_HEADER_LEN]) == (st, sst, sid))]
+    # elif sid not in (0, None):
+    #     return [tm for tm in tmlist if (
+    #             len(tm) > TM_HEADER_LEN and (tm[7], tm[8], struct.unpack('>H', tm[:2])[0] & 0b0000011111111111,
+    #                                          tm[TM_HEADER_LEN]) == (st, sst, apid, sid))]
+    return Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)
 
 
 def show_extracted_packet():
@@ -3307,7 +3286,7 @@ def _get_spid(st, sst, apid=None, pi1val=0):
     return spid, tpsd
 
 
-def get_data_pool_items(pcf_descr=None, src_file=None):
+def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
     if not isinstance(src_file, (str, type(None))):
         raise TypeError('src_file must be str, is {}.'.format(type(src_file)))
 
@@ -3324,7 +3303,13 @@ def get_data_pool_items(pcf_descr=None, src_file=None):
                 else:
                     raise ValueError('Wrong format of input line in {}.'.format(src_file))
 
-        return data_pool
+        if as_dict:
+            data_pool_dict = {int(row[0]): {'descr': row[1], 'fmt': fmtlist[row[2]]} for row in data_pool if row[2] in fmtlist}
+            if len(data_pool_dict) != len(data_pool):
+                logger.warning('Data pool items were rejected because of unknown format ({})'.format(len(data_pool) - len(data_pool_dict)))
+            return data_pool_dict
+        else:
+            return data_pool
 
     elif pcf_descr is None and not src_file:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
@@ -3336,10 +3321,13 @@ def get_data_pool_items(pcf_descr=None, src_file=None):
 
     scoped_session_idb.close()
 
-    data_pool_dict = {}
+    if not as_dict:
+        return data_pool
 
-    for row in data_pool:
-        data_pool_dict.setdefault(row[0:4], []).append(row[5:])
+    data_pool_dict = {int(row[0]): {'descr': row[1], 'fmt': ptt(row[2], row[3])} for row in data_pool}
+
+    # for row in data_pool:
+    #     data_pool_dict.setdefault(row[0:4], []).append(row[5:])
 
     return data_pool_dict
 
@@ -3530,67 +3518,29 @@ def change_main_communication(new_main, new_main_nbr, main_instance, own_bus_nam
     return
 
 
-def add_decode_parameter(label=None, format=None, bytepos=None, parentwin=None):
+def add_decode_parameter(parentwin=None):  # , label=None, fmt=None, bytepos=None):
     """
-    Add a Parameter which can be used in the User Defined Package, only defined by the format and can therefore only be
+    Add a parameter which can be used in a User DEFined packet, only defined by the format and can therefore only be
     used if the package is decoded in the given order
-    :param label: Name of the parameter
-    :param format: The format of the Parameter given as the actual String or the location in the ptt definition
-    :param bytepos: The offset where a parameter is located in a packet
     :param parentwin: For graphical usage
     :return:
     """
 
-    pos = None
-    fmt = None
-
-    if format and label:
-        #if label in cfg['ccs-plot_parameters']:
-        #    print('Please choose a different name for the parameter, can not exist as plot and decode parameter')
-        #    return
-        if isinstance(format, str):
-            try:
-                dummy = ptt_reverse(format)
-                fmt = format
-            except NotImplementedError:
-                if format not in fmtlist.keys():
-                    logger.error('Please give a correct Format')
-                    return
-                else:
-                    fmt = fmtlist[format]
-        elif isinstance(format, (list, tuple)):
-            if len(format) == 2:
-                try:
-                    fmt = ptt(format[0], format[1])
-                except NotImplementedError:
-                    logger.error('Give valid location of format')
-                    return
-            else:
-                logger.error('Please give a correct PTC/PFC format tuple')
-                return
-
-        if bytepos:
-            pos = bytepos
-
-    elif parentwin is not None:
+    if parentwin is not None:
         dialog = TmParameterDecoderDialog(parent=parentwin)
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             label = dialog.label.get_text()
-            #if label in cfg['ccs-plot_parameters']:
-            #    print('Please choose a different name for the parameter, can not exist as plot and decode parameter')
-            #    dialog.destroy()
-            #    return
-            pos = dialog.bytepos.get_active_text()
             fmt = dialog.format.get_active_text()
             if fmt in fmtlist:
                 fmt = fmtlist[fmt]
-                if fmt == 'bit':
+                if fmt in ('uint', 'ascii', 'oct'):
                     fmt += str(dialog.bitlen.get_text())
 
             else:
                 fmt += str(dialog.bitlen.get_text())
+                fmt = fmt.replace('*', '')
                 if fmt.upper() in fmtlist:
                     fmt = fmtlist[fmt.upper()]
             dialog.destroy()
@@ -3599,63 +3549,32 @@ def add_decode_parameter(label=None, format=None, bytepos=None, parentwin=None):
             return
 
     else:
-        logger.error('Please give a Format')
+        logger.error('Please give a valid format')
         return
 
-    # If a position was found the parameter will be stored in user_decoder layer in cfg
-    leng = None
-    if pos:
-        if fmt in fmtlengthlist:
-            leng = fmtlengthlist[fmt]
-        elif fmt.startswith(('bit', 'oct')):
-            len_test = int(fmt[3:])
-            if len_test % 8 == 0:
-                leng = len_test
-        elif fmt.startswith('uint'):
-            len_test = int(fmt[4:])
-            if len_test % 8 == 0:
-                leng = len_test
-        elif fmt.startswith('ascii'):
-            len_test = int(fmt[5:])
-            if len_test % 8 == 0:
-                leng = len_test
-        else:
-            # print('Something went wrong')
-            logger.error('Failed generating UDEF Parameter')
-            return
-
-        if leng:
-            dump = {'bytepos': str(pos), 'bytelen': str(leng), 'format': str(fmt)}
-            cfg.save_option_to_file('ccs-user_decoders', label, json.dumps(dump))
-        else:
-            dump = {'bytepos': str(pos), 'format': str(fmt)}
-            cfg.save_option_to_file('ccs-user_decoders', label, json.dumps(dump))
-    else:
-        cfg['ccs-decode_parameters'][label] = json.dumps(('format', str(fmt)))
-        cfg.save_option_to_file('ccs-decode_parameters', label, json.dumps(('format', str(fmt))))
+    cfg.save_option_to_file('ccs-decode_parameters', label, json.dumps({'format': str(fmt)}))
 
     if fmt:
-        return fmt
+        return {'format': str(fmt)}
     else:
         return
 
 
-# Let one add an additional User defined Package
-# Which can than be decoded
-def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameters=None, idb_pos=False, parentwin=None):
+def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameters=None, parentwin=None):
     """
-    Add decoding info for TM not defined in IDB
+    Add User DEFined packet with decoding info for TM not defined in IDB
     @param label: Name of new defined packet
     @param st: Service Type
     @param sst: Sub Service Type
     @param apid:
     @param sid:
     @param parameters: list of parameters
-    @param idb_pos: False decode in given order, True decode in given/IBD given positiontm
+    @param parentwin:
     @return:
     """
 
     if label and st and sst and apid:
+        sid = sid if sid else 0
         tag = '{}-{}-{}-{}'.format(st, sst, apid, sid)
 
     elif parentwin is not None:
@@ -3663,14 +3582,10 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            slots = dialog.get_content_area().get_children()[0].get_children()[1].get_children()
-            parameters_name = []
-            model = slots[0].get_children()[1].get_child().get_model()
-            parameters_name.append([par[1] for par in model])
-            parameters = parameters_name[0]
-            tag = '{}-{}-{}-{}'.format(dialog.st.get_text(), dialog.sst.get_text(), dialog.apid.get_text(), dialog.sid.get_text())
+            parameters = [par for par in dialog.parameter_list]
+            sid = dialog.sid.get_text() if dialog.sid.get_text() else 0
+            tag = '{}-{}-{}-{}'.format(dialog.st.get_text(), dialog.sst.get_text(), dialog.apid.get_text(), sid)
             label = dialog.label.get_text()
-            idb_pos = dialog.idb_position.get_active()
             dialog.destroy()
         else:
             dialog.destroy()
@@ -3678,144 +3593,113 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
     else:
         logger.error('Please give: label, st, sst and apid')
         return
-    dbcon = scoped_session_idb
 
-    if sid is not None:
-        parameters = ['Sid'] + parameters
-    if None in parameters: # Check if a User defined Parameter was selected
-        parameters_descr = []
-        parameters_descr.append([par[0] for par in model])
-        parameters_descr = parameters_descr[0]
+    if not parameters:
+        logger.warning('No parameters given, cannot create custom TM')
+        return
 
-        # The values of the Parameters which are in the database can be found via SQL, the UD parameters have to be looked up in the config file
-        params = []
-        i =0
-        if idb_pos: #Parameters should be decoded by there position given in the IDB or config file
-
-            while i < len(parameters_descr): # Check for each parameter if it is User-defined or IDB
-                if parameters[i] is not None: # If parameter is in IDB get its values with SQL Query
-                    que = 'SELECT DISTINCT pcf.pcf_name,pcf.pcf_descr,plf_offby,plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,\
-                        pcf.pcf_unit,pcf.pcf_pid,pcf.pcf_width FROM plf LEFT JOIN pcf ON plf.plf_name=pcf.pcf_name  \
-                        WHERE pcf_name ="%s"' %parameters[i]
-
-                    dbres = dbcon.execute(que)
-                    params_value = dbres.fetchall()
-                    params.append(params_value[0])
-                else: # Parameter is User Defined get the values from the config file
-                    try:
-                        params_values = json.loads(cfg['ccs-user_decoders'][parameters_descr[i]])
-                    except:
-                        # print('Parameter: {} can only be decoded in given order'.format(parameters_descr[i]))
-                        logger.info('Parameter: {} can only be decoded in given order'.format(parameters_descr[i]))
-                        return
-                    ptt_value = ptt_reverse(params_values['format'])
-                    params_value = ['user_defined', parameters_descr[i],
-                                    params_values['bytepos'] if 'bytepos' in params_values else None,
-                                    params_values['bytelen'] if 'bytelen' in params_values else None,
-                                    ptt_value[0], ptt_value[1],
-                                    None, None, None]
-                    params.append(tuple(params_value))
-                i += 1
-
-        else: #Parameters will be decoded in the given order
-            while i < len(parameters_descr):  # Check for each parameter if it is User-defined or IDB
-                if parameters[i] is not None:  # If parameter is in IDB get its values with SQL Query
-                    #que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx, \
-                    #        pcf.pcf_width,pcf.pcf_unit,pcf.pcf_pid,vpd_pos,vpd_grpsize,vpd_fixrep from vpd  \
-                    #        left join pcf on vpd.vpd_name=pcf.pcf_name WHERE pcf_name ="%s"' % parameters[i]
-
-
-                    # Most parameters do not have an entry in the vpd table, therefore most of the time the query
-                    # would give no result. But what would be needed would be 3 entries with null at the end. This
-                    # is done manually here.
-                    # Furthermore this means that parameters are only treathed as fixed parameters
-
-                    que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx, \
-                            pcf.pcf_width,pcf.pcf_unit,pcf.pcf_pid,null,null,null from pcf \
-                            WHERE pcf_name ="%s"' % parameters[i]
-
-                    dbres = dbcon.execute(que)
-                    params_value = dbres.fetchall()
-                    params.append(params_value[0])
-
-                else:  # Parameter is User Defined get the values from the config file
-                    try: # Check where parameter is defined
-                        params_values = json.loads(cfg['ccs-user_decoders'][parameters_descr[i]])
-                        format = 'bit' + params_values['bytelen']
-                        ptt_value = ptt_reverse(format)
-                    except:
-                        params_values = json.loads(cfg['ccs-decode_parameters'][parameters_descr[i]])
-                        ptt_value = ptt_reverse(params_values['format'])
-
-                    params_value = ['user_defined', parameters_descr[i], ptt_value[0],
-                                    ptt_value[1], None, None, None, None, None, None, None]
-
-                    params.append(tuple(params_value))
-                i += 1
-
-    else:
-        if idb_pos: #Parameters should be decoded by there position given in the IDB or config file
-            # Check if the User used the PCF Name to describe the parameters or the PCF DESCR
-            if 'DPT' in parameters[0]:
-                que = 'SELECT DISTINCT pcf.pcf_name,pcf.pcf_descr,plf_offby,plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,\
-                    pcf.pcf_unit,pcf.pcf_pid,pcf.pcf_width FROM plf LEFT JOIN pcf ON plf.plf_name=pcf.pcf_name WHERE \
-                    pcf_name in {} ORDER BY FIELD({},'.format(tuple(parameters), 'pcf_name')\
-                    + str(tuple(parameters))[1:]
-
-                dbres = dbcon.execute(que)
-                params = dbres.fetchall()
-
-            else:
-                que = 'SELECT DISTINCT pcf.pcf_name,pcf.pcf_descr,plf_offby,plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,\
-                    pcf.pcf_unit,pcf.pcf_pid,pcf.pcf_width FROM plf LEFT JOIN pcf ON plf.plf_name=pcf.pcf_name WHERE \
-                    pcf_descr in {} ORDER BY FIELD({},'.format(tuple(parameters), 'pcf_descr')\
-                    + str(tuple(parameters))[1:]
-
-                dbres = dbcon.execute(que)
-                params = dbres.fetchall()
-        else: #Parameters will be decoded in the given order
-            # Check if the User used the PCF Name to describe the parameters or the PCF DESCR
-            if 'DPT' in parameters[0]:
-                #que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx, \
-                #        pcf.pcf_width,pcf.pcf_unit,pcf.pcf_pid,vpd_pos,vpd_grpsize,vpd_fixrep from vpd left join pcf on \
-                #        vpd.vpd_name=pcf.pcf_name WHERE pcf_name in {} ORDER BY FIELD({},'.format(tuple(parameters),
-                #        'pcf_name') + str(tuple(parameters))[1:]
-
-                que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx, \
-                        pcf.pcf_width,pcf.pcf_unit,pcf.pcf_pid, null,null,null from pcf WHERE pcf_name in {} \
-                        ORDER BY FIELD({},'.format(tuple(parameters), 'pcf_name') + str(tuple(parameters))[1:]
-
-                dbres = dbcon.execute(que)
-                params = dbres.fetchall()
-
-            else:
-                #que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx, \
-                #        pcf.pcf_width,pcf.pcf_unit,pcf.pcf_pid,vpd_pos,vpd_grpsize,vpd_fixrep from vpd left join pcf on \
-                #        vpd.vpd_name=pcf.pcf_name WHERE pcf_descr in {} ORDER BY FIELD({},'.format(tuple(parameters),
-                #        'pcf_descr') + str(tuple(parameters))[1:]
-
-                que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx, \
-                        pcf.pcf_width,pcf.pcf_unit,pcf.pcf_pid,null,null,null from pcf WHERE pcf_descr in {} \
-                        ORDER BY FIELD({},'.format(tuple(parameters), 'pcf_descr') + str(tuple(parameters))[1:]
-
-                dbres = dbcon.execute(que)
-                parmas = dbres.fetchall()
-
-    # print('Created custom TM decoder {} with parameters: {}'.format(label, [x[1] for x in params]))
+    params = [_parameter_decoding_info(par, check_curtx=True) for par in parameters]
     logger.debug('Created custom TM decoder {} with parameters: {}'.format(label, [x[1] for x in params]))
     user_tm_decoders[tag] = (label, params)
-    dbcon.close()
 
     if not cfg.has_section('ccs-user_defined_packets'):
         cfg.add_section('ccs-user_defined_packets')
     cfg.save_option_to_file('ccs-user_defined_packets', tag, json.dumps((label, [tuple(x) for x in params])))
 
+    return label
 
-# Add a User defined Parameter
-def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, bytepos=None, fmt=None, offbi=None, bitlen=None, parentwin=None):
+
+def _parameter_decoding_info(param, check_curtx=False):
+    """
+    Return parameter info tuple used for TM decoding
+    @param param:
+    @return:
+    """
+
+    if param[1] not in ['user_defined', 'user_defined_nopos', 'dp_item']:
+        que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,pcf.pcf_unit,' \
+              'pcf.pcf_pid,null,null,null from pcf WHERE pcf_name ="{}"'.format(param[1])
+        dinfo = scoped_session_idb.execute(que).fetchall()[0]
+
+    elif param[1] == 'user_defined':
+        fmt = json.loads(cfg[CFG_SECT_PLOT_PARAMETERS][param[0]])['format']
+        ptc, pfc = ptt_reverse(fmt)
+        dinfo = [param[1], param[0], ptc, pfc, None, csize(fmt) * 8, None, None, None, None, None]
+
+    elif param[1] == 'user_defined_nopos':
+        fmt = json.loads(cfg[CFG_SECT_DECODE_PARAMETERS][param[0]])['format']
+        ptc, pfc = ptt_reverse(fmt)
+        dinfo = [param[1], param[0], ptc, pfc, None, csize(fmt) * 8, None, None, None, None, None]
+
+    elif param[1] == 'dp_item':
+        if isinstance(param[0], int):
+            dp_id = param[0]
+            dp_descr = DP_IDS_TO_ITEMS[param[0]]
+        else:
+            dp_id = DP_ITEMS_TO_IDS[param[0].split(' ')[0]]  # strip IDs in parentheses if present from parameter dialog model
+            dp_descr = DP_IDS_TO_ITEMS[dp_id]
+
+        if check_curtx:
+            try:
+                que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,pcf.pcf_unit,' \
+                      'pcf.pcf_pid,null,null,null from pcf WHERE pcf_pid ="{}"'.format(dp_id)
+                dinfo = scoped_session_idb.execute(que).fetchall()[0]
+                return dinfo
+            except IndexError:
+                logger.debug('PID {} not in MIB.'.format(dp_id))
+
+        ptc, pfc = ptt_reverse(_dp_items[dp_id]['fmt'])
+        dinfo = [param[1], dp_descr, ptc, pfc, None, csize(_dp_items[dp_id]['fmt']) * 8, None, None, None, None, None]
+
+    else:
+        logger.warning('Info for parameter "{}" cannot be obtained'.format(param[0]))
+        dinfo = None
+
+    return dinfo
+
+
+def create_hk_decoder(sid, *dp_ids, apid=None):
+    parameters = [(dp_id, 'dp_item') for dp_id in dp_ids]
+
+    if apid is None:
+        que = 'SELECT pic_apid FROM pic WHERE pic_type=3 AND pic_stype=25'
+        res = scoped_session_idb.execute(que).fetchall()
+        apid = int(res[0][0])
+
+
+    sid_off, sid_width = SID_LUT[(3, 25, apid)]
+
+    que = 'SELECT plf_name, pcf_descr FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
+                'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and PID_APID={} and plf_offby={}'.format(apid, sid_off)
+    sid_name, sid_descr = scoped_session_idb.execute(que).fetchall()[0]
+
+    if sid_off != TM_HEADER_LEN:
+        logger.warning('Inconsistent definition of SID parameter')
+
+    parameters = [(sid_descr, sid_name)] + parameters
+    label = add_tm_decoder(label='HK_{}'.format(sid), st=3, sst=25, apid=apid, parameters=parameters, sid=sid)
+    return label
+
+
+def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, bytepos=None, fmt=None, offbi=None,
+                       bitlen=None, parentwin=None):
+    """
+    Add a stand-alone (i.e. with positional info) User DEFined parameter
+    @param parameter:
+    @param apid:
+    @param st:
+    @param sst:
+    @param sid:
+    @param bytepos:
+    @param fmt:
+    @param offbi:
+    @param bitlen:
+    @param parentwin:
+    @return:
+    """
     # If a Gtk Parent Window is given, open the Dialog window to specify the details for the parameter
     if parentwin is not None:
-        dialog = AddUserParamerterDialog(parent=parentwin)
+        dialog = UserParameterDialog(parent=parentwin)
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
@@ -3829,7 +3713,7 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
                 offbi = int(offbi, 0) if offbi != '' else 0
 
                 bytepos, fmt = int(dialog.bytepos.get_text(), 0), fmtlist[dialog.format.get_active_text()]
-                if fmt == 'bit':
+                if fmt in ('uint', 'ascii', 'oct'):
                     fmt += dialog.bitlen.get_text()
             except Exception as err:
                 logger.error(err)
@@ -3847,16 +3731,16 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
         dialog.destroy()
         return
 
-    # Else If parameter is given as the name of the parameter the others have to exist as well and the parameter is created
+    # Else if parameter is given the others have to exist as well and the parameter is created
     if isinstance(parameter, str):
         label = parameter
         if isinstance(apid, int) and isinstance(st, int) and isinstance(sst, int) and isinstance(bytepos, int) and fmt:
-            if fmt == 'bit':
+            if fmt in ('uint', 'ascii', 'oct'):
                 if bitlen:
                     fmt += bitlen
                 else:
                     # print('Please give a bitlen (Amount of Bits) if fmt (Parameter Type) is set to "bit"')
-                    logger.error('Parameter could not be created, no bitlen was given, while fmt was set to  "bit"')
+                    logger.error('Parameter could not be created, no length was given.')
                     return
 
             if not isinstance(sid,int):
@@ -3867,7 +3751,7 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
             # print('Please give all neaded parameters in the correct format')
             logger.error('Parameter could not be created, because not all specifications were given correctly')
             return
-    # Esle if the Parameter is given as a Dictionary get all the needed informations and create the parameter
+    # Else if the Parameter is given as a Dictionary get all the needed informations and create the parameter
     elif isinstance(parameter, dict):
         label = parameter['label']
         apid = parameter['apid']
@@ -3876,12 +3760,12 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
         byteps = parameter['bytepos']
         fmt = parameter['fmt']
         if isinstance(label, str) and isinstance(apid, int) and isinstance(st, int) and isinstance(sst, int) and isinstance(bytepos, int) and fmt:
-            if fmt == 'bit':
+            if fmt in ('uint', 'ascii', 'oct'):
                 if bitlen:
                     fmt += bitlen
                 else:
                     # print('Please give a bitlen (Amount of Bits) if fmt (Parameter Type) is set to "bit"')
-                    logger.error('Parameter could not be created, no bitlen was given, while fmt was set to "bit"')
+                    logger.error('Parameter could not be created, no length was given.')
                     return
 
             if not isinstance(parameter['sid'], int):
@@ -3915,27 +3799,23 @@ def remove_user_parameter(parname=None, parentwin=None):
         return parname
 
     # Else if a Parent Gtk window is given open the dialog to select a parameter
-    elif parentwin is not None:
-        dialog = RemoveUserParameterDialog(cfg, parentwin)
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            param = dialog.remove_name.get_active_text()
-
-            cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, param)
-
-            return param
-
-        else:
-            dialog.destroy()
-
-        return
+    # elif parentwin is not None:
+    #     dialog = RemoveUserParameterDialog(cfg, parentwin)
+    #     response = dialog.run()
+    #     if response == Gtk.ResponseType.OK:
+    #         param = dialog.remove_name.get_active_text()
+    #
+    #         cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, param)
+    #
+    #         return param
+    #
+    #     else:
+    #         dialog.destroy()
+    #
+    #     return
 
     elif parname is not None:
-        logger.error('Selected User Defined Paramter could not be found, please select a new one.')
-        return
-
-    else:
-        return
+        logger.error('Unknown parameter {}. Cannot remove.'.format(parname))
 
 
 # Edit an existing user defined Parameter
@@ -3944,7 +3824,7 @@ def edit_user_parameter(parentwin=None, parname=None):
     # if an existing parameter is given, open same window as for adding a parameter, but pass along the existing information
     # simply overwrite the existing parameter with the new one
     if parname and cfg.has_option(CFG_SECT_PLOT_PARAMETERS, parname):
-        dialog = AddUserParamerterDialog(parentwin, parname)
+        dialog = UserParameterDialog(parentwin, parname)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             try:
@@ -3957,14 +3837,13 @@ def edit_user_parameter(parentwin=None, parname=None):
                 offbi = int(offbi, 0) if offbi != '' else 0
 
                 bytepos, fmt = int(dialog.bytepos.get_text(), 0), fmtlist[dialog.format.get_active_text()]
-                if fmt == 'bit':
+                if fmt in ('uint', 'ascii', 'oct'):
                     fmt += dialog.bitlen.get_text()
             except ValueError as error:
                 logger.error(error)
                 dialog.destroy()
                 return
 
-            # TODO: replace param if label changed
             if label != parname:
                 cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, parname)
 
@@ -3983,23 +3862,25 @@ def edit_user_parameter(parentwin=None, parname=None):
     # Else Open a Window to select a parameter and call the same function again with an existing parameter
     # The upper code will be executed
     else:
-        if parname is not None:
-            logger.warning('User defined parameter "{}" could not be found, please select a new one'.format(parname))
-
-        dialog = EditUserParameterDialog(cfg, parentwin)
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            param = dialog.edit_name.get_active_text()
-            dialog.destroy()
-            ret = edit_user_parameter(parentwin, param)
-            if ret:
-                label, apid, st, sst, sid, bytepos, fmt, offbi = ret
-                return label, apid, st, sst, sid, bytepos, fmt, offbi
-            else:
-                return
-        else:
-            dialog.destroy()
-            return
+        logger.error('Unknown parameter {}'.format(parname))
+        return
+        # if parname is not None:
+        #     logger.warning('User defined parameter "{}" could not be found, please select a new one'.format(parname))
+        #
+        # dialog = EditUserParameterDialog(cfg, parentwin)
+        # response = dialog.run()
+        # if response == Gtk.ResponseType.OK:
+        #     param = dialog.edit_name.get_active_text()
+        #     dialog.destroy()
+        #     ret = edit_user_parameter(parentwin, param)
+        #     if ret:
+        #         label, apid, st, sst, sid, bytepos, fmt, offbi = ret
+        #         return label, apid, st, sst, sid, bytepos, fmt, offbi
+        #     else:
+        #         return
+        # else:
+        #     dialog.destroy()
+        #     return
 
 
 def read_plm_gateway_data(raw):
@@ -4735,7 +4616,7 @@ class TestExecGUI(Gtk.MessageDialog):
 
 class TmParameterDecoderDialog(Gtk.Dialog):
     def __init__(self, parent=None):
-        Gtk.Dialog.__init__(self, "Add User Decoder Parameter", parent, 0,
+        Gtk.Dialog.__init__(self, "Add User Parameter", parent, 0,
                             buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
 
         self.set_border_width(5)
@@ -4747,21 +4628,22 @@ class TmParameterDecoderDialog(Gtk.Dialog):
         bytebox = Gtk.HBox()
 
         self.format = Gtk.ComboBoxText()
-        self.format.set_model(self.create_format_model())
+        self.format.set_model(create_format_model())
         self.format.set_tooltip_text('Format type')
         self.format.connect('changed', self.bitlen_active)
+        self.format.connect('changed', self.check_ok_sensitive, ok_button)
+        # self.offbi = Gtk.Entry()
+        # self.offbi.set_placeholder_text('Bit offset')
+        # self.offbi.set_tooltip_text('Bit offset from byte alignment')
+        # self.offbi.set_sensitive(False)
         self.bitlen = Gtk.Entry()
-        self.bitlen.set_placeholder_text('BitLength')
-        self.bitlen.set_tooltip_text('Length in bits')
+        self.bitlen.set_placeholder_text('Length')
+        self.bitlen.set_tooltip_text('Length in bits (for uint*) or bytes (ascii*, oct*)')
         self.bitlen.set_sensitive(False)
-        self.bytepos = Gtk.Entry()
-        self.bytepos.set_placeholder_text('Byte Offset')
-        self.bytepos.set_tooltip_text('(Optional) Including {} ({} for TCs) header bytes, e.g. byte 0 in source data -> offset={}'
-                                      .format(TM_HEADER_LEN, TC_HEADER_LEN, TM_HEADER_LEN))
 
         bytebox.pack_start(self.format, 0, 0, 0)
+        # bytebox.pack_start(self.offbi, 0, 0, 0)
         bytebox.pack_start(self.bitlen, 0, 0, 0)
-        bytebox.pack_start(self.bytepos, 0, 0, 0)
         bytebox.set_spacing(5)
 
         self.label = Gtk.Entry()
@@ -4774,30 +4656,26 @@ class TmParameterDecoderDialog(Gtk.Dialog):
 
         self.show_all()
 
-    def create_format_model(self):
-        store = Gtk.ListStore(str)
-        for fmt in fmtlist.keys():
-            store.append([fmt])
-        for pers in personal_fmtlist:
-            store.append([pers])
-        return store
-
     def check_ok_sensitive(self, unused_widget, button):
-        if len(self.label.get_text()) == 0:
+        if len(self.label.get_text()) == 0 or not self.format.get_active_text():
             button.set_sensitive(False)
         else:
             button.set_sensitive(True)
 
     def bitlen_active(self, widget):
-        if widget.get_active_text() == 'bit*' or widget.get_active_text() not in fmtlist.keys():
+        if widget.get_active_text().endswith('*'):
             self.bitlen.set_sensitive(True)
+            # if widget.get_active_text().startswith(('ascii', 'oct')):
+            #     self.offbi.set_sensitive(False)
+            # else:
+            #     self.offbi.set_sensitive(True)
         else:
             self.bitlen.set_sensitive(False)
 
 
 class TmDecoderDialog(Gtk.Dialog):
     def __init__(self, logger, parameter_set=None, parent=None):
-        Gtk.Dialog.__init__(self, "Build User Defined Packet", parent, 0)
+        Gtk.Dialog.__init__(self, "Build User Defined Packet Structure", parent, 0)
         self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
 
         # self.set_default_size(780,560)
@@ -4838,17 +4716,19 @@ class TmDecoderDialog(Gtk.Dialog):
         self.apid.set_placeholder_text('APID')
         self.st.set_placeholder_text('Service Type')
         self.sst.set_placeholder_text('Service Subtype')
-        self.label.set_placeholder_text('Label for the current configuration')
+        self.label.set_placeholder_text('Label')
+        self.label.set_tooltip_text('Label for the current configuration')
 
         self.sid = Gtk.Entry()
         self.sid.set_placeholder_text('SID')
+        self.sid.set_tooltip_text('Discriminant, only applicable if ST and SST have a SID defined in the MIB.')
 
         self.apid.connect('changed', self.check_entry)
         self.st.connect('changed', self.check_entry)
         self.sst.connect('changed', self.check_entry)
         self.label.connect('changed', self.check_entry)
 
-        entrybox.pack_start(self.label,0, 0, 0)
+        entrybox.pack_start(self.label, 0, 0, 0)
         entrybox.pack_start(self.apid, 0, 0, 0)
         entrybox.pack_start(self.st, 0, 0, 0)
         entrybox.pack_start(self.sst, 0, 0, 0)
@@ -4857,15 +4737,15 @@ class TmDecoderDialog(Gtk.Dialog):
         entrybox.set_homogeneous(True)
         entrybox.set_spacing(5)
 
-        decisionbox = Gtk.HBox()
-
-        self.given_poition = Gtk.RadioButton.new_with_label_from_widget(None, 'Local')
-        self.given_poition.set_tooltip_text('Decode in given order')
-        self.idb_position = Gtk.RadioButton.new_with_label_from_widget(self.given_poition, 'IDB')
-        self.idb_position.set_tooltip_text('Decode by parameter position given in IDB')
-
-        decisionbox.pack_start(self.given_poition, 0, 0, 0)
-        decisionbox.pack_start(self.idb_position, 0, 0, 0)
+        # decisionbox = Gtk.HBox()
+        #
+        # self.given_poition = Gtk.RadioButton.new_with_label_from_widget(None, 'Local')
+        # self.given_poition.set_tooltip_text('Decode in given order')
+        # self.idb_position = Gtk.RadioButton.new_with_label_from_widget(self.given_poition, 'IDB')
+        # self.idb_position.set_tooltip_text('Decode by parameter position given in IDB')
+        #
+        # decisionbox.pack_start(self.given_poition, 0, 0, 0)
+        # decisionbox.pack_start(self.idb_position, 0, 0, 0)
 
         if parameter_set is not None:
 
@@ -4901,14 +4781,13 @@ class TmDecoderDialog(Gtk.Dialog):
             slot = self.create_slot()
             slotbox.pack_start(slot, 1, 1, 0)
 
-        note = Gtk.Label(label="Note: User-Defined_IDB parameter can only be used if IDB order is chosen, "
-                               "User-Defined_Local only for Local order")
+        # note = Gtk.Label(label="Note: User-Defined_IDB parameter can only be used if IDB order is chosen, User-Defined_Local only for Local order")
 
         box = Gtk.VBox()
         box.pack_start(parameter_view, 1, 1, 5)
-        box.pack_start(note, 0,0,0)
+        # box.pack_start(note, 0,0,0)
         box.pack_start(slotbox, 1, 1, 2)
-        box.pack_start(decisionbox, 1, 1, 2)
+        # box.pack_start(decisionbox, 1, 1, 2)
         box.pack_start(entrybox, 0, 0, 3)
 
         return box
@@ -4934,6 +4813,7 @@ class TmDecoderDialog(Gtk.Dialog):
     def create_slot(self, group=None):
         self.parameter_list = Gtk.ListStore(str, str)
         treeview = Gtk.TreeView(self.parameter_list)
+        treeview.set_reorderable(True)
 
         treeview.append_column(Gtk.TreeViewColumn("Parameters", Gtk.CellRendererText(), text=0))
         hidden_column = Gtk.TreeViewColumn("PCF_NAME", Gtk.CellRendererText(), text=1)
@@ -4978,37 +4858,93 @@ class TmDecoderDialog(Gtk.Dialog):
         else:
             return None, None
 
+    # def create_parameter_model_old(self):
+    #     parameter_model = Gtk.TreeStore(str, str)
+    #
+    #     dbcon = self.session_factory_idb
+    #     #dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid where pid_type=3 and pid_stype=25')
+    #     dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid order by pid_type,pid_pi1_val')
+    #     hks = dbres.fetchall()
+    #     for hk in hks:
+    #         it = parameter_model.append(None, [hk[0], None])
+    #         dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name from pcf left join plf on\
+    #          pcf.pcf_name=plf.plf_name left join pid on plf.plf_spid=pid.pid_spid where pid.pid_spid={}'.format(hk[1]))
+    #         params = dbres.fetchall()
+    #         [parameter_model.append(it, [par[0], par[1]]) for par in params]
+    #     dbcon.close()
+    #     self.useriter_IDB = parameter_model.append(None, ['User-defined_IDB', None])
+    #     self.useriter_local = parameter_model.append(None, ['User-defined_local', None])
+    #     for userpar in self.cfg['ccs-user_decoders']:
+    #         parameter_model.append(self.useriter_IDB, [userpar, None])
+    #     for userpar in self.cfg['ccs-decode_parameters']:
+    #         parameter_model.append(self.useriter_local, [userpar, None])
+    #
+    #     return parameter_model
+
     def create_parameter_model(self):
         parameter_model = Gtk.TreeStore(str, str)
+        self.store = parameter_model
 
         dbcon = self.session_factory_idb
-        #dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid where pid_type=3 and pid_stype=25')
-        dbres = dbcon.execute('SELECT pid_descr,pid_spid from pid order by pid_type,pid_pi1_val')
+        dbres = dbcon.execute('SELECT pid_descr,pid_spid,pid_type from pid order by pid_type,pid_stype,pid_pi1_val')
         hks = dbres.fetchall()
+
+        topleveliters = {}
         for hk in hks:
-            it = parameter_model.append(None, [hk[0], None])
-            dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name from pcf left join plf on\
-             pcf.pcf_name=plf.plf_name left join pid on plf.plf_spid=pid.pid_spid where pid.pid_spid={}'.format(hk[1]))
+
+            if not hk[2] in topleveliters:
+                serv = parameter_model.append(None, ['Service ' + str(hk[2]), None])
+                topleveliters[hk[2]] = serv
+
+            it = parameter_model.append(topleveliters[hk[2]], [hk[0], None])
+
+            dbres = dbcon.execute('SELECT pcf.pcf_descr, pcf.pcf_name from pcf left join plf on pcf.pcf_name=plf.plf_name left join pid on \
+                                   plf.plf_spid=pid.pid_spid where pid.pid_spid={} ORDER BY pcf.pcf_descr'.format(hk[1]))
             params = dbres.fetchall()
-            [parameter_model.append(it, [par[0], par[1]]) for par in params]
+            for par in params:
+                parameter_model.append(it, [*par])
+
         dbcon.close()
-        self.useriter_IDB = parameter_model.append(None, ['User-defined_IDB', None])
-        self.useriter_local = parameter_model.append(None, ['User-defined_local', None])
-        for userpar in self.cfg['ccs-user_decoders']:
-            parameter_model.append(self.useriter_IDB, [userpar, None])
-        for userpar in self.cfg['ccs-decode_parameters']:
-            parameter_model.append(self.useriter_local, [userpar, None])
+
+        # # add user defined PACKETS
+        # self.user_tm_decoders = user_tm_decoders_func()
+        # topit = parameter_model.append(None, ['UDEF'])
+        # for hk in self.user_tm_decoders:
+        #     it = parameter_model.append(topit, ['UDEF|{}'.format(self.user_tm_decoders[hk][0])])
+        #     for par in self.user_tm_decoders[hk][1]:
+        #         parameter_model.append(it, [par[1]])
+
+        # add data pool items
+        self.useriter = parameter_model.append(None, ['Data pool', None])
+        for dp in _dp_items:
+            dp_item = '{} ({})'.format(_dp_items[dp]['descr'], dp)
+            parameter_model.append(self.useriter, [dp_item, 'dp_item'])
+
+        # add user defined PARAMETERS with positional info
+        self.useriter = parameter_model.append(None, ['User defined', None])
+        for userpar in self.cfg[CFG_SECT_PLOT_PARAMETERS]:
+            parameter_model.append(self.useriter, [userpar, 'user_defined'])
+
+        # add user defined PARAMETERS without positional info
+        for userpar in self.cfg[CFG_SECT_DECODE_PARAMETERS]:
+            parameter_model.append(self.useriter, [userpar, 'user_defined_nopos'])
 
         return parameter_model
 
     def add_parameter(self, widget, listmodel):
         par_model, par_iter = self.treeview.get_selection().get_selected()
-        hk = par_model[par_iter].parent[0]
+        if par_model[par_iter][1] is None:
+            return
+
+        # hk = par_model[par_iter].parent[0]
+
         if par_model[par_iter].parent is None:
             return
-        elif hk not in ['User-defined_IDB', 'User-defined_local']:
-            param = par_model[par_iter]
-            listmodel.append([*param])
+
+        # elif hk not in ['User-defined_IDB', 'User-defined_local']:
+        #     param = par_model[par_iter]
+        #     listmodel.append([*param])
+
         else:
             param = par_model[par_iter]
             listmodel.append([*param])
@@ -5032,7 +4968,7 @@ class TmDecoderDialog(Gtk.Dialog):
             self.ok_button.set_sensitive(False)
 
 
-class AddUserParamerterDialog(Gtk.MessageDialog):
+class UserParameterDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, edit=None):
         Gtk.Dialog.__init__(self, "Edit User Parameter", parent, 0,
                             buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
@@ -5050,11 +4986,14 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
         self.st = Gtk.Entry()
         self.sst = Gtk.Entry()
         self.apid.set_placeholder_text('APID')
+        self.apid.connect('changed', self.check_entry, ok_button)
         self.st.set_placeholder_text('Service Type')
+        self.st.connect('changed', self.check_entry, ok_button)
         self.sst.set_placeholder_text('Service Subtype')
+        self.sst.connect('changed', self.check_entry, ok_button)
         self.sid = Gtk.Entry()
         self.sid.set_placeholder_text('SID')
-        self.sid.set_tooltip_text('Further discriminant (i.e. PI1VAL)')
+        self.sid.set_tooltip_text('Discriminant (i.e. PI1VAL)')
 
         hbox.pack_start(self.apid, 0, 0, 0)
         hbox.pack_start(self.st, 0, 0, 0)
@@ -5067,18 +5006,20 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
 
         self.bytepos = Gtk.Entry()
         self.bytepos.set_placeholder_text('Byte Offset')
-        self.bytepos.set_tooltip_text('Including {} ({} for TCs) header bytes, e.g. byte 0 in source data -> offset={}'
+        self.bytepos.set_tooltip_text('Including {} ({} for TCs) header bytes, e.g. byte 0 in TM source data -> offset={}'
                                       .format(TM_HEADER_LEN, TC_HEADER_LEN, TM_HEADER_LEN))
+        self.bytepos.connect('changed', self.check_entry, ok_button)
         self.format = Gtk.ComboBoxText()
-        self.format.set_model(self.create_format_model())
+        self.format.set_model(create_format_model())
         self.format.set_tooltip_text('Format type')
         self.format.connect('changed', self.bitlen_active)
         self.offbi = Gtk.Entry()
         self.offbi.set_placeholder_text('Bit Offset')
         self.offbi.set_tooltip_text('Bit Offset (optional)')
+        self.offbi.set_sensitive(False)
         self.bitlen = Gtk.Entry()
-        self.bitlen.set_placeholder_text('Bitlength')
-        self.bitlen.set_tooltip_text('Length in bits')
+        self.bitlen.set_placeholder_text('Length')
+        self.bitlen.set_tooltip_text('Length in bits (for uint*) and bytes (ascii*, oct*)')
         self.bitlen.set_sensitive(False)
 
         bytebox.pack_start(self.bytepos, 0, 0, 0)
@@ -5089,7 +5030,7 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
 
         self.label = Gtk.Entry()
         self.label.set_placeholder_text('Parameter Label')
-        self.label.connect('changed', self.check_ok_sensitive, ok_button)
+        self.label.connect('changed', self.check_entry, ok_button)
 
         box.pack_start(self.label, 0, 0, 0)
         box.pack_end(bytebox, 0, 0, 0)
@@ -5112,9 +5053,11 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
             if 'format' in pars:
                 fmt_dict = {a: b for b, a in fmtlist.items()}
                 fmt = pars['format']
-                if fmt.startswith('bit'):
-                    self.bitlen.set_text(fmt.strip('bit'))
-                    fmt = 'bit'
+                for fk in ('uint', 'ascii', 'oct'):
+                    if fmt.startswith(fk):
+                        self.bitlen.set_text(fmt.replace(fk, ''))
+                        fmt = fk
+                        break
                 model = self.format.get_model()
                 it = [row.iter for row in model if row[0] == fmt_dict[fmt]][0]
                 self.format.set_active_iter(it)
@@ -5123,108 +5066,105 @@ class AddUserParamerterDialog(Gtk.MessageDialog):
 
         self.show_all()
 
-    def create_format_model(self):
-        store = Gtk.ListStore(str)
-        for fmt in fmtlist.keys():
-            store.append([fmt])
-        return store
-
-    def check_ok_sensitive(self, unused_widget, button):
-        if len(self.label.get_text()) == 0:
-            button.set_sensitive(False)
+    def check_entry(self, widget, ok_button):
+        if self.apid.get_text_length() and self.st.get_text_length() and self.sst.get_text_length \
+                and self.label.get_text_length() and self.bytepos.get_text_length():
+            ok_button.set_sensitive(True)
         else:
-            button.set_sensitive(True)
+            ok_button.set_sensitive(False)
 
     def bitlen_active(self, widget):
-        if widget.get_active_text() == 'bit*':
+        if widget.get_active_text() == 'uint*':
             self.bitlen.set_sensitive(True)
             self.offbi.set_sensitive(True)
+        elif widget.get_active_text() in ('ascii*', 'oct*'):
+            self.bitlen.set_sensitive(True)
+            self.offbi.set_sensitive(False)
         else:
             self.bitlen.set_sensitive(False)
             self.offbi.set_sensitive(False)
 
 
-class RemoveUserParameterDialog(Gtk.Dialog):
-    def __init__(self, cfg, parent=None):
-        Gtk.Dialog.__init__(self, "Remove User Defined Parameter", parent, 0)
-        self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+# class RemoveUserParameterDialog(Gtk.Dialog):
+#     def __init__(self, cfg, parent=None):
+#         Gtk.Dialog.__init__(self, "Remove User Defined Parameter", parent, 0)
+#         self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+#
+#         self.cfg = cfg
+#
+#         box = self.get_content_area()
+#
+#         self.ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
+#         self.ok_button.set_sensitive(False)
+#
+#         self.remove_name = Gtk.ComboBoxText.new_with_entry()
+#         self.remove_name.set_tooltip_text('Parameter')
+#         self.remove_name_entry = self.remove_name.get_child()
+#         self.remove_name_entry.set_placeholder_text('Label')
+#         self.remove_name_entry.set_width_chars(5)
+#         self.remove_name.connect('changed', self.fill_remove_mask)
+#
+#         self.remove_name.set_model(self.create_remove_model())
+#
+#         box.pack_start(self.remove_name, 0, 0, 0)
+#
+#         self.show_all()
+#
+#     def create_remove_model(self):
+#         model = Gtk.ListStore(str)
+#
+#         for decoder in self.cfg[CFG_SECT_PLOT_PARAMETERS].keys():
+#             model.append([decoder])
+#         return model
+#
+#     def fill_remove_mask(self, widget):
+#         decoder = widget.get_active_text()
+#
+#         if self.cfg.has_option(CFG_SECT_PLOT_PARAMETERS, decoder):
+#             self.ok_button.set_sensitive(True)
+#         else:
+#             self.ok_button.set_sensitive(False)
 
-        self.cfg = cfg
 
-        box = self.get_content_area()
-
-        self.ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
-        self.ok_button.set_sensitive(False)
-
-
-        self.remove_name = Gtk.ComboBoxText.new_with_entry()
-        self.remove_name.set_tooltip_text('Parameter')
-        self.remove_name_entry = self.remove_name.get_child()
-        self.remove_name_entry.set_placeholder_text('Label')
-        self.remove_name_entry.set_width_chars(5)
-        self.remove_name.connect('changed', self.fill_remove_mask)
-
-        self.remove_name.set_model(self.create_remove_model())
-
-        box.pack_start(self.remove_name, 0, 0, 0)
-
-        self.show_all()
-
-    def create_remove_model(self):
-        model = Gtk.ListStore(str)
-
-        for decoder in self.cfg[CFG_SECT_PLOT_PARAMETERS].keys():
-            model.append([decoder])
-        return model
-
-    def fill_remove_mask(self, widget):
-        decoder = widget.get_active_text()
-
-        if self.cfg.has_option(CFG_SECT_PLOT_PARAMETERS, decoder):
-            self.ok_button.set_sensitive(True)
-        else:
-            self.ok_button.set_sensitive(False)
-
-
-class EditUserParameterDialog(Gtk.Dialog):
-    def __init__(self, cfg, parent=None):
-        Gtk.Dialog.__init__(self, "Edit User Defined Parameter", parent, 0)
-        self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
-
-        self.cfg = cfg
-
-        box = self.get_content_area()
-
-        self.ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
-        self.ok_button.set_sensitive(False)
-
-        self.edit_name = Gtk.ComboBoxText.new_with_entry()
-        self.edit_name.set_tooltip_text('Parameter')
-        self.edit_name_entry = self.edit_name.get_child()
-        self.edit_name_entry.set_placeholder_text('Label')
-        self.edit_name_entry.set_width_chars(5)
-        self.edit_name.connect('changed', self.fill_edit_mask)
-
-        self.edit_name.set_model(self.create_edit_model())
-
-        box.pack_start(self.edit_name, 0, 0, 0)
-
-        self.show_all()
-
-    def create_edit_model(self):
-        model = Gtk.ListStore(str)
-
-        for decoder in self.cfg[CFG_SECT_PLOT_PARAMETERS].keys():
-            model.append([decoder])
-        return model
-
-    def fill_edit_mask(self, widget):
-        decoder = widget.get_active_text()
-
-        if self.cfg.has_option(CFG_SECT_PLOT_PARAMETERS, decoder):
-            self.ok_button.set_sensitive(True)
-        else:
-            self.ok_button.set_sensitive(False)
+# class EditUserParameterDialog(Gtk.Dialog):
+#     def __init__(self, cfg, parent=None):
+#         Gtk.Dialog.__init__(self, "Edit User Defined Parameter", parent, 0)
+#         self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+#
+#         self.cfg = cfg
+#
+#         box = self.get_content_area()
+#
+#         self.ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
+#         self.ok_button.set_sensitive(False)
+#
+#         self.edit_name = Gtk.ComboBoxText.new_with_entry()
+#         self.edit_name.set_tooltip_text('Parameter')
+#         self.edit_name_entry = self.edit_name.get_child()
+#         self.edit_name_entry.set_placeholder_text('Label')
+#         self.edit_name_entry.set_width_chars(5)
+#         self.edit_name.connect('changed', self.fill_edit_mask)
+#
+#         self.edit_name.set_model(self.create_edit_model())
+#
+#         box.pack_start(self.edit_name, 0, 0, 0)
+#
+#         self.show_all()
+#
+#     def create_edit_model(self):
+#         model = Gtk.ListStore(str)
+#
+#         for decoder in self.cfg[CFG_SECT_PLOT_PARAMETERS].keys():
+#             model.append([decoder])
+#         return model
+#
+#     def fill_edit_mask(self, widget):
+#         decoder = widget.get_active_text()
+#
+#         if self.cfg.has_option(CFG_SECT_PLOT_PARAMETERS, decoder):
+#             self.ok_button.set_sensitive(True)
+#         else:
+#             self.ok_button.set_sensitive(False)
 
 
 class ChangeCommunicationDialog(Gtk.Dialog):
@@ -5448,23 +5388,24 @@ class ProjectDialog(Gtk.Dialog):
             sys.exit()
 
 
-# some default parameter definitions that require functions defined above
+# some default variable definitions that require functions defined above
 
 # create local look-up tables for data pool items from MIB
 try:
     DP_ITEMS_SRC_FILE = cfg.get('database', 'datapool-items')
     if DP_ITEMS_SRC_FILE:
         # get DP from file
-        _dp_items = get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
+        _dp_items = get_data_pool_items(src_file=DP_ITEMS_SRC_FILE, as_dict=True)
     else:
         raise ValueError
 except (FileNotFoundError, ValueError, confignator.config.configparser.NoOptionError):
     DP_ITEMS_SRC_FILE = None
     logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
-    _dp_items = get_data_pool_items()
+    _dp_items = get_data_pool_items(as_dict=True)
 finally:
-    DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _dp_items}
-    DP_ITEMS_TO_IDS = {k[1]: int(k[0]) for k in _dp_items}
+    # DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _dp_items}
+    DP_IDS_TO_ITEMS = {k: _dp_items[k]['descr'] for k in _dp_items}
+    DP_ITEMS_TO_IDS = {_dp_items[k]['descr']: k for k in _dp_items}
 
 # S13 header/offset info
 try:

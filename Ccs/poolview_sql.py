@@ -50,8 +50,8 @@ ActivePoolInfo = NamedTuple(
         ('pool_name', str),
         ('live', bool)])
 
-fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
-           'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
+# fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
+#            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
@@ -2169,16 +2169,26 @@ class TMPoolView(Gtk.Window):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize() + '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
-            vbox.pack_start(start_button, False, True, 10)
+            vbox.pack_start(start_button, False, True, 0)
+
+        # Add the TST option
+        conn_button = Gtk.Button.new_with_label('Test Specification Tool')
+        conn_button.connect("clicked", cfl.start_tst)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
         conn_button.connect("clicked", self.on_communication_dialog)
-        vbox.pack_start(conn_button, False, True, 10)
+        vbox.pack_start(conn_button, True, True, 0)
+
+        # Add the configuration manager option
+        conn_button = Gtk.Button.new_with_label('Preferences')
+        conn_button.connect("clicked", cfl.start_config_editor)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the option to see the Credits
         about_button = Gtk.Button.new_with_label('About')
@@ -2223,7 +2233,7 @@ class TMPoolView(Gtk.Window):
         changed = False
         #self.select_pool(False, new_pool=pool_name)
         model = self.pool_selector.get_model()
-        #It will check all entries in the Pool selector and change to the one if possible
+        # It will check all entries in the Pool selector and change to the one if possible
         count = 0
         while count < len(model):
             value = model.get_value(model.get_iter(count), 0)  # Get the value
@@ -2256,9 +2266,10 @@ class TMPoolView(Gtk.Window):
 
         self.rawswitch = Gtk.CheckButton.new_with_label('Decode Source Data')
         self.rawswitch.connect('toggled', self.set_tm_data_view, None, True)
+        self.rawswitch.connect('toggled', self._update_user_tm_decoders)
         # self.sortswitch = Gtk.CheckButton.new_with_label('Sort by Name')
         # self.sortswitch.connect('toggled', self.set_tm_data_view, )
-        #switchbox = Gtk.Box(Gtk.Orientation.HORIZONTAL)
+        # switchbox = Gtk.Box(Gtk.Orientation.HORIZONTAL)
         switchbox = Gtk.HBox()
         switchbox.pack_start(self.rawswitch, 0, 0, 0)
         # switchbox.pack_end(self.sortswitch, 0, 0, 0)
@@ -2342,22 +2353,26 @@ class TMPoolView(Gtk.Window):
         box = Gtk.VBox()
 
         box1 = Gtk.HBox()
-        package_button = Gtk.Button(label = 'Add Package to Decode')
+        package_button = Gtk.Button(label='Create TM Structure')
         package_button.set_image(Gtk.Image.new_from_icon_name('list-add', Gtk.IconSize.MENU))
-        package_button.set_tooltip_text('Add User Defined Package to Decode')
+        package_button.set_tooltip_text('Create user defined TM packet structure')
         package_button.set_always_show_image(True)
 
-        parameter_button = Gtk.Button()
+        parameter_button = Gtk.Button(label='Create Parameter')
         parameter_button.set_image(Gtk.Image.new_from_icon_name('list-add', Gtk.IconSize.MENU))
-        parameter_button.set_tooltip_text('Add User Defined Parameter to use in Package')
+        parameter_button.set_tooltip_text('Create user defined parameter')
         parameter_button.set_always_show_image(True)
+
+        decode_udef_check = Gtk.CheckButton.new_with_label('UDEF')
+        decode_udef_check.set_tooltip_text('Force decoding with custom packet structures')
 
         package_button.connect('clicked', self.add_new_user_package)
         parameter_button.connect('clicked', self.add_decode_parameter)
+        decode_udef_check.connect('toggled', self.set_decoding_order)
 
         box1.pack_start(package_button, 0, 0, 0)
         box1.pack_start(parameter_button, 0, 0, 0)
-
+        box1.pack_start(decode_udef_check, 0, 0, 2)
 
         box2 = Gtk.HBox()
 
@@ -2365,37 +2380,32 @@ class TMPoolView(Gtk.Window):
         decoder_name.set_tooltip_text('Label')
         decoder_name_entry = decoder_name.get_child()
         decoder_name_entry.set_placeholder_text('Label')
-        decoder_name_entry.set_width_chars(5)
+        decoder_name_entry.set_width_chars(10)
 
         decoder_name.set_model(self.create_decoder_model())
 
         bytepos = Gtk.Entry()
-        bytepos.set_placeholder_text('Offset+{}'.format(TM_HEADER_LEN))
-        bytepos.set_tooltip_text('Offset+{}'.format(TM_HEADER_LEN))
-        bytepos.set_width_chars(5)
+        bytepos.set_placeholder_text('Offset')  # +{}'.format(TM_HEADER_LEN))
+        bytepos.set_tooltip_text('Offset')  # +{}'.format(TM_HEADER_LEN))
+        bytepos.set_width_chars(7)
 
         bytelength = Gtk.Entry()
         bytelength.set_placeholder_text('Length')
         bytelength.set_tooltip_text('Length')
-        bytelength.set_width_chars(5)
+        bytelength.set_width_chars(7)
 
         add_button = Gtk.Button(label=' Decoder')
         add_button.set_image(Gtk.Image.new_from_icon_name('list-add', Gtk.IconSize.MENU))
+        add_button.set_tooltip_text('Add byte decoder')
         add_button.set_always_show_image(True)
-
-        decode_udef_check = Gtk.CheckButton.new_with_label('UDEF')
-        decode_udef_check.set_tooltip_text('Use User-defined Packets first for Decoding')
 
         decoder_name.connect('changed', self.fill_decoder_mask, bytepos, bytelength)
         add_button.connect('clicked', self.add_decoder, decoder_name, bytepos, bytelength)
-        decode_udef_check.connect('toggled', self.set_decoding_order)
 
-
-        box2.pack_start(decoder_name, 0, 0, 0)
-        box2.pack_start(bytepos, 0, 0, 1)
-        box2.pack_start(bytelength, 0, 0, 1)
+        box2.pack_start(decoder_name, 0, 1, 0)
+        box2.pack_start(bytepos, 0, 0, 0)
+        box2.pack_start(bytelength, 0, 0, 0)
         box2.pack_start(add_button, 0, 0, 0)
-        box2.pack_start(decode_udef_check, 0, 0, 0)
 
         box.pack_start(box1, 0, 0, 0)
         box.pack_start(box2, 0, 0, 0)
@@ -2442,16 +2452,15 @@ class TMPoolView(Gtk.Window):
         # if not self.cfg.has_option('user_decoders',decoder):
         #    return
 
-        if self.cfg.has_option('ccs-plot_parameters', decoder):
-            data = json.loads(self.cfg['ccs-plot_parameters'][decoder])
+        if self.cfg.has_option('ccs-user_decoders', decoder):
+            data = json.loads(self.cfg['ccs-user_decoders'][decoder])
 
             bytepos.set_text(str(data['bytepos']))
-            bytelen.set_text(str(struct.calcsize(data['format'])))
+            bytelen.set_text(str(data['bytelen']))
 
     def add_decoder(self, widget, decoder_name, byteoffset, bytelength):
         try:
-            label, bytepos, bytelen = decoder_name.get_active_text(), int(byteoffset.get_text()), int(
-                bytelength.get_text())
+            label, bytepos, bytelen = decoder_name.get_active_text(), int(byteoffset.get_text()), int(bytelength.get_text())
         except:
             return
 
@@ -2498,7 +2507,7 @@ class TMPoolView(Gtk.Window):
         self.show_all()
 
     def set_decoder_view(self, tm):
-        decoders = self.decoder_box.get_children()[1:]
+        decoders = self.decoder_box.get_children()[0].get_children()[2:]
 
         for decoder in decoders:
             try:
@@ -2521,6 +2530,10 @@ class TMPoolView(Gtk.Window):
             if treepath:
                 value = model[treepath[0]][3]
                 self.hexview.set_text(value)
+
+    def _update_user_tm_decoders(self, widget):
+        if widget.get_active():
+            importlib.reload(cfl)
 
     @delayed(10)
     def set_tm_data_view(self, selection=None, event=None, change_columns=False):
@@ -3082,7 +3095,7 @@ class TMPoolView(Gtk.Window):
         res = self.session_factory_storage.execute(que)
         return [row[1] for row in res]
 
-    def plot_parameters(self, widget=None, parameters={}, start_live=False):
+    def plot_parameters(self, widget=None, parameters=None, start_live=False):
         #if self.active_pool_info is None:
         #    self.logger.warning('Cannot open plot window without pool!')
         #    print('Cannot open plot window without pool!')
@@ -3252,10 +3265,7 @@ class TMPoolView(Gtk.Window):
             # cnt = rows.count()
             cnt = rows.order_by(Telemetry[self.decoding_type].idx.desc()).first().idx
             # print(cnt)
-            rows = rows.filter(Telemetry[self.decoding_type].idx > (cnt - 100)).offset(100 - 25
-                                                                     ).limit(
-                25
-            ).all()
+            rows = rows.filter(Telemetry[self.decoding_type].idx > (cnt - 100)).offset(100 - 25).limit(25).all()
             # rr=[row for row in rows]
             self.logger.info('fetched', rows[-1].idx, cnt, 'at', time.time())
             dbcon.close()

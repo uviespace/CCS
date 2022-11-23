@@ -182,9 +182,9 @@ class ParameterMonitor(Gtk.Window):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize() + '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, False, True, 0)
 
@@ -784,6 +784,7 @@ class MonitorSetupDialog(Gtk.Dialog):
     def create_slot(self, group=None):
         parameter_list = Gtk.ListStore(str, str)
         treeview = Gtk.TreeView(model=parameter_list)
+        treeview.set_reorderable(True)
 
         treeview.append_column(Gtk.TreeViewColumn("Parameters", Gtk.CellRendererText(), text=0))
         hidden_column = Gtk.TreeViewColumn("ID", Gtk.CellRendererText(), text=1)
