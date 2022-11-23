@@ -120,7 +120,13 @@ class TmTable(Gtk.Grid):
         self.scrollable_treelist = Gtk.ScrolledWindow()
         self.scrollable_treelist.set_vexpand(True)
         self.scrollable_treelist.set_hexpand(True)
-        self.attach(self.scrollable_treelist, 0, 1, 8, 10)
+        self.paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
+        self.paned.set_wide_handle(True)
+        self.paned.set_position(int(cfl.cfg['tst-preferences']['main-window-height']) * 0.6)
+        # self.attach(self.scrollable_treelist, 0, 1, 8, 10)
+        self.attach(self.paned, 0, 1, 8, 10)
+
+        self.paned.add1(self.scrollable_treelist)
 
         self.scrollable_treelist.add(self.treeview)
 
@@ -129,7 +135,8 @@ class TmTable(Gtk.Grid):
         # self.attach_next_to(self.telemetry_entry, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 1)
 
         self.secondary_box = TmSecondaryTable()
-        self.attach_next_to(self.secondary_box, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 5)
+        # self.attach_next_to(self.secondary_box, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 5)
+        self.paned.add2(self.secondary_box)
 
         # Set up Drag and Drop
         self.treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
