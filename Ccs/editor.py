@@ -530,68 +530,21 @@ class CcsEditor(Gtk.Window):
         while self.is_editor_socket_active:
             self.console_sock, addr = sock_csl.accept()
             line = self.console_sock.recv(2**16).decode()
-            # if line.startswith('exec:'):
-            #     exec(line.strip('exec:'))
-            # elif line.startswith('get:'):
-            #     buf = pickle.dumps(line.strip('get:'))
-            #     self.console_sock.sendall(buf)
-            # else:
-            #     workaround for IP5
-            #     for line in line.split('\n'):
-            #         while 1:
-            #             if self.feed_ready:
-            #                 GLib.idle_add(self.process_line_idle, line)
-            #                 # self.feed_ready = False
-            #                 break
-            #             else:
-            #                 time.sleep(0.01)
             GLib.idle_add(self.process_line_idle, line)
-            self.console_sock.sendall(b'ACK ' + line.encode()[:1020])
+            self.console_sock.sendall(b'ACK ' + line.encode()[:60])
             self.console_sock.close()
         sock_csl.close()
 
     def process_line_idle(self, line):
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
-        # line += '\n'
-        # print(line)
         if not line.endswith('\n'):
             line += '\n'
-        # if line.count('\n') > 1:
-        #     self.ipython_view.feed_child('%cpaste\n', len('%cpaste\n'))
-        #     time.sleep(0.01)
-        #     line += '\n--\n'
-        # if len(line.split('\n')) > 2:
         if line.count('\n') > 2:
             self.ipython_view.feed_child_compat('%cpaste\n')
             time.sleep(0.2)  # wait for interpreter to return before feeding new code
             self.ipython_view.feed_child_compat(line)
             self.ipython_view.feed_child_compat('--\n')
-            # if VTE_VERSION < '0.52.3':
-            #     self.ipython_view.feed_child('%cpaste\n', 8)
-            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
-            #     self.ipython_view.feed_child(line, len(line))
-            #     self.ipython_view.feed_child('--\n', 3)
-            # else:
-            #     self.ipython_view.feed_child('%cpaste\n'.encode('utf-8'))
-            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
-            #     self.ipython_view.feed_child(line.encode('utf-8'))
-            #     self.ipython_view.feed_child('--\n'.encode('utf-8'))
-            # self.ipython_view.feed_child('%cpaste\n'+line+'--\n', len(line)+11)
-            # for line in line.split('\n'):
-            #     while 1:
-            #         if self.feed_ready:
-            #             self.feed_ready = False
-            #             self.ipython_view.feed_child(line+'\n', len(line)+1)
-            #             break
-            #         else:
-            #             time.sleep(0.01)
         else:
             self.ipython_view.feed_child_compat(line)
-            # if VTE_VERSION < '0.52.3':
-            #     self.ipython_view.feed_child(line, len(line))
-            # else:
-            #     self.ipython_view.feed_child(line.encode('utf-8'))
 
     def create_mark_attributes(self):
         self.mark_play = GtkSource.MarkAttributes()
@@ -1405,7 +1358,7 @@ class CcsEditor(Gtk.Window):
         # Add the different Starting Options
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())  # + '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, True, True, 0)
 
