@@ -1292,7 +1292,7 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         fetch = dbres.fetchall()
         dbcon.close()
         if len(fetch) == 0:
-            return rawval if isinstance(rawval, int) else rawval[0]
+            return rawval if isinstance(rawval, (int, float)) else rawval[0]
 
         ptc, pfc, categ, curtx = fetch[0]
 
@@ -1303,7 +1303,7 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         type_par = ptt(ptc, pfc)
     except NotImplementedError:
         try:
-            return rawval if isinstance(rawval, int) else rawval[0]
+            return rawval if isinstance(rawval, (int, float)) else rawval[0]
         except IndexError:
             return rawval
 
@@ -1316,7 +1316,7 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         return rawval.hex().upper()
     elif curtx is None:
         try:
-            return rawval if isinstance(rawval, int) else rawval[0]
+            return rawval if isinstance(rawval, (int, float)) else rawval[0]
         except IndexError:
             return rawval
     elif curtx is not None and categ == 'N':
