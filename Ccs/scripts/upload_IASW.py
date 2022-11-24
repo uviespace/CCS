@@ -15,6 +15,14 @@ segid = 0x200B0101  # ID for data segments, see DBS UM
 cfl.upload_srec(srecfile, memid, mem_addr, segid, pool_name='LIVE', max_pkt_size=504, progress=True)  # optionally, provide the name of the TC that shall be used for upload, e.g., tcname='DBS_TC_LOAD_MEMORY'
 
 #! CCS.BREAKPOINT
+# upload the SREC content directly without segmentation
+srecfile = '/path/to/srec'  # SREC filename
+memid = 'EEPROM'
+tc_cmd = 'SES CMD_Memory_Load'
+dlen, dcrc = srec_direct(srecfile, memid, pool_name='LIVE', max_pkt_size=1024, tcname=tc_cmd, sleep=0.125, byte_align=2)
+
+
+#! CCS.BREAKPOINT
 # The upload command will block the console while the packets are being sent. Run it in a thread to avoid that.
 import threading
 
