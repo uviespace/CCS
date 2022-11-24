@@ -179,7 +179,7 @@ def start_app(file_path, wd, *args, console=False, **kwargs):
 def start_pv(pool_name=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Poolviewer and executes it
-    :param console: If False will be run in Console, otherwise will be run in seperate Environment
+    :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
 
@@ -195,7 +195,7 @@ def start_pv(pool_name=None, console=False, **kwargs):
 def start_pmgr(gui=True, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Poolmanager and executes it
-    :param console: If False will be run in Console, otherwise will be run in seperate Environment
+    :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
 
@@ -213,7 +213,7 @@ def start_pmgr(gui=True, console=False, **kwargs):
 def start_editor(*files, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Editor and executes it
-    :param console: If False will be run in Console, otherwise will be run in seperate Environment
+    :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
 
@@ -228,7 +228,7 @@ def start_editor(*files, console=False, **kwargs):
 def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Monitor and executes it
-    :param console: If False will be run in Console, otherwise will be run in seperate Environment
+    :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
 
@@ -248,7 +248,7 @@ def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
 def start_plotter(pool_name=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Plotter and executes it
-    :param console: If False will be run in Console, otherwise will be run in seperate Environment
+    :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
     directory = cfg.get('paths', 'ccs')
@@ -1596,6 +1596,7 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
 
     else:
         xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]
+
     dbcon.close()
 
     try:
@@ -2517,8 +2518,13 @@ def CnCsend(cmd, pool_name=None):
     received = pmgr.Functions('socket_send_packed_data', packed_data, pool_name, signature='says')
     if received is not None:
         counters[1804] += 1
-        received = bytes(received)  # convert dbus type to python type
-    logger.info('[CNC response:]' + str(received))
+        try:
+            received = bytes(received, encoding='utf-8', errors='replace')
+        except Exception as err:
+            logger.error(err)
+            return None
+
+    logger.info('[CNC response:]' + received.decode(encoding='utf-8', errors='replace'))
 
     return received
 
@@ -5223,7 +5229,7 @@ class ChangeCommunicationDialog(Gtk.Dialog):
 
             #Start each Changing box here
             communication_entry = Gtk.ComboBox.new_with_model(entry_list)
-            communication_entry.set_title(name) #Give the boxes names to seperate them
+            communication_entry.set_title(name) #Give the boxes names to separate them
             communication_entry.connect('changed', self.main_com_changed)
 
             # Necessary for Combobox but not importent for program
