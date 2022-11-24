@@ -3079,6 +3079,133 @@ def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_
     logger.info('Data written to file: "{}", skipped first {} bytes.'.format(outfile, skip_bytes))
 
 
+def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname=None, sleep=0.125, progress=True,
+                image_crc=True, byte_align=2, ack=0b1001, dryrun=False):
+    """
+    Upload data from SREC file directly to memory _memid_, no additional segment headers (like for DBS) are added.
+    @param fname:
+    @param memid:
+    @param pool_name:
+    @param max_pkt_size:
+    @param tcname:
+    @param sleep:
+    @param progress:
+    @param image_crc:
+    @param byte_align:
+    @param ack:
+    @param dryrun:
+    @return:
+    """
+    if dryrun:
+        print('DRYRUN -- NO PACKETS ARE BEING SENT!')
+
+    # get service 6,2 info from MIB
+    apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
+    pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + len(endspares) + PEC_LEN
+    payload_len = max_pkt_size - pkt_overhead
+
+    memid = get_mem_id(memid, memid_ref)
+
+    # get permanent pmgr handle to avoid requesting one for each packet
+    if not dryrun:
+        pmgr = _get_pmgr_handle(tc_pool=pool_name)
+
+    upload_bytes = b''
+    bcnt = 0
+    pcnt = 0
+    ptot = None
+
+    f = open(fname, 'r').readlines()[1:-1]  # omit header and footer line
+    lines = [p[12:-3] for p in f]
+    data_size = len(''.join(lines)) // 2
+    memaddr = int(f[0][4:12], 16)
+
+    linecount = 0
+    nextlinelength = len(lines[linecount]) // 2
+    while linecount < len(f) - 1:
+
+        t1 = time.time()
+
+        linepacklist = []
+        packlen = 0
+        while (packlen + nextlinelength) <= payload_len:
+            if linecount >= (len(lines) - 1):
+                break
+            linepacklist.append(lines[linecount])
+            linelength = len(lines[linecount]) // 2
+            packlen += linelength
+            if int(f[linecount + 1][4:12], 16) != (int(f[linecount][4:12], 16) + linelength):
+                linecount += 1
+                newstartaddr = int(f[linecount][4:12], 16)
+                break
+            else:
+                linecount += 1
+                newstartaddr = int(f[linecount][4:12], 16)
+
+            nextlinelength = len(lines[linecount]) // 2
+
+        data = bytes.fromhex(''.join(linepacklist))
+
+        dlen = len(data)
+        bcnt += dlen
+
+        # create PUS packet
+        packetdata = struct.pack(fmt, memid, memaddr, len(data)) + data + endspares
+        seq_cnt = counters.setdefault(apid, 0)
+        puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=seq_cnt, ack=ack)
+
+        if len(puspckt) > MAX_PKT_LEN:
+            logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
+
+        if not dryrun:
+            Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+
+        # collect all uploaded segments for CRC at the end
+        upload_bytes += data
+        pcnt += 1
+
+        if progress:
+            if ptot is None:
+                ptot = int(np.ceil(data_size / dlen))  # packets needed to transfer SREC payload
+            print('{}/{} packets sent\r'.format(pcnt, ptot), end='')
+
+        dt = time.time() - t1
+        time.sleep(max(sleep - dt, 0))
+
+        if data == b'':
+            print('No data left, exit upload.')
+            return
+
+        memaddr = newstartaddr
+        if not dryrun:
+            counters[apid] += 1
+
+    # check if entire data is x-byte-aligned
+    if len(upload_bytes) % byte_align:
+        padding = byte_align - (len(upload_bytes) % byte_align)
+        print('\nData is not {}-byte aligned. Sending padding data ({})'.format(byte_align, padding))
+
+        # create PUS packet
+        packetdata = struct.pack(fmt, memid, memaddr, padding) + bytes(padding) + endspares
+        seq_cnt = counters.setdefault(apid, 0)
+        puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=seq_cnt, ack=ack)
+
+        if not dryrun:
+            Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+            counters[apid] += 1
+
+        memaddr += padding
+        upload_bytes += bytes(padding)
+        bcnt += padding
+        pcnt += 1
+
+    print('\nUpload finished, {} bytes sent in {} packets.'.format(bcnt, pcnt))
+
+    if image_crc:
+        # return total length of uploaded data (without termination segment) and CRC over entire image, including segment headers
+        return len(upload_bytes), crc(upload_bytes)
+
+
 def _get_upload_service_info(tcname=None):
     """
     Get info about service 6,2 from MIB
