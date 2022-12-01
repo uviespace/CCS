@@ -822,7 +822,7 @@ class DatapoolManager:
                     else:
                         self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=False)
             except socket.timeout as e:
-                self.logger.info('Socket timeout ({}:{})'.format(host, port))
+                self.logger.debug('Socket timeout ({}:{})'.format(host, port))
                 new_session.commit()
                 continue
             except socket.error as e:
@@ -1573,20 +1573,20 @@ class DatapoolManager:
     def socket_send_packed_data(self, packdata, poolname):
         cncsocket = self.tc_connections[poolname]['socket']
         cncsocket.send(packdata)
-        received = None
+        received = b''
         try:
             received = cncsocket.recv(MAX_PKT_LEN)
             # self.logger.info.write(logtf(self.tnow()) + ' ' + recv[6:].decode() + ' [CnC]\n')
-            self.logger.info(received.decode(errors='replace') + ' [CnC]')
+            self.logger.info(received.decode('utf-8', errors='replace') + ' [CnC]')
             # logfile.flush()
             # s.close()
             # self.counters[1804] += 1
         except socket.timeout:
-            self.logger.error('Got a timeout')
-            self.logger.exception(socket.timeout)
+            # self.logger.error('Got a timeout')
+            self.logger.error(socket.timeout)
 
         # Dbus does not like original data type
-        if received is not None:
+        if received:
             received = dbus.ByteArray(received)
 
         return received
@@ -1761,7 +1761,7 @@ class DatapoolManager:
                 header.bits.PKT_TYPE == 0 and header.bits.WRITE == 1):
             pktsize = hsize
         else:
-            pktsize = hsize + header.bits.DATA_LEN# + RMAP_PEC_LEN # TODO: data CRC from FEEsim?
+            pktsize = hsize + header.bits.DATA_LEN + RMAP_PEC_LEN  # TODO: data CRC from FEEsim?
 
         while len(buf) < pktsize:
             d = sockfd.recv(pktsize - len(buf))

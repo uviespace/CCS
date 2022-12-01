@@ -69,6 +69,7 @@ class PlotViewer(Gtk.Window):
         self.parameter_limits = set()
 
         self.data_dict = {}
+        self.data_dict_info = {}  # row idx of last data point in data_dict
         self.max_datapoints = 0
         self.data_min_idx = None
         self.data_max_idx = None
@@ -253,7 +254,7 @@ class PlotViewer(Gtk.Window):
 
     def _create_navbar(self):
         # navbar = NavigationToolbarX(self.canvas, self)
-        navbar = NavigationToolbar(self.canvas, self)
+        navbar = NavigationToolbar(self.canvas, window=self)
 
         limits = Gtk.HBox()
         self.xmin = Gtk.Entry()
@@ -438,8 +439,10 @@ class PlotViewer(Gtk.Window):
         # Or check between which Pools should be selected
         all_pools = None
         if cfl.is_open('poolmanager'):
-            pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            all_pools = cfl.Dictionaries(pmgr, 'loaded_pools')
+            # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+            pmgr = cfl.get_module_handle('poolmanager')
+            all_pools = pmgr.Dictionaries('loaded_pools')
+            # all_pools = cfl.Dictionaries(pmgr, 'loaded_pools')
             #if not all_pools:
             #    found_pools = None
             #elif len(active_pool) == 1:
@@ -451,7 +454,9 @@ class PlotViewer(Gtk.Window):
 
         elif cfl.is_open('poolviewer'):
             pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
-            all_pools = cfl.Variables(pv, 'active_pool_info')
+            pv = cfl.get_module_handle('poolviewer')
+            all_pools = pv.Variables('active_pool_info')
+            # all_pools = cfl.Variables(pv, 'active_pool_info')
             #if all_pools:
                 #loaded_pool = ActivePoolInfo(active_pool[0],active_pool[1],active_pool[2],active_pool[3])
             #    found_pools = all_pools[2]
@@ -669,6 +674,10 @@ class PlotViewer(Gtk.Window):
         else:
             selection = self.treeview.get_selection()
             model, treepath = selection.get_selected()
+
+            if treepath is None:
+                return
+
             parameter = model[treepath][0]
 
             if model[treepath].parent is None:
@@ -677,15 +686,14 @@ class PlotViewer(Gtk.Window):
             hk = model[treepath].parent[0]
 
         rows = cfl.get_pool_rows(self.loaded_pool.filename)
-
-        # TODO filter by idx
         rows = self.set_plot_range(rows)
 
         dbcon = self.session_factory_idb
 
         if hk != 'User defined' and not hk.startswith('UDEF|'):
-            que = 'SELECT pid_type,pid_stype,pid_pi1_val,pid_apid FROM pid LEFT JOIN plf ON pid.pid_spid=plf.plf_spid LEFT JOIN pcf ' \
-                  'ON plf.plf_name=pcf.pcf_name WHERE pcf.pcf_descr="{}" AND pid.pid_descr="{}"'.format(parameter, hk)
+            que = 'SELECT pid_type,pid_stype,pid_pi1_val,pid_apid FROM pid LEFT JOIN plf ON pid.pid_spid=plf.plf_spid ' \
+                  'LEFT JOIN pcf ON plf.plf_name=pcf.pcf_name WHERE pcf.pcf_descr="{}" AND ' \
+                  'pid.pid_descr="{}"'.format(parameter, hk)
             dbres = dbcon.execute(que).fetchall()
 
             if not dbres:
@@ -694,18 +702,8 @@ class PlotViewer(Gtk.Window):
 
             st, sst, sid, apid = dbres[0]
 
-            sid_pos = self.sid_position_query(st, sst, apid, sid)
-
-            if sid_pos is not None:
-                sid_offset, sid_size = sid_pos
-                rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-                                   func.mid(DbTelemetry.data, sid_offset - TM_HEADER_LEN + 1, sid_size) ==
-                                            sid.to_bytes(sid_size, 'big'))
-            else:
-                rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid)
-
         elif hk.startswith('UDEF|'):
-            label = hk.strip('UDEF|')
+            label = hk.replace('UDEF|', '')
             tag = [k for k in self.user_tm_decoders if self.user_tm_decoders[k][0] == label][0]
             pktinfo = tag.split('-')
             st = int(pktinfo[0])
@@ -713,32 +711,27 @@ class PlotViewer(Gtk.Window):
             apid = int(pktinfo[2]) if pktinfo[2] != 'None' else None
             sid = int(pktinfo[3]) if pktinfo[3] != 'None' else None
 
-            sid_pos = self.sid_position_query(st, sst, apid, sid)
-
-            if sid_pos is not None:
-                sid_offset, sid_size = sid_pos
-
-                rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.sst == apid,
-                                   func.mid(DbTelemetry.data, sid_offset - TM_HEADER_LEN + 1, sid_size) ==
-                                            sid.to_bytes(sid_size, 'big'))
-            else:
-                rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid)
         else:
             userpar = json.loads(self.cfg[cfl.CFG_SECT_PLOT_PARAMETERS][parameter])
-            rows = rows.filter(DbTelemetry.stc == userpar['ST'], DbTelemetry.sst == userpar['SST'],
-                               DbTelemetry.apid == userpar['APID'])
-            if 'SID' in userpar and userpar['SID']:
-                try:
-                    sid_offset, sid_size = self.sid_position_query(userpar['ST'], userpar['SST'], userpar['APID'], userpar['SID'])
-                except TypeError:
-                    self.logger.error('{}: SID not applicable.'.format(parameter))
-                    return
+            st, sst, apid = userpar['ST'], userpar['SST'], userpar['APID']
 
-                rows = rows.filter(func.mid(DbTelemetry.data, sid_offset - TM_HEADER_LEN + 1, sid_size) ==
-                                            userpar['SID'].to_bytes(sid_size, 'big'))
+            if 'SID' in userpar and userpar['SID']:
+                sid = userpar['SID']
+            else:
+                sid = None
+
+        if self.sid_position_query(st, sst, apid, sid) is None:
+            if sid:
+                self.logger.error('{}: SID not applicable.'.format(parameter))
+                return
+
+            sid = None
+
+        rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
 
         if not self.filter_tl2.get_active():
-            rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > 2.)
+            rows = cfl.filter_rows(rows, time_from=2.)
+            # rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > 2.)
 
         try:
             xy, (descr, unit) = cfl.get_param_values([row.raw for row in rows.yield_per(1000)], hk, parameter,
@@ -746,15 +739,25 @@ class PlotViewer(Gtk.Window):
             if len(xy) == 0:
                 return
 
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as err:
+            self.logger.debug(err)
             self.logger.error("Can't plot {}".format(parameter))
             return
 
+        # store packet info for update worker
         self.data_dict[hk + ':' + descr] = xy
+        self.data_dict_info[hk + ':' + descr] = {}
+        self.data_dict_info[hk + ':' + descr]['idx_last'] = rows.order_by(DbTelemetry.idx.desc()).first().idx
+        self.data_dict_info[hk + ':' + descr]['st'] = st
+        self.data_dict_info[hk + ':' + descr]['sst'] = sst
+        self.data_dict_info[hk + ':' + descr]['apid'] = apid
+        self.data_dict_info[hk + ':' + descr]['sid'] = sid
+
         # npoints = self.count_datapoints(self.subplot.get_xlim(), self.subplot.get_ylim())
         # if npoints > self.max_datapoints > 0:
         #     xy = xy.T[::npoints // self.max_datapoints + 1].T
         self.subplot.autoscale(enable=not self.scaley.get_active(), axis='y')
+
         try:
             if self.plot_diff.get_active():
                 x, y = xy
@@ -856,19 +859,21 @@ class PlotViewer(Gtk.Window):
     #     self.max_datapoints = n
 
     def reduce_datapoints(self, xlim, ylim, fulldata=True):
+
         ax = self.canvas.figure.get_axes()[0]
 
-        n_datapoints = self.count_datapoints(xlim, ylim)
-        if n_datapoints > self.max_datapoints > 0:
-            red_fac = n_datapoints // self.max_datapoints + 1
-            for line in ax.lines:
-                if not line.get_label().startswith('_lim_'):
-                    x, y = self.data_dict[line.get_gid() + ':' + line.get_label()]
-                    if self.plot_diff.get_active():
-                        x = x[1:]
-                        y = np.diff(y)
-                    line.set_xdata(x[::red_fac])
-                    line.set_ydata(y[::red_fac])
+        if self.max_datapoints > 0:
+            n_datapoints = self.count_datapoints(xlim, ylim)
+            if n_datapoints > self.max_datapoints:
+                red_fac = n_datapoints // self.max_datapoints + 1
+                for line in ax.lines:
+                    if not line.get_label().startswith('_lim_'):
+                        x, y = self.data_dict[line.get_gid() + ':' + line.get_label()]
+                        if self.plot_diff.get_active():
+                            x = x[1:]
+                            y = np.diff(y)
+                        line.set_xdata(x[::red_fac])
+                        line.set_ydata(y[::red_fac])
         elif fulldata:
             for line in ax.lines:
                 if not line.get_label().startswith('_lim_'):
@@ -890,6 +895,7 @@ class PlotViewer(Gtk.Window):
 
     def clear_parameter(self, widget):
         self.data_dict.clear()
+        self.data_dict_info.clear()
         self.parameter_limits.clear()
         self.subplot.clear()
         self.subplot.grid()
@@ -902,7 +908,8 @@ class PlotViewer(Gtk.Window):
 
     def update_plot_worker(self, plot=None, parameter=None):
         # pool_name = self.pool_box.get_active_text()
-        rows = cfl.get_pool_rows(self.loaded_pool.filename).filter(DbTelemetry.stc == 3, DbTelemetry.sst == 25)
+        rows = cfl.get_pool_rows(self.loaded_pool.filename)
+        rows = self.set_plot_range(rows)
         # xmin, xmax = self.subplot.get_xlim()
         lines = self.subplot.lines
 
@@ -912,28 +919,22 @@ class PlotViewer(Gtk.Window):
                 hk = line.get_gid()
 
                 xold, yold = self.data_dict[hk + ':' + parameter]
-                time_last = round(float(xold[-1]), 6)  # np.float64 not properly understood in sql comparison below
-                new_rows = rows.filter(
-                    func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > time_last)
+                # time_last = round(float(xold[-1]), 6)  # np.float64 not properly understood in sql comparison below
+                # new_rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > time_last)
+                pinfo = self.data_dict_info[hk + ':' + parameter]
+                new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], apid=pinfo['apid'],
+                                           sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
+
                 try:
-                    xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter,
-                                                           numerical=True)[0]
+                    # xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True)[0]
+                    xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True, tmfilter=False)[0]
+                    idx_new = new_rows.order_by(DbTelemetry.idx.desc()).first().idx
                 except ValueError:
                     continue
 
                 xy = np.stack([np.append(xold, xnew), np.append(yold, ynew)], -1).T
                 self.data_dict[hk + ':' + parameter] = xy
-
-                # line.set_data(xy)
-
-                # npoints = xy.shape[1]
-                # if npoints > self.max_datapoints > 0:
-                #     line.set_data(xy.T[::npoints//self.max_datapoints].T)
-                # else:
-                #     line.set_data(xy)
-                # line.set_xdata(np.append(xold, xnew))
-                # line.set_ydata(np.append(yold, ynew))
-                # self.subplot.draw_artist(line)
+                self.data_dict_info[hk + ':' + parameter]['idx_last'] = idx_new
 
         self.reduce_datapoints(self.subplot.get_xlim(), self.subplot.get_ylim())
 
@@ -1119,7 +1120,8 @@ class PlotViewer(Gtk.Window):
         #if self.loaded_pool:
         #    return
         if cfl.is_open('poolviewer'):
-            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            # pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            pv = cfl.get_module_handle('poolviewer')
             active_pool = cfl.Variables(pv, 'active_pool_info')
             #active_pool = pv.Variables('active_pool_info')
             if active_pool and active_pool[0]:
@@ -1131,7 +1133,8 @@ class PlotViewer(Gtk.Window):
             #    self.loaded_pool = None
 
         elif cfl.is_open('poolmanager'):
-            pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+            # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+            pmgr = cfl.get_module_handle('poolmanager')
             active_pool = cfl.Dictionaries(pmgr, 'loaded_pools')
             #active_pool = pmgr.Dictionaries('loaded_pools')
             #if not active_pool:
@@ -1161,7 +1164,6 @@ class PlotViewer(Gtk.Window):
 
         #if self.loaded_pool:
         #    self.select_pool(pool=self.loaded_pool)
-
 
     def quit_func(self, *args):
         # Try to tell terminal in the editor that the variable is not longer availabe
@@ -1407,7 +1409,8 @@ class SelectPoolDialog(Gtk.Dialog):
         # Or check between which Pools should be selected
 
         if cfl.is_open('poolmanager'):
-            pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+            # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+            pmgr = cfl.get_module_handle('poolmanager')
             self.all_pools = pmgr.Dictionaries('loaded_pools')
             if not self.all_pools:
                 self.loaded_pool = None
@@ -1419,7 +1422,8 @@ class SelectPoolDialog(Gtk.Dialog):
                 self.loaded_pool = list(self.all_pools.keys())
 
         elif cfl.is_open('poolviewer'):
-            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolmanager'])
+            # pv = cfl.dbus_connection('poolviewer', cfl.communication['poolmanager'])
+            pv = cfl.get_module_handle('poolviewer')
             self.all_pools = pv.Variables('active_pool_info')
             if self.all_pools:
                 #loaded_pool = ActivePoolInfo(active_pool[0],active_pool[1],active_pool[2],active_pool[3])

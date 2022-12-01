@@ -330,7 +330,7 @@ def dbus_connection(name, instance=1):
         return dbuscon
     except:
         # print('Please start ' + str(name) + ' if it is not running')
-        logger.warning('Connection to ' + str(name) + ' is not possible.')
+        logger.info('Connection to ' + str(name) + ' is not possible.')
         return False
 
 
@@ -594,8 +594,8 @@ def user_tm_decoders_func():
 #
 #  Return a formatted string containing all the decoded source data of TM packet _tm_
 #  @param tm TM packet bytestring
-def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, UDEF=False):
-    sourcedata, tmtcnames = Tmdata(tm, UDEF=UDEF)
+def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=False):
+    sourcedata, tmtcnames = Tmdata(tm, udef=udef)
     tmtcname = " / ".join(tmtcnames)
     if textmode:
         if sourcedata is not None:
@@ -624,17 +624,18 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, UDEF=Fals
 #
 #  Decode source data field of TM packet
 #  @param tm TM packet bytestring
-def Tmdata(tm, UDEF=False, *args):
+def Tmdata(tm, udef=False):
     tpsd = None
     params = None
     dbcon = scoped_session_idb
 
-    # This will be used to first check if an UDEF exists and used this to decode, if not the IDB will be checked
-    if UDEF:
+    # check if a UDEF exists and use to decode, if not the IDB will be checked
+    if udef:
         try:
             header, data, crc = Tmread(tm)
             st, sst, apid = header.SERV_TYPE, header.SERV_SUB_TYPE, header.APID
             que = 'SELECT pic_pi1_off,pic_pi1_wid from pic where pic_type=%s and pic_stype=%s' % (st, sst)
+            # que = 'SELECT pic_pi1_off,pic_pi1_wid from pic where pic_type=%s and pic_stype=%s and pic_apid=%s' % (st, sst, apid)
             dbres = dbcon.execute(que)
             pi1, pi1w = dbres.fetchall()[0]
 
@@ -642,41 +643,46 @@ def Tmdata(tm, UDEF=False, *args):
             tag = '{}-{}-{}-{}'.format(st, sst, apid, pi1val)
             user_label, params = user_tm_decoders[tag]
             spid = None
-            #o = data.unpack(','.join([ptt[i[4]][i[5]] for i in params]))
-            if len(params[0]) == 9: #Length of a parameter which should be decoded acording to given position
+
+            # Length of a parameter which should be decoded acording to given position
+            if len(params[0]) == 9:
                 vals_params = decode_pus(data, params)
-            else: #Decode according to given order, length is then 11
+            # Decode according to given order, length is then 11
+            else:
                 vals_params = read_variable_pckt(data, params)
 
             tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
             tmname = ['USER DEFINED: {}'.format(user_label)]
 
             return tmdata, tmname
-        except:
-            logger.info('UDEF could not be found, search in IDB')
+
+        except Exception as err:
+            logger.info('UDEF could not be found, search in IDB ({})'.format(err))
+        finally:
+            dbcon.close()
 
     try:
 
         if (tm[0] >> 4) & 1:
-            return Tcdata(tm, *args)
-        # with poolmgr.lock:
+            return Tcdata(tm)
+
         header, data, crc = Tmread(tm)
-        # data = tm_list[-2]
         st, sst, apid = header.SERV_TYPE, header.SERV_SUB_TYPE, header.APID
         que = 'SELECT pic_pi1_off,pic_pi1_wid from pic where pic_type=%s and pic_stype=%s' % (st, sst)
         dbres = dbcon.execute(que)
         pi1, pi1w = dbres.fetchall()[0]
+
         if pi1 != -1:
-            #print(tm[pi1:pi1 + pi1w])
-            # pi1val = Bits(tm)[pi1 * 8:pi1 * 8 + pi1w].uint
             pi1val = int.from_bytes(tm[pi1:pi1 + pi1w//8], 'big')
             que = 'SELECT pid_spid,pid_tpsd,pid_dfhsize from pid where pid_type=%s and pid_stype=%s and ' \
                   'pid_apid=%s and pid_pi1_val=%s' % (st, sst, apid, pi1val)
         else:
             que = 'SELECT pid_spid,pid_tpsd,pid_dfhsize from pid where pid_type=%s and pid_stype=%s and ' \
                   'pid_apid=%s' % (st, sst, apid)
+
         dbres = dbcon.execute(que)
         fetch = dbres.fetchall()
+
         # if APID or SID does not match:
         if len(fetch) != 0:
             spid, tpsd, dfhsize = fetch[0]
@@ -696,6 +702,7 @@ def Tmdata(tm, UDEF=False, *args):
             if params is None:
                 dbres = dbcon.execute(que)
                 spid, tpsd, dfhsize = dbres.fetchall()[0]
+
         # TODO: proper handling of super-commutated parameters
         if tpsd == -1 and params is None:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,plf_offby,plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,\
@@ -708,14 +715,15 @@ def Tmdata(tm, UDEF=False, *args):
             tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         elif params is not None:
-            #o = data.unpack(','.join([ptt[i[4]][i[5]] for i in params]))
-
-            if len(params[0]) == 9: #Length of a parameter which should be decoded acording to given position
+            # Length of a parameter which should be decoded acording to given position
+            if len(params[0]) == 9:
                 vals_params = decode_pus(data, params)
-            else: #Decode according to given order, length is then 11
+            # Decode according to given order, length is then 11
+            else:
                 vals_params = read_variable_pckt(data, params)
 
             tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
+
         else:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,\
             pcf.pcf_unit,pcf.pcf_pid,vpd_pos,vpd_grpsize,vpd_fixrep from vpd left join pcf on \
@@ -733,10 +741,13 @@ def Tmdata(tm, UDEF=False, *args):
             tmname = dbres.fetchall()[0]
         else:
             tmname = ['USER DEFINED: {}'.format(user_label)]
+
     except Exception as failure:
         raise Exception('Packet data decoding failed: ' + str(failure))
+
     finally:
         dbcon.close()
+
     return tmdata, tmname
 
 
@@ -803,7 +814,7 @@ def read_stream(stream, fmt, pos=None, offbi=0):
             x = x.decode('ascii')
         except UnicodeDecodeError as err:
             logger.warning(err)
-            x = str(data)
+            x = x.decode('utf-8', errors='replace')
     elif fmt == timepack[0]:
         x = timecal(data)
     else:
@@ -812,7 +823,7 @@ def read_stream(stream, fmt, pos=None, offbi=0):
     return x
 
 
-def csize(fmt, offbi=0):
+def csize(fmt, offbi=0, bitsize=False):
     """
     Returns the amount of bytes required for the input format
     @param fmt: Input String that defines the format
@@ -864,6 +875,10 @@ def parameter_ptt_type_tc_read(par):
 #  @param s Input string
 def none_to_empty(s):
     return '' if s is None else s
+
+
+def str_to_int(itr):
+    return int(itr) if itr.lower() != 'none' else None
 
 
 def Tm_header_formatted(tm, detailed=False):
@@ -965,13 +980,15 @@ def parameter_tooltip_text(x):
             h = hex(x)[3:].upper()
     elif isinstance(x, float):
         h = struct.pack('>f', x).hex().upper()
+    elif isinstance(x, bytes):
+        return x.hex().upper()
     else:
         # h = str(x)
         return str(x)
     return 'HEX: 0x{}\nDEC: {}'.format(h, x)
 
 
-def Tcdata(tm, *args):
+def Tcdata(tm):
     header, data, crc = Tmread(tm)
     st, sst, apid = header.SERV_TYPE, header.SERV_SUB_TYPE, header.APID
     dbcon = scoped_session_idb
@@ -1201,7 +1218,7 @@ def read_stream_recursive(tms, parameters, decoded=None):
             continue
         grp = par[-2]
 
-        if grp is None:  # None happens for UDFP, would give error using None
+        if grp is None:  # None happens for UDEF
             grp = 0
 
         fmt = ptt(par[2], par[3])
@@ -1285,6 +1302,7 @@ def pidfmt_reverse(val):
 #  @param pcf_name PCF_NAME
 #  @param rawval   Raw value of the parameter
 def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None):
+
     if properties is None:
         dbcon = scoped_session_idb
         que = 'SELECT pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % pcf_name
@@ -1292,7 +1310,7 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         fetch = dbres.fetchall()
         dbcon.close()
         if len(fetch) == 0:
-            return rawval if isinstance(rawval, (int, float)) else rawval[0]
+            return rawval if isinstance(rawval, (int, float, str, bytes)) else rawval[0]
 
         ptc, pfc, categ, curtx = fetch[0]
 
@@ -1419,7 +1437,7 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
         # tmlist = [tm for tm in list(tmlist) if ((struct.unpack('>H', tm[:2])[0] & 2047) == apid)]
         tmlist = [tm for tm in list(tmlist) if (int.from_bytes(tm[:2], 'big') & 0x7FF) == apid]
 
-    if sid is not None:
+    if sid:
         if st is None or sst is None or apid is None:
             raise ValueError('Must provide st, sst and apid if filtering by sid')
 
@@ -1434,6 +1452,65 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
         tmlist = [tm for tm in list(tmlist) if (get_cuctime(tm) <= time_to)]
 
     return tmlist
+
+
+def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None, idx_from=None, idx_to=None,
+                tmtc=None, get_last=False):
+    """
+    Filter SQL query object by any of the given arguments, return filtered query.
+    @param rows:
+    @param st:
+    @param sst:
+    @param apid:
+    @param sid:
+    @param time_from:
+    @param time_to:
+    @param idx_from:
+    @param idx_to:
+    @param tmtc:
+    @param get_last:
+    """
+
+    if st is not None:
+        rows = rows.filter(DbTelemetry.stc == st)
+
+    if sst is not None:
+        rows = rows.filter(DbTelemetry.sst == sst)
+
+    if apid is not None:
+        rows = rows.filter(DbTelemetry.apid == apid)
+
+    if sid:
+        if st is None or sst is None or apid is None:
+            raise ValueError('Must provide st, sst and apid if filtering by sid')
+
+        sid_offset, sid_bitlen = get_sid(st, sst, apid)
+        if sid_offset != -1:
+            sid_size = sid_bitlen // 8
+            rows = rows.filter(
+                func.mid(DbTelemetry.data, sid_offset - TM_HEADER_LEN + 1, sid_size) == sid.to_bytes(sid_size, 'big'))
+        else:
+            logger.error('SID ({}) not applicable for {}-{}-{}'.format(sid, st, sst, apid))
+
+    if time_from is not None:
+        rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) >= time_from)
+
+    if time_to is not None:
+        rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) <= time_to)
+
+    if idx_from is not None:
+        rows = rows.filter(DbTelemetry.idx >= idx_from)
+
+    if idx_to is not None:
+        rows = rows.filter(DbTelemetry.idx <= idx_to)
+
+    if tmtc is not None:
+        rows = rows.filter(DbTelemetry.is_tm == tmtc)
+
+    if get_last:
+        rows = rows.order_by(DbTelemetry.idx.desc()).first()
+
+    return rows
 
 
 ##
@@ -1506,9 +1583,8 @@ def get_pool_rows(pool_name, check_existence=False):
     return rows
 
 
-#  get values of parameter from HK packets
-def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None):
-
+# get values of parameter from HK packets
+def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True):
     if param is None:
         return
 
@@ -1524,20 +1600,21 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         dbres = dbcon.execute(que)
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
-            tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-                                   func.mid(DbTelemetry.data, get_sid(st, sst, apid)[0] - TM_HEADER_LEN + 1,
-                                            get_sid(st, sst, apid)[1] // 8) == sid.to_bytes(get_sid(st, sst, apid)[1] // 8, 'big')
-                                   ).order_by(DbTelemetry.idx.desc())
-            if tmlist is not None:
+            # tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
+            #                        func.mid(DbTelemetry.data, get_sid(st, sst, apid)[0] - TM_HEADER_LEN + 1,
+            #                                 get_sid(st, sst, apid)[1] // 8) == sid.to_bytes(get_sid(st, sst, apid)[1] // 8, 'big')
+            #                        ).order_by(DbTelemetry.idx.desc())
+            tmlist_rows = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)
+            if tmlist_rows is not None:
                 if last > 1:
-                    tmlist_filt = [tm.raw for tm in tmlist[:last]]
+                    tmlist = [tm.raw for tm in tmlist_rows[-last:]]
                 else:
-                    tmlist_filt = [tmlist.first().raw]
+                    tmlist = [tmlist_rows.order_by(DbTelemetry.idx.desc()).first().raw]
             else:
-                tmlist_filt = []
+                tmlist = []
         else:
             sid = None if sid == 0 else sid
-            tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+            # tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
 
         ufmt = ptt(ptc, pfc)
 
@@ -1550,9 +1627,8 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         hkdescr, st, sst, sid, apid, name, spid, offby, offbi, ptc, pfc, unit, descr, pid = dbres.fetchall()[0]
 
         sid = None if sid == 0 else sid
-        tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
-
         ufmt = ptt(ptc, pfc)
+        # tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
 
     elif hk.startswith('UDEF|'):
         label = hk.replace('UDEF|', '')
@@ -1565,21 +1641,30 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         sst = int(pktkey[1])
         apid = int(pktkey[2]) if pktkey[2] != 'None' else None
         sid = int(pktkey[3]) if pktkey[3] != 'None' else None
-        name, descr, _, offbi, ptc, pfc, unit, _, bitlen = parinfo
+        # name, descr, _, offbi, ptc, pfc, unit, _, bitlen = parinfo
+        _, descr, ptc, pfc, curtx, bitlen, _, _, _, _, _ = parinfo
+        unit = None
+        name = None
+        offbi = 0
 
-        offby = sum([x[-1] for x in pktinfo[:pktinfo.index(parinfo)]]) // 8 + TM_HEADER_LEN  # +TM_HEADER_LEN for header
-        tmlist_filt = Tm_filter_st(tmlist, st, sst, apid, sid)[-last:] if tmfilter else tmlist[-last:]
+        offby = sum([x[5] for x in pktinfo[:pktinfo.index(parinfo)]]) // 8 + TM_HEADER_LEN  # +TM_HEADER_LEN for header
+        # tmlist_filt = Tm_filter_st(tmlist, st, sst, apid, sid)[-last:] if tmfilter else tmlist[-last:]
         ufmt = ptt(ptc, pfc)
 
     else:
         userpar = json.loads(cfg[CFG_SECT_PLOT_PARAMETERS][param])
-        sid = None if (('SID' not in userpar.keys()) or (userpar['SID'] is None)) else userpar['SID']
-        tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'], sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        st = int(userpar['ST'])
+        sst = int(userpar['SST'])
+        apid = int(userpar['APID'])
+        sid = None if (('SID' not in userpar) or (userpar['SID'] is None)) else int(userpar['SID'])
+        # tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'], sid=sid)[-last:] if tmfilter else tmlist[-last:]
         offby, ufmt = userpar['bytepos'], userpar['format']
         offbi = userpar['offbi'] if 'offbi' in userpar else 0
         descr, unit, name = param, None, None
 
     bylen = csize(ufmt)
+    tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+
     if name is not None:
         que = 'SELECT pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % name
         dbres = dbcon.execute(que)
@@ -1600,7 +1685,10 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
     dbcon.close()
 
     try:
-        return np.array(np.array(xy).T, dtype='float'), (descr, unit)
+        if mk_array:
+            return np.array(np.array(xy).T, dtype='float'), (descr, unit)
+        else:
+            return xy, (descr, unit)
     except ValueError:
         return np.array(xy, dtype='float, U32'), (descr, unit)
 
@@ -1656,9 +1744,9 @@ def get_module_handle(module_name, instance=1, timeout=5):
             if module:
                 break
             else:
-                time.sleep(1.)
+                time.sleep(.2)
         except dbus.DBusException as err:
-            logger.warning(err)
+            logger.info(err)
             module = False
             time.sleep(0.5)
 
@@ -2138,9 +2226,10 @@ def get_sid(st, sst, apid):
         return SID_LUT[(st, sst, apid)]
     else:
         try:
+            logger.warning('APID {} not known'.format(apid))
             return SID_LUT[(st, sst, None)]
         except KeyError:
-            return None
+            return
 
 
 ##
@@ -2505,28 +2594,36 @@ def Tcsend_bytes(tc_bytes, pool_name='LIVE', pmgr_handle=None):
 #  Send command to C&C socket
 #  @param pool_name Name of the pool bound to the socket for CnC/TC communication
 #  @param cmd         Command string to be sent to C&C socket
-def CnCsend(cmd, pool_name=None):
+def CnCsend(cmd, pool_name=None, apid=1804):
     global counters  # One can only Change variable as global since we are static
-
-    pmgr = dbus_connection('poolmanager', communication['poolmanager'])
+    # pmgr = dbus_connection('poolmanager', communication['poolmanager'])
+    pmgr = get_module_handle('poolmanager')
     if pool_name is None:
         pool_name = pmgr.Variables('tc_name')
 
-    packed_data = CnCpack(data=cmd, sc=counters.setdefault(1804, 1))
+    pid = (apid >> 4) & 0x7F
+    cat = apid & 0xF
+    packed_data = CnCpack(data=cmd, pid=pid, cat=cat, sc=counters.setdefault(apid, 1))
 
-    logger.info('[CNC sent:]' + str(packed_data))
     received = pmgr.Functions('socket_send_packed_data', packed_data, pool_name, signature='says')
-    if received is not None:
-        counters[1804] += 1
+    logger.info('[CNC sent:]' + str(packed_data))
+
+    try:
+        msg = bytes(received)
+    except TypeError as err:
+        logger.error(err)
+        return
+
+    if msg:
+        counters[apid] += 1
         try:
-            received = bytes(received, encoding='utf-8', errors='replace')
+            msg = msg.decode('ascii', errors='replace')
         except Exception as err:
             logger.error(err)
-            return None
+            return
 
-    logger.info('[CNC response:]' + received.decode(encoding='utf-8', errors='replace'))
-
-    return received
+        logger.info('[CNC response:] ' + msg)
+        return msg
 
 
 ##
@@ -2542,6 +2639,10 @@ def CnCsend(cmd, pool_name=None):
 #  @param gflags  Segmentation flags
 #  @param sc      Sequence counter
 def CnCpack(data=b'', version=0b011, typ=1, dhead=0, pid=112, cat=12, gflags=0b11, sc=0):
+
+    if isinstance(data, str):
+        data = data.encode('ascii')
+
     header = PHeader()
     header.bits.PKT_VERS_NUM = version
     header.bits.PKT_TYPE = typ
@@ -2551,7 +2652,7 @@ def CnCpack(data=b'', version=0b011, typ=1, dhead=0, pid=112, cat=12, gflags=0b1
     header.bits.PKT_SEQ_CNT = sc
     header.bits.PKT_LEN = len(data) - 1
 
-    return bytes(header.bin) + data.encode()
+    return bytes(header.bin) + data
 
 
 ##
@@ -3465,6 +3566,12 @@ def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
     return data_pool_dict
 
 
+def get_dp_fmt_info(dp_name):
+    que = 'SELECT pcf_name FROM pcf where pcf_pid is not NULL and pcf_descr="{}"'.format(dp_name)
+    mib_name = scoped_session_idb.execute(que).fetchall()[0]
+    return mib_name
+
+
 # def get_dp_items(source='mib'):
 #     fmt = {3: {4: 'UINT8', 12: 'UINT16', 14: 'UINT32'}, 4: {4: 'INT8', 12: 'INT16', 14: 'INT32'}, 5: {1: 'FLOAT'}, 9: {18: 'CUC'}, 7: {1: '1OCT'}}
 #
@@ -4278,7 +4385,7 @@ def extract_spw(stream):
                 header.bits.PKT_TYPE == 0 and header.bits.WRITE == 1):
             pktsize = hsize
         else:
-            pktsize = hsize + header.bits.DATA_LEN# + pc.RMAP_PEC_LEN  # TODO: no data CRC from FEEsim?
+            pktsize = hsize + header.bits.DATA_LEN + pc.RMAP_PEC_LEN  # TODO: no data CRC from FEEsim?
 
         while len(buf) < pktsize:
             data = stream.read(pktsize - len(buf))

@@ -2430,8 +2430,6 @@ class TMPoolView(Gtk.Window):
 
         self.set_tm_data_view()
 
-        return
-
     def create_decoder_model(self):
         model = Gtk.ListStore(str)
 
@@ -2461,7 +2459,8 @@ class TMPoolView(Gtk.Window):
     def add_decoder(self, widget, decoder_name, byteoffset, bytelength):
         try:
             label, bytepos, bytelen = decoder_name.get_active_text(), int(byteoffset.get_text()), int(bytelength.get_text())
-        except:
+        except Exception as err:
+            self.logger.info(err)
             return
 
         if label in (None, ''):
@@ -2608,7 +2607,7 @@ class TMPoolView(Gtk.Window):
             datamodel.clear()
             try:
                 if self.UDEF:
-                    data = cfl.Tmformatted(tm, textmode=False, UDEF=True)
+                    data = cfl.Tmformatted(tm, textmode=False, udef=True)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
                 else:
@@ -3096,10 +3095,6 @@ class TMPoolView(Gtk.Window):
         return [row[1] for row in res]
 
     def plot_parameters(self, widget=None, parameters=None, start_live=False):
-        #if self.active_pool_info is None:
-        #    self.logger.warning('Cannot open plot window without pool!')
-        #    print('Cannot open plot window without pool!')
-        #    return
 
         cfl.start_plotter(pool_name=self.active_pool_info.pool_name)
 
