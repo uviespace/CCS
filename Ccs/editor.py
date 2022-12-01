@@ -52,6 +52,7 @@ UI_INFO = """
       <menuitem action='EditPaste' />
       <separator />
       <menuitem action='EditFind' />
+      <menuitem action='EditComment' />
       <separator />
       <menuitem action='EditPreferences' />
     </menu>
@@ -633,7 +634,11 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self.on_search_clicked)
         action_group.add_action_with_accel(action, "<control>F")
 
-        action = Gtk.Action(name="EditPreferences", label="_Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
+        action = Gtk.Action(name="EditComment", label="Comment Line(s)", tooltip=None)
+        action.connect("activate", self._on_comment_lines)
+        action_group.add_action_with_accel(action, "<control>B")
+
+        action = Gtk.Action(name="EditPreferences", label="Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
         action.connect("activate", cfl.start_config_editor)
         action_group.add_action(action)
 
@@ -737,38 +742,53 @@ class CcsEditor(Gtk.Window):
     def _on_menu_file_new(self, widget=None, filename=None):
         self.notebook_open_tab()
 
-    # def _on_select_pool_config(self, action):
-    #     print('TODO')
-    #
-    # def _on_edit_pool_config(self, action):
-    #     print('TODO')
-    #
-    # def _on_create_pool_config(self, action):
-    #     cfg_dialog = config_dialog.CreateConfig(self)
-    #     response = cfg_dialog.run()
-    #
-    #     config = cfg_dialog.get_config()
-    #     cfg_dialog.destroy()
-    #
-    #     if response == Gtk.ResponseType.CANCEL:
-    #         return
-    #
-    #     dialog = Gtk.FileChooserDialog(title="Save file as", parent=None,
-    #                                    action=Gtk.FileChooserAction.SAVE)
-    #     dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-    #                        Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-    #
-    #     dialog.set_transient_for(self)
-    #
-    #     response = dialog.run()
-    #
-    #     if response == Gtk.ResponseType.OK:
-    #         filename = dialog.get_filename()
-    #         with open(filename, 'w') as fdesc:
-    #             config.write(fdesc)
-    #             fdesc.close()
-    #
-    #     dialog.destroy()
+    def _on_comment_lines(self, widget=None):
+        view = self._get_active_view()
+        textbuffer = view.get_buffer()
+
+        hs = textbuffer.get_has_selection()
+
+        if hs:
+            x, y = textbuffer.get_selection_bounds()
+
+            # remember selected part for re-selection at the end
+            ix = x.get_offset()
+            iyl, iyo = y.get_line(), y.get_line_offset()
+
+            x.set_line_offset(0)
+            tt = x.get_text(y)
+            lnlist = tt.split('\n')
+            if all([ln.startswith('#') for ln in lnlist]):
+                newbuf = []
+                for ln in lnlist:
+                    newbuf.append(ln[1:])
+                tr = '\n'.join(newbuf)
+                ix -= 1
+                iyo -= 1
+            else:
+                tr = '#' + tt.replace('\n', '\n#')
+                ix += 1
+                iyo += 1
+
+        else:
+            x = textbuffer.get_iter_at_mark(textbuffer.get_insert())
+            x.set_line_offset(0)
+            y = x.copy()
+            y.forward_to_line_end()
+            tt = x.get_text(y)
+
+            if tt.startswith('#'):
+                tr = tt[1:]
+            else:
+                tr = '#' + tt
+
+        textbuffer.delete(x, y)
+        textbuffer.insert(x, tr, len(tr))
+
+        if hs:
+            x = textbuffer.get_iter_at_offset(ix)
+            y = textbuffer.get_iter_at_line_offset(iyl, iyo)
+            textbuffer.select_range(x, y)
 
     def _on_start_poolviewer(self, action):
         cfl.start_pv()
