@@ -55,6 +55,7 @@ UI_INFO = """
       <menuitem action='EditComment' />
       <separator />
       <menuitem action='EditPreferences' />
+      <menuitem action='EditStyle' />
     </menu>
     <menu action='ModulesMenu'>
       <menuitem action='Poolviewer' />
@@ -81,23 +82,23 @@ UI_INFO = """
 VTE_VERSION = "{}.{}.{}".format(Vte.MAJOR_VERSION, Vte.MINOR_VERSION, Vte.MICRO_VERSION)
 
 
-class SearchDialog(Gtk.Dialog):
-    def __init__(self, parent):
-        Gtk.Dialog.__init__(self, "Search", parent,
-                            Gtk.DialogFlags.MODAL, buttons=(Gtk.STOCK_FIND, Gtk.ResponseType.OK,
-                                                            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
-
-        box = self.get_content_area()
-        box.set_spacing(5)
-        box.set_homogeneous(True)
-
-        label = Gtk.Label("Insert text you want to search for:")
-        box.add(label)
-
-        self.entry = Gtk.Entry()
-        box.add(self.entry)
-
-        self.show_all()
+# class SearchDialog(Gtk.Dialog):
+#     def __init__(self, parent):
+#         Gtk.Dialog.__init__(self, "Search", parent,
+#                             Gtk.DialogFlags.MODAL, buttons=(Gtk.STOCK_FIND, Gtk.ResponseType.OK,
+#                                                             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
+#
+#         box = self.get_content_area()
+#         box.set_spacing(5)
+#         box.set_homogeneous(True)
+#
+#         label = Gtk.Label("Insert text you want to search for:")
+#         box.add(label)
+#
+#         self.entry = Gtk.Entry()
+#         box.add(self.entry)
+#
+#         self.show_all()
 
 
 class IPythonTerminal(Vte.Terminal):
@@ -181,6 +182,11 @@ class CcsEditor(Gtk.Window):
 
         self.editor_notebook = Gtk.Notebook(scrollable=True)
         self.grid.attach(self.editor_notebook, 0, 3, 3, 1)
+
+        if self.cfg.has_option('ccs-editor', 'color_scheme'):
+            self._update_style_schemes(self.cfg.get('ccs-editor', 'color_scheme'))
+        else:
+            self.style_scheme = None
 
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
@@ -269,7 +275,6 @@ class CcsEditor(Gtk.Window):
         @return: -
         """
 
-        ######
         # This function exists in every app, but is different here, be careful!
 
         self.my_bus_name = My_Bus_Name
@@ -322,10 +327,9 @@ class CcsEditor(Gtk.Window):
                                          " = dbus.SessionBus().get_object('" + str(My_Bus_Name) +
                                          "', '/MessageListener')")
 
-        #####
         # Connect to all running applications for terminal
         our_con = []
-        #Search for all applications
+        # Search for all applications
         for service in dbus.SessionBus().list_names():
             if service.startswith('com'):
                 our_con.append(service)
@@ -383,7 +387,6 @@ class CcsEditor(Gtk.Window):
                             self._to_console_via_socket("editor" + str(service[-1]) +
                                                         " = dbus.SessionBus().get_object('" + str(service) +
                                                         "', '/MessageListener')")
-        return
 
     def restart_terminal(self):
 
@@ -642,21 +645,9 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", cfl.start_config_editor)
         action_group.add_action(action)
 
-    # def create_pool_menu(self, action_group):
-    #     action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None, sensitive=False)
-    #     action_group.add_action(action)
-    #
-    #     action = Gtk.Action(name="SelectConfig", label="_Select Configuration", tooltip=None, stock_id=None)
-    #     action.connect("activate", self._on_select_pool_config)
-    #     action_group.add_action(action)
-    #
-    #     action = Gtk.Action(name="EditConfig", label="_Edit Configuration", tooltip=None, stock_id=None)
-    #     action.connect("activate", self._on_edit_pool_config)
-    #     action_group.add_action(action)
-    #
-    #     action = Gtk.Action(name="CreateConfig", label="_Create Configuration", tooltip=None, stock_id=None)
-    #     action.connect("activate", self._on_create_pool_config)
-    #     action_group.add_action(action)
+        action = Gtk.Action(name="EditStyle", label="Set Editor Style", tooltip=None)
+        action.connect("activate", self._on_set_style)
+        action_group.add_action(action)
 
     def create_modules_menu(self, action_group):
         action = Gtk.Action(name="ModulesMenu", label="_Modules", tooltip=None, stock_id=None)
@@ -836,8 +827,6 @@ class CcsEditor(Gtk.Window):
         scrolled_window = self.editor_notebook.get_nth_page(nbpage)
         view = scrolled_window.get_child()
         return view
-
-    """ TODO: unsaved buffer warning on delete/destroy """
 
     def notebook_open_tab(self, filename=None):
 
@@ -1102,12 +1091,6 @@ class CcsEditor(Gtk.Window):
 
         toolbar.add(Gtk.SeparatorToolItem())
 
-        # button_reset_ns = Gtk.ToolButton()
-        # button_reset_ns.set_icon_name("edit-clear")
-        # button_reset_ns.set_tooltip_text('Reset console namespace')
-        # button_reset_ns.connect('clicked', self.reset_ns)
-        # toolbar.add(button_reset_ns)
-
         return toolbar
 
     def create_action_buttons(self, toolbar, targets, nbutt=10):
@@ -1315,7 +1298,8 @@ class CcsEditor(Gtk.Window):
         scrolledwindow.set_hexpand(True)
         scrolledwindow.set_vexpand(True)
 
-        textview = GtkSource.View(buffer=GtkSource.Buffer())
+        textview = GtkSource.View()
+        textview.set_buffer(GtkSource.Buffer())
 
         textview.set_wrap_mode(Gtk.WrapMode.WORD)
 
@@ -1352,6 +1336,9 @@ class CcsEditor(Gtk.Window):
         language = lang_manager.get_language('python3')
 
         textbuffer.set_language(language)
+
+        if self.style_scheme is not None:
+            textbuffer.set_style_scheme(self.style_scheme)
 
         scrolledwindow.add(textview)
 
@@ -1595,34 +1582,12 @@ class CcsEditor(Gtk.Window):
         self.searchbar.set_search_mode(not self.searchbar.get_search_mode())
         if self.searchbar.get_search_mode():
             self.searchbar.get_child().get_child().get_children()[1].get_children()[0].get_children()[0].grab_focus()
-        '''
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-
-        tag_clear = textbuffer.create_tag(background='white')
-        textbuffer.apply_tag(tag_clear, *textbuffer.get_bounds())
-
-        dialog = SearchDialog(self)
-
-        response = dialog.run()
-
-        if response == Gtk.ResponseType.OK:
-            cursor_mark = textbuffer.get_insert()
-            start = textbuffer.get_iter_at_mark(cursor_mark)
-
-            if start.get_offset() == textbuffer.get_char_count():
-                start = textbuffer.get_start_iter()
-
-            self.search_and_mark(textbuffer, dialog.entry.get_text(), start)
-
-        dialog.destroy()
-        '''
 
     def search_and_mark(self, searchentry, start=None, direction='next'):
         searchtext = searchentry.get_text()
         view = self._get_active_view()
         textbuffer = view.get_buffer()
-        if start == None:
+        if start is None:
             start, end = textbuffer.get_bounds()
         else:
             start = textbuffer.get_iter_at_mark(start)
@@ -1737,6 +1702,29 @@ class CcsEditor(Gtk.Window):
         self.log_file = file
         return True
 
+    def _on_set_style(self, widget):
+        dialog = StyleChooserDialog(scheme=self.style_scheme)
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            style = dialog.styleschemechooser.get_style_scheme().get_id()
+            style_manager = GtkSource.StyleSchemeManager.get_default()
+            scheme = style_manager.get_scheme(style)
+            self._update_style_schemes(scheme)
+            self.cfg.save_option_to_file('ccs-editor', 'color_scheme', style)
+
+        dialog.destroy()
+
+    def _update_style_schemes(self, scheme):
+        if isinstance(scheme, str):
+            style_manager = GtkSource.StyleSchemeManager.get_default()
+            scheme = style_manager.get_scheme(scheme)
+
+        self.style_scheme = scheme
+        for tab in self.editor_notebook:
+            buf = tab.get_child().get_buffer()
+            buf.set_style_scheme(scheme)
+
 
 class UnsavedBufferDialog(Gtk.MessageDialog):
     def __init__(self, parent=None, msg=None):
@@ -1784,6 +1772,20 @@ class ActionWindow(Gtk.Window):
             grid.attach(button, i % ncolumns, i//2, 1, 1)
 
         self.add(grid)
+        self.show_all()
+
+
+class StyleChooserDialog(Gtk.Dialog):
+
+    def __init__(self, scheme=None):
+        super(StyleChooserDialog, self).__init__(title='Choose Style', use_header_bar=True)
+
+        self.styleschemechooser = GtkSource.StyleSchemeChooserWidget()
+        self.styleschemechooser.set_style_scheme(scheme)
+        self.get_content_area().add(self.styleschemechooser)
+
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+
         self.show_all()
 
 
