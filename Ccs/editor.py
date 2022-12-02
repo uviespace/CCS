@@ -163,6 +163,7 @@ class CcsEditor(Gtk.Window):
         self.add(self.paned)
 
         self.grid = Gtk.Grid()
+        self.grid.connect('key-release-event', self._kill_search)
         self.paned.add1(self.grid)
 
         menubar = self.create_menus()
@@ -171,6 +172,9 @@ class CcsEditor(Gtk.Window):
         toolbar = self.create_toolbar()
         self.grid.attach(toolbar, 0, 1, 2, 1)
 
+        self.search_context = None
+        self.editor_notebook = Gtk.Notebook(scrollable=True)
+        self.editor_notebook.connect('switch-page', self._set_search_context)
         self.searchbar = self.create_searchbar()
         self.grid.attach(self.searchbar, 0, 2, 3, 1)
 
@@ -180,7 +184,6 @@ class CcsEditor(Gtk.Window):
         self.sourcemarks = {}
         self.create_mark_attributes()
 
-        self.editor_notebook = Gtk.Notebook(scrollable=True)
         self.grid.attach(self.editor_notebook, 0, 3, 3, 1)
 
         if self.cfg.has_option('ccs-editor', 'color_scheme'):
@@ -637,7 +640,7 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self.on_search_clicked)
         action_group.add_action_with_accel(action, "<control>F")
 
-        action = Gtk.Action(name="EditComment", label="Comment Line(s)", tooltip=None)
+        action = Gtk.Action(name="EditComment", label="Comment Lines", tooltip=None)
         action.connect("activate", self._on_comment_lines)
         action_group.add_action_with_accel(action, "<control>B")
 
@@ -825,6 +828,10 @@ class CcsEditor(Gtk.Window):
     def _get_active_view(self):
         nbpage = self.editor_notebook.get_current_page()
         scrolled_window = self.editor_notebook.get_nth_page(nbpage)
+
+        if scrolled_window is None:
+            return
+
         view = scrolled_window.get_child()
         return view
 
@@ -1274,24 +1281,80 @@ class CcsEditor(Gtk.Window):
         searchbar = Gtk.SearchBar.new()
         searchbar.set_search_mode(False)
         searchbar.set_show_close_button(True)
-        searchentry = Gtk.SearchEntry(width_chars=30)
+        self.searchentry = Gtk.SearchEntry(width_chars=40)
 
-        searchentry.connect('search-changed', self.search_and_mark)
-        searchentry.connect('next-match', self._on_search_next, searchentry)
-        searchentry.connect('previous-match', self._on_search_previous, searchentry)
+        # self.searchentry.connect('search-changed', self.search_and_mark)
+        self.searchentry.connect('search-changed', self._on_search_changed)
+        self.searchentry.connect('activate', self._on_search_next2)
+        # self.searchentry.connect('next-match', self._on_search_next)
+        self.searchentry.connect('next-match', self._on_search_next2)
+        # self.searchentry.connect('previous-match', self._on_search_previous)
+        self.searchentry.connect('previous-match', self._on_search_prev2)
+
+        self._init_search_settings()
 
         next = Gtk.Button.new_from_icon_name('go-down-symbolic', Gtk.IconSize.BUTTON)
-        next.connect('clicked', self._on_search_next, searchentry)
+        next.connect('clicked', self._on_search_next2)
         prev = Gtk.Button.new_from_icon_name('go-up-symbolic', Gtk.IconSize.BUTTON)
-        prev.connect('clicked', self._on_search_previous, searchentry)
+        prev.connect('clicked', self._on_search_prev2)
+
+        csens = Gtk.CheckButton.new_with_label('match case')
+        csens.connect('toggled', self._set_case_sensitive)
 
         hbox = Gtk.HBox()
         searchbar.add(hbox)
-        hbox.pack_start(searchentry, 0, 0, 0)
+        hbox.pack_start(self.searchentry, 1, 1, 4)
         hbox.pack_start(prev, 0, 0, 0)
         hbox.pack_start(next, 0, 0, 0)
+        hbox.pack_start(csens, 0, 0, 6)
 
         return searchbar
+
+    def _set_case_sensitive(self, widget):
+        self.search_settings.set_case_sensitive(widget.get_active())
+
+    def _on_search_changed(self, widget):
+        self.findtext(start_offset=0)
+
+    def _on_search_next2(self, widget):
+        self.findtext()
+
+    def _on_search_prev2(self, *args):
+        self.findtext(start_offset=0, back=True)
+
+    def _init_search_settings(self):
+        self.search_settings = GtkSource.SearchSettings()
+        self.search_settings.set_case_sensitive(False)
+        self.search_settings.set_wrap_around(True)
+        self.searchentry.bind_property('text', self.search_settings, 'search-text')
+
+    def _set_search_context(self, notebook, nbchild, nbpage, *args):
+        self.current_view = nbchild.get_child()
+        self.current_buffer = self.current_view.get_buffer()
+        self.search_context = GtkSource.SearchContext.new(self.current_buffer, self.search_settings)
+
+    def findtext(self, start_offset=1, back=False):
+        buf = self.current_buffer
+        insert = buf.get_iter_at_mark(buf.get_insert())
+        insert.forward_chars(start_offset)
+
+        if not back:
+            match, start_iter, end_iter, wrapped = self.search_context.forward2(insert)
+        else:
+            match, start_iter, end_iter, wrapped = self.search_context.backward2(insert)
+
+        if match:
+            buf.place_cursor(start_iter)
+            buf.move_mark(buf.get_selection_bound(), end_iter)
+            self.current_view.scroll_to_mark(buf.get_insert(), 0.25, True, 0.5, 0.5)
+            return True
+        else:
+            buf.place_cursor(buf.get_iter_at_mark(buf.get_insert()))
+
+    def _kill_search(self, widget, evt, *args):
+        if evt.keyval == Gdk.KEY_Escape:
+            self.searchentry.delete_text(0, -1)
+            self.searchbar.set_search_mode(False)
 
     def create_textview(self, filename=None):
         scrolledwindow = Gtk.ScrolledWindow()
@@ -1457,8 +1520,6 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(begin, end, True)
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
         self._to_console(line)
 
         return iter
@@ -1486,9 +1547,6 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(start, stop, True)
-        # line += '\n'
-
-        # self._to_console_via_socket(line)
         self._to_console(line)
 
         self._set_play_mark(view, stop)
@@ -1509,12 +1567,6 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(start, end, True)
-        # line += '\n'
-
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
-        # self._to_console(line, editor_read=True)
-        # self._to_console_via_socket(line)
         self._to_console(line)
 
         self._set_play_mark(view, end)
@@ -1583,47 +1635,44 @@ class CcsEditor(Gtk.Window):
         if self.searchbar.get_search_mode():
             self.searchbar.get_child().get_child().get_children()[1].get_children()[0].get_children()[0].grab_focus()
 
-    def search_and_mark(self, searchentry, start=None, direction='next'):
-        searchtext = searchentry.get_text()
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-        if start is None:
-            start, end = textbuffer.get_bounds()
-        else:
-            start = textbuffer.get_iter_at_mark(start)
-            end = textbuffer.get_end_iter()
-        # tag_found = textbuffer.create_tag(background='limegreen')#, foreground='black')
+    # def search_and_mark(self, widget=None, start=None, direction='next'):
+    #     searchtext = self.searchentry.get_text()
+    #     view = self._get_active_view()
+    #     textbuffer = view.get_buffer()
+    #     if start is None:
+    #         start, end = textbuffer.get_bounds()
+    #     else:
+    #         start = textbuffer.get_iter_at_mark(start)
+    #         end = textbuffer.get_end_iter()
+    #     # tag_found = textbuffer.create_tag(background='limegreen')#, foreground='black')
+    #
+    #     if direction == 'next':
+    #         found = start.forward_search(searchtext, 0)
+    #     else:
+    #         found = start.backward_search(searchtext, 0)
+    #
+    #     if found:
+    #         start, end = found
+    #         textbuffer.select_range(start, end)
+    #         if direction == 'next':
+    #             last_search_pos = textbuffer.create_mark('last_search_pos', end, False)
+    #         else:
+    #             last_search_pos = textbuffer.create_mark('last_search_pos', start, False)
+    #         # textbuffer.apply_tag(tag_found, match_start, match_end)
+    #         # view.scroll_to_iter(match_start,0.,False,0,0)
+    #         view.scroll_mark_onscreen(last_search_pos)
 
-        if direction == 'next':
-            found = start.forward_search(searchtext, 0)
-        else:
-            found = start.backward_search(searchtext, 0)
+    # def _on_search_next(self, widget, *args):
+    #     view = self._get_active_view()
+    #     textbuffer = view.get_buffer()
+    #     last_search_pos = textbuffer.get_mark('last_search_pos')
+    #     self.search_and_mark(start=last_search_pos, direction='next')
 
-        if found:
-            start, end = found
-            textbuffer.select_range(start, end)
-            if direction == 'next':
-                last_search_pos = textbuffer.create_mark('last_search_pos', end, False)
-            else:
-                last_search_pos = textbuffer.create_mark('last_search_pos', start, False)
-            # textbuffer.apply_tag(tag_found, match_start, match_end)
-            # view.scroll_to_iter(match_start,0.,False,0,0)
-            view.scroll_mark_onscreen(last_search_pos)
-        return
-
-    def _on_search_next(self, widget, searchentry, last_search_pos=None):
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-        last_search_pos = textbuffer.get_mark('last_search_pos')
-        self.search_and_mark(searchentry=searchentry, start=last_search_pos, direction='next')
-        return
-
-    def _on_search_previous(self, widget, searchentry, last_search_pos=None):
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-        last_search_pos = textbuffer.get_mark('last_search_pos')
-        self.search_and_mark(searchentry=searchentry, start=last_search_pos, direction='prev')
-        return
+    # def _on_search_previous(self, widget, *args):
+    #     view = self._get_active_view()
+    #     textbuffer = view.get_buffer()
+    #     last_search_pos = textbuffer.get_mark('last_search_pos')
+    #     self.search_and_mark(start=last_search_pos, direction='prev')
 
     def on_button_action(self, widget):
         action_name = widget.get_name()
