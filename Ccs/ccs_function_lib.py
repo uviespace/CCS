@@ -2744,11 +2744,11 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
 
 
 def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
-                   progress=True, calc_crc=True, align=4):
+                   progress=True, calc_crc=True, byte_align=4):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_bytes_ function until
-    all _data_ is transferred. Data is zero-padded if not aligned to _align_ bytes.
+    all _data_ is transferred. Data is zero-padded if not aligned to _byte_align_ bytes.
     @param data:
     @param memid:
     @param memaddr:
@@ -2759,7 +2759,7 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1
     @param tcname:
     @param progress:
     @param calc_crc:
-    @param align:
+    @param byte_align:
     @return:
     """
 
@@ -2769,9 +2769,9 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1
         else:
             raise TypeError('Data is not bytes or str')
 
-    if align and (len(data) % align):
-        logger.warning('Data is not {}-byte aligned, padding.'.format(align))
-        data += bytes(align - (len(data) % align))
+    if byte_align and (len(data) % byte_align):
+        logger.warning('Data is not {}-byte aligned, padding.'.format(byte_align))
+        data += bytes(byte_align - (len(data) % byte_align))
 
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)

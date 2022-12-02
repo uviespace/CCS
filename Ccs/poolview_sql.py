@@ -3346,8 +3346,7 @@ class ExtractionDialog(Gtk.MessageDialog):
 class SavePoolDialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None, decoding_type='PUS'):
         super(SavePoolDialog, self).__init__(title="Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE)
-        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                                      Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
 
         # self.set_transient_for(parent)
 
