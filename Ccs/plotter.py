@@ -440,7 +440,7 @@ class PlotViewer(Gtk.Window):
         all_pools = None
         if cfl.is_open('poolmanager'):
             # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            pmgr = cfl.get_module_handle('poolmanager')
+            pmgr = cfl.get_module_handle('poolmanager', instance=cfl.communication['poolmanager'])
             all_pools = pmgr.Dictionaries('loaded_pools')
             # all_pools = cfl.Dictionaries(pmgr, 'loaded_pools')
             #if not all_pools:
@@ -453,8 +453,8 @@ class PlotViewer(Gtk.Window):
             #    found_pools = list(all_pools.keys())
 
         elif cfl.is_open('poolviewer'):
-            pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
-            pv = cfl.get_module_handle('poolviewer')
+            # pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
+            pv = cfl.get_module_handle('poolviewer', instance=cfl.communication['poolviewer'])
             all_pools = pv.Variables('active_pool_info')
             # all_pools = cfl.Variables(pv, 'active_pool_info')
             #if all_pools:
