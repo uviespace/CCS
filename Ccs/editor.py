@@ -1850,7 +1850,10 @@ class StyleChooserDialog(Gtk.Dialog):
         super(StyleChooserDialog, self).__init__(title='Choose Style', use_header_bar=True)
 
         self.styleschemechooser = GtkSource.StyleSchemeChooserWidget()
-        self.styleschemechooser.set_style_scheme(scheme)
+
+        if scheme is not None:
+            self.styleschemechooser.set_style_scheme(scheme)
+
         self.get_content_area().add(self.styleschemechooser)
 
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
