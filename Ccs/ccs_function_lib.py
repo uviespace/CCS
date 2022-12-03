@@ -3586,7 +3586,7 @@ def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
                 logger.warning('Data pool items were rejected because of unknown format ({})'.format(len(data_pool) - len(data_pool_dict)))
             return data_pool_dict
         else:
-            return data_pool
+            return data_pool, src_file
 
     elif pcf_descr is None and not src_file:
         data_pool = scoped_session_idb.execute('SELECT pcf_pid, pcf_descr, pcf_ptc, pcf_pfc '
@@ -3599,7 +3599,7 @@ def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
     scoped_session_idb.close()
 
     if not as_dict:
-        return data_pool
+        return data_pool, src_file
 
     data_pool_dict = {int(row[0]): {'descr': row[1], 'fmt': ptt(row[2], row[3])} for row in data_pool}
 
@@ -5682,7 +5682,8 @@ try:
     else:
         raise ValueError
 except (FileNotFoundError, ValueError, confignator.config.configparser.NoOptionError):
-    DP_ITEMS_SRC_FILE = None
+    if 'DP_ITEMS_SRC_FILE' not in locals():
+        DP_ITEMS_SRC_FILE = None
     logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
     _dp_items = get_data_pool_items(as_dict=True)
 finally:

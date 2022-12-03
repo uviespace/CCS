@@ -18,21 +18,26 @@ DP_ITEMS_SRC_FILE = cfl.DP_ITEMS_SRC_FILE
 
 def reload_dp_data():
     global DP_ITEMS_SRC_FILE
-    global dictionary_of_data_pool
+    # global dictionary_of_data_pool
     global list_of_data_pool
     global data_pool_sublist
 
     try:
-        dictionary_of_data_pool = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
+        list_of_data_pool, _src = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
     except (FileNotFoundError, ValueError):
         logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
-        dictionary_of_data_pool = cfl.get_data_pool_items()
+        list_of_data_pool, _src = cfl.get_data_pool_items()
 
-    if not isinstance(dictionary_of_data_pool, list):
-        list_of_data_pool = list(dictionary_of_data_pool.keys())
+    # check if DP items are from MIB or CSV
+    if not _src:
         data_pool_sublist = get_data_pool_sublist()
     else:
-        data_pool_sublist = dictionary_of_data_pool
+        data_pool_sublist = list_of_data_pool
+
+    # if not isinstance(list_of_data_pool, list):
+    #     data_pool_sublist = get_data_pool_sublist()
+    # else:
+    #     data_pool_sublist = dictionary_of_data_pool
 
 
 def get_data_pool_sublist():
@@ -54,16 +59,21 @@ def get_data_pool_sublist():
 
 data_pool_sublist = []
 try:
-    dictionary_of_data_pool = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
+    list_of_data_pool, _src = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
 except (FileNotFoundError, ValueError):
     logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
-    dictionary_of_data_pool = cfl.get_data_pool_items()
+    list_of_data_pool, _src = cfl.get_data_pool_items()
 
-if not isinstance(dictionary_of_data_pool, list):
-    list_of_data_pool = list(dictionary_of_data_pool.keys())
+# check if DP items are from MIB or CSV
+if not _src:
     data_pool_sublist = get_data_pool_sublist()
 else:
-    data_pool_sublist = dictionary_of_data_pool
+    data_pool_sublist = list_of_data_pool
+
+# if not isinstance(list_of_data_pool, list):
+#     data_pool_sublist = get_data_pool_sublist()
+# else:
+#     data_pool_sublist = list_of_data_pool
 
 
 class DataPoolTable(Gtk.Grid):
