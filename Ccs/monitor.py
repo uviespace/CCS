@@ -12,7 +12,7 @@ gi.require_version('Gtk', '3.0')
 
 from gi.repository import Gtk, Gdk, GLib, GdkPixbuf
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker
-from sqlalchemy.sql.expression import func
+# from sqlalchemy.sql.expression import func
 import ccs_function_lib as cfl
 
 cfg = confignator.get_config(check_interpolation=False)
@@ -25,11 +25,11 @@ class ParameterMonitor(Gtk.Window):
     limit_colors = {0: "green", 1: "orange", 2: "red"}
     alarm_colors = {'red': Gdk.RGBA(1, 0, 0, 1), 'orange': Gdk.RGBA(1, 0.647059, 0, 1),
                     'green': Gdk.RGBA(0.913725, 0.913725, 0.913725, 1.)}
-    parameter_types = {"S": "s", "N": ".3G"}
+    # parameter_types = {"S": "s", "N": ".3G"}
 
     def __init__(self, pool_name=None, parameter_set=None, interval=INTERVAL, max_age=MAX_AGE, user_limits=None):
-
-        Gtk.Window.__init__(self, title="Parameter Monitor - {} - {}".format(pool_name, parameter_set))
+        super(ParameterMonitor, self).__init__(title="Parameter Monitor - {} - {}".format(pool_name, parameter_set))
+        # Gtk.Window.__init__(self, title="Parameter Monitor - {} - {}".format(pool_name, parameter_set))
         self.set_border_width(10)
         self.set_resizable(True)
 
@@ -238,6 +238,7 @@ class ParameterMonitor(Gtk.Window):
         if self.cfg.has_option('ccs-monitor_parameter_sets', parameter_set):
             parameters = json.loads(self.cfg['ccs-monitor_parameter_sets'][parameter_set])
             try:
+                self.parameter_set = parameter_set
                 self.setup_grid(parameters)
             except KeyError as err:
                 self.logger.error('Failed to load parameter set "{}" ({})'.format(parameter_set, err))
@@ -358,6 +359,7 @@ class ParameterMonitor(Gtk.Window):
         # LUT for user defined parameter names by pktid
         self.pname_from_pktid = {self.parameters[k]['pktid']: k.split(':')[-1] for k in self.parameters}
 
+        self.set_title("Parameter Monitor - {} - {}".format(self.pool_name, self.parameter_set))
         self.grid.show_all()
 
     def update_parameter_view(self, interval=INTERVAL, max_age=MAX_AGE):
@@ -669,8 +671,8 @@ class ParameterMonitor(Gtk.Window):
             parameter_set = dialog.label.get_active_text()
             self.cfg.save_option_to_file('ccs-monitor_parameter_sets', parameter_set, json.dumps(parameters))
 
+            self.parameter_set = parameter_set
             self.setup_grid(parameters)
-            # self.set_pool(self.pool_name)
             dialog.destroy()
 
         else:
@@ -1084,7 +1086,6 @@ if __name__ == "__main__":
             sys.argv.remove(arg)
 
     if len(sys.argv) == 2:
-        win.pool_name = sys.argv[1]
         is_pool = win.set_pool(sys.argv[1])
 
     elif len(sys.argv) >= 3:
@@ -1092,17 +1093,14 @@ if __name__ == "__main__":
         if len(sys.argv) > 3:
             win.logger.warning('Too many arguments, ignoring {}'.format(sys.argv[3:]))
 
-        win.pool_name = sys.argv[1]
-        win.parameter_set = sys.argv[2]
-        win.set_parameter_view(win.parameter_set)
-        is_pool = win.set_pool(win.pool_name)
+        win.set_parameter_view(sys.argv[2])
+        is_pool = win.set_pool(sys.argv[1])
 
     elif len(sys.argv) == 1:
         is_pool = win.check_for_pools()
 
     else:
-        win.quit_func()
-        sys.exit()
+        is_pool = 0
 
     if is_pool == 0:
         win.quit_func()
