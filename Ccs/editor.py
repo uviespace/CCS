@@ -173,8 +173,10 @@ class CcsEditor(Gtk.Window):
         self.grid.attach(toolbar, 0, 1, 2, 1)
 
         self.search_context = None
-        self.editor_notebook = Gtk.Notebook(scrollable=True)
+        self.editor_notebook = Gtk.Notebook()
+        self.editor_notebook.set_scrollable(True)
         self.editor_notebook.connect('switch-page', self._set_search_context)
+
         self.searchbar = self.create_searchbar()
         self.grid.attach(self.searchbar, 0, 2, 3, 1)
 
@@ -226,7 +228,6 @@ class CcsEditor(Gtk.Window):
         self.connect("delete-event", self.quit_func)
         # self.connect("delete-event", self.tcpserver_shutdown)
         self.connect('key-press-event', self.key_pressed)
-        # self.open_file("startpv.py")
         self.show_all()
 
     def timeout(self, sec):
@@ -409,9 +410,9 @@ class CcsEditor(Gtk.Window):
 
         self.ipython_view.connect("size-allocate", self.console_autoscroll, self.ipython_view)
 
-        self.ed_host, self.ed_port = self.cfg.get('ccs-misc', 'editor_host'), int(self.cfg.get('ccs-misc', 'editor_ul_port'))  # Get standart port
+        self.ed_host, self.ed_port = self.cfg.get('ccs-misc', 'editor_host'), int(self.cfg.get('ccs-misc', 'editor_ul_port'))  # Get standard port
 
-        # Connect to standart port if possible otherwise use a random alternative
+        # Connect to standard port if possible otherwise use a random alternative
         try:
             self.setup_editor_socket(self.ed_host, self.ed_port)
         except OSError:
@@ -857,6 +858,7 @@ class CcsEditor(Gtk.Window):
 
         sourceview = self.create_textview(filename)
         self.editor_notebook.append_page(sourceview, hbox)
+        self.editor_notebook.set_tab_reorderable(sourceview, True)
 
         button.connect("clicked", self._notebook_close_tab, sourceview)
 
@@ -1452,11 +1454,29 @@ class CcsEditor(Gtk.Window):
         about_button.connect("clicked", self._on_select_about_dialog)
         vbox.pack_start(about_button, True, True, 10)
 
+        # Add the close modules button
+        kill_button = Gtk.Button.new_with_label('Close modules')
+        kill_button.connect("clicked", self._close_modules_cmd)
+        vbox.pack_start(kill_button, True, True, 0)
+
         self.popover.add(vbox)
         self.popover.set_position(Gtk.PositionType.BOTTOM)
         self.popover.set_relative_to(univie_button)
 
         return univie_box
+
+    def _close_modules_cmd(self, *args):
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES,)
+        dialog.set_markup('<b>Close all modules?</b>')
+        response = dialog.run()
+        if response == Gtk.ResponseType.YES:
+            dialog.destroy()
+        else:
+            dialog.destroy()
+            return
+
+        self._to_console('cfl._close_modules()')
 
     def on_univie_button(self, action):
         """

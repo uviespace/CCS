@@ -1757,6 +1757,49 @@ def get_module_handle(module_name, instance=1, timeout=5):
         return False
 
 
+def _get_ccs_dbus_names(exclude=None):
+    if exclude is None:
+        exclude = []
+
+    dbus_names = dbus.SessionBus().list_names()
+    ccs_names = [cfg['ccs-dbus_names'][mod] for mod in cfg['ccs-dbus_names'] if mod not in exclude]
+    ccs_modules = [mod for mod in dbus_names if mod.startswith(tuple(ccs_names))]
+
+    return ccs_modules
+
+
+def _quit_module(module_name, instance=1):
+    mod = get_module_handle(module_name, instance=instance)
+
+    if not mod:
+        logger.error('{}{} not found on DBus').format(module_name, instance)
+        return False
+
+    try:
+        mod.Functions('quit_func')
+        return True
+    except Exception as err:
+        logger.exception(err)
+        return False
+
+
+def _close_modules():
+    dbus_names = _get_ccs_dbus_names(exclude=['editor'])
+    while dbus_names:
+        print(dbus_names)
+        for module in dbus_names:
+            _, name, iid = module.split('.')
+            success = _quit_module(name, int(iid.replace('communication', '')))
+            if success:
+                logger.info('Closed {}'.format(module))
+            else:
+                logger.error('Could not close {}'.format(module))
+
+        dbus_names = _get_ccs_dbus_names(exclude=['editor'])
+
+    logger.info('Closed all modules')
+
+
 def connect(pool_name, host, port, protocol='PUS', is_server=False, timeout=10, delete_abandoned=False, try_delete=True,
             pckt_filter=None, options='', drop_rx=False, drop_tx=False):
     """
