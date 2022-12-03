@@ -228,7 +228,19 @@ class CcsEditor(Gtk.Window):
         self.connect("delete-event", self.quit_func)
         # self.connect("delete-event", self.tcpserver_shutdown)
         self.connect('key-press-event', self.key_pressed)
+
+        # self._apply_css(cssfile='style.css')
         self.show_all()
+
+    def _apply_css(self, cssfile=None, data=None):
+        style_provider = Gtk.CssProvider()
+        if data is not None:
+            style_provider.load_from_data(data)
+        if cssfile is not None:
+            style_provider.load_from_path(cssfile)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),
+                                                 style_provider,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def timeout(self, sec):
         print(self.cfg['ccs-database']['commit_interval'])
@@ -1372,8 +1384,7 @@ class CcsEditor(Gtk.Window):
         textview.set_properties(show_line_numbers=True)
         textview.set_properties(auto_indent=True)
         # textview.set_properties(highlight_current_line = True)
-        # textview.set_properties(monospace = True)
-        textview.modify_font(Pango.FontDescription('monospace 10'))
+        textview.set_properties(monospace=True)
         textview.set_properties(tab_width=4)
         textview.set_show_line_marks(True)
         textview.connect('line-mark-activated', self.line_mark_activated)
@@ -1391,7 +1402,7 @@ class CcsEditor(Gtk.Window):
                                            GtkSource.SpaceTypeFlags.NEWLINE)
             drawer.set_enable_matrix(True)
 
-        textview.modify_font(Pango.FontDescription('monospace ' + str(self.cfg['ccs-editor']['font_size'])))
+        self._apply_css(data='grid textview {{font-size :{}pt}}'.format(self.cfg['ccs-editor']['font_size']).encode())
 
         textview.set_mark_attributes("play", self.mark_play, 1)
         textview.set_mark_attributes("break", self.mark_break, 2)
