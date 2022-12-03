@@ -2608,6 +2608,21 @@ def run():
     Gtk.main()
 
 
+def _start_new_pmgr(*args):
+    dialog = Gtk.MessageDialog()
+    dialog.add_buttons(Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES,)
+    dialog.set_title('Poolmanager')
+    dialog.set_markup('A poolmanager instance is already running. Start another one?')
+    response = dialog.run()
+
+    if response == Gtk.ResponseType.YES:
+        dialog.destroy()
+        return True
+    else:
+        dialog.destroy()
+        return False
+
+
 if __name__ == "__main__":
 
     # Important to tell Dbus that Gtk loop can be used before the first dbus command
@@ -2621,6 +2636,12 @@ if __name__ == "__main__":
     # Check all dbus connections to find all running poolmanagers
     for service in dbus.SessionBus().list_names():
         if service.startswith(cfg['ccs-dbus_names']['poolmanager']):
+
+            # ask if new pmgr should be started if one is already running
+            start_new = _start_new_pmgr()
+            if not start_new:
+                sys.exit()
+
             managers.append(service)
             break
 
