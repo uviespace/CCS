@@ -1,6 +1,6 @@
-.PHONY: confignator ccs-storage codeblockreusefeature install-testlib python-requirements db-user database-dev-env databases
+.PHONY: confignator ccs-storage codeblockreusefeature install-testlib python-requirements db-user database-dev-env databases startmenu-entries
 
-install: python-requirements confignator ccs-storage codeblockreusefeature
+install: python-requirements confignator ccs-storage codeblockreusefeature startmenu-entries
 
 databases: ccs-storage codeblockreusefeature
 
@@ -66,6 +66,18 @@ install-testlib:
 	    $(MAKE) all -C $(CURDIR)/Tst/testing_library
 	@echo "+----------------------------------+"
 	@echo "| installed testlib Python package |"
+	@echo "+----------------------------------+"
+	@echo
+
+startmenu-entries:
+	@echo "+-----------------------------------+"
+	@echo "| creating application menu entries |"
+	@echo "+-----------------------------------+"
+	    ./gen_desktop_files.sh $(CURDIR)
+	    mv ccs.desktop $(HOME)/.local/share/applications/
+	    mv tst.desktop $(HOME)/.local/share/applications/
+	@echo "+----------------------------------+"
+	@echo "| created application menu entries |"
 	@echo "+----------------------------------+"
 	@echo
 
