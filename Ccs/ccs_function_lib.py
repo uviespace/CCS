@@ -715,7 +715,7 @@ def Tmdata(tm, udef=False):
             tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         elif params is not None:
-            # Length of a parameter which should be decoded acording to given position
+            # Length of a parameter which should be decoded according to given position
             if len(params[0]) == 9:
                 vals_params = decode_pus(data, params)
             # Decode according to given order, length is then 11
@@ -790,15 +790,15 @@ def read_stream(stream, fmt, pos=None, offbi=0):
     if pos is not None:
         stream.seek(int(pos))
 
-    data = stream.read(csize(fmt, offbi))
+    readsize = csize(fmt, offbi)
+    data = stream.read(readsize)
+
     if not data:
         raise BufferError('No data left to read from [{}]!'.format(fmt))
 
     if fmt == 'I24':
-        # x = struct.unpack('>I', b'\x00' + data)[0]
         x = int.from_bytes(data, 'big')
     elif fmt == 'i24':
-        # x = struct.unpack('>i', data + b'\x00')[0] >> 8
         x = int.from_bytes(data, 'big', signed=True)
     # for bit-sized unsigned parameters:
     elif fmt.startswith('uint'):
@@ -1200,7 +1200,7 @@ def read_variable_pckt(tm_data, parameters):
     return result
 
 
-def read_stream_recursive(tms, parameters, decoded=None):
+def read_stream_recursive(tms, parameters, decoded=None, bit_off=0):
     """
     Recursively operating function for decoding variable length packets
     :param tms:
@@ -1224,23 +1224,29 @@ def read_stream_recursive(tms, parameters, decoded=None):
         fmt = ptt(par[2], par[3])
         if fmt == 'deduced':
             raise NotImplementedError('Deduced parameter type PTC=11')
-            # if 'ptype' in locals():
-            #     fmt = ptype_values[ptype]
-            # else:
-            #     # print('No format deduced for parameter, aborting.')
-            #     logger.warning('No format deduced for parameter, aborting.')
-            #     return decoded
-        value = read_stream(tms, fmt)
 
-        if par[0] in ptype_parameters:
-            ptype = value
+        fixrep = par[-1]
 
-        decoded.append((value, par))
+        if grp and fixrep:
+            value = fixrep
+            logger.debug('{} with fixrep={} used'.format(par[1], value))
+        else:
+            bits = par[5]
+            unaligned = bits % 8
+
+            value = read_stream(tms, fmt, offbi=bit_off)
+
+            bit_off = (bit_off + unaligned) % 8
+            if bit_off:
+                tms.seek(tms.tell() - 1)
+
+            decoded.append((value, par))
+
         if grp != 0:
             skip = grp
             rep = value
             while rep > 0:
-                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded)
+                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off)
                 rep -= 1
 
     return decoded

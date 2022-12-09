@@ -1432,7 +1432,7 @@ class CcsEditor(Gtk.Window):
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(pixmap_folder, 'Icon_Space_blau_en.png'), 48, 48)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
-        univie_button.set_tooltip_text('Applications and About')
+        univie_button.set_tooltip_text('Application Drawer')
         univie_button.connect("clicked", self.on_univie_button)
         univie_box.add(univie_button)
 
