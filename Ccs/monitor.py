@@ -1006,7 +1006,11 @@ class MonitorSetupDialog(Gtk.Dialog):
         self.useriter = parameter_model.append(None, ['UDEF packets', None])
         for userpacket in udpkts:
             st, sst, apid, sid = map(cfl.str_to_int, userpacket.split('-'))
-            sid_off, sid_bitlen = cfl.get_sid(st, sst, apid)
+            sidinfo = cfl.get_sid(st, sst, apid)
+            if sidinfo is None:
+                self.logger.error('UDEF packet {} not compatible with SID definitions'.format(userpacket))
+                continue
+            sid_off, sid_bitlen = sidinfo
             pktdef = json.loads(udpkts[userpacket])
             pktiter = parameter_model.append(self.useriter, [pktdef[0], None])
             for userpar in pktdef[1]:
@@ -1064,7 +1068,11 @@ class MonitorSetupDialog(Gtk.Dialog):
                 pnames = {eval(par)[0]: par for par in slots}
 
                 for par in pnames:
-                    self.slots[i][3].append([par.split(':')[1], pnames[par]])
+                    try:
+                        self.slots[i][3].append([par.split(':')[1], pnames[par]])
+                    except Exception as err:
+                        self.logger.error('Incompatible parameter {} in set {}'.format(par, entry))
+                        continue
             dbcon.close()
 
         else:

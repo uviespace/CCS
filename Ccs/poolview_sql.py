@@ -2476,7 +2476,7 @@ class TMPoolView(Gtk.Window):
 
         box = Gtk.HBox()
 
-        name = Gtk.Label(decoder_name.get_active_text())
+        name = Gtk.Label(label=decoder_name.get_active_text())
         name.set_tooltip_text('bytes {}-{}'.format(bytepos, bytepos + bytelen - 1))
         hexa = Gtk.Label()
         uint = Gtk.Label()
