@@ -169,8 +169,12 @@ class CcsEditor(Gtk.Window):
         menubar = self.create_menus()
         self.grid.attach(menubar, 0, 0, 3, 1)
 
+        toolbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         toolbar = self.create_toolbar()
-        self.grid.attach(toolbar, 0, 1, 2, 1)
+        toolbox.pack_start(toolbar, 1, 1, 0)
+        self.univie_box = self.create_univie_box()
+        toolbox.pack_end(self.univie_box, 0, 0, 0)
+        self.grid.attach(toolbox, 0, 1, 3, 1)
 
         self.search_context = None
         self.editor_notebook = Gtk.Notebook()
@@ -179,9 +183,6 @@ class CcsEditor(Gtk.Window):
 
         self.searchbar = self.create_searchbar()
         self.grid.attach(self.searchbar, 0, 2, 3, 1)
-
-        self.univie_box = self.create_univie_box()
-        self.grid.attach(self.univie_box, 2, 1, 1, 1)
 
         self.sourcemarks = {}
         self.create_mark_attributes()
@@ -1110,8 +1111,6 @@ class CcsEditor(Gtk.Window):
         # button_reload_config.connect("clicked", self.reload_config)
         # toolbar.add(button_reload_config)
 
-        toolbar.add(Gtk.SeparatorToolItem())
-
         return toolbar
 
     def create_action_buttons(self, toolbar, targets, nbutt=10):
@@ -1426,7 +1425,7 @@ class CcsEditor(Gtk.Window):
         manage communication
         :return:
         """
-        univie_box = Gtk.HBox()
+        univie_box = Gtk.Toolbar()
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(pixmap_folder, 'Icon_Space_blau_en.png'), 48, 48)

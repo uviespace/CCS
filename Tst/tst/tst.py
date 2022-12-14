@@ -331,6 +331,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         # add the notebook for the test specifications
         self.notebook = Gtk.Notebook()
+        self.notebook.set_scrollable(True)
         self.notebook.connect('switch-page', self.update_model_viewer)
         self.work_desk.pack1(self.notebook)
 
@@ -482,6 +483,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
             label_text = 'New test'
         label = self.notebook_page_label(label_text=label_text)
         page_index = self.notebook.append_page(child=test_instance.view, tab_label=label)
+        self.notebook.set_tab_reorderable(test_instance.view, True)
+
         # reload the data of the widgets, in order to display it
         test_instance.view.update_widget_data()
         self.show_all()
@@ -493,10 +496,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
         label = Gtk.Label()
         label.set_text(label_text)
         btn_close = Gtk.Button.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
-        btn_close.set_tooltip_text('Close')
+        btn_close.set_tooltip_text('close')
+        btn_close.set_relief(Gtk.ReliefStyle.NONE)
         btn_close.connect('clicked', self.on_close_clicked)
         box.pack_start(label, True, True, 0)
-        box.pack_start(btn_close, True, True, 0)
+        box.pack_start(btn_close, True, True, 3)
         box.show_all()
         return box
 
