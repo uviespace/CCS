@@ -127,3 +127,7 @@
 .highlight-2 {
     border-color: orange;
 }
+
+.text-view {
+    padding: 3px;
+}
