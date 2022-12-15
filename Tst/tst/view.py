@@ -76,7 +76,7 @@ class Board(Gtk.Box):
         * a instance of a grid is added
         * drag and drop is set up
         """
-        #assert isinstance(model, data_model.TestSpecification)
+        # assert isinstance(model, data_model.TestSpecification)
         self.model = model
         self.app = app
         self._filename = filename
@@ -86,7 +86,8 @@ class Board(Gtk.Box):
         # Save Button in TST clicked for first time, Always do save_as to not overwrite something, used in tst.py
         self._ask_overwrite = True
 
-        Gtk.Box.__init__(self)
+        # Gtk.Box.__init__(self)
+        super(Board, self).__init__()
         self.set_orientation(Gtk.Orientation.VERTICAL)
 
         # test meta data
@@ -247,6 +248,8 @@ class Board(Gtk.Box):
         self.test_meta_data_iasw_version.connect('changed', self.on_test_iasw_version_change)
         self.text_meta_data_test_is_locked.connect('toggled', self.on_test_locked_toggled)
         self.test_meta_data_comment.get_buffer().connect('changed', self.on_comment_change)
+
+        Gtk.StyleContext.add_class(self.get_style_context(), 'board')
 
     @property
     def test_is_locked(self):
@@ -1662,8 +1665,8 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.section_dict = db_interaction.get_pre_post_con(None)
 
     def view(self):
-        self.main_box = Gtk.Box()
-        self.main_box.set_orientation(Gtk.Orientation.VERTICAL)
+        # self.main_box = Gtk.Box()
+        # self.main_box.set_orientation(Gtk.Orientation.VERTICAL)
 
         self.selection_box = Gtk.Box()
         self.selection_box.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -1688,13 +1691,18 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.selection_box.pack_start(self.delete_button, False, True, 0)
 
         box = self.get_content_area()
-        box.pack_start(self.selection_box, False, True, 0)
+        # Gtk.StyleContext.add_class(box.get_style_context(), 'cond-dialog')
+        # box.set_margin_top(5)
+        # box.set_margin_bottom(5)
+        # box.set_margin_left(5)
+        # box.set_margin_right(5)
+        box.pack_start(self.selection_box, False, True, 3)
         box.pack_start(self.descr_lbl_box, False, False, 0)
         box.pack_start(self.descr_scrolled_window, False, False, 0)
         box.pack_start(self.con_lbl_box, False, False, 0)
         box.pack_start(self.con_scrolled_window, True, True, 0)
-        #box.add(self.selection_box)
-        #box.pack_end(self.scrolled_window, True, True, 0)
+        # box.add(self.selection_box)
+        # box.pack_end(self.scrolled_window, True, True, 0)
 
     def make_con_sections_model(self):
         for condition in self.section_dict:
@@ -1752,7 +1760,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         # Label in a Box to have it on the left boarder
         self.descr_lbl_box = Gtk.HBox()
         descr_lbl = Gtk.Label()
-        descr_lbl.set_text('Description: ')
+        descr_lbl.set_text('Description')
         self.descr_lbl_box.pack_start(descr_lbl, False, False, 0)
 
         # a scrollbar for the child widget (that is going to be the textview)
@@ -1776,7 +1784,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         # Label in a Box to have it on the left boarder
         self.con_lbl_box = Gtk.HBox()
         con_lbl = Gtk.Label()
-        con_lbl.set_text('Condition: ')
+        con_lbl.set_text('Condition')
         self.con_lbl_box.pack_start(con_lbl, False, False, 0)
 
         self.con_scrolled_window = Gtk.ScrolledWindow()
@@ -1793,12 +1801,3 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.con_buffer.set_language(lngg)
         # self.commands_buffer.set_style_scheme(self.board.current_scheme)
         self.con_scrolled_window.add(self.con_view)
-
-        #box = self.get_content_area()
-        #box.add(self.selection_box)
-
-        return
-
-
-
-
