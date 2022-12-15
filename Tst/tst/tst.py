@@ -200,7 +200,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.product_paths = []
 
         # actions
-        action = Gio.SimpleAction.new('make_new_test', None)
+        action = Gio.SimpleAction.new('makenewtest', None)
         action.connect('activate', self.on_new_test)
         self.add_action(action)
 
@@ -212,7 +212,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action.connect('activate', self.on_save)
         self.add_action(action)
 
-        action = Gio.SimpleAction.new('save_as', None)
+        action = Gio.SimpleAction.new('saveas', None)
         action.connect('activate', self.on_save_as)
         self.add_action(action)
 
@@ -264,10 +264,19 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_save.set_icon_name('document-save')
         self.btn_save.set_tooltip_text('Save')
         self.btn_save.connect('clicked', self.on_save)
+        self.btn_save_as = Gtk.ToolButton()
+        self.btn_save_as.set_icon_name('document-save-as')
+        self.btn_save_as.set_tooltip_text('Save as')
+        self.btn_save_as.connect('clicked', self.on_save_as)
         # self.btn_show_model_viewer = Gtk.ToolButton()
         # self.btn_show_model_viewer.set_icon_name('accessories-dictionary-symbolic')
         # self.btn_show_model_viewer.set_tooltip_text('Show/hide model viewer')
         # self.btn_show_model_viewer.connect('clicked', self.model_viewer_toggle_hide)
+        self.btn_export_csv = Gtk.ToolButton()
+        self.btn_export_csv.set_label('Export to CSV')
+        self.btn_export_csv.set_icon_name('text-csv')
+        self.btn_export_csv.set_tooltip_text('Export current spec to CSV')
+        self.btn_export_csv.connect('clicked', self.on_generate_csv)
         self.btn_generate_products = Gtk.ToolButton()
         self.btn_generate_products.set_label('Generate scripts')
         self.btn_generate_products.set_icon_name('text-x-python')
@@ -293,10 +302,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_new_file, 0)
         self.toolbar.insert(self.btn_open_file, 1)
         self.toolbar.insert(self.btn_save, 2)
+        self.toolbar.insert(self.btn_save_as, 3)
         # self.toolbar.insert(self.btn_show_model_viewer, 2)
-        self.toolbar.insert(self.btn_generate_products, 3)
-        self.toolbar.insert(self.btn_start_ccs_editor, 4)
-        self.toolbar.insert(self.btn_open_progress_view, 5)
+        self.toolbar.insert(self.btn_export_csv, 4)
+        self.toolbar.insert(self.btn_generate_products, 5)
+        self.toolbar.insert(self.btn_start_ccs_editor, 6)
+        self.toolbar.insert(self.btn_open_progress_view, 7)
         
         # IDB chooser
         self.idb_chooser = Gtk.ToolButton()
@@ -306,12 +317,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.idb_chooser.set_label_widget(label)
         self.idb_chooser.set_tooltip_text('Select IDB')
         self.idb_chooser.connect('clicked', self.on_set_idb_version)
-        self.toolbar.insert(self.idb_chooser, 6)
+        self.toolbar.insert(self.idb_chooser, 8)
 
         # separator
         sepa = Gtk.SeparatorToolItem()
         sepa.set_expand(True)
-        self.toolbar.insert(sepa, 7)
+        self.toolbar.insert(sepa, 9)
 
         # logo
         self.unilogo = Gtk.ToolButton()
@@ -320,7 +331,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.unilogo.set_icon_widget(icon)
         self.unilogo.connect('clicked', self.on_about)
-        self.toolbar.insert(self.unilogo, 8)
+        self.toolbar.insert(self.unilogo, 10)
         self.box.pack_start(self.toolbar, False, True, 0)
         
         self.info_bar = None
@@ -646,6 +657,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
     def save_as_file_dialog(self):
         current_test = self.current_test_instance()
+
+        if current_test is None:
+            return
+
         current_name = self.current_model().name
         current_model = self.current_model()
         dialog = Gtk.FileChooserDialog('Please choose a file',
@@ -889,16 +904,18 @@ class TstAppWindow(Gtk.ApplicationWindow):
         outfile_basic = '{}-TS-{}.py'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
+        dialog.set_do_overwrite_confirmation(True)
 
         response = dialog.run()
-        while response == Gtk.ResponseType.OK:
-            if os.path.exists(dialog.get_filename()):
-                if not self.existing_file_dialog(dialog.get_filename()):
-                    response = dialog.run()
-                    continue
+        if response == Gtk.ResponseType.OK:
+            # while response == Gtk.ResponseType.OK:
+            #     if os.path.exists(dialog.get_filename()):
+            #         if not self.existing_file_dialog(dialog.get_filename()):
+            #             response = dialog.run()
+            #             continue
             json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename())
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
-            break
+            # break
 
         dialog.destroy()
         return
@@ -925,16 +942,18 @@ class TstAppWindow(Gtk.ApplicationWindow):
         outfile_basic = '{}-TS-{}.csv_PIPE'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
+        dialog.set_do_overwrite_confirmation(True)
 
         response = dialog.run()
-        while response == Gtk.ResponseType.OK:
-            if os.path.exists(dialog.get_filename()):
-                if not self.existing_file_dialog(dialog.get_filename()):
-                    response = dialog.run()
-                    continue
+        if response == Gtk.ResponseType.OK:
+            # while response == Gtk.ResponseType.OK:
+            #     if os.path.exists(dialog.get_filename()):
+            #         if not self.existing_file_dialog(dialog.get_filename()):
+            #             response = dialog.run()
+            #             continue
             json_to_csv.run(current_model.encode_to_json(), dialog.get_filename())
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
-            break
+            # break
 
         dialog.destroy()
         return

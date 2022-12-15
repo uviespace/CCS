@@ -6,7 +6,8 @@
             <section>
                 <item>
                     <attribute name="label" translatable="yes">New</attribute>
-                    <attribute name="action">win.make_new_test</attribute>
+                    <attribute name="action">win.makenewtest</attribute>
+                    <attribute name="accel">&lt;Primary&gt;n</attribute>
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Open</attribute>
@@ -20,7 +21,8 @@
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Save as</attribute>
-                    <attribute name="action">win.save_as</attribute>
+                    <attribute name="action">win.saveas</attribute>
+                    <attribute name="accel">&lt;Shift&gt;&lt;Primary&gt;s</attribute>
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Import CSV</attribute>
