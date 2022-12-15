@@ -620,6 +620,7 @@ class CcsEditor(Gtk.Window):
 
         action = Gtk.Action(name="FileSaveAs", label="_Save As", tooltip=None, stock_id=Gtk.STOCK_SAVE_AS)
         action.connect("activate", self.on_menu_file_saveas)
+        action_group.add_action_with_accel(action, "<control><shift>S")
         action_group.add_action(action)
 
         action = Gtk.Action(name="FileQuit", label="_Quit", tooltip=None, stock_id=Gtk.STOCK_QUIT)
