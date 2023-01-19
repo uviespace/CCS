@@ -657,7 +657,7 @@ class CcsEditor(Gtk.Window):
 
         action = Gtk.Action(name="EditComment", label="Comment Lines", tooltip=None)
         action.connect("activate", self._on_comment_lines)
-        action_group.add_action_with_accel(action, "<control>B")
+        action_group.add_action_with_accel(action, "<control>T")
 
         action = Gtk.Action(name="EditPreferences", label="Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
         action.connect("activate", cfl.start_config_editor)
