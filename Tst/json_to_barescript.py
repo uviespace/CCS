@@ -32,7 +32,7 @@ def run(jfile, outfile):
     script += '# Software Version: ' + data['_iasw_version'] + '\n'
     script += '# Author: UVIE\n# Date: {}\n'.format(date)
     script += '#--------------------------------------------\n\n'
-    script += '# COMMENT: {}\n\n\n'.format(data['_comment'])
+    script += '# COMMENT: {}\n\n\n'.format(data['_comment'].replace('\n', '\n# '))
 
     script += '# Precond.\n# {}\n'.format(data['_precon_descr'])
     # script += '{}\n\n\n'.format(data['_precon_code'].strip())  # Add the precondition code
