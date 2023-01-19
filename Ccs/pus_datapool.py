@@ -30,6 +30,7 @@ from typing import NamedTuple
 from collections import deque
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker, FEEDataTelemetry, RMapTelemetry
 import importlib
+from sqlalchemy.exc import OperationalError as SQLOperationalError
 
 
 cfg = confignator.get_config(check_interpolation=False)
@@ -665,12 +666,13 @@ class DatapoolManager:
         #     start_new = True
 
         new_session = self.session_factory_storage
+        creation_time = round(time.time())
 
         # If no TC Pool has been started start new one
         if start_new:
             pool_row = DbTelemetryPool(
                 pool_name=pool_name,
-                modification_time=time.time(),
+                modification_time=creation_time,
                 protocol=protocol)
             new_session.add(pool_row)
             # new_session.flush()
@@ -825,6 +827,11 @@ class DatapoolManager:
                 self.logger.debug('Socket timeout ({}:{})'.format(host, port))
                 new_session.commit()
                 continue
+            except SQLOperationalError as e:
+                self.logger.warning(e)
+                new_session.close()
+                pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name,
+                                                                     DbTelemetryPool.modification_time == creation_time).first()
             except socket.error as e:
                 self.logger.error('Socket error ({}:{})'.format(host, port))
                 self.logger.exception(e)
@@ -834,6 +841,10 @@ class DatapoolManager:
             except struct.error as e:
                 self.logger.error('Lost connection to {}:{}'.format(host, port))
                 self.logger.exception(e)
+                self.connections[pool_name]['recording'] = False
+                break
+            except Exception as e:
+                self.logger.error(e)
                 self.connections[pool_name]['recording'] = False
                 break
         # if self.state[pool_row.pool_name] % 10 != 0:
@@ -968,7 +979,7 @@ class DatapoolManager:
                 with self.lock:
                     self.databuflen += len(buf)
             except socket.timeout:
-                self.logger.info('Socket timeout {}:{} [TC RX]'.format(host, port))
+                self.logger.debug('Socket timeout {}:{} [TC RX]'.format(host, port))
                 continue
             except socket.error:
                 self.logger.error('Socket error')
