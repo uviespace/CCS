@@ -1567,7 +1567,7 @@ def get_cuctime(tml):
 
 
 def get_pool_rows(pool_name, check_existence=False):
-    dbcon = scoped_session_storage
+    dbcon = scoped_session_storage()
 
     if check_existence:
         check = dbcon.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name)
@@ -1597,7 +1597,7 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
     if tmlist is None and pool_name is not None:
         tmlist = get_pool_rows(pool_name, check_existence=True)
 
-    dbcon = scoped_session_idb
+    dbcon = scoped_session_idb()
     if hk is None:
         que = 'SELECT plf.plf_name,plf.plf_spid,plf.plf_offby,plf.plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_unit,\
                    pcf.pcf_descr,pid.pid_apid,pid.pid_type,pid.pid_stype,pid.pid_descr,pid.pid_pi1_val from pcf\
@@ -1932,7 +1932,11 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     # params = dbcon.execute(que).fetchall()
     # dbcon.close()
 
-    params = _get_tc_params(cmd)
+    try:
+        params = _get_tc_params(cmd)
+    except SQLOperationalError:
+        scoped_session_idb.close()
+        params = _get_tc_params(cmd)
 
     try:
         st, sst, apid, npars = params[0][:4]
@@ -2026,9 +2030,8 @@ def _get_tc_params(cmd, paf_cal=False):
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
               'WHERE BINARY ccf_descr="%s"' % cmd
 
-    dbcon = scoped_session_idb
-    params = dbcon.execute(que).fetchall()
-    dbcon.close()
+    params = scoped_session_idb.execute(que).fetchall()
+    scoped_session_idb.close()
     return params
 
 
@@ -2528,7 +2531,7 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
     # More specific Logging format that is compatible with the TST
     log_dict = dict([('st', st),('sst', sst),('ssc', ssc),('apid', apid),('timestamp', t)])
     json_string = '{} {}'.format('#SENT TC', json.dumps(log_dict))
-    logger.info(json_string)
+    logger.debug(json_string)
     # time.sleep(sleep)
     return apid, ssc, t
 
@@ -2630,7 +2633,7 @@ def Tcsend_bytes(tc_bytes, pool_name='LIVE', pmgr_handle=None):
     try:
         pmgr.Functions('tc_send', pool_name, tc_bytes, signature='ssay')
         return True
-    except dbus.DBusException:
+    except (dbus.DBusException, AttributeError):
         logger.error('Failed to send packet of length {} to {}!'.format(len(tc_bytes), pool_name))
         return False
     # logger.debug(msg)

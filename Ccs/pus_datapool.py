@@ -58,6 +58,8 @@ PLM_PKT_PREFIX_TC = packet_config.PLM_PKT_PREFIX_TC
 PLM_PKT_PREFIX_TC_SEND = packet_config.PLM_PKT_PREFIX_TC_SEND
 PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
 
+SOCK_TO_LIMIT = 900  # number of tm_recv socket timeouts before SQL session reconnect
+
 communication = {}
 for name in cfg['ccs-dbus_names']:
     communication[name] = 0
@@ -665,7 +667,8 @@ class DatapoolManager:
         # if not pool_name in self.state:
         #     start_new = True
 
-        new_session = self.session_factory_storage
+        new_session = self.session_factory_storage()
+        _tocnt = 0  # timeout counter
         creation_time = round(time.time())
 
         # If no TC Pool has been started start new one
@@ -675,7 +678,6 @@ class DatapoolManager:
                 modification_time=creation_time,
                 protocol=protocol)
             new_session.add(pool_row)
-            # new_session.flush()
             new_session.commit()
             self.trashbytes[pool_name] = 0
             self.state[pool_name] = 1
@@ -807,11 +809,9 @@ class DatapoolManager:
                             tail = b''
                     pkt_size_stream = tail
 
-                # buf = sockfd.recv(self.pckt_size_max)
                 if not buf:
                     break
-                with self.lock:
-                    self.databuflen += len(buf)
+
                 if not drop_rx:
                     if pckt_filter:
                         for pkt in self.extract_pus(buf):
@@ -823,33 +823,44 @@ class DatapoolManager:
                                                                                 checkcrc=False)
                     else:
                         self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=False)
+
+                    _tocnt = 0
+
+                with self.lock:
+                    self.databuflen += len(buf)
+
             except socket.timeout as e:
                 self.logger.debug('Socket timeout ({}:{})'.format(host, port))
+                # reconnect SQL session handle after x socket timeouts to avoid SQL timeout
+                _tocnt += 1
                 new_session.commit()
-                continue
+                if _tocnt > SOCK_TO_LIMIT:
+                    new_session.close()
+                    pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name,
+                                                                         DbTelemetryPool.modification_time == creation_time).first()
+                    self.logger.debug('SQL session reconnected, SOCK_SQL_TO_LIMIT reached ({})'.format(SOCK_TO_LIMIT))
+                    _tocnt = 0
             except SQLOperationalError as e:
                 self.logger.warning(e)
                 new_session.close()
                 pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name,
                                                                      DbTelemetryPool.modification_time == creation_time).first()
+                pkt_size_stream = buf + pkt_size_stream  # re-read buffer in next loop since DB insertion has failed
             except socket.error as e:
                 self.logger.error('Socket error ({}:{})'.format(host, port))
                 self.logger.exception(e)
-                # self.logger.error('ERROR: socket error')
-                self.connections[pool_name]['recording'] = False
                 break
             except struct.error as e:
                 self.logger.error('Lost connection to {}:{}'.format(host, port))
                 self.logger.exception(e)
-                self.connections[pool_name]['recording'] = False
                 break
             except Exception as e:
-                self.logger.error(e)
-                self.connections[pool_name]['recording'] = False
+                self.logger.exception(e)
                 break
-        # if self.state[pool_row.pool_name] % 10 != 0:
+
         new_session.commit()
         new_session.close()
+        self.connections[pool_name]['recording'] = False
         self.logger.warning('Disconnected from ' + str(host) + ':' + str(port))
         sockfd.close()
 
@@ -1015,7 +1026,7 @@ class DatapoolManager:
             return
         # self.logger.debug('tc_send: tc_connections = {}'.format(self.tc_connections))
 
-        new_session = self.session_factory_storage
+        new_session = self.session_factory_storage()
         pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
 
         # TC normally just take the information which pool it is from the first Row, But if a Pool is given with only
