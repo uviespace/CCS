@@ -27,6 +27,8 @@ from s2k_partypes import ptt, ptt_reverse, ptype_parameters, ptype_values
 import confignator
 import importlib
 
+import decompression
+
 
 cfg = confignator.get_config(check_interpolation=False)
 
