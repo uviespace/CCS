@@ -1042,6 +1042,13 @@ def Tcdata(tm):
     dbcon.close()
     tcnames = list({x[1] for x in params})
 
+    # return if no TC can be unambiguously assigned
+    _npars = {x[4] for x in params}
+    if len(tcnames) and len(_npars) > 1:
+        tcdata = None
+        tcnames.append("\n\nAmbiguous packet type - cannot decode.")
+        return tcdata, tcnames
+
     # select one parameter set if IFSW and DBS have entry
     if len(tcnames) > 1:
         params = params[::len(tcnames)]
