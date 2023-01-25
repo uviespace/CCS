@@ -117,7 +117,8 @@ class TMPoolView(Gtk.Window):
 
         self.refresh_treeview_active = False
         self.cnt = 0
-        self.active_pool_info = ActivePoolInfo(None, None, None, None)
+        # self.active_pool_info = ActivePoolInfo(None, None, None, None)
+        self.active_pool_info = ActivePoolInfo('', 0, '', False)
         self.set_border_width(2)
         self.set_resizable(True)
         self.set_default_size(1150, 1280)
@@ -575,7 +576,7 @@ class TMPoolView(Gtk.Window):
         self.adj = scrollbar.get_adjustment()
         # get size of tmpool
 
-        if self.active_pool_info.pool_name is not None:
+        if self.active_pool_info.pool_name not in (None, ''):
             self.adj.set_upper(self.count_current_pool_rows())
         self.adj.set_page_size(25)
         scrollbar.connect('value_changed', self._on_scrollbar_changed, self.adj, False)

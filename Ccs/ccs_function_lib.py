@@ -27,8 +27,6 @@ from s2k_partypes import ptt, ptt_reverse, ptype_parameters, ptype_values
 import confignator
 import importlib
 
-import decompression
-
 
 cfg = confignator.get_config(check_interpolation=False)
 
@@ -4583,11 +4581,11 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
                sdu=None, verbose=True):
 
     if not os.path.isfile(pool_name):
-        logger.info('{} is not a file, looking it up in DB')
+        logger.debug('{} is not a file, looking it up in DB')
         # try fetching pool info from pools opened in viewer
-        pname = _get_displayed_pool_path(pool_name)
-        if pname:
-            pool_name = pname
+        # pname = _get_displayed_pool_path(pool_name)
+        # if pname:
+        #     pool_name = pname
 
     rows = get_pool_rows(pool_name, check_existence=True)
 
@@ -4732,7 +4730,8 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     filedict = {}
     ldt_dict = collect_13(pool_name, starttime=starttime, endtime=endtime, join=True, collect_all=dump_all,
                           startidx=startidx, endidx=endidx, sdu=sdu, verbose=verbose)
-    n_ldt = len(ldt_dict)
+
+    ldt_cnt = 0
     for i, buf in enumerate(ldt_dict, 1):
         if ldt_dict[buf] is None:
             continue
@@ -4748,9 +4747,12 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
         with open(fname, "wb") as fdesc:
             fdesc.write(ldt_dict[buf])
             filedict[buf] = fdesc.name
+            ldt_cnt += 1
 
-    logger.info('Dumped {} CEs to {}'.format(n_ldt, outdir))
-    print('Dumped {} CEs to {}'.format(n_ldt, outdir))
+    if ldt_cnt != 0:
+        logger.info('Dumped {} CEs to {}'.format(ldt_cnt, outdir))
+    logger.debug('{} CEs found'.format(ldt_cnt))
+    # print('Dumped {} CEs to {}'.format(ldt_cnt, outdir))
 
     return filedict
 

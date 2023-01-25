@@ -10,8 +10,8 @@ import confignator
 import ccs_function_lib as cfl
 
 cfg = confignator.get_config(check_interpolation=False)
-logger = logging.getLogger(__name__)
-logger.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
+logger = cfl.start_logging('Decompression')
+# logger.setLevel(getattr(logging, cfg.get('ccs-logging', 'level').upper()))
 
 CE_COLLECT_TIMEOUT = 1
 LDT_MINIMUM_CE_GAP = 0.001
@@ -81,7 +81,7 @@ def ce_decompress(outdir, pool_name=None, sdu=None, starttime=None, endtime=None
     decomp = CeDecompress(outdir, pool_name=pool_name, sdu=sdu, starttime=starttime, endtime=endtime, startidx=startidx,
                           endidx=endidx, ce_exec=ce_exec)
     decomp.start()
-    ce_decompressors[int(time.time())] = decomp
+    ce_decompressors[decomp.init_time] = decomp
 
 
 def ce_decompress_stop(name=None):
@@ -104,6 +104,8 @@ class CeDecompress:
         self.endtime = endtime
         self.startidx = startidx
         self.endidx = endidx
+
+        self.init_time = int(time.time())
 
         if ce_exec is None:
             try:
@@ -137,7 +139,7 @@ class CeDecompress:
 
         try:
             thread.start()
-            logger.info('Started CeDecompress...')
+            logger.info('Started CeDecompress [{}]...'.format(self.init_time))
         except Exception as err:
             logger.error(err)
             self.ce_decompression_on = False
@@ -155,9 +157,14 @@ class CeDecompress:
             subprocess.run([self.ce_exec, cefile, fitspath], stdout=open(cefile[:-2] + 'log', 'w'))
 
         # first, get all TM13s already complete in pool
-        filedict = cfl.dump_large_data(pool_name=self.pool_name, starttime=self.last_ce_time, endtime=self.endtime,
-                                       outdir=self.outdir, dump_all=True, sdu=self.sdu, startidx=self.startidx,
-                                       endidx=self.endidx)
+        try:
+            filedict = cfl.dump_large_data(pool_name=self.pool_name, starttime=self.last_ce_time, endtime=self.endtime,
+                                           outdir=self.outdir, dump_all=True, sdu=self.sdu, startidx=self.startidx,
+                                           endidx=self.endidx)
+        except ValueError as err:
+            ce_decompressors.pop(self.init_time)
+            raise err
+
         for ce in filedict:
             self.last_ce_time = ce
             decompress(filedict[ce])
@@ -173,7 +180,8 @@ class CeDecompress:
             decompress(cefile)
             self.last_ce_time += self.ldt_minimum_ce_gap
             time.sleep(self.ce_collect_timeout)
-        logger.info('CeDecompress stopped.')
+        logger.info('CeDecompress stopped [{}].'.format(self.init_time))
+        ce_decompressors.pop(self.init_time)
 
     def start(self):
         self._ce_decompress()

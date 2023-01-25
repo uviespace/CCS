@@ -235,7 +235,7 @@ class DatapoolManager:
             # new_session.flush()
             new_session.commit()
             new_session.close()
-            self.lo('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
+            self.logger.info('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
         return
 
     def _clear_db(self):
