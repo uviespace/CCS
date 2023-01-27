@@ -254,7 +254,7 @@ class PlotViewer(Gtk.Window):
 
     def _create_navbar(self):
         # navbar = NavigationToolbarX(self.canvas, self)
-        navbar = NavigationToolbar(self.canvas, window=self)
+        navbar = NavigationToolbar(self.canvas)  # , window=self)
 
         limits = Gtk.HBox()
         self.xmin = Gtk.Entry()
@@ -485,7 +485,7 @@ class PlotViewer(Gtk.Window):
                         i += 1
                     if pool_info == tuple(found_pool):  # Check if pools match
                         x = True    # If at least one entry matches to the pool it is not necessary to add
-                    count +=1
+                    count += 1
                 if not x:   # Add a pool if it is not already in the model (liststore)
                     model.append([pool_info[0], pool_info[1], pool_info[2], pool_info[3]])
 
@@ -734,6 +734,7 @@ class PlotViewer(Gtk.Window):
             # rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > 2.)
 
         try:
+            # TODO: speedup?
             xy, (descr, unit) = cfl.get_param_values([row.raw for row in rows.yield_per(1000)], hk, parameter,
                                                      numerical=True, tmfilter=False)
             if len(xy) == 0:
@@ -1272,8 +1273,6 @@ class PlotViewer(Gtk.Window):
                                      " = dbus.SessionBus().get_object('" + str(My_Bus_Name) +
                                      "', '/MessageListener')")
 
-
-        #####
         # Get the prev loaded Pools form Viewer and Manager if none is given
         self.update_pool_view()
         self.get_prev_loaded_pools()

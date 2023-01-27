@@ -31,6 +31,8 @@ action_folder = cfg.get('ccs-paths', 'actions')
 scripts = glob.glob(os.path.join(cfg.get('paths', 'ccs'), "scripts/*.py"))
 script_actions = '\n'.join(["<menuitem action='{}' />".format(os.path.split(script)[-1][:-3]) for script in scripts])
 
+LOG_UPDT_PER = 2000  # ms
+
 UI_INFO = """
 <ui>
   <menubar name='MenuBar'>
@@ -68,6 +70,7 @@ UI_INFO = """
       <menuitem action='ActionButtons' />
       <menuitem action='ReconnectSQL' />
       <menuitem action='RestartTerminal' />
+      <menuitem action='ClearLog' />
     </menu>
     <menu action='ScriptsMenu'>
         {}    
@@ -211,9 +214,10 @@ class CcsEditor(Gtk.Window):
         self.nb.append_page(self.logwin, tab_label=Gtk.Label(label='Log', angle=270))
         self.paned.add2(self.nb)
 
-        self.log_file = None  # save the shown text from the log file tab
-        # Update the log-file view window every 2 seconds
-        GLib.timeout_add(2000, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
+        self.log_file = None
+        self.log_file_text = None  # save the shown text from the log file tab
+        # Update the log-file view window every LOG_UPDT_PER milliseconds
+        GLib.timeout_add(LOG_UPDT_PER, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
 
         self.ipython_view.connect("size-allocate", self.console_autoscroll, self.ipython_view)
 
@@ -706,6 +710,10 @@ class CcsEditor(Gtk.Window):
 
         action = Gtk.Action(name="RestartTerminal", label="_Restart Terminal", tooltip=None, stock_id=None)
         action.connect("activate", self._on_restart_terminal)
+        action_group.add_action(action)
+
+        action = Gtk.Action(name="ClearLog", label="_Clear Log", tooltip=None, stock_id=None)
+        action.connect("activate", self._on_clear_log)
         action_group.add_action(action)
 
     def create_scripts_menu(self, action_group):
@@ -1761,26 +1769,36 @@ class CcsEditor(Gtk.Window):
         filelist = glob.glob(os.path.join(self.logdir, '*.log'))
         filelist.sort(reverse=True)
         if not filelist:
-            self.logger.info('No log files to track!')
+            self.logger.warning('No log files to track!')
             return True
-        with open(filelist[0], 'r') as fd:
+        self.log_file = filelist[0]
+        with open(self.log_file, 'r') as fd:
             file = fd.read()
-        if self.log_file is None:
+        if self.log_file_text is None:
             logwin.remove(logwin.get_child())
-            buffer.set_text('CCS Applications Log ({}):\n'.format(os.path.basename(filelist[0])))
+            buffer.set_text('CCS Applications Log ({}):\n'.format(os.path.basename(self.log_file)))
             end = buffer.get_end_iter()
             buffer.insert(end, '\n')
             end = buffer.get_end_iter()
             buffer.insert(end, file)
             logwin.add(view)
         else:
-            new_text = file[len(self.log_file):]
+            new_text = file[len(self.log_file_text):]
             if new_text:
                 end = buffer.get_end_iter()
                 buffer.insert(end, new_text)
 
-        self.log_file = file
+        self.log_file_text = file
         return True
+
+    def _on_clear_log(self, *args):
+        try:
+            with open(self.log_file, 'w') as fd:
+                fd.write('{}.000: Log truncated\n'.format(time.strftime('%Y-%m-%d %H:%M:%S')))
+            self.log_file_text = None
+            self.switch_notebook_page(self.logwin, self.logwintext, self.logbuffer)
+        except Exception as err:
+            self.logger.error(err)
 
     def _on_set_style(self, widget):
         dialog = StyleChooserDialog(scheme=self.style_scheme)

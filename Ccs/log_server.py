@@ -143,7 +143,7 @@ def main():
         tcpserver.serve_until_stopped(cfg)
         logger.info('TCP-server for logging shutting down')
     # Catch exception if log_server is already running and address/port is already in use
-    except OSError:
+    except OSError as err:
         logger.info('TCP-server for logging seems to be already running.')
     except Exception as err:
         raise err

@@ -344,7 +344,7 @@ def is_open(name, instance=1):
         dbus_type.get_object(Bus_Name, '/MessageListener')
         return True
     except Exception as err:
-        logger.info(err)
+        logger.debug(err)
         return False
 
 
@@ -4581,7 +4581,7 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
                sdu=None, verbose=True):
 
     if not os.path.isfile(pool_name):
-        logger.debug('{} is not a file, looking it up in DB')
+        logger.debug('{} is not a file, looking it up in DB'.format(pool_name))
         # try fetching pool info from pools opened in viewer
         # pname = _get_displayed_pool_path(pool_name)
         # if pname:
