@@ -9,6 +9,8 @@ import dbus.service
 import logging
 import ccs_function_lib as cfl
 
+sys.path.append(cfl.cfg.get('paths', 'ccs'))
+
 # gi.require_version('Gtk', '3.0')
 
 # import confignator
