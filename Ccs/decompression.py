@@ -81,7 +81,6 @@ def ce_decompress(outdir, pool_name=None, sdu=None, starttime=None, endtime=None
     decomp = CeDecompress(outdir, pool_name=pool_name, sdu=sdu, starttime=starttime, endtime=endtime, startidx=startidx,
                           endidx=endidx, ce_exec=ce_exec)
     decomp.start()
-    ce_decompressors[decomp.init_time] = decomp
 
 
 def ce_decompress_stop(name=None):
@@ -125,6 +124,9 @@ class CeDecompress:
         self.ce_collect_timeout = CE_COLLECT_TIMEOUT
         self.ldt_minimum_ce_gap = LDT_MINIMUM_CE_GAP
 
+        global ce_decompressors
+        ce_decompressors[self.init_time] = self
+
     def _ce_decompress(self):
         checkdir = os.path.dirname(self.outdir)
         if not os.path.exists(checkdir) and checkdir != "":
@@ -161,13 +163,12 @@ class CeDecompress:
             filedict = cfl.dump_large_data(pool_name=self.pool_name, starttime=self.last_ce_time, endtime=self.endtime,
                                            outdir=self.outdir, dump_all=True, sdu=self.sdu, startidx=self.startidx,
                                            endidx=self.endidx)
-        except ValueError as err:
+            for ce in filedict:
+                self.last_ce_time = ce
+                decompress(filedict[ce])
+        except (ValueError, TypeError, AttributeError) as err:
             ce_decompressors.pop(self.init_time)
             raise err
-
-        for ce in filedict:
-            self.last_ce_time = ce
-            decompress(filedict[ce])
 
         while self.ce_decompression_on:
             filedict = cfl.dump_large_data(pool_name=self.pool_name, starttime=self.last_ce_time, endtime=self.endtime,
