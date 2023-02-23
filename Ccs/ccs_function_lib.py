@@ -2466,6 +2466,7 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
         header.bits.SERV_SUB_TYPE = sst
         header.bits.DEST_ID = sdid
         ctime, ftime, sync = calc_timestamp(timestamp)
+        sync = 0 if sync is None else sync
         header.bits.CTIME = ctime
         header.bits.FTIME = ftime
         header.bits.TIMESYNC = sync
