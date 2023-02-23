@@ -79,9 +79,6 @@ def get_scoped_session_factory():
 class DatapoolManager:
     # pecmodes = ['ignore', 'warn', 'discard']
 
-    # defaults
-    pecmode = 'warn'
-
     # crcfunc = packet_config.puscrc
     # crcfunc_rmap = packet_config.rmapcrc
 
@@ -113,6 +110,7 @@ class DatapoolManager:
         self.cfg = confignator.get_config()
 
         self.commit_interval = float(self.cfg['ccs-database']['commit_interval'])
+        self.pecmode = self.cfg['ccs-misc']['pec_mode'].lower()
 
         # Set up the logger
         self.logger = cfl.start_logging('PoolManager')
@@ -726,6 +724,7 @@ class DatapoolManager:
         # set short timeout to commit last packet, in case no further one is received
         sockfd.settimeout(1.)
 
+        checkcrc = True if self.pecmode in ('warn', 'discard') else False
         pkt_size_stream = b''
         while self.connections[pool_name]['recording']:
             if sockfd.fileno() < 0:
@@ -791,22 +790,25 @@ class DatapoolManager:
                             break
                         buf += d
 
-                    while self.crc_check(buf):
-                        buf = buf[1:] + tail
-                        self.trashbytes[pool_name] += 1
-                        while len(buf) < 6:
-                            buf += sockfd.recv(6 - len(buf))
-                        pkt_len = struct.unpack('>4xH', buf[:6])[0] + 7
-                        if pkt_len > MAX_PKT_LEN:
-                            tail = b''
-                            continue
-                        while pkt_len > len(buf):
-                            buf += sockfd.recv(pkt_len - len(buf))
-                        if pkt_len < len(buf):
-                            tail = buf[pkt_len:]
-                            buf = buf[:pkt_len]
-                        else:
-                            tail = b''
+                    # if self.pecmode == 'discard':
+                    # process if wrong CRC?
+                    # while self.crc_check(buf):
+                    #     buf = buf[1:] + tail
+                    #     self.trashbytes[pool_name] += 1
+                    #     while len(buf) < 6:
+                    #         buf += sockfd.recv(6 - len(buf))
+                    #     pkt_len = struct.unpack('>4xH', buf[:6])[0] + 7
+                    #     if pkt_len > MAX_PKT_LEN:
+                    #         tail = b''
+                    #         continue
+                    #     while pkt_len > len(buf):
+                    #         buf += sockfd.recv(pkt_len - len(buf))
+                    #     if pkt_len < len(buf):
+                    #         tail = buf[pkt_len:]
+                    #         buf = buf[:pkt_len]
+                    #     else:
+                    #         tail = b''
+
                     pkt_size_stream = tail
 
                 if not buf:
@@ -820,9 +822,9 @@ class DatapoolManager:
                                 self.filtered_pckts[pool_name].append(buf)
                             else:
                                 self.decode_tmdump_and_process_packets_internal(pkt, process_tm, pckt_decoded=tm,
-                                                                                checkcrc=False)
+                                                                                checkcrc=checkcrc)
                     else:
-                        self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=False)
+                        self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=checkcrc)
 
                     _tocnt = 0
 
@@ -830,7 +832,7 @@ class DatapoolManager:
                     self.databuflen += len(buf)
 
             except socket.timeout as e:
-                self.logger.debug('Socket timeout ({}:{})'.format(host, port))
+                # self.logger.debug('Socket timeout ({}:{})'.format(host, port))
                 # reconnect SQL session handle after x socket timeouts to avoid SQL timeout
                 _tocnt += 1
                 new_session.commit()
@@ -1243,8 +1245,6 @@ class DatapoolManager:
             processor(pckt_decoded, buf)
             return
 
-        decode = self.unpack_pus
-
         if brute:
             pckts = self.extract_pus_brute_search(buf, filename=filename)
             checkcrc = False  # CRC already performed during brute_search
@@ -1254,25 +1254,25 @@ class DatapoolManager:
         for pckt in pckts:
             # this CRC only works for PUS packets
             if checkcrc:
-                if self.crc_check(pckt):
+                calc = cfl.crc(pckt)
+                if calc:
+                    chk = int.from_bytes(pckt[-PEC_LEN:], 'big')
                     if self.pecmode == 'warn':
                         if len(pckt) > 7:
-                            self.logger.info(
-                                'decode_tmdump_and_process_packets_internal: [CRC error]: packet with seq nr ' + str(
-                                    int(pckt[5:7].hex(), 16)) + '\n')
+                            self.logger.warning('[CRC error]: is {:0{plen}X}, calc {:0{plen}X} [{}...]'.format(chk, calc, pckt[:6].hex().upper(), plen=PEC_LEN * 2))
                         else:
-                            self.logger.info('INVALID packet -- too short' + '\n')
+                            self.logger.warning('INVALID packet -- too short: {}'.format(pckt.hex().upper()))
                     elif self.pecmode == 'discard':
                         if len(pckt) > 7:
-                            self.logger.info(
-                                '[CRC error]: packet with seq nr ' + str(int(pckt[5:7].hex(), 16)) + ' (discarded)\n')
+                            self.logger.warning('[CRC error]: is {:0{plen}X}, calc {:0{plen}X}'.format(chk, calc, plen=PEC_LEN*2))
+                            self.logger.warning('[CRC error]: packet discarded: {}'.format(pckt.hex().upper()))
                         else:
-                            self.logger.info('INVALID packet -- too short' + '\n')
+                            self.logger.warning('INVALID packet -- too short: {}'.format(pckt.hex().upper()))
                         continue
 
-            pckt_decoded = decode(pckt)
+            pckt_decoded = self.unpack_pus(pckt)
             if pckt_decoded == (None, None, None):
-                self.logger.warning('Could not interpret bytestream: {}. DISCARDING DATA'.format(pckt.hex()))
+                self.logger.warning('Could not interpret packet: {}. DISCARDING DATA'.format(pckt.hex().upper()))
                 continue
             elif isinstance(pckt_decoded[0]._b_base_, PHeader):
                 self.logger.info('Non-PUS packet received: {}'.format(pckt))
@@ -1291,7 +1291,6 @@ class DatapoolManager:
 
         if protocol == 'PUS':
             buf = buf.read()
-            decode = self.unpack_pus
             if brute:
                 pckts = self.extract_pus_brute_search(buf, filename=filename)
                 checkcrc = False  # CRC already performed during brute_search
@@ -1318,7 +1317,7 @@ class DatapoolManager:
                                 self.logger.info('INVALID packet -- too short' + '\n')
                             continue
 
-                pcktdicts.append(processor(decode(pckt), pckt))
+                pcktdicts.append(processor(self.unpack_pus(pckt), pckt))
                 pcktcount += 1
                 if pcktcount % bulk_insert_size == 0:
                     new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
