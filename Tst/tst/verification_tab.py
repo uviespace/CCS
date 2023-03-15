@@ -10,6 +10,7 @@ import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
 sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
+sys.path.append('/home/sebastian/CCS/Tst/testing_library/testlib')  # notwendig damit tm als Modul erkannt wird
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 
@@ -38,8 +39,18 @@ Verification_4 = "tm." + tm.get_frequency_of_hk.__name__ + str(inspect.signature
 Verification_5 = "tm." + tm.get_dpu_mode.__name__ + str(inspect.signature((tm.get_dpu_mode)))
 Verification_6 = "tm." + tm.get_packet_length.__name__ + str(inspect.signature((tm.get_packet_length)))
 Verification_7 = "tm." + tm.get_version_number.__name__ + str(inspect.signature((tm.get_version_number)))
-Verification_8 = "tm." + tm.get_time_of_last_tc.__name__ + str(inspect.signature((tm.get_time_of_last_tc)))
+Verification_8 = "tm." + tm.get_data_of_last_tc.__name__ + str(inspect.signature((tm.get_data_of_last_tc)))
+Verification_9 = "tm." + tm.verify_no_more_hk.__name__ + str(inspect.signature((tm.verify_no_more_hk)))
 
+
+
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# Descriptions
+
+descr_8 = "Get Timestamp of TM before last TC, get IID of last TC, get first 4 bytes of TC raw data."
+descr_9 = "Check if there are no more HK packets"
 
 
 
@@ -51,7 +62,8 @@ verification_list = [
     ("Get DPU Mode", None, None, "descr", Verification_5),
     ("Get Packet Length", None, None, "descr", Verification_6),
     ("Get Version Number", None, None, "descr", Verification_7),
-    ("Get Time before last TC", None, None, "descr", Verification_8)
+    ("Get Data of last TC", None, None, descr_8, Verification_8),
+    ("Test if there are no more HK packets", None, None, descr_9, Verification_9)
 ]
 
 
