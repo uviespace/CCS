@@ -14,7 +14,7 @@ import json
 import sys
 
 
-def run(jfile, outfile):
+def run(jfile, outfile, reportfunc=False, specfile=None):
 
     if os.path.isfile(jfile):
         data = json.load(open(jfile, 'r'))
@@ -34,18 +34,37 @@ def run(jfile, outfile):
     script += '#--------------------------------------------\n\n'
     script += '# COMMENT: {}\n\n\n'.format(data['_comment'].replace('\n', '\n# '))
 
+    if reportfunc:
+        if specfile is None:
+            specfile = '{}-TS-{}.csv_PIPE'.format(data['_name'], data['_spec_version'])
+        script += 'specfile = "{}"\n'.format(specfile)
+        script += 'rep_version = 1\n'
+        script += 'mib_version = "3.4"\n'
+        script += 'ask_tc_exec = True\n'
+        script += 'report = cfl.TestReport(specfile, rep_version, mib_version, gui=True)\n\n'
+
     script += '# Precond.\n# {}\n'.format(data['_precon_descr'])
     # script += '{}\n\n\n'.format(data['_precon_code'].strip())  # Add the precondition code
 
     for step in data['sequences'][0]['steps']:
         comment = '# COMMENT: {}\n'.format(step['_step_comment'].strip()) if step['_step_comment'] != '' else ''
 
+        if reportfunc:
+            step_tag = 'Step {}'.format(step['_step_number'])
+            exec_step = 'report.execute_step("{}", ask=ask_tc_exec)\n'.format(step_tag)
+            verif_step = 'report.verify_step("{}")\n'.format(step_tag)
+        else:
+            exec_step = ''
+            verif_step = ''
+
         txt = '# STEP {}\n' \
               '# {}\n' \
+              '{}' \
               '{}\n' \
-              '# VERIFICATION: {}\n{}\n\n'.format(step['_step_number'], step['_description'].strip(),
+              '# VERIFICATION: {}\n{}{}\n\n'.format(step['_step_number'], step['_description'].strip(), exec_step,
                                                   step['_command_code'].strip(),
                                                   step['_verification_description'].strip(),
+                                                  verif_step,
                                                   # step['_verification_code'].strip(), # Add verification code
                                                   comment)
 
@@ -53,6 +72,9 @@ def run(jfile, outfile):
 
     script += '# Postcond.\n# {}\n'.format(data['_postcon_descr'])
     # script += data['_postcon_code'].strip()  # Add the postcondition code
+
+    if reportfunc:
+        script += '\nreport.export()\n\n'
 
     if outfile[-1] == '/':  # If path is given not the actual filename
         outfile = outfile + data['_name'] + '-TS' + '-'.join(data['_spec_version']) + '.py'
@@ -70,4 +92,4 @@ if __name__ == '__main__':
         outputfile = os.getcwd() + '/'
         #outputfile = '/'.join(json_file_path[:-len(json_file_path.split('/')[-1])-1]) + '/'  # This would take the json File path
 
-    run(json_file_path, outputfile)
+    run(json_file_path, outputfile, reportfunc=False)

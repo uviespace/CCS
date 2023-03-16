@@ -4854,12 +4854,13 @@ class TestReport:
 
         self.report[self.step_rowid[str(step)]][3] = result
 
-    def export(self, reportdir=None):
-        if reportdir is None:
-            reportfile = self.specfile.replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version)).replace('/testspec/', '/testrep/')
-        else:
-            reportdir += '/' if not reportdir.endswith('/') else ''
-            reportfile = reportdir + self.specfile.split('/')[-1].replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version))
+    def export(self, reportdir=None, reportfile=None):
+        if reportfile is None:
+            if reportdir is None:
+                reportfile = self.specfile.replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version)).replace('/testspec/', '/testrep/')
+            else:
+                reportdir += '/' if not reportdir.endswith('/') else ''
+                reportfile = reportdir + self.specfile.split('/')[-1].replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version))
 
         self.report[1][3] += ' TR-{:03d}, MIB v{}'.format(self.version, self.idb_version)
         self.report[2][3] = time.strftime('%Y-%m-%d')
@@ -4869,6 +4870,7 @@ class TestReport:
         with open(reportfile, 'w') as fd:
             fd.write(buf + '\n')
         logger.info('Report written to {}.'.format(reportfile))
+        print('Report written to {}.'.format(reportfile))
 
 
 class TestReportGUI(Gtk.MessageDialog):

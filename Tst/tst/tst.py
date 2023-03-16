@@ -886,13 +886,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
         """
         Generates a compact python test file without all the additional stuff from on_generate_scripts
         """
-        dialog = Gtk.FileChooserDialog(
-            title="Save script as", parent=self, action=Gtk.FileChooserAction.SAVE)
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_SAVE,
-            Gtk.ResponseType.OK, )
+        # dialog = Gtk.FileChooserDialog(
+        #     title="Save script as", parent=self, action=Gtk.FileChooserAction.SAVE)
+        # dialog.add_buttons(
+        #     Gtk.STOCK_CANCEL,
+        #     Gtk.ResponseType.CANCEL,
+        #     Gtk.STOCK_SAVE,
+        #     Gtk.ResponseType.OK, )
 
         if self.current_test_instance():
             # current_json_filename = self.current_test_instance().filename
@@ -901,6 +901,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
             logger.error('Small Script can not be generated without JSON file')
             return
 
+        dialog = ScriptExportDialog()
+
         outfile_basic = '{}-TS-{}.py'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
@@ -908,17 +910,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            # while response == Gtk.ResponseType.OK:
-            #     if os.path.exists(dialog.get_filename()):
-            #         if not self.existing_file_dialog(dialog.get_filename()):
-            #             response = dialog.run()
-            #             continue
-            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename())
+            report = dialog.report.get_active()
+            spec = dialog.csvspec.get_filename()
+
+            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename(), reportfunc=report, specfile=spec)
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
-            # break
 
         dialog.destroy()
-        return
 
     def on_generate_csv(self, *args):
         """
@@ -1269,6 +1267,41 @@ def run():
 
     applica = TstApp(bus_name, Gio.ApplicationFlags.FLAGS_NONE, logger=logger)
     applica.run()
+
+
+class ScriptExportDialog(Gtk.FileChooserDialog):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(title="Save script as", action=Gtk.FileChooserAction.SAVE)
+        self.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE,
+            Gtk.ResponseType.OK, )
+
+        area = self.get_content_area()
+        hbox = Gtk.HBox()
+        hbox.set_border_width(10)
+
+        self.report = Gtk.CheckButton.new_with_label('Reporting')
+        self.report.set_tooltip_text('Add interactive reporting')
+        self.report.connect('toggled', self.check_report)
+
+        self.csvspec = Gtk.FileChooserButton()
+        self.csvspec.set_tooltip_text('Select corresponding CSV spec file')
+        self.csvspec.set_sensitive(False)
+
+        hbox.pack_start(self.report, 0, 0, 0)
+        hbox.pack_start(self.csvspec, 1, 1, 0)
+        area.add(hbox)
+
+        self.show_all()
+
+    def check_report(self, widget, *args):
+        if widget.get_active():
+            self.csvspec.set_sensitive(True)
+        else:
+            self.csvspec.set_sensitive(False)
 
 
 if __name__ == '__main__':
