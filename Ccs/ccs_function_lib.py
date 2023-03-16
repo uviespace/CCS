@@ -1082,7 +1082,7 @@ def Tcdata(tm):
         #outlist = []
         #datastream = BitStream(data)
         try:
-            vals_params = read_variable_pckt(data, params)
+            vals_params = read_variable_pckt(data, params, tc=True)
         except IndexError:
             vals_params = None
     if vals_params:
@@ -1192,7 +1192,7 @@ def read_varpack(data, parameters, paramid, outlist, parlist):
     return outlist, parlist
 
 
-def read_variable_pckt(tm_data, parameters):
+def read_variable_pckt(tm_data, parameters, tc=False):
     """
     Read parameters from a variable length packet
     :param tm_data:
@@ -1202,18 +1202,20 @@ def read_variable_pckt(tm_data, parameters):
     tms = io.BytesIO(tm_data)
     result = []
 
-    result = read_stream_recursive(tms, parameters, decoded=result)
+    result = read_stream_recursive(tms, parameters, decoded=result, tc=tc)
 
     return result
 
 
-def read_stream_recursive(tms, parameters, decoded=None, bit_off=0):
+def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
     """
     Recursively operating function for decoding variable length packets
-    :param tms:
-    :param parameters:
-    :param decoded:
-    :return:
+    @param tms:
+    @param parameters:
+    @param decoded:
+    @param bit_off:
+    @param tc:
+    @return:
     """
 
     decoded = [] if decoded is None else decoded
@@ -1234,7 +1236,8 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0):
 
         fixrep = par[-1]
 
-        if grp and fixrep:
+        # don't use fixrep in case of a TC, since it is only defined for TMs
+        if grp and fixrep and not tc:
             value = fixrep
             logger.debug('{} with fixrep={} used'.format(par[1], value))
         else:
@@ -1244,6 +1247,7 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0):
             value = read_stream(tms, fmt, offbi=bit_off)
 
             bit_off = (bit_off + unaligned) % 8
+            # re-read byte if read position is bit-offset after previous parameter
             if bit_off:
                 tms.seek(tms.tell() - 1)
 
@@ -1253,7 +1257,7 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0):
             skip = grp
             rep = value
             while rep > 0:
-                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off)
+                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off, tc=tc)
                 rep -= 1
 
     return decoded
