@@ -391,7 +391,7 @@ class CBRSearch(Gtk.Box):
         # self.popover_filter_columns.add(self.listbox_columns)
 
         # search field
-        self.input_field = Gtk.Entry()
+        self.input_field = Gtk.SearchEntry()
         self.pack_start(self.input_field, False, False, 0)
         self.input_buffer = Gtk.EntryBuffer()
         self.input_field.set_buffer(self.input_buffer)

@@ -91,13 +91,10 @@ class DataPoolTable(Gtk.Grid):
         # setting the filter function
         self.data_pool_filter.set_visible_func(self.data_pool_filter_func)
 
-        self.pid = None
-
-        # Create ListStores for the ComboBoxes
-        # self.pid_liststore = Gtk.ListStore(str)
-        # for pid_ref in pid_list:
-        #     self.pid_liststore.append([pid_ref, ])
-        # self.current_filter_type = None
+        # filter entry
+        self.filter_entry = Gtk.SearchEntry()
+        self.filter_entry.connect('search-changed', self.do_filter)
+        self.attach(self.filter_entry, 0, 0, 8, 1)
 
         # creating the treeview, making it use the filter a model, adding columns
         self.treeview = Gtk.TreeView.new_with_model(Gtk.TreeModelSort(self.data_pool_filter))
@@ -106,12 +103,6 @@ class DataPoolTable(Gtk.Grid):
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
             column.set_sort_column_id(i)
             self.treeview.append_column(column)
-
-        # self.treeview.set_tooltip_text('Right-click for copy menu')
-
-        # Handle selection
-        self.selected_row = self.treeview.get_selection()
-        #self.selected_row.connect("changed", self.item_selected)
 
         # setting up layout, treeview in scrollwindow
         self.scrollable_treelist = Gtk.ScrolledWindow()
@@ -134,6 +125,10 @@ class DataPoolTable(Gtk.Grid):
 
         self.show_all()
 
+    def do_filter(self, widget, *args):
+        self.current_filter_data_pool = widget.get_text()
+        self.data_pool_filter.refilter()
+
     def on_treeview_clicked(self, widget, event):
         if event.button == 3:
             self.rcl_menu.popup_at_pointer()
@@ -147,30 +142,12 @@ class DataPoolTable(Gtk.Grid):
             else:
                 self.clipboard.set_text(model[it][cell_idx], -1)
 
-    def on_pid_combo_changed(self, combo):
-        combo_iter = combo.get_active_iter()
-        if combo_iter is not None:
-            model = combo.get_model()
-            number = model[combo_iter][0]
-            self.current_filter_data_pool = int(number)
-
-        self.data_pool_filter.refilter()
-
-    def on_clear_button_clicked(self, widget):
-        self.current_filter_data_pool = None
-        self.data_pool_filter.refilter()
-
-    def item_selected(self, selection):
-        model, row = selection.get_selected()
-        if row is not None:
-            self.pid = model[row][:2]
-
     def data_pool_filter_func(self, model, iter, data):
-
-        if self.current_filter_data_pool is None or self.current_filter_data_pool == "None":
+        if not self.current_filter_data_pool:
             return True
         else:
-            return model[iter][0] == self.current_filter_data_pool
+            # match search string in PID, NAME, DESCR columns
+            return ' '.join([*model[iter][:2], model[iter][5]]).lower().count(self.current_filter_data_pool.lower())
 
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
