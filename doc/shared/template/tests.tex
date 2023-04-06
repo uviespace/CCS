@@ -1,0 +1,45 @@
+%% this is an extremely crappy solution. need something
+%% flexible that can do that in one command
+
+%arg: purpose, \testrow{}
+\newcommand{\testbegin}[3]{%
+	\rowcolors{1}{white}{white}%
+	\begin{tcolorbox}[enhanced, notitle, clip upper,%
+			  sharp corners, colframe = white, colback = white,%
+		tabularx={%
+				>{\arraybackslash\centering}p{0.10\columnwidth}%
+				>{\arraybackslash\centering}p{0.05\columnwidth}%
+				>{\arraybackslash}X%
+				>{\arraybackslash}p{0.1\columnwidth}%
+			}%
+		]%
+	%
+	\vspace{-1em}%
+	\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}
+	\color{uvie-blue!75}\textbf{ID} &%
+	\multicolumn{3}{|>{\arraybackslash\raggedright}X}{\textbf{#1}}%
+	\\%
+	\vspace{-1em}%
+	\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}
+	\color{uvie-blue!75}\textbf{Purpose} &%
+	\multicolumn{3}{|>{\arraybackslash\raggedright}X}{#2}%
+	\\%
+
+	\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+	\cellcolor{uvie-blue!75}\color{white}\textbf{TYPE} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{SEQ} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{Description} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{VERIFY} \\%
+	
+	#3 %
+
+	\end{tcolorbox}%
+}
+%arg: type, step, description, verified item
+\newcommand{\testrow}[4]{%
+	\textbf{#1} & #2 & #3 & #4 & %
+}
+

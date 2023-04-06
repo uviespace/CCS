@@ -1,0 +1,265 @@
+%---------------------------------------------
+% Management of lists
+%---------------------------------------------		
+\newenvironment{fw_itemize}						% Control spacing between items in a list
+{\begin{itemize}
+  \setlength{\itemsep}{1mm}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}}
+{\end{itemize}}
+
+\newenvironment{fw_enumerate}					% Control spacing between items in an enumeration
+{\begin{enumerate}
+  \setlength{\itemsep}{1mm}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}}
+{\end{enumerate}}
+
+\newenvironment{fw_description}					% Control spacing between items in a description
+{\begin{description}
+  \setlength{\itemsep}{1mm}
+  \setlength{\parskip}{5pt}			% Line spacing between paragraphs in an item
+  \setlength{\parsep}{0pt}}
+{\end{description}}
+
+%---------------------------------------------
+% Title and Definitions
+%---------------------------------------------		
+
+\title{CCS \& TST UM}
+\def \documentid {UVIE-EGSE-UM-001}
+\date{Issue 0.1, April 1, 2023}
+
+\newcommand\affil[1]{\textsuperscript#1}
+
+\def\preparedby {Marko Mecina\affil{1}}
+\def\checkedby {}
+\def\approvedby {}
+
+\def\affiliations{
+	\affil{1} Department of Astrophysics, University of Vienna
+}
+
+%---------------------------------------------
+% Input files
+%---------------------------------------------		
+\input{../shared/template/univieA4.tex}
+\input{../shared/template/titlepage.tex}
+\input{../shared/glossary_egse.tex}
+
+%---------------------------------------------
+% Used Packages
+%---------------------------------------------
+\usepackage{datatool}	% Management of external databases
+\usepackage{vhistory}
+\usepackage{morewrites}
+\usepackage{pdflscape}	% Provides 'landscape mode' for selected pages
+\usepackage{csvsimple}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{}%colorlinks=true}
+\definecolor{codegray}{gray}{0.9}
+\newcommand{\code}[1]{\colorbox{codegray}{\texttt{#1}}}
+
+\usepackage[
+	backend=biber,
+	%defernumbers=true,
+    natbib=true,
+    style=numeric, %style=alphabetic,
+    %sorting=none,
+	%citestyle=authoryear
+]{biblatex}
+\addbibresource{../shared/bibliography_egse.bib}
+
+%\usepackage{color, colortbl}
+%
+%%In the preamble
+%\usepackage{array}
+%\newcolumntype{H}{>{\setbox0=\hbox\bgroup}c<{\egroup}@{}}
+
+%---------------------------------------------
+% Definition of colours
+%---------------------------------------------
+%\definecolor{dkgreen}{rgb}{0,0.6,0}
+%\definecolor{gray}{rgb}{0.5,0.5,0.5}
+%\definecolor{light-gray}{gray}{0.85}
+%\definecolor{mauve}{rgb}{0.58,0,0.82}
+%\definecolor{lightblue}{RGB}{128,179,255}
+%\definecolor{blue}{RGB}{41,85,204}
+%\definecolor{lbcolor}{rgb}{0.9,0.9,0.9}
+
+%---------------------------------------------
+% Miscellaneous
+%---------------------------------------------		
+
+%###########################################################################################
+%###########################################################################################
+\begin{document}
+
+\setmainfont{MyriadPro-SemiCondensed}
+\uvietitlepage%
+{UVIE EGSE}%
+{\doctitle}%
+{../shared/images/ccs_logo_2.png}
+\setmainfont{MyriadPro}
+
+\approvalpage
+
+\tableofcontents
+\newpage
+
+\begin{versionhistory}
+
+	\vhEntry{0.1}{01.04.2023}{MM}{initial version}
+
+\end{versionhistory}
+
+\chapter{Introduction}
+
+
+\chapter{Installation \& Setup}
+
+\section{Prerequisites}
+\begin{enumerate}
+\item Get CCS repository\footnote{\href{https://gitlab.phaidra.org/mecinam2/CCS}{https://gitlab.phaidra.org/mecinam2/CCS}}\vspace{5pt}\\
+\texttt{git clone https://gitlab.phaidra.org/mecinam2/CCS.git}
+    
+\item Required packages/devtools
+\begin{itemize}
+  \item make
+  \item gtk3
+  \item gtksourceview3
+  \item python-pip
+  \item python-gobject
+  \item dbus-python
+  \item mariadb
+  \item mysql-workbench (optional)
+\end{itemize}
+
+\item Initialise MySQL/MariaDB and set it up
+
+\texttt{sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql}\\
+\texttt{sudo systemctl enable --now mariadb}\\
+\texttt{sudo mariadb-secure-installation}  (optional)
+
+    To create a MariaDB user, in the CCS base directory execute
+    
+	\texttt{make db-user USER=<user> PW=<password>}
+
+    Alternatively, execute the following SQL statements:
+    
+	\texttt{CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';}\\
+	\texttt{GRANT ALL PRIVILEGES ON * . * TO 'user'@'localhost';}\\
+	\texttt{FLUSH PRIVILEGES;}
+    
+\item {Install Python packages. To install the required modules with pip in userspace or a venv, run
+   \texttt{make python-requirements} in the CCS base directory or use \texttt{pip install [--user] -r requirements.txt}.
+   If using a venv, it must have been created using the \texttt{--system-site-packages} option.
+   For more details, see requirements.txt}
+\end{enumerate}
+
+\section{Setup}
+In the CCS base directory,
+
+\begin{itemize}
+  \item first configure the [database] section in egse.cfg!
+  \item execute:\\
+   \texttt{make confignator}\\
+   \texttt{make databases}
+  \end{itemize}
+
+    
+\subsection{MIB}
+Use \texttt{CCS/Ccs/tools/import\_mib.py} to import a set of SCOS2000 MIB files into the MySQL mib-schema specified in egse.cfg
+
+\subsection{CCS \& TST}
+\texttt{./start\_ccs}: starts the CCS\\
+\texttt{./start\_tst}: starts the TST
+
+\chapter{Central Checkout System}
+
+\section{Modules}
+\subsection{Editor}
+
+\begin{figure}\label{fig:editor}
+\includegraphics[width=1.\textwidth]{../shared/images/editor.png} 
+\caption{The \emph{Editor}.}
+\end{figure}
+
+\begin{figure}\label{fig:editorlog}
+\includegraphics[width=1.\textwidth]{../shared/images/editor_log.png} 
+\caption{The log view.}
+\end{figure}
+
+\begin{figure}\label{fig:appdraw}
+\centering
+\includegraphics[width=0.3\textwidth]{../shared/images/editor_appdrawer.png} 
+\caption{App drawer.}
+\end{figure}
+
+\begin{figure}\label{fig:settings}
+\includegraphics[width=1.\textwidth]{../shared/images/config_editor.png} 
+\caption{The settings editor.}
+\end{figure}
+
+\subsection{Poolmanager}
+\begin{figure}\label{fig:pmgr}
+\centering
+\includegraphics[width=0.5\textwidth]{../shared/images/pmgr.png} 
+\caption{The \emph{Poolmanager}.}
+\end{figure}
+
+\subsection{Pool Viewer}
+\begin{figure}\label{fig:pvraw}
+\includegraphics[width=1.\textwidth]{../shared/images/pvraw.png} 
+\caption{The \emph{Pool Viewer}.}
+\end{figure}
+
+\begin{figure}\label{fig:pvdec}
+\includegraphics[width=1.\textwidth]{../shared/images/pvdec.png} 
+\caption{Decoded packet view using the MIB.}
+\end{figure}
+
+\subsection{Plotter}
+
+\subsection{Monitor}
+
+\section{Operation}
+\code{packet\_config\_<PROJECT>.py}
+
+\code{ccs\_function\_lib.py}
+
+\texttt{cfl.TcsendDB()}
+
+\chapter{Test Specification Tool}
+shown in Figure~\ref{fig:tstmain}
+
+\begin{figure}\label{fig:tstmain}
+\includegraphics[width=1.\textwidth]{../shared/images/tst.png} 
+\caption{The \emph{TST} main view.}
+\end{figure}
+
+\begin{figure}\label{fig:tstsnips}
+\includegraphics[width=1.\textwidth]{../shared/images/tst_snips.png} 
+\caption{A list of step templates.}
+\end{figure}
+
+\begin{figure}\label{fig:tctab}
+\includegraphics[width=1.\textwidth]{../shared/images/tctab.png} 
+\caption{Overview of available TC packets.}
+\end{figure}
+
+\begin{figure}\label{fig:tmtab}
+\includegraphics[width=1.\textwidth]{../shared/images/tmtab.png} 
+\caption{Overview of available TM packets.}
+\end{figure}
+
+\begin{figure}\label{fig:tstdp}
+\includegraphics[width=1.\textwidth]{../shared/images/datapool.png} 
+\caption{A list of the specified data pool items.}
+\end{figure}
+
+
+\section{Workflow}
+
+\end{document}

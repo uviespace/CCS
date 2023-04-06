@@ -1,0 +1,28 @@
+% allowed UVIE logo height
+\newlength{\maxlogoheight}\setlength{\maxlogoheight}{20mm}
+\newlength{\medlogoheight}\setlength{\medlogoheight}{15mm}
+\newlength{\minlogoheight}\setlength{\minlogoheight}{10mm}
+%
+% allowed space round logo: logoheight <= x <= 0.5 logoheight 
+\def \maxlogospacing{1.0}
+\def \medlogospacing{0.75}
+\def \minlogospacing{0.5}
+
+%
+%elif \paperheight \equal {210mm} % A5
+% todo: based on papersize: >= A4: 20mm, A5/long: 15mm, all smaller: 10mm
+%\if \paperheight \equal {297mm}	  % A4
+<<<<<<< HEAD
+\newlength{\logoheight}\setlength{\logoheight}{\maxlogoheight}
+=======
+\newlength{\logoheight}{\setlength{\logoheight}{\maxlogoheight}}
+>>>>>>> origin/latex_stack_fix
+%elif \paperheight \equal {210mm} % A5
+%\fi
+%
+% todo: pass as option
+<<<<<<< HEAD
+\newlength{\logospacing}\setlength{\logospacing}{\medlogospacing\logoheight}
+=======
+\newlength{\logospacing}{\setlength{\logospacing}{\medlogospacing\logoheight}}
+>>>>>>> origin/latex_stack_fix

@@ -1,0 +1,61 @@
+\usepackage{fontspec}
+%
+\defaultfontfeatures[MyriadPro-SemiCondensed]{
+	Path		= ../shared/fonts/,
+	Extension	= .otf,
+	UprightFont	= *-light,
+	ItalicFont	= *-italic,
+	BoldFont	= *-bold,
+	BoldItalicFont	= *-bold-italic
+%	LetterSpace	= 5pt		% Laufweite
+}
+%
+\defaultfontfeatures[MyriadPro]{
+	Path		= ../shared/fonts/,
+	Extension	= .otf,
+	UprightFont	= *-regular,
+	ItalicFont	= *-italic,
+	BoldFont	= *-bold,
+	BoldItalicFont	= *-bold-italic
+}%
+\defaultfontfeatures[MyriadProLight]{
+	Path		= ../shared/fonts/,
+	Extension	= .otf,
+	UprightFont	= MyriadPro-light,
+	ItalicFont	= MyriadPro-light-italic,
+}
+
+\setmainfont{MyriadPro}
+
+
+
+\makeatletter
+\renewcommand\normalsize{%
+\@setfontsize\normalsize{11pt}{14pt}
+\abovedisplayskip 10\p@ \@plus2\p@ \@minus5\p@%
+\abovedisplayshortskip \z@ \@plus2\p@%
+\belowdisplayshortskip 5\p@ \@plus2\p@ \@minus3\p@%
+\belowdisplayskip \abovedisplayskip%
+\let\@listi\@listI%
+}
+\normalsize  
+\makeatother
+
+
+
+\usepackage{titlesec}
+
+\titleformat{\chapter}[hang]
+  {\fontspec{MyriadProLight}\fontsize{30}{36}\selectfont\color{uvie-blue}}
+  {\fontspec{MyriadPro}\selectfont\thechapter.}{8pt}{}
+\titlespacing*{\chapter}{0pt}{-20pt}{20pt}
+
+\titleformat{\section}
+  {\fontspec{MyriadPro}\fontsize{13}{16}\selectfont\color{uvie-blue}}
+  {\thesection}{1em}{}
+
+\titleformat{\subsection}
+  {\fontspec{MyriadPro}\fontsize{13}{16}\selectfont\color{uvie-blue}}
+  {\thesubsection}{1em}{}
+
+\DeclareMathSizes{12}{55}{15}{15}

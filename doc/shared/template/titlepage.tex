@@ -1,0 +1,75 @@
+\newcommand{\uvietitlepage}[3]{%
+\begin{titlepage}
+\BgThispage
+%
+%
+\begin{tikzpicture}[overlay, remember picture]
+\node[anchor	= north west,
+      xshift	= \logospacing,
+      yshift	=-\logospacing] 
+      at (current page.north west)
+     {\includegraphics[height = \logoheight]{../shared/images/uni_logo_astrophysik_cmyk.eps}}; 
+\end{tikzpicture}
+%
+\begin{tikzpicture}[overlay, remember picture]
+\node[anchor	= north east,
+      xshift	=-\logospacing,
+      yshift	=-\logospacing] 
+      at (current page.north east)
+     {\includegraphics[height = \logoheight]{../shared/images/uni_logo_farbe_02.eps}}; 
+\end{tikzpicture}
+%
+%
+%
+% main title, must not exceed 3 lines 
+\begin{tikzpicture}[overlay, remember picture]
+\node[anchor			= north west,
+      xshift			= \logospacing,
+      yshift			=-\logospacing * 3.0,
+	  minimum height	= \logospacing * 3.0,
+	  text width		= \textwidth]
+      at (current page.north west)
+      {\fontsize{30pt}{36pt}\selectfont
+       \textcolor{white}
+       {
+			\uppercase{#1}
+       }
+       \par
+      };
+\end{tikzpicture}
+%
+% subtitle, must not exceed 3 lines 
+\begin{tikzpicture}[overlay, remember picture]
+\node[anchor			= north west,
+      xshift			= \logospacing,
+      yshift			=-\logospacing * 5.5,
+	  minimum height	= \logospacing * 2.5,
+	  text width		= \textwidth]
+      at (current page.north west)
+      {\fontsize{13pt}{16pt}\selectfont
+       \textcolor{white}
+       {
+			\uppercase{\textbf {#2}}
+       }
+       \par
+      };
+\end{tikzpicture}
+%
+%\noindent
+%\hfill
+% \hspace*{-3cm}
+\begin{tikzpicture}[overlay, remember picture]
+\node[anchor=south east,		%anchor is upper left corner of the graphic
+      xshift  = 0.5cm,		%shifting around
+      yshift  = -0.5cm] 
+     	at (current page.south east) %left upper corner of the page
+     {\includegraphics[width=8.0cm]{#3}}; 
+\end{tikzpicture}
+%
+%
+\end{titlepage}
+%
+\restoregeometry
+%
+\newpage
+}% newcommand uvietitlepage

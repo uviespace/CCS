@@ -1,0 +1,291 @@
+\usepackage[xindy, nopostdot, numberedsection, style=super, section, toc, acronyms, nogroupskip]{glossaries}
+\usepackage{xparse}
+
+\setlength{\glsdescwidth}{0.8\textwidth}
+\renewcommand{\glsnamefont}[1]{\textbf{#1}}
+
+% label, acronym, name, description
+\DeclareDocumentCommand{\newdualentry}{ m m m m } {
+	\newglossaryentry{gls-#1}{
+	name={#3 (\gls{#1})},
+	description={#4}, nonumberlist
+	}
+	\newglossaryentry{#1}{
+		type=\acronymtype,
+		name={#2},
+		first={#3 (#2)},
+		firstplural={#3s (#2s)},
+		see={[Glossary:]{\gls{gls-#1}}},
+		description=\glslink{gls-#1}{#3},
+		nonumberlist
+	}%
+}
+%%% \gls{ABBREV} to point at Acronym/Abbreviation index
+%%% \gls{gls-ABBREV} to point to glossary
+
+\makeglossaries
+\newacronym{FGS}{FGS}{Fine Guidance Sensor}%
+
+\newacronym{ARIEL}{ARIEL}{Atmospheric Remote-sensing Exoplanet Large-survey}
+  
+\newacronym{AIRS}{AIRS}{ARIEL Infrared Spectrometer}
+
+
+
+\newacronym{NIRSpec}{NIRSpec}{Near Infrared Spectrometer}
+
+\newacronym{VISPhot}{VISPhot}{Visible Photometer}
+
+% see also: https://www.cosmos.esa.int/web/athena/acronyms
+
+\newacronym{ATHENA}{ATHENA}{Advanced Telescope for High-Energy Astrophysics}
+
+\newacronym{WFI}{WFI}{Wide-Field Imager}
+
+\newacronym{CPM}{CPM}{Central Processing Module}
+
+\newacronym{DE}{DE}{Detector Electronics}
+
+\newacronym{RMAP}{RMAP}{Remote Memory Access Protocol}
+
+\newglossaryentry{Doxygen}{
+  name={Doxygen},
+  description={Doxygen is a documentation generator for writing software %
+   	       reference documentation.},
+  nonumberlist
+  }
+
+%### A ###
+\newacronym{ADC}{ADC}{Analog/Digital Converter}
+
+\newacronym{AIB}{AIB}{Analog Interface Board}
+
+\newacronym{AIT/V}{AIT/V}{Assembly, Integration and Testing / Verification}
+
+\newacronym{AIV}{AIV}{Assembly, Integration and Verification}
+
+\newacronym{API}{API}{Application Programming Interface}
+
+\newacronym{AOCS}{AOCS}{Attitude and Orientation Control System}
+
+%### C ###
+\newacronym{CAS}{CAS}{Chinese Academy of Sciences}
+
+\newacronym{CCD}{CCD}{Charge-Coupled Device}
+
+\newacronym{CDR}{CDR}{Critical Design Review}
+
+\newacronym{CEE}{CEE}{Centroid Estimation Error}
+
+\newacronym{CIDL}{CIDL}{Configurable Items Data List}
+
+\newacronym{CoG}{CoG}{Center of Gravity}
+
+\newacronym{CFEE}{CFEE}{Cold Front End Electronics}
+
+\newacronym{CPU}{CPU}{Central Processing Unit}%
+
+\newacronym{CR}{CR}{Cramer-Rao}
+
+%### D ###
+\newacronym{DPU}{DPU}{Data Processing Unit}
+
+\newacronym{DCU}{DCU}{Detector Control Unit}
+
+%### E ###
+\newacronym{ECSS}{ECSS}{European Coordination for Space Standardization}
+
+\newacronym{EDAC}{EDAC}{Error Detection and Correction}
+
+\newacronym{EGSE}{EGSE}{Electronic Ground Support Equipment}
+
+\newacronym{EM}{EM}{Engineering Model}
+
+\newacronym{EQM}{EQM}{Engineering Qualification Model}
+
+%### F ###
+\newacronym{FCE}{FCE}{FGS Control Electronics}
+
+\newacronym{FCE SW}{FCE SW}{FCE Software} 
+
+\newacronym{FDIR}{FDIR}{Fault Detection, Isolation and Recovery}
+
+\newacronym{FEE}{FEE}{Front-End Electronics}
+
+\newacronym{FPM}{FPM}{Focal Plane Module}
+
+\newacronym{FPA}{FPA}{Focal Plane Assembly}
+
+\newacronym{FPGA}{FPGA}{Field-programmable Gate Array}
+
+\newacronym{FSW}{FSW}{Flight Software}
+
+\newacronym{FOV}{FOV}{Field of View}
+
+%### G ###
+\newacronym{GS}{GS}{Ground Segment}
+
+\newacronym{GSW}{GSW}{Ground (Segment) Software}
+
+%### H ###
+
+\newacronym{HK}{HK}{Housekeeping}
+
+%### I ###
+\newacronym{IASW}{IASW}{Instrument Application Software}
+
+\newacronym{ICD}{ICD}{Interface Control Document}
+
+\newacronym{ICU}{ICU}{Instrument Control Unit}
+
+\newacronym{IFSW}{IFSW}{Instrument Flight Software}
+
+\newacronym{ISR}{ISR}{Interrupt Service Routine}%
+
+\newacronym{IWC}{IWC}{Intensity Weighted Centroiding}
+
+\newacronym{IWCoG}{IWCoG}{Iterative Weighted Center of Gravity}
+
+\newacronym{IWF}{IWF}{Institut für Weltraumforschung (Space Research Institute), Graz}
+
+%### L ###
+\newacronym{LoS}{LoS}{Line of Sight}%
+
+%### M ###
+\newacronym{MMU}{MMU}{Memory Management Unit}%
+
+\newacronym{MTL}{MTL}{Mission TimeLine}
+ 
+%### O ###
+\newacronym{OBC}{OBC}{On-Board Computer}
+
+\newacronym{OBMP}{OBMP}{On-Board Macro Procedures}
+
+\newacronym{OS}{OS}{Operating System}
+
+%### P ###
+\newacronym{PA}{PA}{Product Assurance}
+
+\newacronym{PAM}{PAM}{Product Assurance Manager}
+
+\newacronym{PDR}{PDR}{Preliminary Design Review}
+
+\newacronym{PES}{PES}{Pointing Error Sources}
+
+\newacronym{PEC}{PEC}{Pointing Error Contributor}
+
+\newacronym{PI}{PI}{Principal Investigator}
+
+\newacronym{PLM}{PLM}{Payload Module}
+
+\newacronym{PLMCU}{PLMCU}{PayLoad Management \& Control Unit}
+
+\newacronym{PSF}{PSF}{Point Spread Function}
+
+\newacronym{PSU}{PSU}{Power Supply Unit}
+
+\newacronym{PDU}{PDU}{Power Distribution Unit}
+
+\newacronym{PTR}{PTR}{Post Test Review}
+
+\newacronym{PUS}{PUS}{Packet Utilisation Standard}
+
+%### Q ###
+\newacronym{QA}{QA}{Quality Assurance}
+
+\newacronym{QAR}{QAR}{Qualification and Acceptance Review}
+
+%### R ###
+\newacronym{RISC}{RISC}{Reduced Instruction Set Computing}%
+  
+\newacronym{ROI}{ROI}{Region of Interest}
+
+\newacronym{RPE}{RPE}{Relative Performance Error}
+
+\newacronym{RTU}{RTU}{Remote Terminal Unit}
+%### S ###
+\newacronym{SCA}{SCA}{Sensor Chip Assembly}
+
+\newacronym{SCF}{SCF}{Software Configuration File}
+
+\newacronym{SDD}{SDD}{Software Design Document}
+
+\newacronym{SDP}{SDP}{Software Development Plan}
+
+\newacronym{SDU}{SDU}{Service Data Unit}
+
+\newacronym{SDE}{SDE}{Service Data Entity}
+
+\newacronym{SPAMR}{SPAMR}{Software Product Assurance Milestone Report}
+
+\newglossaryentry{SPARC}{
+  name={SPARC},
+  description={SPARC ("scalable processor architecture") is a \gls{RISC}
+           instruction set architecture developed by Sun Microsystems in
+         the 1980s. The distinct feature of SPARC processors is the high
+         number of \gls{CPU} registers that are accessed similarly to
+         stack variables via ``sliding windows''.},
+  nonumberlist
+  }
+
+\newacronym{SPR}{SPR}{Software Problems Reports}
+
+\newacronym{SSS}{SSS}{System Software Specification}
+
+\newacronym{SRD}{SRD}{Software Release Document}
+
+\newacronym{SRR}{SRR}{System Requirements Review}
+
+\newacronym{SRS}{SRS}{Software Requirement Specification}
+
+\newacronym{SpW}{SpW}{SpaceWire}
+
+\newglossaryentry{SpaceWire}{
+  name={SpaceWire},
+  description={SpaceWire is a spacecraft communication network based in part
+               on the IEEE 1355 standard of communications.},
+  nonumberlist
+  }
+
+\newacronym{SQ}{SQ}{Software Quality}
+
+\newacronym{SQAM}{SQAM}{Software Quality Assurance Manager}
+
+\newacronym{SQA}{SQA}{Software Quality Assurance}
+
+%### T ###
+\newacronym{TP}{TP}{Test Plan}
+
+\newacronym{TRR}{TRR}{Test Readiness Review}
+
+\newacronym{TS}{TS}{Test Specification}
+
+%### U ###
+\newacronym{UVIE}{UVIE}{University of Vienna}
+
+\newacronym{WCoG}{WCoG}{Weighted Center of Gravity}
+
+\newacronym{WFEE}{WFEE}{Warm Front End Electronics}
+
+\newacronym{WFE}{WFE}{Wavefront Error}
+
+\newacronym{AKE}{AKE}{Absolute Knowledge Error}
+
+\newacronym{APE}{APE}{Absolute Performance Error}
+
+\newacronym{MKE}{MKE}{Mean Knowledge Error}
+
+\newacronym{MPE}{MPE}{Mean Performance Error}
+
+\newacronym{RKE}{RKE}{Relative Knowledge Error}
+
+\newacronym{KDE}{KDE}{Knowledge Drift Error}
+
+\newacronym{PDE}{PDE}{Performance Drift Error}
+
+\newacronym{KRE}{KRE}{Knowledge Reproducibility Error}
+
+\newacronym{PRE}{PRE}{Performance Reproducibility Error}
+% do not remove
+\glsresetall
+\makeglossaries
