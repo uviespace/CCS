@@ -55,6 +55,7 @@
 \usepackage{morewrites}
 \usepackage{pdflscape}	% Provides 'landscape mode' for selected pages
 \usepackage{csvsimple}
+\usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 \hypersetup{}%colorlinks=true}
@@ -71,6 +72,34 @@
 ]{biblatex}
 \addbibresource{../shared/bibliography_egse.bib}
 
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+
+\lstdefinestyle{mystyle}{
+    %backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{mygray},
+    stringstyle=\color{mymauve},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
 %\usepackage{color, colortbl}
 %
 %%In the preamble
@@ -225,11 +254,16 @@ Use \texttt{CCS/Ccs/tools/import\_mib.py} to import a set of SCOS2000 MIB files 
 \subsection{Monitor}
 
 \section{Operation}
+
 \code{packet\_config\_<PROJECT>.py}
 
 \code{ccs\_function\_lib.py}
 
-\texttt{cfl.TcsendDB()}
+\clearpage
+\subsection{Basic Connection Setup}
+\lstinputlisting[language=Python]{../../Ccs/scripts/connection_setup.py}
+
+\texttt{cfl.Tcsend\_DB()}
 
 \chapter{Test Specification Tool}
 shown in Figure~\ref{fig:tstmain}
