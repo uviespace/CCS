@@ -6,7 +6,7 @@ scipy
 matplotlib
 cairocffi
 mysqlclient
-sqlalchemy
+sqlalchemy < 2
 sphinx
 sphinx_rtd_theme
 astropy
