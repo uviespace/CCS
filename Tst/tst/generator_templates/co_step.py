@@ -22,8 +22,8 @@
             step_end_cuc = cfl.get_last_pckt_time(pool_name=pool_name, string=False)
             report.command_step_end(step_param=param, step_end_cuc=step_end_cuc, step_id=step_id)
 
-        summary =self.step_verification(pool_name=pool_name, step_start_cuc=step_start_cuc, param=param, summary=summary,
-                                        ver_file=${testSpecFileName}_verification, ver_class="${testSpecClassName}Verification",
-                                        ver_func="step_${testStepNumber}", step_id=step_id)
+        summary = self.step_verification(pool_name=pool_name, step_start_cuc=step_start_cuc, param=param, summary=summary,
+                                         ver_file=${testSpecFileName}_verification, ver_class="${testSpecClassName}Verification",
+                                         ver_func="step_${testStepNumber}", step_id=step_id)
 
         return summary

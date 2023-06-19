@@ -33,7 +33,7 @@ def create_file_name(name):
     :param str name: the name which should be transformed into a valid file name
     """
     assert isinstance(name, str)
-    file_name = name.replace(' ', '_')
+    file_name = name.replace(' ', '_').replace('-', '_')
     file_name = file_name.lower()
 
     return file_name
@@ -51,7 +51,7 @@ def create_class_name(name):
     """ Take the name of the test specification and make a valid python class name out of it
     :param str name: the name of the test specification"""
     assert isinstance(name, str)
-    class_name = name.replace(' ', '')
+    class_name = name.replace(' ', '').replace('-', '_')
     return class_name
 
 
