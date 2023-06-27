@@ -7,7 +7,6 @@ Data from SMILE-IWF-PL-UM-147-d0-3_SXI_EBox_User_Manual (ID 5233)
 import os
 import numpy as np
 import scipy as sp
-import matplotlib.pyplot as plt
 
 # constants
 T_ZERO = 273.15
@@ -18,6 +17,9 @@ ADC_OFFSET = -1.69565  # V
 
 
 class Dpu:
+
+    _unit = "V"
+
     ADC_P3V9 = "HK_ADC_P3V9"
     ADC_P3V3 = "HK_ADC_P3V3"
     ADC_P3V3_LVDS = "HK_ADC_P3V3_LVDS"
@@ -39,6 +41,9 @@ K_DPU = {
 
 
 class Temp:
+
+    _unit = "degC"
+
     ADC_TEMP1 = "HK_ADC_TEMP1"
     ADC_TEMP_FEE = "HK_ADC_TEMP_FEE"
     ADC_TEMP_CCD = "HK_ADC_TEMP_CCD"
@@ -106,6 +111,9 @@ PSU_TEMP = [
 
 
 class Psu:
+
+    _unit = "A"
+
     ADC_I_FEE_ANA = "HK_ADC_I_FEE_ANA"
     ADC_I_FEE_DIG = "HK_ADC_I_FEE_DIG"
     ADC_I_DPU = "HK_ADC_I_DPU"
@@ -131,6 +139,9 @@ PSU_OFFSET = {
 
 
 class Rse:
+
+    _unit = "degC"
+
     RSE_MOTOR_TEMP = "HK_RSE_MOTOR_TEMP"
     RSE_ELEC_TEMP = "HK_RSE_ELEC_TEMP"
 
@@ -284,6 +295,16 @@ def i_psu_amp_to_adu(i, signal):
 
 
 def calibrate(adu, signal):
+    """
+
+    :param adu:
+    :param signal:
+    :return:
+    """
+
+    if signal in SIGNAL_IASW_DBS:
+        signal = SIGNAL_IASW_DBS[signal]
+
     if signal in Dpu.__dict__.values():
         x = u_dpu_adu_to_volt(adu, signal)
     elif signal in Temp.__dict__.values() or signal in Rse.__dict__.values():
@@ -297,6 +318,16 @@ def calibrate(adu, signal):
 
 
 def decalibrate(x, signal):
+    """
+
+    :param x:
+    :param signal:
+    :return:
+    """
+
+    if signal in SIGNAL_IASW_DBS:
+        signal = SIGNAL_IASW_DBS[signal]
+
     if signal in Dpu.__dict__.values():
         adu = u_dpu_volt_to_adu(x, signal)
     elif signal in Temp.__dict__.values() or signal in Rse.__dict__.values():
@@ -314,19 +345,22 @@ class CalibrationTables:
     BOUND_L = 0
     BOUND_U = 0x3FFE
 
-    BOUND_RSE = 0xCD
+    BOUND_RSE_L = 0x01
+    BOUND_RSE_U = 0xCD
 
     def __init__(self):
 
         # temperatures
-        x = np.linspace(self.BOUND_L, self.BOUND_U, 60, dtype=int)
+        # x = np.linspace(self.BOUND_L, self.BOUND_U, 60, dtype=int)
         self.temperature = {}
         for sig in vars(Temp):
             if sig.startswith('ADC'):
                 label = getattr(Temp, sig)
+                lmts = getattr(Limits, sig)
+                x = np.linspace(int(lmts[0]*0.9), int(lmts[-1]*1.1), 50, dtype=int)
                 self.temperature[label] = np.array([x, t_adu_to_deg(x, label)])
 
-        x = np.linspace(self.BOUND_L, self.BOUND_RSE, 60, dtype=int)
+        x = np.linspace(self.BOUND_RSE_L, self.BOUND_RSE_U, 50, dtype=int)
         for sig in vars(Rse):
             if sig.startswith('RSE'):
                 label = getattr(Rse, sig)
@@ -360,7 +394,10 @@ class CalibrationTables:
 
         print("Calibration tables written to {}".format(path))
 
-    def plot(self, signal, xmin=BOUND_L, xmax=BOUND_U):
+    def _plot(self, signal, xmin=BOUND_L, xmax=BOUND_U):
+
+        if 'plt' not in globals():
+            raise ModuleNotFoundError("This only works in stand-alone mode")
 
         sig = signal[3:]
 
@@ -462,7 +499,34 @@ class LimitTables:
                 self.current[label] = np.array([adu_limits, i_psu_adu_to_amp(adu_limits, label)])
 
 
+# lookup table for DBS vs IASW naming
+SIGNAL_IASW_DBS = {
+    "AdcP3V9": Dpu.ADC_P3V9,
+    "AdcP3V3": Dpu.ADC_P3V3,
+    "AdcP3V3LVDS": Dpu.ADC_P3V3_LVDS,
+    "AdcP2V5": Dpu.ADC_P2V5,
+    "AdcP1V8": Dpu.ADC_P1V8,
+    "AdcP1V2": Dpu.ADC_P1V2,
+    "AdcRef": Dpu.ADC_REF,
+    "AdcTemp1": Temp.ADC_TEMP1,
+    "AdcTempFee": Temp.ADC_TEMP_FEE,
+    "AdcTempCcd": Temp.ADC_TEMP_CCD,
+    "AdcPsuTemp": Temp.ADC_PSU_TEMP,
+    "AdcIFeeAna": Psu.ADC_I_FEE_ANA,
+    "AdcIFeeDig": Psu.ADC_I_FEE_DIG,
+    "AdcIDpu": Psu.ADC_I_DPU,
+    "AdcIRse": Psu.ADC_I_RSE,
+    "AdcIHeater": Psu.ADC_I_HEATER,
+    "RseMotorTemp": Rse.RSE_MOTOR_TEMP,
+    "RseElecTemp": Rse.RSE_ELEC_TEMP
+}
+
+SIGNAL_DBS_IASW = {SIGNAL_IASW_DBS[k]: k for k in SIGNAL_IASW_DBS}
+
 if __name__ == '__main__':
+
+    import matplotlib.pyplot as plt
+
     ct = CalibrationTables()
     # ct.plot(Temp.ADC_PSU_TEMP)
     lmt = LimitTables()
