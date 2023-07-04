@@ -41,6 +41,9 @@ def reload_dp_data():
 
 
 def get_data_pool_sublist():
+
+    data_pool_sublist.clear()  # clear content from previously selected MIB
+
     for counter in list_of_data_pool:
         pcf_pid = str(int(counter[0]))  # cast PID to int in case data type is wrong in MIB SQL (e.g. in CHEOPS)
         pcf_descr = str(counter[1])

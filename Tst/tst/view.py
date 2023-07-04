@@ -763,18 +763,19 @@ class StepWidget(Gtk.EventBox):
         self.whole_verification_box.set_column_homogeneous(True)
 
         # Left side of the verification area, where the verification-commands a entered
-        # Make the label, inside a own Box to show it on the left side
+        # Make the label, inside an own Box to show it on the left side
         self.lbl_box_verification = Gtk.Box()
         self.lbl_box_verification.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.verification_label = Gtk.Label.new()
-        self.verification_label.set_text(_('Verification'))
-        #self.btn_exec_verification = Gtk.Button.new_from_icon_name(icon_name='media-playback-start', size=Gtk.IconSize.BUTTON)
-        #self.btn_exec_verification.connect('clicked', self.on_exec_verification)
+        self.verification_label.set_text(_('Verification Code'))
+        self.verification_label.set_tooltip_text(_('The verification code-block must define a variable "result" that is TRUE/FALSE'))
+        # self.btn_exec_verification = Gtk.Button.new_from_icon_name(icon_name='media-playback-start', size=Gtk.IconSize.BUTTON)
+        # self.btn_exec_verification.connect('clicked', self.on_exec_verification)
         self.lbl_box_verification.pack_start(self.verification_label, False, False, 0)
         # self.lbl_box_verification.pack_start(self.btn_exec_verification, False, False, 0)
-        #self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
+        # self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
         self.verification_scrolled_window = Gtk.ScrolledWindow()
-        #self.verification_scrolled_window.set_size_request(50, 100)
+        # self.verification_scrolled_window.set_size_request(50, 100)
         self.verification_view = GtkSource.View()
         self.verification_view.set_auto_indent(True)
         self.verification_view.set_show_line_numbers(True)
