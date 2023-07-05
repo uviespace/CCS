@@ -578,7 +578,7 @@ class TMPoolView(Gtk.Window):
 
         if self.active_pool_info.pool_name not in (None, ''):
             self.adj.set_upper(self.count_current_pool_rows())
-        self.adj.set_page_size(25)
+        self.adj.set_page_size(50)
         scrollbar.connect('value_changed', self._on_scrollbar_changed, self.adj, False)
         scrollbar.connect('button-press-event', self.scroll_bar)
         # scrollbar.connect('value_changed', self.reselect_rows)
@@ -2268,18 +2268,24 @@ class TMPoolView(Gtk.Window):
         self.rawswitch = Gtk.CheckButton.new_with_label('Decode Source Data')
         self.rawswitch.connect('toggled', self.set_tm_data_view, None, True)
         self.rawswitch.connect('toggled', self._update_user_tm_decoders)
-        # self.sortswitch = Gtk.CheckButton.new_with_label('Sort by Name')
-        # self.sortswitch.connect('toggled', self.set_tm_data_view, )
-        # switchbox = Gtk.Box(Gtk.Orientation.HORIZONTAL)
-        switchbox = Gtk.HBox()
+        switchbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         switchbox.pack_start(self.rawswitch, 0, 0, 0)
-        # switchbox.pack_end(self.sortswitch, 0, 0, 0)
+
+        self.calibrated_switch = Gtk.CheckButton.new_with_label('Calibrated')
+        self.calibrated_switch.set_sensitive(False)
+        self.calibrated_switch.connect('toggled', self.set_tm_data_view, None, True)
+        self.rawswitch.connect('toggled', self._enable_calibrated_switch)
+
+        switchbox.pack_start(self.calibrated_switch, 0, 0, 0)
+
+        ctrlbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        ctrlbox.pack_start(switchbox, 0, 0, 0)
 
         self.hexview = Gtk.Label()
         self.hexview.set_selectable(True)
-        switchbox.pack_end(self.hexview, 1, 1, 0)
+        ctrlbox.pack_end(self.hexview, 1, 1, 0)
 
-        box.pack_start(switchbox, 0, 0, 3)
+        box.pack_start(ctrlbox, 0, 0, 3)
 
         scrolled_header_view = Gtk.ScrolledWindow()
         scrolled_header_view.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
@@ -2296,6 +2302,14 @@ class TMPoolView(Gtk.Window):
         box.pack_start(scrolled_tm_view, 1, 1, 0)
 
         return box
+
+    def _enable_calibrated_switch(self, *args):
+        if self.rawswitch.get_active():
+            self.calibrated_switch.set_sensitive(True)
+            self.calibrated_switch.set_active(True)
+        else:
+            self.calibrated_switch.set_sensitive(False)
+            self.calibrated_switch.set_active(False)
 
     def create_tm_data_viewer_list(self, decode=False, create=False):
         tm_data_model = Gtk.ListStore(str, str, str, str)
@@ -2606,13 +2620,14 @@ class TMPoolView(Gtk.Window):
         if self.rawswitch.get_active():
             self.tm_header_view.set_monospace(False)
             datamodel.clear()
+            nocalibration = not self.calibrated_switch.get_active()
             try:
                 if self.UDEF:
-                    data = cfl.Tmformatted(tm, textmode=False, udef=True)
+                    data = cfl.Tmformatted(tm, textmode=False, udef=True, nocal=nocalibration)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
                 else:
-                    data = cfl.Tmformatted(tm, textmode=False)
+                    data = cfl.Tmformatted(tm, textmode=False, nocal=nocalibration)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
 
