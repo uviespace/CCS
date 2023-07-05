@@ -36,6 +36,9 @@ PUS_PKT_VERS_NUM = 0  # 0 for space packets
 PUS_VERSION = 1
 MAX_PKT_LEN = 886  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
 
+TMTC = {0: 'TM', 1: 'TC'}
+TSYNC_FLAG = {0: 'U', 5: 'S'}
+
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
     ("PKT_TYPE", ctypes.c_uint16, 1),
@@ -72,7 +75,7 @@ timepack = [ptt(9, 18), 8, 1e6, 1]
 CUC_EPOCH = datetime.datetime(2018, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 
-def timecal(data, string=False):
+def timecal(data, string=False, checkft=False):
     if not isinstance(data, bytes):
         try:
             return data[0]
@@ -94,6 +97,10 @@ def timecal(data, string=False):
     else:
         coarse = data >> 24
         fine = (data & 0xffffff) / timepack[2]
+
+    # check for fine time overflow
+    if checkft and (fine > timepack[2]):
+        raise ValueError('Fine time is greater than resolution {} > {}!'.format(fine, timepack[2]))
 
     if string:
         if sync_byte:
@@ -240,68 +247,68 @@ SPW_FEE_LOGICAL_ADDRESS = 0x51
 SPW_FEE_KEY = 0xD1  # application authorisation key
 
 RMAP_COMMAND_HEADER = [
-    ("TARGET_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("PROTOCOL_ID", ctypes.c_uint8, 8),
-    ("PKT_TYPE", ctypes.c_uint8, 2),
-    ("WRITE", ctypes.c_uint8, 1),
-    ("VERIFY", ctypes.c_uint8, 1),
-    ("REPLY", ctypes.c_uint8, 1),
-    ("INCREMENT", ctypes.c_uint8, 1),
-    ("REPLY_ADDR_LEN", ctypes.c_uint8, 2),
-    ("KEY", ctypes.c_uint8, 8),
-    ("INIT_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("TRANSACTION_ID", ctypes.c_uint16, 16),
-    ("EXT_ADDR", ctypes.c_uint8, 8),
+    ("TARGET_LOGICAL_ADDR", ctypes.c_uint32, 8),
+    ("PROTOCOL_ID", ctypes.c_uint32, 8),
+    ("PKT_TYPE", ctypes.c_uint32, 2),
+    ("WRITE", ctypes.c_uint32, 1),
+    ("VERIFY", ctypes.c_uint32, 1),
+    ("REPLY", ctypes.c_uint32, 1),
+    ("INCREMENT", ctypes.c_uint32, 1),
+    ("REPLY_ADDR_LEN", ctypes.c_uint32, 2),
+    ("KEY", ctypes.c_uint32, 8),
+    ("INIT_LOGICAL_ADDR", ctypes.c_uint32, 8),
+    ("TRANSACTION_ID", ctypes.c_uint32, 16),
+    ("EXT_ADDR", ctypes.c_uint32, 8),
     ("ADDR", ctypes.c_uint32, 32),
     ("DATA_LEN", ctypes.c_uint32, 24),
     ("HEADER_CRC", ctypes.c_uint32, 8)
 ]
 
 RMAP_REPLY_WRITE_HEADER = [
-    ("INIT_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("PROTOCOL_ID", ctypes.c_uint8, 8),
-    ("PKT_TYPE", ctypes.c_uint8, 2),
-    ("WRITE", ctypes.c_uint8, 1),
-    ("VERIFY", ctypes.c_uint8, 1),
-    ("REPLY", ctypes.c_uint8, 1),
-    ("INCREMENT", ctypes.c_uint8, 1),
-    ("REPLY_ADDR_LEN", ctypes.c_uint8, 2),
-    ("STATUS", ctypes.c_uint8, 8),
-    ("TARGET_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("TRANSACTION_ID", ctypes.c_uint16, 16),
-    ("HEADER_CRC", ctypes.c_uint8, 8)
+    ("INIT_LOGICAL_ADDR", ctypes.c_uint32, 8),
+    ("PROTOCOL_ID", ctypes.c_uint32, 8),
+    ("PKT_TYPE", ctypes.c_uint32, 2),
+    ("WRITE", ctypes.c_uint32, 1),
+    ("VERIFY", ctypes.c_uint32, 1),
+    ("REPLY", ctypes.c_uint32, 1),
+    ("INCREMENT", ctypes.c_uint32, 1),
+    ("REPLY_ADDR_LEN", ctypes.c_uint32, 2),
+    ("STATUS", ctypes.c_uint32, 8),
+    ("TARGET_LOGICAL_ADDR", ctypes.c_uint32, 8),
+    ("TRANSACTION_ID", ctypes.c_uint32, 16),
+    ("HEADER_CRC", ctypes.c_uint32, 8)
 ]
 
 RMAP_REPLY_READ_HEADER = [
-    ("INIT_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("PROTOCOL_ID", ctypes.c_uint8, 8),
-    ("PKT_TYPE", ctypes.c_uint8, 2),
-    ("WRITE", ctypes.c_uint8, 1),
-    ("VERIFY", ctypes.c_uint8, 1),
-    ("REPLY", ctypes.c_uint8, 1),
-    ("INCREMENT", ctypes.c_uint8, 1),
-    ("REPLY_ADDR_LEN", ctypes.c_uint8, 2),
-    ("STATUS", ctypes.c_uint8, 8),
-    ("TARGET_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("TRANSACTION_ID", ctypes.c_uint16, 16),
-    ("RESERVED", ctypes.c_uint8, 8),
+    ("INIT_LOGICAL_ADDR", ctypes.c_uint32, 8),
+    ("PROTOCOL_ID", ctypes.c_uint32, 8),
+    ("PKT_TYPE", ctypes.c_uint32, 2),
+    ("WRITE", ctypes.c_uint32, 1),
+    ("VERIFY", ctypes.c_uint32, 1),
+    ("REPLY", ctypes.c_uint32, 1),
+    ("INCREMENT", ctypes.c_uint32, 1),
+    ("REPLY_ADDR_LEN", ctypes.c_uint32, 2),
+    ("STATUS", ctypes.c_uint32, 8),
+    ("TARGET_LOGICAL_ADDR", ctypes.c_uint32, 8),
+    ("TRANSACTION_ID", ctypes.c_uint32, 16),
+    ("RESERVED", ctypes.c_uint32, 8),
     ("DATA_LEN", ctypes.c_uint32, 24),
-    ("HEADER_CRC", ctypes.c_uint8, 8)
+    ("HEADER_CRC", ctypes.c_uint32, 8)
 ]
 
 # FEEDATA packet structure definitions
 
 FEEDATA_TRANSFER_HEADER = [
-    ("INIT_LOGICAL_ADDR", ctypes.c_uint8, 8),
-    ("PROTOCOL_ID", ctypes.c_uint8, 8),
+    ("INIT_LOGICAL_ADDR", ctypes.c_uint16, 8),
+    ("PROTOCOL_ID", ctypes.c_uint16, 8),
     ("DATA_LEN", ctypes.c_uint16, 16),
-    ("RESERVED1", ctypes.c_uint8, 4),
-    ("MODE", ctypes.c_uint8, 4),
-    ("LAST_PKT", ctypes.c_uint8, 1),
-    ("CCDSIDE", ctypes.c_uint8, 2),
-    ("CCD", ctypes.c_uint8, 1),
-    ("RESERVED2", ctypes.c_uint8, 2),
-    ("PKT_TYPE", ctypes.c_uint8, 2),
+    ("RESERVED1", ctypes.c_uint16, 4),
+    ("MODE", ctypes.c_uint16, 4),
+    ("LAST_PKT", ctypes.c_uint16, 1),
+    ("CCDSIDE", ctypes.c_uint16, 2),
+    ("CCD", ctypes.c_uint16, 1),
+    ("RESERVED2", ctypes.c_uint16, 2),
+    ("PKT_TYPE", ctypes.c_uint16, 2),
     ("FRAME_CNT", ctypes.c_uint16, 16),
     ("SEQ_CNT", ctypes.c_uint16, 16)
 ]
@@ -412,49 +419,49 @@ class FeeDataTransferHeader(ctypes.Union):
 #########################
 
 # look-up table for FEE parameters (DP IDs & internal IDs) (20220908)
-fee_id = {'vstart': {'pid': 345544373, 'idx': 1},
-          'vend': {'pid': 345544372, 'idx': 2},
-          'charge_injection_width': {'pid': 345544348, 'idx': 3},
-          'charge_injection_gap': {'pid': 345544347, 'idx': 4},
-          'parallel_toi_period': {'pid': 345544366, 'idx': 5},
-          'parallel_clk_overlap': {'pid': 345544365, 'idx': 6},
-          'n_final_dump': {'pid': 345544363, 'idx': 7},
-          'h_end': {'pid': 345544359, 'idx': 8},
-          'packet_size': {'pid': 345544364, 'idx': 9},
-          'int_period': {'pid': 345544362, 'idx': 10},
-          'readout_node_sel': {'pid': 345544368, 'idx': 11},
-          'h_start': {'pid': 345544360, 'idx': 12},
-          'ccd2_e_pix_threshold': {'pid': 345544327, 'idx': 13},
-          'ccd2_f_pix_threshold': {'pid': 345544328, 'idx': 14},
-          'ccd4_e_pix_threshold': {'pid': 345544334, 'idx': 15},
-          'ccd4_f_pix_threshold': {'pid': 345544335, 'idx': 16},
-          'full_sun_pix_threshold': {'pid': 345544358, 'idx': 17},
-          'ccd1_readout': {'pid': 345544325, 'idx': 18},
-          'ccd2_readout': {'pid': 345544329, 'idx': 19},
-          'charge_injection': {'pid': 345544346, 'idx': 20},
-          'tri_level_clk': {'pid': 345544371, 'idx': 21},
-          'img_clk_dir': {'pid': 345544361, 'idx': 22},
-          'reg_clk_dir': {'pid': 345544369, 'idx': 23},
-          'sync_sel': {'pid': 345544370, 'idx': 24},
-          'digitise_en': {'pid': 345544353, 'idx': 25},
-          'correction_bypass': {'pid': 345544351, 'idx': 26},
-          'dg_en': {'pid': 345544352, 'idx': 27},
-          'clear_full_sun_counters': {'pid': 345544350, 'idx': 28},
-          'edu_wandering_mask_en': {'pid': 345544354, 'idx': 29},
-          'ccd2_vod_config': {'pid': 345544331, 'idx': 30},
-          'ccd4_vod_config': {'pid': 345544337, 'idx': 31},
-          'ccd2_vrd_config': {'pid': 345544332, 'idx': 32},
-          'ccd4_vrd_config': {'pid': 345544338, 'idx': 33},
-          'ccd2_vgd_config': {'pid': 345544330, 'idx': 34},
-          'ccd4_vgd_config': {'pid': 345544336, 'idx': 35},
-          'ccd_vog_config': {'pid': 345544345, 'idx': 36},
-          'event_detection': {'pid': 345544355, 'idx': 37},
-          'clear_error_flag': {'pid': 345544349, 'idx': 38},
-          'event_pkt_limit': {'pid': 345544356, 'idx': 39},
-          'execute_op': {'pid': 345544357, 'idx': 40},
-          'ccd_mode_config': {'pid': 345544342, 'idx': 41},
-          'ccd_mode2_config': {'pid': 345544341, 'idx': 42},
-          'pix_offset': {'pid': 345544367, 'idx': 43}}
+# fee_id = {'vstart': {'pid': 345544373, 'idx': 1},
+#           'vend': {'pid': 345544372, 'idx': 2},
+#           'charge_injection_width': {'pid': 345544348, 'idx': 3},
+#           'charge_injection_gap': {'pid': 345544347, 'idx': 4},
+#           'parallel_toi_period': {'pid': 345544366, 'idx': 5},
+#           'parallel_clk_overlap': {'pid': 345544365, 'idx': 6},
+#           'n_final_dump': {'pid': 345544363, 'idx': 7},
+#           'h_end': {'pid': 345544359, 'idx': 8},
+#           'packet_size': {'pid': 345544364, 'idx': 9},
+#           'int_period': {'pid': 345544362, 'idx': 10},
+#           'readout_node_sel': {'pid': 345544368, 'idx': 11},
+#           'h_start': {'pid': 345544360, 'idx': 12},
+#           'ccd2_e_pix_threshold': {'pid': 345544327, 'idx': 13},
+#           'ccd2_f_pix_threshold': {'pid': 345544328, 'idx': 14},
+#           'ccd4_e_pix_threshold': {'pid': 345544334, 'idx': 15},
+#           'ccd4_f_pix_threshold': {'pid': 345544335, 'idx': 16},
+#           'full_sun_pix_threshold': {'pid': 345544358, 'idx': 17},
+#           'ccd1_readout': {'pid': 345544325, 'idx': 18},
+#           'ccd2_readout': {'pid': 345544329, 'idx': 19},
+#           'charge_injection': {'pid': 345544346, 'idx': 20},
+#           'tri_level_clk': {'pid': 345544371, 'idx': 21},
+#           'img_clk_dir': {'pid': 345544361, 'idx': 22},
+#           'reg_clk_dir': {'pid': 345544369, 'idx': 23},
+#           'sync_sel': {'pid': 345544370, 'idx': 24},
+#           'digitise_en': {'pid': 345544353, 'idx': 25},
+#           'correction_bypass': {'pid': 345544351, 'idx': 26},
+#           'dg_en': {'pid': 345544352, 'idx': 27},
+#           'clear_full_sun_counters': {'pid': 345544350, 'idx': 28},
+#           'edu_wandering_mask_en': {'pid': 345544354, 'idx': 29},
+#           'ccd2_vod_config': {'pid': 345544331, 'idx': 30},
+#           'ccd4_vod_config': {'pid': 345544337, 'idx': 31},
+#           'ccd2_vrd_config': {'pid': 345544332, 'idx': 32},
+#           'ccd4_vrd_config': {'pid': 345544338, 'idx': 33},
+#           'ccd2_vgd_config': {'pid': 345544330, 'idx': 34},
+#           'ccd4_vgd_config': {'pid': 345544336, 'idx': 35},
+#           'ccd_vog_config': {'pid': 345544345, 'idx': 36},
+#           'event_detection': {'pid': 345544355, 'idx': 37},
+#           'clear_error_flag': {'pid': 345544349, 'idx': 38},
+#           'event_pkt_limit': {'pid': 345544356, 'idx': 39},
+#           'execute_op': {'pid': 345544357, 'idx': 40},
+#           'ccd_mode_config': {'pid': 345544342, 'idx': 41},
+#           'ccd_mode2_config': {'pid': 345544341, 'idx': 42},
+#           'pix_offset': {'pid': 345544367, 'idx': 43}}
 
 
 # TODO: the FEE related parameters might need an update
