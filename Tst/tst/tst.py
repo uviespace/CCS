@@ -277,11 +277,16 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_export_csv.set_icon_name('text-csv')
         self.btn_export_csv.set_tooltip_text('Export current spec to CSV')
         self.btn_export_csv.connect('clicked', self.on_generate_csv)
-        self.btn_generate_products = Gtk.ToolButton()
-        self.btn_generate_products.set_label('Generate scripts')
-        self.btn_generate_products.set_icon_name('text-x-python')
-        self.btn_generate_products.set_tooltip_text('Generate command.py, verification.py and manually.py')
-        self.btn_generate_products.connect('clicked', self.on_generate_products)
+        # self.btn_generate_products = Gtk.ToolButton()
+        # self.btn_generate_products.set_label('Generate scripts')
+        # self.btn_generate_products.set_icon_name('text-x-python')
+        # self.btn_generate_products.set_tooltip_text('Generate command.py, verification.py and manually.py')
+        # self.btn_generate_products.connect('clicked', self.on_generate_products)
+        self.btn_generate_script = Gtk.ToolButton()
+        self.btn_generate_script.set_label('Generate scripts')
+        self.btn_generate_script.set_icon_name('text-x-python')
+        self.btn_generate_script.set_tooltip_text('Generate Python script of the current test')
+        self.btn_generate_script.connect('clicked', self.on_generate_barescript)
 
         self.btn_start_ccs_editor = Gtk.ToolButton()
         self.btn_start_ccs_editor.set_label('Start CCS')
@@ -305,7 +310,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_save_as, 3)
         # self.toolbar.insert(self.btn_show_model_viewer, 2)
         self.toolbar.insert(self.btn_export_csv, 4)
-        self.toolbar.insert(self.btn_generate_products, 5)
+        # self.toolbar.insert(self.btn_generate_products, 5)
+        self.toolbar.insert(self.btn_generate_script, 5)
         self.toolbar.insert(self.btn_start_ccs_editor, 6)
         self.toolbar.insert(self.btn_open_progress_view, 7)
         
@@ -1118,8 +1124,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
         about_dialog.set_program_name('Test Specification Tool')
         about_dialog.set_copyright('UVIE 08/2022')
         about_dialog.set_license_type(Gtk.License.MPL_2_0)
-        about_dialog.present()
-        return
+        about_dialog.run()
+        about_dialog.destroy()
 
     def on_set_idb_version(self, widget):
         self.reconnect_mib()
