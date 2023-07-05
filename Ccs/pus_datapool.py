@@ -91,8 +91,10 @@ class DatapoolManager:
     PROTOCOL_IDS = {packet_config.SPW_PROTOCOL_IDS[key]: key for key in packet_config.SPW_PROTOCOL_IDS}
     # MAX_PKT_LEN = packet_config.RMAP_MAX_PKT_LEN
 
-    tmtc = {0: 'TM', 1: 'TC'}
-    tsync_flag = {0: 'U', 1: 'S', 5: 'S'}
+    tmtc = cfl.tmtc
+    tsync_flag = cfl.tsync_flag
+    # tmtc = {0: 'TM', 1: 'TC'}
+    # tsync_flag = {0: 'U', 1: 'S', 5: 'S'}
 
     lock = threading.Lock()
     own_gui = None
@@ -288,9 +290,11 @@ class DatapoolManager:
                     timestamp))
 
             new_session.commit()
+            return 0
         except Exception as err:
             self.logger.error("Error trying to delete old DB rows: {}".format(err))
             new_session.rollback()
+            return 1
         finally:
             new_session.close()
 
@@ -1110,30 +1114,16 @@ class DatapoolManager:
         new_session.close()
 
     def crc_check(self, pckt):
-        # return bool(self.crcfunc(pckt))
-        return bool(packet_config.puscrc(pckt))
+        return cfl.crc_check(pckt)
 
     def read_pus(self, data):
         """
         Read single PUS packet from buffer
 
-        @param data: has to be seekable
+        @param data: has to be peekable
         @return: single PUS packet as byte string or _None_
         """
-        pus_size = data.peek(10)
-
-        if len(pus_size) >= 6:
-            pus_size = pus_size[4:6]
-        elif 0 < len(pus_size) < 6:
-            start_pos = data.tell()
-            pus_size = data.read(6)[4:6]
-            data.seek(start_pos)
-        elif len(pus_size) == 0:
-            return
-
-        # packet size is header size (6) + pus size field + 1
-        pckt_size = int.from_bytes(pus_size, 'big') + 7
-        return data.read(pckt_size)
+        return cfl.read_pus(data)
 
     def extract_pus(self, data):
         """
@@ -1141,17 +1131,7 @@ class DatapoolManager:
         @param data:
         @return:
         """
-        pckts = []
-        if isinstance(data, bytes):
-            data = io.BufferedReader(io.BytesIO(data))
-
-        while True:
-            pckt = self.read_pus(data)
-            if pckt is not None:
-                pckts.append(pckt)
-            else:
-                break
-        return pckts
+        return cfl.extract_pus(data)
 
     def extract_pus_brute_search(self, data, filename=None):
         """
@@ -1160,79 +1140,25 @@ class DatapoolManager:
         @param filename:
         @return:
         """
-
-        pckts = []
-        if isinstance(data, bytes):
-            data = io.BufferedReader(io.BytesIO(data))
-        elif isinstance(data, io.BufferedReader):
-            pass
-        else:
-            raise TypeError('Cannot handle input of type {}'.format(type(data)))
-
-        while True:
-            pos = data.tell()
-            pckt = self.read_pus(data)
-            if pckt is not None:
-                if not self.crc_check(pckt):
-                    pckts.append(pckt)
-                else:
-                    data.seek(pos + 1)
-                    if filename is not None:
-                        self.trashbytes[filename] += 1
-            else:
-                break
-
-        return pckts
+        return cfl.extract_pus_brute_search(data, filename=filename, trashcnt=self.trashbytes)
 
     # @staticmethod
     def unpack_pus(self, pckt):
         """
         Decode PUS and return header parameters and data field
+
         :param pckt:
         :return:
         """
-        try:
-            tmtc = pckt[0] >> 4 & 1
-            dhead = pckt[0] >> 3 & 1
-
-            if tmtc == 0 and dhead == 1 and (len(pckt) >= TM_HEADER_LEN):
-                header = TMHeader()
-                header.bin[:] = pckt[:TM_HEADER_LEN]
-                data = pckt[TM_HEADER_LEN:-PEC_LEN]
-                crc = pckt[-PEC_LEN:]
-
-            elif tmtc == 1 and dhead == 1 and (len(pckt) >= TC_HEADER_LEN):
-                header = TCHeader()
-                header.bin[:] = pckt[:TC_HEADER_LEN]
-                data = pckt[TC_HEADER_LEN:-PEC_LEN]
-                crc = pckt[-PEC_LEN:]
-
-            else:
-                header = PHeader()
-                header.bin[:P_HEADER_LEN] = pckt[:P_HEADER_LEN]
-                data = pckt[P_HEADER_LEN:]
-                crc = None
-
-            head_pars = header.bits
-
-        except Exception as err:
-            self.logger.warning('Error unpacking PUS packet: {}\n{}'.format(pckt, err))
-            head_pars = None
-            data = None
-            crc = None
-
-        finally:
-            return head_pars, data, crc
+        return cfl.unpack_pus(pckt, logger=self.logger)
 
     def cuc_time_str(self, head):
-        try:
-            if head.PKT_TYPE == 0 and head.SEC_HEAD_FLAG == 1:
-                return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], self.tsync_flag[head.TIMESYNC])
-            else:
-                return ''
-        except Exception as err:
-            self.logger.info(err)
-            return ''
+        """
+
+        :param head:
+        :return:
+        """
+        return cfl.cuc_time_str(head, logger=self.logger)
 
     def decode_tmdump_and_process_packets(self, filename, processor, brute=False):
         buf = open(filename, 'rb').read()

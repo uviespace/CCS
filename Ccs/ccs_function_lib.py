@@ -1,3 +1,7 @@
+"""
+Utility functions for packet handling in CCS
+"""
+
 import gi
 gi.require_version('Gtk', '3.0')
 # gi.require_version('Notify', '0.7')
@@ -69,6 +73,9 @@ try:
     s13_unpack_data_header = pc.s13_unpack_data_header
     SPW_PROTOCOL_IDS_R = {pc.SPW_PROTOCOL_IDS[key]: key for key in pc.SPW_PROTOCOL_IDS}
 
+    tmtc = pc.TMTC
+    tsync_flag = pc.TSYNC_FLAG
+
 except AttributeError as err:
     logger.critical(err)
     raise err
@@ -136,6 +143,10 @@ def _remove_log_socket_handlers():
 
 
 def set_scoped_session_idb_version(idb_version=None):
+    """
+
+    :param idb_version:
+    """
     global scoped_session_idb
     scoped_session_idb.close()
     scoped_session_idb = scoped_session_maker('idb', idb_version=idb_version)
@@ -143,16 +154,21 @@ def set_scoped_session_idb_version(idb_version=None):
 
 
 def get_scoped_session_storage():
+    """
+
+    :return:
+    """
     return scoped_session_maker('storage')
 
 
 def start_app(file_path, wd, *args, console=False, **kwargs):
     """
-    @param file_path:
-    @param wd:
-    @param args:
-    @param console:
-    @param kwargs:
+    
+    :param file_path:
+    :param wd:
+    :param args:
+    :param console:
+    :param kwargs:
     """
     # gui argument only used for poolmanager since it does not have an automatic gui
     if not os.path.isfile(file_path):
@@ -179,6 +195,7 @@ def start_app(file_path, wd, *args, console=False, **kwargs):
 def start_pv(pool_name=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Poolviewer and executes it
+    
     :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
@@ -195,6 +212,7 @@ def start_pv(pool_name=None, console=False, **kwargs):
 def start_pmgr(gui=True, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Poolmanager and executes it
+    
     :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
@@ -213,6 +231,7 @@ def start_pmgr(gui=True, console=False, **kwargs):
 def start_editor(*files, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Editor and executes it
+    
     :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
@@ -228,6 +247,7 @@ def start_editor(*files, console=False, **kwargs):
 def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Monitor and executes it
+    
     :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
@@ -248,6 +268,7 @@ def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
 def start_plotter(pool_name=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Plotter and executes it
+    
     :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
@@ -260,30 +281,55 @@ def start_plotter(pool_name=None, console=False, **kwargs):
         start_app(file_path, directory, console=console, **kwargs)
 
 def start_tst(console=False, **kwargs):
+    """
+
+    :param console:
+    :param kwargs:
+    """
     directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'tst/main.py')
     start_app(file_path, directory, console=console, **kwargs)
 
 
 def start_progress_view(console=False, **kwargs):
+    """
+
+    :param console:
+    :param kwargs:
+    """
     directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'progress_view/progress_view.py')
     start_app(file_path, directory, console=console, **kwargs)
 
 
 def start_log_viewer(console=False, **kwargs):
+    """
+
+    :param console:
+    :param kwargs:
+    """
     directory = cfg.get('paths', 'tst')
     file_path = os.path.join(directory, 'log_viewer/log_viewer.py')
     start_app(file_path, directory, console=console, **kwargs)
 
 
 def start_config_editor(console=False, **kwargs):
+    """
+
+    :param console:
+    :param kwargs:
+    """
     file_path = cfg.get('start-module', 'config-editor')
     directory = os.path.dirname(file_path)
     start_app(file_path, directory, console=console, **kwargs)
 
 
 def start_tst(console=False, **kwargs):
+    """
+
+    :param console:
+    :param kwargs:
+    """
     file_path = os.path.join(cfg.get('paths', 'base'), 'start_tst')
     directory = os.path.dirname(file_path)
     start_app(file_path, directory, console=console, **kwargs)
@@ -292,6 +338,11 @@ def start_tst(console=False, **kwargs):
 # This sets up a logging client for the already running TCP-logging Server,
 # The logger is returned with the given name an can be used like a normal logger
 def start_logging(name):
+    """
+
+    :param name:
+    :return:
+    """
     level = cfg.get('ccs-logging', 'level')
     loglevel = getattr(logging, level.upper())
 
@@ -308,6 +359,12 @@ def start_logging(name):
 
 # This returns a dbus connection to a given Application-Name
 def dbus_connection(name, instance=1):
+    """
+
+    :param name:
+    :param instance:
+    :return:
+    """
     if instance == 0:
         logger.warning('No instance of {} found.'.format(name))
         return False
@@ -336,6 +393,12 @@ def dbus_connection(name, instance=1):
 
 # Returns True if application is running or False if not
 def is_open(name, instance=1):
+    """
+
+    :param name:
+    :param instance:
+    :return:
+    """
     dbus_type = dbus.SessionBus()
     try:
         # dbus_connection(name, instance)
@@ -351,9 +414,10 @@ def is_open(name, instance=1):
 def show_functions(conn, filter=None):
     """
     Show all available functions for a CCS application
-    @param conn: A Dbus connection
-    @param filter: A string which filters the results
-    @return: A list of available functions
+    
+    :param conn: A Dbus connection
+    :param filter: A string which filters the results
+    :return: A list of available functions
     """
     '''
     if app_nbr and not isinstance(app_nbr, int):
@@ -379,9 +443,10 @@ def ConnectionCheck(dbus_con, argument=None):
     """
     The user friendly version to use the ConnectionCheck method exported by all CCS applications via DBus, checks if the
     connection is made
-    @param dbus_con: A Dbus connection
-    @param argument: An argument which can be sent for testing purposes
-    @return: If the connection is made
+    
+    :param dbus_con: A Dbus connection
+    :param argument: An argument which can be sent for testing purposes
+    :return: If the connection is made
     """
     argument = python_to_dbus(argument, True)
 
@@ -399,11 +464,12 @@ def Functions(dbus_con, function_name, *args, **kwargs):
     """
     The user friendly version to use the Functions method exported by all CCS applications via DBus, lets one call all
     Functions in a CCS application
-    @param dbus_con: A Dbus connection
-    @param function_name: The function to call as a string
-    @param args: The arguments for the function
-    @param kwargs: The keyword arguments for the function as as Dict
-    @return:
+
+    :param dbus_con: A Dbus connection
+    :param function_name: The function to call as a string
+    :param args: The arguments for the function
+    :param kwargs: The keyword arguments for the function as as Dict
+    :return:
     """
     args = (python_to_dbus(value, True) for value in args)
 
@@ -420,10 +486,11 @@ def Variables(dbus_con, variable_name, *args):
     """
     The user friendly version to use the Variables method exported by all CCS applications via DBus, lets one change and
     get all Variables of a CCs application
-    @param dbus_con: A Dbus connection
-    @param variable_name: The variable
-    @param args: The value to change the variable to, if nothing is given the value of the Variable is returned
-    @return: Either the variable value or None if Variable was changed
+
+    :param dbus_con: A Dbus connection
+    :param variable_name: The variable
+    :param args: The value to change the variable to, if nothing is given the value of the Variable is returned
+    :return: Either the variable value or None if Variable was changed
     """
     args = (python_to_dbus(value, True) for value in args)
 
@@ -437,11 +504,12 @@ def Dictionaries(dbus_con, dictionary_name, *args):
     """
     The user friendly version to use the Dictionaries method exported by all CCS applications via DBus, lets one change
     and get values or the entire Dictionary for all availabe Dictionaries of a CCS application
-    @param dbus_con: A Dbus connection
-    @param dictionary_name: The dictionary name
-    @param args: A key of the dictionary to get the corresponding value, or a key and a value to change the value for a
+
+    :param dbus_con: A Dbus connection
+    :param dictionary_name: The dictionary name
+    :param args: A key of the dictionary to get the corresponding value, or a key and a value to change the value for a
     key, if not given the entire dictionary is returned
-    @return: The entire dictionary, a value for a given key or None if a value was changed
+    :return: The entire dictionary, a value for a given key or None if a value was changed
     """
     args = (python_to_dbus(value, True) for value in args)
 
@@ -454,8 +522,9 @@ def Dictionaries(dbus_con, dictionary_name, *args):
 def dict_to_dbus_kwargs(arguments={}, user_console = False):
     """
     Converts a dictionary to kwargs dbus does understand and if necessary and requested changes NoneType to 'NoneType'
-    @param arguments: The to converting dictionary
-    @return: The dbus Dictionary which simulates the kwargs
+
+    :param arguments: The to converting dictionary
+    :return: The dbus Dictionary which simulates the kwargs
     """
     if user_console:
         for key in arguments.keys():
@@ -468,10 +537,11 @@ def dict_to_dbus_kwargs(arguments={}, user_console = False):
 # Converts dbus types to python types
 def dbus_to_python(data, user_console=False):
     """
-    Convets dbus Types to Python Types
-    @param data: Dbus Type variables or containers
-    @param user_console: Flag to check for NoneType arguments
-    @return: Same data as python variables or containers
+    Converts DBus types to Python types
+
+    :param data: Dbus Type variables or containers
+    :param user_console: Flag to check for NoneType arguments
+    :return: Same data as python variables or containers
     """
     # NoneType string is transformed to a python None type
     if user_console and data == 'NoneType':
@@ -505,9 +575,10 @@ def dbus_to_python(data, user_console=False):
 def python_to_dbus(data, user_console=False):
     """
     Converts Python Types to Dbus Types, only containers, since 'normal' data types are converted automatically by dbus
-    @param data: Dbus Type variables or containers
-    @param user_console: Flag to check for NoneType arguments
-    @return: Same data for python variables, same data for container types as dbus containers
+
+    :param data: Dbus Type variables or containers
+    :param user_console: Flag to check for NoneType arguments
+    :return: Same data for python variables, same data for container types as dbus containers
     """
 
     if user_console and data is None:
@@ -530,15 +601,28 @@ def python_to_dbus(data, user_console=False):
 def convert_to_python(func):
     """
     The Function dbus_to_python can be used as a decorator where all return values are changed to python types
-    @param func: The function where the decorator should be used
-    @return: The wrapped function
+
+    :param func: The function where the decorator should be used
+    :return: The wrapped function
     """
     def wrapper(*args, **kwargs):
+        """
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
         return dbus_to_python(func(*args, **kwargs))
     return wrapper
 
 
 def set_monitor(pool_name=None, param_set=None):
+    """
+
+    :param pool_name:
+    :param param_set:
+    :return:
+    """
     if is_open('monitor'):
         monitor = dbus_connection('monitor', communication['monitor'])
     else:
@@ -583,6 +667,10 @@ def set_monitor(pool_name=None, param_set=None):
 
 
 def user_tm_decoders_func():
+    """
+
+    :return:
+    """
     if cfg.has_section('ccs-user_defined_packets'):
         user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
     else:
@@ -590,16 +678,31 @@ def user_tm_decoders_func():
     return user_tm_decoders
 
 
-# TM formatted
-#
-#  Return a formatted string containing all the decoded source data of TM packet _tm_
-#  @param tm TM packet bytestring
-def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=False):
+def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=False, nocal=False):
+    """
+    Return a formatted string containing all the decoded source data of TM packet _tm_
+
+    :param tm:
+    :param separator:
+    :param sort_by_name:
+    :param textmode:
+    :param udef:
+    :param nocal:
+    :return:
+    """
     sourcedata, tmtcnames = Tmdata(tm, udef=udef)
     tmtcname = " / ".join(tmtcnames)
+
+    if nocal:
+        def _get_val_func(x):
+            return [str(x[2]), str(x[4][0]), '']
+    else:
+        def _get_val_func(x):
+            return [str(x[2]), str(x[0]), none_to_empty(x[1])]
+
     if textmode:
         if sourcedata is not None:
-            formattedlist = ['{}:  {} {}'.format(i[2], i[0], none_to_empty(i[1])) for i in sourcedata]
+            formattedlist = ['{}:  {} {}'.format(*_get_val_func(i)) for i in sourcedata]
             if sort_by_name:
                 formattedlist.sort()
         else:
@@ -608,14 +711,13 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
     else:
         if sourcedata is not None:
             try:
-                formattedlist = [[str(i[2]), str(i[0]), none_to_empty(i[1]),
-                                parameter_tooltip_text(i[-1][0])] for i in sourcedata]
-            # For variable length packets:
-            except:
-                formattedlist = [[str(i[2]), str(i[0]), none_to_empty(i[1]),
-                                parameter_tooltip_text(i[-1])] for i in sourcedata]
+                formattedlist = [[*_get_val_func(i), parameter_tooltip_text(i[-1][0])] for i in sourcedata]
+            # for variable length packets
+            except (IndexError, TypeError):
+                formattedlist = [[*_get_val_func(i), parameter_tooltip_text(i[-1])] for i in sourcedata]
         else:
             formattedlist = [[]]
+
         return formattedlist, tmtcname
 
 
@@ -625,6 +727,12 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
 #  Decode source data field of TM packet
 #  @param tm TM packet bytestring
 def Tmdata(tm, udef=False):
+    """
+
+    :param tm:
+    :param udef:
+    :return:
+    """
     tpsd = None
     params = None
     dbcon = scoped_session_idb
@@ -751,7 +859,144 @@ def Tmdata(tm, udef=False):
     return tmdata, tmname
 
 
+def read_pus(data):
+    """
+    Read single PUS packet from buffer
+
+    @param data: has to be peekable
+    @return: single PUS packet as byte string or *None*
+    """
+    pus_size = data.peek(10)
+
+    if len(pus_size) >= 6:
+        pus_size = pus_size[4:6]
+    elif 0 < len(pus_size) < 6:
+        start_pos = data.tell()
+        pus_size = data.read(6)[4:6]
+        data.seek(start_pos)
+    elif len(pus_size) == 0:
+        return
+
+    # packet size is header size (6) + pus size field + 1
+    pckt_size = int.from_bytes(pus_size, 'big') + 7
+    return data.read(pckt_size)
+
+
+def extract_pus(data):
+    """
+
+    @param data:
+    @return:
+    """
+    pckts = []
+    if isinstance(data, bytes):
+        data = io.BufferedReader(io.BytesIO(data))
+
+    while True:
+        pckt = read_pus(data)
+        if pckt is not None:
+            pckts.append(pckt)
+        else:
+            break
+    return pckts
+
+
+def extract_pus_brute_search(data, filename=None, trashcnt=None):
+    """
+
+    :param data:
+    :param filename:
+    :param trashcnt:
+    :return:
+    """
+    pckts = []
+    if trashcnt is None:
+        trashcnt = {filename: 0}  # dummy counter if no trashcnt dict is given
+
+    if isinstance(data, bytes):
+        data = io.BufferedReader(io.BytesIO(data))
+    elif isinstance(data, io.BufferedReader):
+        pass
+    else:
+        raise TypeError('Cannot handle input of type {}'.format(type(data)))
+
+    while True:
+        pos = data.tell()
+        pckt = read_pus(data)
+        if pckt is not None:
+            if not crc_check(pckt):
+                pckts.append(pckt)
+            else:
+                data.seek(pos + 1)
+                trashcnt[filename] += 1
+        else:
+            break
+
+    return pckts
+
+
+def unpack_pus(pckt, use_pktlen=False, logger=logger):
+    """
+    Decode PUS and return header parameters and data field
+
+    :param pckt:
+    :param use_pktlen: whether to use packet length info in header or just take all of the data after the header as payload
+    :param logger:
+    :return:
+    """
+    try:
+        tmtc = pckt[0] >> 4 & 1
+        dhead = pckt[0] >> 3 & 1
+
+        if tmtc == 0 and dhead == 1 and (len(pckt) >= TM_HEADER_LEN):
+            header = TMHeader()
+            header.bin[:] = pckt[:TM_HEADER_LEN]
+            if not use_pktlen:
+                data = pckt[TM_HEADER_LEN:-PEC_LEN]
+                crc = pckt[-PEC_LEN:]
+            else:
+                data = pckt[TM_HEADER_LEN:header.bits.PKT_LEN + 7 - PEC_LEN]
+                crc = pckt[header.bits.PKT_LEN + 7 - PEC_LEN:header.bits.PKT_LEN + 7]
+
+        elif tmtc == 1 and dhead == 1 and (len(pckt) >= TC_HEADER_LEN):
+            header = TCHeader()
+            header.bin[:] = pckt[:TC_HEADER_LEN]
+            if not use_pktlen:
+                data = pckt[TC_HEADER_LEN:-PEC_LEN]
+                crc = pckt[-PEC_LEN:]
+            else:
+                data = pckt[TC_HEADER_LEN:header.bits.PKT_LEN + 7 - PEC_LEN]
+                crc = pckt[header.bits.PKT_LEN + 7 - PEC_LEN:header.bits.PKT_LEN + 7]
+
+        else:
+            header = PHeader()
+            header.bin[:P_HEADER_LEN] = pckt[:P_HEADER_LEN]
+            if not use_pktlen:
+                data = pckt[P_HEADER_LEN:]
+            else:
+                data = pckt[P_HEADER_LEN:header.bits.PKT_LEN + 7]
+            crc = None
+
+        head_pars = header.bits
+
+    except Exception as err:
+        logger.warning('Error unpacking PUS packet: {}\n{}'.format(pckt, err))
+        head_pars = None
+        data = None
+        crc = None
+
+    finally:
+        return head_pars, data, crc
+
+
 def decode_pus(tm_data, parameters, decode_tc=False):
+    """
+
+    :param tm_data:
+    :param parameters:
+    :param decode_tc:
+    :return:
+    """
     # checkedfmts = [fmtcheck(i[1]) for i in idb]
     # if not any(checkedfmts):
     # fmts = []
@@ -787,6 +1032,14 @@ def decode_pus(tm_data, parameters, decode_tc=False):
 #  @param pos Input The BytePosition in the input bytes
 #  @param offbi
 def read_stream(stream, fmt, pos=None, offbi=0):
+    """
+
+    :param stream:
+    :param fmt:
+    :param pos:
+    :param offbi:
+    :return:
+    """
     if pos is not None:
         stream.seek(int(pos))
 
@@ -826,10 +1079,17 @@ def read_stream(stream, fmt, pos=None, offbi=0):
 def csize(fmt, offbi=0, bitsize=False):
     """
     Returns the amount of bytes required for the input format
-    @param fmt: Input String that defines the format
-    @param offbi:
-    @return:
+
+    :param fmt: Input String that defines the format
+    :param offbi:
+    :return:
     """
+
+    if bitsize:
+        bits = 8
+    else:
+        bits = 1
+
     if fmt in ('i24', 'I24'):
         return 3
     elif fmt.startswith('uint'):
@@ -853,6 +1113,11 @@ def csize(fmt, offbi=0, bitsize=False):
 # Returns the format of the input bytes for TM (list has to be formated the correct way)
 # @param parameters Input List of one parameter
 def parameter_ptt_type_tm(par):
+    """
+
+    :param par:
+    :return:
+    """
     return ptt(par[4], par[5])
 
 
@@ -862,6 +1127,11 @@ def parameter_ptt_type_tm(par):
 # Returns the format of the input bytes for TC (list has to be formated the correct way)
 # @param parameters Input List of one parameter
 def parameter_ptt_type_tc_read(par):
+    """
+
+    :param par:
+    :return:
+    """
     if par[2] is None:
         return ptt('SPARE_visible', par[5])
     else:
@@ -874,15 +1144,30 @@ def parameter_ptt_type_tc_read(par):
 #  Return empty string "" if input is _None_, else return input string
 #  @param s Input string
 def none_to_empty(s):
+    """
+
+    :param s:
+    :return:
+    """
     return '' if s is None else s
 
 
 def str_to_int(itr):
+    """
+
+    :param itr:
+    :return:
+    """
     return int(itr) if itr.lower() != 'none' else None
 
 
 def Tm_header_formatted(tm, detailed=False):
-    """unpack APID, SEQCNT, PKTLEN, TYPE, STYPE, SOURCEID"""
+    """
+
+    :param tm:
+    :param detailed:
+    :return:
+    """
 
     # if len(tm) < TC_HEADER_LEN:
     #     return 'Cannot decode header - packet has only {} bytes!'.format(len(tm))
@@ -911,6 +1196,11 @@ def Tm_header_formatted(tm, detailed=False):
 
 
 def spw_header_formatted(spw_header):
+    """
+
+    :param spw_header:
+    :return:
+    """
     buf = spw_header.__class__.__name__ + '\n\n'
     buf += spw_header.raw.hex()
     return buf
@@ -919,6 +1209,7 @@ def spw_header_formatted(spw_header):
 def get_header_parameters_detailed(pckt):
     """
     Return values of all header elements
+
     :param pckt:
     """
     head = Tmread(pckt)[0]
@@ -932,12 +1223,18 @@ def get_header_parameters_detailed(pckt):
 #  Generate timestring (seconds.microseconds) with (un-)synchronised flag (U/S) appended from TM packet (header data)
 #  @param tml List of decoded TM packet header parameters or TM packet
 def mkcucstring(tml):
+    """
+
+    :param tml:
+    :return:
+    """
     return timecal(tml[CUC_OFFSET:CUC_OFFSET+timepack[1]], string=True)
 
 
 def get_cuc_now():
     """
     Returns the current UTC time in seconds since the reference epoch
+
     :return:
     """
     cuc = datetime.datetime.now(datetime.timezone.utc) - CUC_EPOCH
@@ -947,6 +1244,7 @@ def get_cuc_now():
 def utc_to_cuc(utc):
     """
     Returns the time provided in seconds since the reference epoch
+
     :param utc: ISO formatted date-time string or timezone aware datetime object
     :return:
     """
@@ -960,6 +1258,7 @@ def utc_to_cuc(utc):
 def cuc_to_utc(cuc):
     """
     Returns the UTC date-time corresponding to the provided second offset from the reference epoch
+
     :param cuc: Seconds since the reference epoch
     :return:
     """
@@ -967,13 +1266,39 @@ def cuc_to_utc(cuc):
     return utc.isoformat()
 
 
+def cuc_time_str(head, logger=logger):
+    """
+    Return PUS header timestamp as string
+
+    :param head: TMHeader instance
+    :param logger:
+    :return:
+    """
+    try:
+        if head.PKT_TYPE == 0 and head.SEC_HEAD_FLAG == 1:
+            if head.TIMESYNC in tsync_flag:
+                return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], tsync_flag[head.TIMESYNC])
+            else:
+                logger.warning('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.raw[:4].hex()))
+                return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], 'U')
+        else:
+            return ''
+    except Exception as err:
+        logger.info(err)
+        return ''
+
+
 ##
 #  Parametertooltiptext
 #
 #  Takes numerical value and returns corresponding hex and decimal values as a string.
 #  Intended for parameter view tooltips.
-
 def parameter_tooltip_text(x):
+    """
+
+    :param x:
+    :return:
+    """
     if isinstance(x, int):
         h = hex(x)[2:].upper()
         if np.sign(x) == -1:
@@ -989,6 +1314,11 @@ def parameter_tooltip_text(x):
 
 
 def Tcdata(tm):
+    """
+
+    :param tm:
+    :return:
+    """
     header, data, crc = Tmread(tm)
     st, sst, apid = header.SERV_TYPE, header.SERV_SUB_TYPE, header.APID
     dbcon = scoped_session_idb
@@ -1103,39 +1433,40 @@ def Tmread(pckt):
     :param pckt:
     :return:
     """
-    try:
-        tmtc = pckt[0] >> 4 & 1
-        dhead = pckt[0] >> 3 & 1
-
-        if tmtc == 0 and dhead == 1 and (len(pckt) >= TM_HEADER_LEN):
-            header = TMHeader()
-            header.bin[:] = pckt[:TM_HEADER_LEN]
-            data = pckt[TM_HEADER_LEN:-PEC_LEN]
-            crc = pckt[-PEC_LEN:]
-
-        elif tmtc == 1 and dhead == 1 and (len(pckt) >= TC_HEADER_LEN):
-            header = TCHeader()
-            header.bin[:] = pckt[:TC_HEADER_LEN]
-            data = pckt[TC_HEADER_LEN:-PEC_LEN]
-            crc = pckt[-PEC_LEN:]
-
-        else:
-            header = TCHeader()
-            header.bin[:P_HEADER_LEN] = pckt[:P_HEADER_LEN]
-            data = pckt[P_HEADER_LEN:]
-            crc = None
-
-        head_pars = header.bits
-
-    except Exception as err:
-        # print('Error unpacking packet: {}\n{}'.format(pckt, err))
-        logger.warning('Error unpacking packet: {}\n{}'.format(pckt, err))
-        head_pars = None
-        data = None
-        crc = None
-
-    finally:
-        return head_pars, data, crc
+    return unpack_pus(pckt)
+    # try:
+    #     tmtc = pckt[0] >> 4 & 1
+    #     dhead = pckt[0] >> 3 & 1
+    #
+    #     if tmtc == 0 and dhead == 1 and (len(pckt) >= TM_HEADER_LEN):
+    #         header = TMHeader()
+    #         header.bin[:] = pckt[:TM_HEADER_LEN]
+    #         data = pckt[TM_HEADER_LEN:-PEC_LEN]
+    #         crc = pckt[-PEC_LEN:]
+    #
+    #     elif tmtc == 1 and dhead == 1 and (len(pckt) >= TC_HEADER_LEN):
+    #         header = TCHeader()
+    #         header.bin[:] = pckt[:TC_HEADER_LEN]
+    #         data = pckt[TC_HEADER_LEN:-PEC_LEN]
+    #         crc = pckt[-PEC_LEN:]
+    #
+    #     else:
+    #         header = TCHeader()
+    #         header.bin[:P_HEADER_LEN] = pckt[:P_HEADER_LEN]
+    #         data = pckt[P_HEADER_LEN:]
+    #         crc = None
+    #
+    #     head_pars = header.bits
+    #
+    # except Exception as err:
+    #     # print('Error unpacking packet: {}\n{}'.format(pckt, err))
+    #     logger.warning('Error unpacking packet: {}\n{}'.format(pckt, err))
+    #     head_pars = None
+    #     data = None
+    #     crc = None
+    #
+    # finally:
+    #     return head_pars, data, crc
 
 
 ##
@@ -1143,6 +1474,12 @@ def Tmread(pckt):
 #  @param inbytes   bytestring or bitstring object to be converted
 #  @param separator string by which the hex doublettes are joined, default=' '
 def prettyhex(inbytes, separator=' '):
+    """
+
+    :param inbytes:
+    :param separator:
+    :return:
+    """
     if not isinstance(inbytes, bytes):
         inbytes = inbytes.bytes
     return separator.join(['%02X' % x for x in inbytes])
@@ -1158,6 +1495,15 @@ def prettyhex(inbytes, separator=' '):
 #  @param outlist list of decoded source data parameter values
 #  @param parlist list of decoded source data parameter properties
 def read_varpack(data, parameters, paramid, outlist, parlist):
+    """
+
+    :param data:
+    :param parameters:
+    :param paramid:
+    :param outlist:
+    :param parlist:
+    :return:
+    """
     while paramid < len(parameters):
         fmt = ptt(parameters[paramid][2], parameters[paramid][3])
         if parameters[paramid][2] == 11:  # TODO: handle deduced parameter types
@@ -1195,6 +1541,7 @@ def read_varpack(data, parameters, paramid, outlist, parlist):
 def read_variable_pckt(tm_data, parameters, tc=False):
     """
     Read parameters from a variable length packet
+
     :param tm_data:
     :param parameters:
     :return:
@@ -1210,12 +1557,13 @@ def read_variable_pckt(tm_data, parameters, tc=False):
 def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
     """
     Recursively operating function for decoding variable length packets
-    @param tms:
-    @param parameters:
-    @param decoded:
-    @param bit_off:
-    @param tc:
-    @return:
+
+    :param tms:
+    :param parameters:
+    :param decoded:
+    :param bit_off:
+    :param tc:
+    :return:
     """
 
     decoded = [] if decoded is None else decoded
@@ -1264,6 +1612,14 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
 
 
 def tc_param_alias_reverse(paf, cca, val, pname=None):
+    """
+
+    :param paf:
+    :param cca:
+    :param val:
+    :param pname:
+    :return:
+    """
     if paf is not None:
         dbcon = scoped_session_idb
         que = 'SELECT pas_altxt from pas where pas_numbr="%s" and pas_alval="%s"' % (paf, val)
@@ -1289,28 +1645,47 @@ def tc_param_alias_reverse(paf, cca, val, pname=None):
 
 
 def get_pid_name(pid):
-    if isinstance(pid, str):
-        return pid
-    # que = 'SELECT pcf_descr from pcf where pcf_pid="{}"'.format(pid)
-    # dbcon = scoped_session_idb
-    # fetch = dbcon.execute(que).fetchall()
-    # dbcon.close()
-    # if len(fetch) != 0:
-    #     return fetch[0][0]
-    if pid in DP_IDS_TO_ITEMS:
-        return DP_IDS_TO_ITEMS[pid]
-    else:
-        logger.warning('Unknown datapool ID: {}'.format(pid))
-        return pid
+    """
+
+    :param pid:
+    :return:
+    """
+    # if isinstance(pid, str):
+    #     return pid
+    if isinstance(pid, int):
+        pids = [pid]
+
+    try:
+        names = [DP_IDS_TO_ITEMS[p] for p in pids]
+    except KeyError as err:
+        logger.warning('Unknown datapool ID')
+        raise err
+
+    # if pid in DP_IDS_TO_ITEMS:
+    #     return DP_IDS_TO_ITEMS[pid]
+    # else:
+    #     logger.warning('Unknown datapool ID: {}'.format(pid))
+    #     return pid
+    return names if len(names) > 1 else names[0]
 
 
 ##
 #  Format PID from I-DB value to int
 def pidfmt(val):
+    """
+
+    :param val:
+    :return:
+    """
     return int(val - pid_offset) if val is not None else None
 
 
 def pidfmt_reverse(val):
+    """
+
+    :param val:
+    :return:
+    """
     return int(val + pid_offset) if val is not None else None
 
 
@@ -1318,18 +1693,37 @@ def pidfmt_reverse(val):
 #  Calibrate raw parameter values
 #  @param pcf_name PCF_NAME
 #  @param rawval   Raw value of the parameter
-def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None):
+def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False):
+    """
 
+    :param pcf_name:
+    :param rawval:
+    :param properties:
+    :param numerical:
+    :param dbcon:
+    :param nocal:
+    :return:
+    """
     if properties is None:
-        dbcon = scoped_session_idb
-        que = 'SELECT pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % pcf_name
-        dbres = dbcon.execute(que)
-        fetch = dbres.fetchall()
-        dbcon.close()
-        if len(fetch) == 0:
-            return rawval if isinstance(rawval, (int, float, str, bytes)) else rawval[0]
 
-        ptc, pfc, categ, curtx = fetch[0]
+        # cache
+        if pcf_name in _pcf_cache:
+            if _pcf_cache[pcf_name] is None:
+                return rawval if isinstance(rawval, (int, float, str, bytes)) else rawval[0]
+            else:
+                ptc, pfc, categ, curtx = _pcf_cache[pcf_name]
+
+        else:
+            que = 'SELECT pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % pcf_name
+            dbres = scoped_session_idb.execute(que)
+            fetch = dbres.fetchall()
+            scoped_session_idb.close()
+            if len(fetch) == 0:
+                _pcf_cache[pcf_name] = None
+                return rawval if isinstance(rawval, (int, float, str, bytes)) else rawval[0]
+
+            ptc, pfc, categ, curtx = fetch[0]
+            _pcf_cache[pcf_name] = (ptc, pfc, categ, curtx)
 
     else:
         ptc, pfc, categ, curtx = properties
@@ -1343,10 +1737,9 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
             return rawval
 
     if type_par == timepack[0]:
-        #return timecal(rawval, 'uint:32,uint:15,uint:1')
         return timecal(rawval)
-    elif categ == 'T' or type_par.startswith('ascii'):
-        return rawval
+    # elif categ == 'T' or type_par.startswith('ascii'):
+    #     return rawval
     elif type_par.startswith('oct'):
         return rawval.hex().upper()
     elif curtx is None:
@@ -1355,12 +1748,16 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         except IndexError:
             return rawval
     elif curtx is not None and categ == 'N':
-        # print('CALIBRATED!')
-        return get_cap_yval(pcf_name, rawval)
+        if nocal:
+            return rawval
+        else:
+            return get_cap_yval(pcf_name, rawval)
     elif curtx is not None and categ == 'S':
-        if numerical:
+        if numerical or nocal:
             return rawval
         return get_txp_altxt(pcf_name, rawval)
+    else:
+        return rawval
 
 
 ##
@@ -1370,17 +1767,45 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
 #  @param pcf_name PCF_NAME
 #  @param xval     Raw value of the parameter
 def get_cap_yval(pcf_name, xval, properties=None, dbcon=None):
-    dbcon = scoped_session_idb
-    que = 'SELECT cap.cap_xvals,cap.cap_yvals from pcf left join cap on pcf.pcf_curtx=cap.cap_numbr\
-            where pcf.pcf_name="%s"' % pcf_name
-    dbres = dbcon.execute(que)
-    try:
-        xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
-        yval = np.interp(xval, xvals, yvals)
-    except IndexError:
-        yval = xval
-    finally:
-        dbcon.close()
+    """
+
+    :param pcf_name:
+    :param xval:
+    :param properties:
+    :param dbcon:
+    :return:
+    """
+
+    # cache
+    if pcf_name in _cap_cache:
+        if _cap_cache[pcf_name] is None:
+            return xval
+        xvals, yvals = _cap_cache[pcf_name]
+
+    else:
+        que = 'SELECT cap.cap_xvals,cap.cap_yvals from pcf left join cap on pcf.pcf_curtx=cap.cap_numbr\
+                where pcf.pcf_name="%s"' % pcf_name
+        dbres = scoped_session_idb.execute(que)
+
+        try:
+            xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
+            if np.isnan(xvals).any() or np.isnan(yvals).any():
+                logger.error('Error in CAP support points for {}'.format(pcf_name))
+                _cap_cache[pcf_name] = None
+                return xval
+            sortidx = xvals.argsort()
+            xvals, yvals = xvals[sortidx], yvals[sortidx]  # make sure value pairs are sorted in x-ascending order
+            _cap_cache[pcf_name] = (xvals, yvals)
+        except IndexError:
+            return xval
+        finally:
+            scoped_session_idb.close()
+
+    yval = np.interp(xval, xvals, yvals, left=np.nan, right=np.nan)  # return NAN if outside defined calibration range
+
+    # if yval == np.nan:
+    #     logger.info('Calibration of {} failed. Value {} outside calibrated range {}-{}'.format(pcf_name, xval, xvals.min(), xvals.max()))
+
     return format(yval, 'g')
 
 
@@ -1391,12 +1816,26 @@ def get_cap_yval(pcf_name, xval, properties=None, dbcon=None):
 #  @param pcf_name PCF_NAME
 #  @param alval    Raw value of the parameter
 def get_txp_altxt(pcf_name, alval, dbcon=None):
+    """
+
+    :param pcf_name:
+    :param alval:
+    :param dbcon:
+    :return:
+    """
+
+    # cache
+    if (pcf_name, alval) in _txp_cache:
+        altxt = _txp_cache[(pcf_name, alval)]
+        return altxt
+
     dbcon = scoped_session_idb
     que = 'SELECT txp.txp_altxt from pcf left join txp on pcf.pcf_curtx=txp.txp_numbr where\
             pcf.pcf_name="%s" and txp.txp_from=%s' % (pcf_name, alval if isinstance(alval, int) else alval[0])
     dbres = dbcon.execute(que)
     try:
         altxt, = dbres.fetchall()[0]
+        _txp_cache[(pcf_name, alval)] = altxt
     except IndexError:
         altxt = alval
     finally:
@@ -1413,6 +1852,14 @@ def get_txp_altxt(pcf_name, alval, dbcon=None):
 #  @param mode      Save as "binary" file or "hex" values with one packet per line
 #  @param st_filter Save only packets of this service type
 def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
+    """
+
+    :param filename:
+    :param tmlist:
+    :param mode:
+    :param st_filter:
+    :param check_crc:
+    """
     if st_filter is not None:
         tmlist = Tm_filter_st(tmlist, **st_filter)
 
@@ -1443,7 +1890,19 @@ def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
 
 
 def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None):
-    """From tmlist return list of packets with specified criteria"""
+    """
+    From tmlist return list of packets that match the specified criteria
+
+    :param tmlist:
+    :param st:
+    :param sst:
+    :param apid:
+    :param sid:
+    :param time_from:
+    :param time_to:
+    :return:
+    """
+
     if st is not None:
         tmlist = [tm for tm in tmlist if tm[7] == st]
 
@@ -1475,17 +1934,18 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
                 tmtc=None, get_last=False):
     """
     Filter SQL query object by any of the given arguments, return filtered query.
-    @param rows:
-    @param st:
-    @param sst:
-    @param apid:
-    @param sid:
-    @param time_from:
-    @param time_to:
-    @param idx_from:
-    @param idx_to:
-    @param tmtc:
-    @param get_last:
+
+    :param rows:
+    :param st:
+    :param sst:
+    :param apid:
+    :param sid:
+    :param time_from:
+    :param time_to:
+    :param idx_from:
+    :param idx_to:
+    :param tmtc:
+    :param get_last:
     """
 
     if st is not None:
@@ -1537,12 +1997,20 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
 #  @param packet TM/TC packet or any bytestring or bitstring object to be CRCed.
 def crc_check(packet):
     """
-    This function returns True if the CRC result is non-zero
+    This function returns *True* if the CRC result is non-zero
+
+    :param packet:
+    :return:
     """
     return bool(crc(packet))
 
 
 def get_cuctime(tml):
+    """
+
+    :param tml:
+    :return:
+    """
     cuc_timestamp = None
     if tml is not None:
         if isinstance(tml, bytes):
@@ -1578,6 +2046,12 @@ def get_cuctime(tml):
 
 
 def get_pool_rows(pool_name, check_existence=False):
+    """
+
+    :param pool_name:
+    :param check_existence:
+    :return:
+    """
     dbcon = scoped_session_storage()
 
     if check_existence:
@@ -1601,7 +2075,20 @@ def get_pool_rows(pool_name, check_existence=False):
 
 
 # get values of parameter from HK packets
-def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True):
+def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True, nocal=False):
+    """
+
+    :param tmlist:
+    :param hk:
+    :param param:
+    :param last:
+    :param numerical:
+    :param tmfilter:
+    :param pool_name:
+    :param mk_array:
+    :param nocal:
+    :return:
+    """
     if param is None:
         return
 
@@ -1617,21 +2104,16 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         dbres = dbcon.execute(que)
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
-            # tmlist = tmlist.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-            #                        func.mid(DbTelemetry.data, get_sid(st, sst, apid)[0] - TM_HEADER_LEN + 1,
-            #                                 get_sid(st, sst, apid)[1] // 8) == sid.to_bytes(get_sid(st, sst, apid)[1] // 8, 'big')
-            #                        ).order_by(DbTelemetry.idx.desc())
             tmlist_rows = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)
             if tmlist_rows is not None:
                 if last > 1:
-                    tmlist = [tm.raw for tm in tmlist_rows[-last:]]
+                    tmlist = [tm.raw for tm in tmlist_rows.yield_per(1000)[-last:]]
                 else:
                     tmlist = [tmlist_rows.order_by(DbTelemetry.idx.desc()).first().raw]
             else:
                 tmlist = []
         else:
             sid = None if sid == 0 else sid
-            # tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
 
         ufmt = ptt(ptc, pfc)
 
@@ -1645,7 +2127,6 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
 
         sid = None if sid == 0 else sid
         ufmt = ptt(ptc, pfc)
-        # tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
 
     elif hk.startswith('UDEF|'):
         label = hk.replace('UDEF|', '')
@@ -1694,24 +2175,41 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         categ, curtx = fetch[0]
         xy = [(get_cuctime(tm),
                get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
-                              properties=[ptc, pfc, categ, curtx], numerical=numerical)) for tm in tmlist_filt]
+                              properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
 
     else:
         xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]
 
     dbcon.close()
 
+    if not mk_array:
+        return xy, (descr, unit)
+
     try:
-        if mk_array:
-            return np.array(np.array(xy).T, dtype='float'), (descr, unit)
-        else:
-            return xy, (descr, unit)
-    except ValueError:
+        arr = np.array(np.array(xy).T, dtype='float')
+        # calibrate y values
+        if not nocal and name is not None:
+            get_cap_yval(name, arr[1, 0])  # calibrate one value to get name into _cap_cache
+            if _cap_cache[name] is None:
+                return arr, (descr, unit)
+            xvals, yvals = _cap_cache[name]
+            arr[1, :] = np.interp(arr[1, :], xvals, yvals, left=np.nan, right=np.nan)
+        return arr, (descr, unit)
+
+    except (ValueError, IndexError):
         return np.array(xy, dtype='float, U32'), (descr, unit)
 
 
 def Hk_filter(tmlist, st, sst, apid=None, sid=None):
+    """
 
+    :param tmlist:
+    :param st:
+    :param sst:
+    :param apid:
+    :param sid:
+    :return:
+    """
     # if apid in (None, '') and sid not in (0, None):
     #     return [tm for tm in tmlist if (
     #             len(tm) > TM_HEADER_LEN and (tm[7], tm[8], tm[TM_HEADER_LEN]) == (st, sst, sid))]
@@ -1724,7 +2222,8 @@ def Hk_filter(tmlist, st, sst, apid=None, sid=None):
 
 def show_extracted_packet():
     """
-    Get packet data selected in poolviewer
+    Get packet data selected in Pool Viewer
+
     :return:
     """
     pv = dbus_connection('poolviewer', communication['poolviewer'])
@@ -1736,13 +2235,18 @@ def show_extracted_packet():
 
 
 def packet_selection():
-    """Alias for show_extracted_packet call"""
+    """
+    Alias for show_extracted_packet call
+
+    :return:
+    """
     return show_extracted_packet()
 
 
 def get_module_handle(module_name, instance=1, timeout=5):
     """
     Try getting the DBUS proxy object for the module_name module for timeout seconds.
+
     :param module_name:
     :param instance:
     :param timeout:
@@ -1821,6 +2325,7 @@ def connect(pool_name, host, port, protocol='PUS', is_server=False, timeout=10, 
             pckt_filter=None, options='', drop_rx=False, drop_tx=False):
     """
     Accessibility function for 'connect' in pus_datapool
+
     :param pool_name:
     :param host:
     :param port:
@@ -1863,6 +2368,7 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
                options=''):
     """
     Accessibility function for 'connect_tc' in pus_datapool
+
     :param pool_name:
     :param host:
     :param port:
@@ -1893,9 +2399,6 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
 ##
 #  TC send (DB)
 #
-#  Send a telecommand over _cncsocket_ to DPU/SEM. This function uses the I-DB to generate the properly formatted
-#  PUS packet. The TC is specified with the CCF_DESCR string (case sensitive!) _cmd_, followed by the corresponding
-#  number of arguments. The default TC acknowledgement behaviour can be overridden by passing the _ack_ argument.
 #  @param cmd       CCF_DESCR string of the TC to be issued
 #  @param args      Parameters required by the TC specified with _cmd_
 #  @param ack       Override the I-DB TC acknowledment value (4-bit binary string, e.g., '0b1011')
@@ -1903,7 +2406,23 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
 #  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a
 #  loop to prevent too many packets are being sent over the socket in a too short time interval.
 def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, **kwargs):
+    """
+    Build and send a TC packet whose structure is defined in the MIB. Note that for repeating parameter groups
+    the arguments are interleaved, e.g., ParID1, ParVal1, ParID2, ParVal2,... Use the function *interleave_lists*
+    to create a list ordered that way.
 
+    :param cmd: command name as specified in *CCF_DESCR*
+    :type cmd: str
+    :param args: unpacked list of (calibrated) TC parameter values, order is as specified in the MIB
+    :param ack: override acknowledge flags in PUS header
+    :type ack: int
+    :param pool_name:
+    :param sleep:
+    :param no_check:
+    :param pkt_time:
+    :param kwargs:
+    :return:
+    """
     t1 = time.time()
 
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
@@ -1928,12 +2447,20 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 
 ##
 #  Generate TC
-#
-#  Create TC bitstring for _cmd_ with corresponding parameters
-#  @param cmd  CCF_DESCR string of the requested TC
-#  @param args Parameters required by the cmd
-#  @param ack  Override the I-DB TC acknowledment value (4-bit binary string, e.g., '0b1011')
 def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, **kwargs):
+    """
+    Create TC bytestring for CMD with corresponding parameters
+
+    :param cmd: CCF_DESCR string of the requested TC
+    :param args: Parameters required by the cmd
+    :param sdid:
+    :param ack: Override the I-DB TC acknowledment value (4-bit binary, e.g., 0b1011)
+    :param no_check:
+    :param hack_value:
+    :param source_data_only:
+    :param kwargs:
+    :return:
+    """
     # with self.poolmgr.lock:
     # que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
     #       'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
@@ -2047,6 +2574,13 @@ def _get_tc_params(cmd, paf_cal=False):
 
 
 def encode_pus(params, *values, params_as_fmt_string=False):
+    """
+
+    :param params:
+    :param values:
+    :param params_as_fmt_string:
+    :return:
+    """
     if params_as_fmt_string or isinstance(params, str):
         return struct.pack(params, *values)
 
@@ -2082,7 +2616,14 @@ def encode_pus(params, *values, params_as_fmt_string=False):
 
 
 def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
+    """
 
+    :param fmt:
+    :param value:
+    :param bitbuffer:
+    :param offbit:
+    :return:
+    """
     if fmt == 'I24':
         x = value.to_bytes(3, 'big')
 
@@ -2127,8 +2668,9 @@ def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
 def date_to_cuc_bytes(date, sync=None):
     """
     Create CUC time bytes from date string.
-    @param date: date as ISO formatted string
-    @param sync: CUC sync flag, if None sync byte is omitted
+
+    :param date: date as ISO formatted string
+    :param sync: CUC sync flag, if None sync byte is omitted
     """
     if sync in [1, True]:
         sync = 'S'
@@ -2150,6 +2692,11 @@ def date_to_cuc_bytes(date, sync=None):
 # Returns the format of the input bytes for TC (list has to be formated the correct way)
 # @param parameters Input List of one parameter
 def parameter_ptt_type_tc(par):
+    """
+
+    :param par:
+    :return:
+    """
     return ptt(par[-4], par[-3])
 
 
@@ -2161,6 +2708,12 @@ def parameter_ptt_type_tc(par):
 #  @param sst  Service sub-type
 #  @param apid APID of TC
 def Tcack(cmd):
+    """
+    Get type acknowledgement type for give service (sub-)type and APID from I-DB
+
+    :param cmd:
+    :return:
+    """
     que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_descr="{}"'.format(cmd)
     dbcon = scoped_session_idb
     ack = int(dbcon.execute(que).fetchall()[0][0])
@@ -2174,6 +2727,14 @@ def Tcack(cmd):
 #  @param param CPC_PNAME
 #  @param val   Parameter value
 def tc_param_alias(param, val, no_check=False):
+    """
+    Numerical/textual calibration and range check for value val of parameter param
+
+    :param param:
+    :param val:
+    :param no_check:
+    :return:
+    """
     que = 'SELECT cpc_prfref,cpc_ccaref,cpc_pafref,cpc_descr,cpc_categ from cpc where cpc_pname="%s"' % param
     dbcon = scoped_session_idb
     prf, cca, paf, pdesc, categ = dbcon.execute(que).fetchall()[0]
@@ -2241,6 +2802,11 @@ def tc_param_alias(param, val, no_check=False):
 #  Translates name of data pool variable to corresponding ID, based on DP_ITEMS_TO_IDS look-up table
 #  @param paramname Name of the data pool variables
 def get_pid(parnames):
+    """
+
+    :param parnames:
+    :return:
+    """
     # if isinstance(parnames, int):
     #     return parnames
     if isinstance(parnames, str):
@@ -2254,37 +2820,15 @@ def get_pid(parnames):
 
     return pids if len(pids) > 1 else pids[0]
 
-    # que = 'SELECT pcf_descr,pcf_pid from pcf where BINARY pcf_descr in ({})'.format(', '.join(['"{}"'.format(p) for p in parnames]))
-    # dbcon = scoped_session_idb
-    # fetch = dbcon.execute(que).fetchall()
-    # dbcon.close()
-    #
-    # if len(fetch) == 1 and len(parnames) == 1:
-    #     return int(fetch[0][1]) if fetch[0][1] is not None else None  # not since IDBv2.1: - 212010000
-    #
-    # elif len(fetch) >= 1:
-    #     descr, pid = zip(*fetch)
-    #     nopcf = [name for name in parnames if name not in descr]
-    #     if nopcf:
-    #         raise NameError("The following parameters are not in the database: {}".format(nopcf))
-    #     nopid = [name for name, p in fetch if p is None]
-    #     if nopid:
-    #         msg = "The following parameters have no PID: {}".format(nopid)
-    #         logger.warning(msg)
-    #         # print(msg)
-    #     sort_order = [parnames.index(d) for d in descr]
-    #     descr, pid = zip(*[x for _, x in sorted(zip(sort_order, fetch), key=lambda x: x[0])])
-    #     return descr, pid
-    #
-    # else:
-    #     msg = 'Unknown datapool item(s) {}'.format(parnames)
-    #     # raise NameError(msg)
-    #     logger.error(msg)
-    #     # print(msg)
-    #     return None
-
 
 def get_sid(st, sst, apid):
+    """
+
+    :param st:
+    :param sst:
+    :param apid:
+    :return:
+    """
     if (st, sst, apid) in SID_LUT:
         return SID_LUT[(st, sst, apid)]
     else:
@@ -2303,6 +2847,13 @@ def get_sid(st, sst, apid):
 #  @param val   Parameter value
 #  @param pdesc Parameter DESCR
 def tc_param_in_range(prf, val, pdesc):
+    """
+
+    :param prf:
+    :param val:
+    :param pdesc:
+    :return:
+    """
     que = 'SELECT prf_dspfmt,prf_radix,prv_minval,prv_maxval FROM prv INNER JOIN prf ON prf_numbr=prv_numbr WHERE prv_numbr="{}"'.format(prf)
     dbcon = scoped_session_idb
     prfs = dbcon.execute(que).fetchall()
@@ -2337,6 +2888,12 @@ def tc_param_in_range(prf, val, pdesc):
 #  @param params List of TC parameter properties
 #  @param args   List of supplied parameter values
 def zip_no_pad(params, args):
+    """
+
+    :param params:
+    :param args:
+    :return:
+    """
     # [params.pop(i) for i, j in enumerate(params) if j[-4] in ['SPARE', 'PAD']]
     params = [param for param in params if param[5] not in ['A', 'F']]
     return zip(params, args)
@@ -2360,8 +2917,29 @@ def zip_no_pad(params, args):
 #  @param destid  source/destination ID
 #  @param data    application data
 def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestamp=0, dhead=1, gflags=0b11,
-           sc=None, tmv=PUS_VERSION, pktl=None, chksm=None, **kwargs):
+           sc=None, tmv=PUS_VERSION, tref_stat=0, msg_type_cnt=0, pktl=None, chksm=None, **kwargs):
+    """
+    Create TM packet conforming to PUS
 
+    :param data:
+    :param apid:
+    :param st:
+    :param sst:
+    :param destid:
+    :param version:
+    :param typ:
+    :param timestamp:
+    :param dhead:
+    :param gflags:
+    :param sc:
+    :param tmv:
+    :param tref_stat:
+    :param msg_type_cnt:
+    :param pktl:
+    :param chksm:
+    :param kwargs:
+    :return:
+    """
     if pktl is None:
         # pktl = len(data) * 8 + (TC_HEADER_LEN + PEC_LEN - 7)  # 7=-1(convention)+6(datahead)+2(CRC) # len(data) *8, data in bytes has to be bits
         pktl = len(data) + (TM_HEADER_LEN + PEC_LEN - 7)
@@ -2373,7 +2951,8 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
             counters[int(str(apid))] += 1  # 0 is not allowed for seq cnt
 
     tm = PUSpack(version=version, typ=typ, dhead=dhead, apid=apid, gflags=gflags, sc=sc, pktl=pktl,
-                      tmv=tmv, st=st, sst=sst, sdid=destid, timestamp=timestamp, data=data, **kwargs)
+                 tmv=tmv, st=st, sst=sst, sdid=destid, timestamp=timestamp, tref_stat=tref_stat,
+                 msg_type_cnt=msg_type_cnt, data=data, **kwargs)
 
     if chksm is None:
         chksm = crc(tm)
@@ -2401,6 +2980,26 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
 #  @param data    application data
 def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1, gflags=0b11, sc=None,
            tmv=PUS_VERSION, ack=0b1001, pktl=None, chksm=None, **kwargs):
+    """
+    Create TC packet conforming to PUS
+
+    :param data:
+    :param apid:
+    :param st:
+    :param sst:
+    :param sdid:
+    :param version:
+    :param typ:
+    :param dhead:
+    :param gflags:
+    :param sc:
+    :param tmv:
+    :param ack:
+    :param pktl:
+    :param chksm:
+    :param kwargs:
+    :return:
+    """
     if pktl is None:
         pktl = len(data) + (TC_HEADER_LEN + PEC_LEN - 7)  # 7=-1(convention)+6(datahead)+2(CRC)
 
@@ -2410,7 +3009,7 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
             sc += 1
             counters[int(str(apid))] += 1  # 0 is not allowed for seq cnt
     tc = PUSpack(version=version, typ=typ, dhead=dhead, apid=int(str(apid), 0), gflags=int(str(gflags), 0),
-                      sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, **kwargs)
+                 sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, **kwargs)
 
     if chksm is None:
         chksm = crc(tc)
@@ -2423,7 +3022,6 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
 ##
 #  Generate PUS packet
 #
-#  Create Bitstring conforming to PUS with no CRC appended, for details see PUS documentation
 #  @param version version number
 #  @param typ     packet type (TC/TM)
 #  @param dhead   data field header flag
@@ -2439,6 +3037,28 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
 #  @param data    application data
 def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
             tmv=PUS_VERSION, ack=0, st=0, sst=0, sdid=0, tref_stat=0, msg_type_cnt=0, timestamp=0, data=b'', **kwargs):
+    """
+    Create bytestring conforming to PUS with no CRC appended, for details see PUS documentation
+
+    :param version:
+    :param typ:
+    :param dhead:
+    :param apid:
+    :param gflags:
+    :param sc:
+    :param pktl:
+    :param tmv:
+    :param ack:
+    :param st:
+    :param sst:
+    :param sdid:
+    :param tref_stat:
+    :param msg_type_cnt:
+    :param timestamp:
+    :param data:
+    :param kwargs:
+    :return:
+    """
     if typ == 1 and dhead == 1:
         header = TCHeader()
     elif typ == 0 and dhead == 1:
@@ -2454,27 +3074,54 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
     header.bits.PKT_SEQ_CNT = sc
     header.bits.PKT_LEN = pktl
 
-    if typ == 1 and dhead == 1:
-        header.bits.CCSDS_SEC_HEAD_FLAG = 0
-        header.bits.PUS_VERSION = tmv
-        header.bits.ACK = ack
-        header.bits.SERV_TYPE = st
-        header.bits.SERV_SUB_TYPE = sst
-        header.bits.SOURCE_ID = sdid
+    # PUS-A
+    if PUS_VERSION == 1:
+        if typ == 1 and dhead == 1:
+            header.bits.CCSDS_SEC_HEAD_FLAG = 0
+            header.bits.PUS_VERSION = tmv
+            header.bits.ACK = ack
+            header.bits.SERV_TYPE = st
+            header.bits.SERV_SUB_TYPE = sst
+            header.bits.SOURCE_ID = sdid
 
-    if typ == 0 and dhead == 1:
-        header.bits.SPARE1 = 0
-        header.bits.PUS_VERSION = tmv
-        header.bits.SPARE2 = tref_stat
-        header.bits.SERV_TYPE = st
-        header.bits.SERV_SUB_TYPE = sst
-        header.bits.DEST_ID = sdid
-        ctime, ftime, sync = calc_timestamp(timestamp)
-        sync = 0 if sync is None else sync
-        header.bits.CTIME = ctime
-        header.bits.FTIME = ftime
-        header.bits.TIMESYNC = sync
-        header.bits.SPARE = 0
+        elif typ == 0 and dhead == 1:
+            header.bits.SPARE1 = 0
+            header.bits.PUS_VERSION = tmv
+            header.bits.SPARE2 = 0
+            header.bits.SERV_TYPE = st
+            header.bits.SERV_SUB_TYPE = sst
+            header.bits.DEST_ID = sdid
+            ctime, ftime, sync = calc_timestamp(timestamp)
+            sync = 0 if sync is None else sync
+            header.bits.CTIME = ctime
+            header.bits.FTIME = ftime
+            header.bits.TIMESYNC = sync
+            # header.bits.SPARE = 0
+
+    # PUS-C
+    elif PUS_VERSION == 2:
+        if typ == 1 and dhead == 1:
+            header.bits.PUS_VERSION = tmv
+            header.bits.ACK = ack
+            header.bits.SERV_TYPE = st
+            header.bits.SERV_SUB_TYPE = sst
+            header.bits.SOURCE_ID = sdid
+
+        elif typ == 0 and dhead == 1:
+            header.bits.PUS_VERSION = tmv
+            header.bits.SC_REFTIME = tref_stat
+            header.bits.SERV_TYPE = st
+            header.bits.SERV_SUB_TYPE = sst
+            header.bits.MSG_TYPE_CNT = msg_type_cnt
+            header.bits.DEST_ID = sdid
+            ctime, ftime, sync = calc_timestamp(timestamp)
+            sync = 0 if sync is None else sync
+            header.bits.CTIME = ctime
+            header.bits.FTIME = ftime
+            header.bits.TIMESYNC = sync
+
+    else:
+        raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
 
     return bytes(header.bin) + data
 
@@ -2491,6 +3138,19 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 #  @param grpsize Parameter group size
 #  @param repfac  Number of parameter (group) repetitions
 def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_check=False):
+    """
+
+    :param st:
+    :param sst:
+    :param apid:
+    :param params:
+    :param varpos:
+    :param grpsize:
+    :param repfac:
+    :param args:
+    :param no_check:
+    :return:
+    """
     ptypeindex = [i[-1] == FMT_TYPE_PARAM for i in params].index(True)  # check where fmt type defining parameter is
     ptype = args[varpos + ptypeindex::grpsize]
     args2 = list(args)
@@ -2553,6 +3213,12 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
 #   @param string: <boolean> if true the CUC timestamp is returned as a string, otherwise as a float
 #   @return: <CUC> timestamp or None if failing
 def get_last_pckt_time(pool_name='LIVE', string=True):
+    """
+
+    :param pool_name:
+    :param string:
+    :return:
+    """
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
     if not pmgr:
@@ -2635,7 +3301,13 @@ def _get_pmgr_handle(tc_pool=None):
 
 
 def Tcsend_bytes(tc_bytes, pool_name='LIVE', pmgr_handle=None):
+    """
 
+    :param tc_bytes:
+    :param pool_name:
+    :param pmgr_handle:
+    :return:
+    """
     if not pmgr_handle:
         pmgr = _get_pmgr_handle(pool_name)
     else:
@@ -2659,6 +3331,13 @@ def Tcsend_bytes(tc_bytes, pool_name='LIVE', pmgr_handle=None):
 #  @param pool_name Name of the pool bound to the socket for CnC/TC communication
 #  @param cmd         Command string to be sent to C&C socket
 def CnCsend(cmd, pool_name=None, apid=1804):
+    """
+
+    :param cmd:
+    :param pool_name:
+    :param apid:
+    :return:
+    """
     global counters  # One can only Change variable as global since we are static
     # pmgr = dbus_connection('poolmanager', communication['poolmanager'])
     pmgr = get_module_handle('poolmanager')
@@ -2703,7 +3382,18 @@ def CnCsend(cmd, pool_name=None, apid=1804):
 #  @param gflags  Segmentation flags
 #  @param sc      Sequence counter
 def CnCpack(data=b'', version=0b011, typ=1, dhead=0, pid=112, cat=12, gflags=0b11, sc=0):
+    """
 
+    :param data:
+    :param version:
+    :param typ:
+    :param dhead:
+    :param pid:
+    :param cat:
+    :param gflags:
+    :param sc:
+    :return:
+    """
     if isinstance(data, str):
         data = data.encode('ascii')
 
@@ -2726,6 +3416,12 @@ def CnCpack(data=b'', version=0b011, typ=1, dhead=0, pid=112, cat=12, gflags=0b1
 #  @param data      Bytestring to be sent to socket
 #  @param pool_name Name of pool bound to Python socket for CnC/TC communication
 def Datasend(data, pool_name):
+    """
+
+    :param data:
+    :param pool_name:
+    :return:
+    """
     pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
     if not pmgr:
@@ -2742,6 +3438,14 @@ def Datasend(data, pool_name):
 #  @param param OCF_NAME
 #  @param val   Parameter value
 def Tm_limits_check(param, val, user_limit: dict = None, dbcon=None):
+    """
+
+    :param param:
+    :param val:
+    :param user_limit:
+    :param dbcon:
+    :return:
+    """
     if user_limit is not None:
         val = float(val)
         limits = [user_limit[i][0] <= val <= user_limit[i][1] for i in user_limit]
@@ -2784,6 +3488,12 @@ def Tm_limits_check(param, val, user_limit: dict = None, dbcon=None):
 #  @param string input string
 #  @param fmt    format specifier for conversion, 'I' for int, 'R' for float
 def str_to_num(string, fmt=None):
+    """
+
+    :param string:
+    :param fmt:
+    :return:
+    """
     if fmt == 'I':
         num = int(string)
     elif fmt == 'R':
@@ -2797,11 +3507,12 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
     """
     Calculates the CRC over the packet source data (excluding the checksum parameter).
     Uses the same CRC algo as packet CRC and assumes the checksum is at the end of the packet source data.
-    @param cmd:
-    @param args:
-    @param no_check:
-    @param hack_value:
-    @return:
+
+    :param cmd:
+    :param args:
+    :param no_check:
+    :param hack_value:
+    :return:
     """
     pdata = Tcbuild(cmd, *args, no_check=no_check, hack_value=hack_value, source_data_only=True)
     return crc(pdata[:-PEC_LEN])
@@ -2813,18 +3524,19 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_bytes_ function until
     all _data_ is transferred. Data is zero-padded if not aligned to _byte_align_ bytes.
-    @param data:
-    @param memid:
-    @param memaddr:
-    @param max_pkt_size:
-    @param sleep:
-    @param ack:
-    @param pool_name:
-    @param tcname:
-    @param progress:
-    @param calc_crc:
-    @param byte_align:
-    @return:
+
+    :param data:
+    :param memid:
+    :param memaddr:
+    :param max_pkt_size:
+    :param sleep:
+    :param ack:
+    :param pool_name:
+    :param tcname:
+    :param progress:
+    :param calc_crc:
+    :param byte_align:
+    :return:
     """
 
     if not isinstance(data, bytes):
@@ -2893,11 +3605,22 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1
 
 
 def get_tc_descr_from_stsst(st, sst):
+    """
+
+    :param st:
+    :param sst:
+    :return:
+    """
     res = scoped_session_idb.execute('SELECT ccf_descr FROM ccf where ccf_type={} and ccf_stype={}'.format(st, sst)).fetchall()
     return [x[0] for x in res]
 
 
 def bin_to_hex(fname, outfile):
+    """
+
+    :param fname:
+    :param outfile:
+    """
     # bash alternative: hexdump -e '16/1 "%3.2X"' fname > outfile
     bindata = open(fname, 'rb').read()
     buf = prettyhex(bindata)
@@ -2908,6 +3631,12 @@ def bin_to_hex(fname, outfile):
 
 
 def get_mem_id(memid, memid_ref):
+    """
+
+    :param memid:
+    :param memid_ref:
+    :return:
+    """
     if not isinstance(memid, int):
         dbcon = scoped_session_idb
         dbres = dbcon.execute('SELECT pas_alval from pas where pas_numbr="{}" and pas_altxt="{}"'.format(memid_ref, memid))
@@ -2938,7 +3667,21 @@ def get_mem_id(memid, memid_ref):
 #  @param sleep        Timeout after each packet if packets are sent directly to socket
 def srectohex(fname, memid, memaddr, segid, tcsend=False, outname=None, linesperpack=61, pcount=0, sleep=0.,
               source_only=False, add_memaddr_to_source=False):
+    """
 
+    :param fname:
+    :param memid:
+    :param memaddr:
+    :param segid:
+    :param tcsend:
+    :param outname:
+    :param linesperpack:
+    :param pcount:
+    :param sleep:
+    :param source_only:
+    :param add_memaddr_to_source:
+    :return:
+    """
     source_list = []
     if outname is None:
         outname = fname.replace('.srec', '')
@@ -3033,11 +3776,12 @@ def srectohex(fname, memid, memaddr, segid, tcsend=False, outname=None, linesper
 def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61):
     """
     Repack source data from srec file into 'DBS structure' and save it to new srec file.
-    @param input_srec:
-    @param output_srec:
-    @param imageaddr:
-    @param linesperpack:
-    @return:
+
+    :param input_srec:
+    :param output_srec:
+    :param imageaddr:
+    :param linesperpack:
+    :return:
     """
     # get source data from original srec and add memory address
     srectohex(input_srec, outname='srec_binary', memaddr=0xDEADBEEF, source_only=True, linesperpack=linesperpack)
@@ -3050,17 +3794,18 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
                 max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
     """
     Upload data from an SREC file to _memid_ via S6,2
-    @param fname:
-    @param memid:
-    @param memaddr:
-    @param segid:
-    @param pool_name:
-    @param tcname:
-    @param linesperpack:
-    @param sleep:
-    @param max_pkt_size:
-    @param progress:
-    @param image_crc:
+
+    :param fname:
+    :param memid:
+    :param memaddr:
+    :param segid:
+    :param pool_name:
+    :param tcname:
+    :param linesperpack:
+    :param sleep:
+    :param max_pkt_size:
+    :param progress:
+    :param image_crc:
     """
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
@@ -3154,7 +3899,12 @@ def segment_data(data, segid, addr, seglen=480):
     """
     Split data into segments (as defined in IWF DPU HW SW ICD) with segment header and CRC.
     Segment data has to be two-word aligned.
-    Return list of segments.
+
+    :param data:
+    :param segid:
+    :param addr:
+    :param seglen:
+    :return: list of segments
     """
 
     if isinstance(data, str):
@@ -3191,16 +3941,22 @@ def segment_data(data, segid, addr, seglen=480):
 
 def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_bytes=0):
     """
-    @param data:
-    @param outfile:
-    @param memaddr:
-    @param header:
-    @param bytes_per_line:
-    @param skip_bytes:
-    @return:
+
+    :param data:
+    :param outfile:
+    :param memaddr:
+    :param header:
+    :param bytes_per_line:
+    :param skip_bytes:
+    :return:
     """
 
     def srec_chksum(x):
+        """
+
+        :param x:
+        :return:
+        """
         return sum(bytes.fromhex(x)) & 0xff ^ 0xff
 
     if bytes_per_line > SREC_MAX_BYTES_PER_LINE:
@@ -3248,18 +4004,19 @@ def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname
                 image_crc=True, byte_align=2, ack=0b1001, dryrun=False):
     """
     Upload data from SREC file directly to memory _memid_, no additional segment headers (like for DBS) are added.
-    @param fname:
-    @param memid:
-    @param pool_name:
-    @param max_pkt_size:
-    @param tcname:
-    @param sleep:
-    @param progress:
-    @param image_crc:
-    @param byte_align:
-    @param ack:
-    @param dryrun:
-    @return:
+
+    :param fname:
+    :param memid:
+    :param pool_name:
+    :param max_pkt_size:
+    :param tcname:
+    :param sleep:
+    :param progress:
+    :param image_crc:
+    :param byte_align:
+    :param ack:
+    :param dryrun:
+    :return:
     """
     if dryrun:
         print('DRYRUN -- NO PACKETS ARE BEING SENT!')
@@ -3374,8 +4131,9 @@ def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname
 def _get_upload_service_info(tcname=None):
     """
     Get info about service 6,2 from MIB
-    @param tcname:
-    @return:
+
+    :param tcname:
+    :return:
     """
     if tcname is None:
         cmd = get_tc_descr_from_stsst(6, 2)[0]
@@ -3411,7 +4169,11 @@ def _get_upload_service_info(tcname=None):
 
 
 def get_tc_list(ccf_descr=None):
+    """
 
+    :param ccf_descr:
+    :return:
+    """
     if ccf_descr is None:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
@@ -3436,7 +4198,11 @@ def get_tc_list(ccf_descr=None):
 
 
 def get_tc_calibration_and_parameters(ccf_descr=None):
+    """
 
+    :param ccf_descr:
+    :return:
+    """
     if ccf_descr is None:
         calibrations = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, cdf_eltype, cdf_descr, cdf_ellen, '
                                                   'cdf_value, cdf_pname, cpc_descr, cpc_categ, cpc_ptc, '
@@ -3469,7 +4235,14 @@ def get_tc_calibration_and_parameters(ccf_descr=None):
 
 
 def get_tm_parameter_list(st, sst, apid=None, pi1val=0):
+    """
 
+    :param st:
+    :param sst:
+    :param apid:
+    :param pi1val:
+    :return:
+    """
     spid, tpsd = _get_spid(st, sst, apid=apid, pi1val=pi1val)
 
     if tpsd == -1:
@@ -3483,6 +4256,11 @@ def get_tm_parameter_list(st, sst, apid=None, pi1val=0):
 
 
 def get_tm_parameter_info(pname):
+    """
+
+    :param pname:
+    :return:
+    """
     que = 'SELECT ocp_lvalu, ocp_hvalu, ocp_type, txp_from, txp_altxt FROM pcf LEFT JOIN ocp ON pcf_name=ocp_name ' \
           'LEFT JOIN txp ON pcf_curtx=txp_numbr WHERE pcf_name="{}" ORDER BY txp_from, ocp_pos'.format(pname)
     res = scoped_session_idb.execute(que).fetchall()
@@ -3491,6 +4269,11 @@ def get_tm_parameter_info(pname):
 
 
 def get_tm_id(pcf_descr=None):
+    """
+
+    :param pcf_descr:
+    :return:
+    """
     if pcf_descr is None:
         tms = scoped_session_idb.execute('SELECT pid_type, pid_stype, pid_apid, pid_pi1_val, pid_descr, pid_tpsd, '
                                          'pid_spid, pcf_name, pcf_descr, pcf_curtx, txp_from, txp_altxt, plf_offby,'
@@ -3538,11 +4321,12 @@ def get_tm_id(pcf_descr=None):
 def get_tm_parameter_sizes(st, sst, apid=None, pi1val=0):
     """
     Returns a list of parameters and their sizes. For variable length TMs only the first fixed part is considered.
-    @param st:
-    @param sst:
-    @param apid:
-    @param pi1val:
-    @return:
+
+    :param st:
+    :param sst:
+    :param apid:
+    :param pi1val:
+    :return:
     """
 
     spid, tpsd = _get_spid(st, sst, apid=apid, pi1val=pi1val)
@@ -3567,11 +4351,11 @@ def get_tm_parameter_sizes(st, sst, apid=None, pi1val=0):
 def _get_spid(st, sst, apid=None, pi1val=0):
     """
 
-    @param st:
-    @param sst:
-    @param apid:
-    @param pi1val:
-    @return:
+    :param st:
+    :param sst:
+    :param apid:
+    :param pi1val:
+    :return:
     """
     if apid is None:
         apid = ''
@@ -3585,6 +4369,13 @@ def _get_spid(st, sst, apid=None, pi1val=0):
 
 
 def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
+    """
+
+    :param pcf_descr:
+    :param src_file:
+    :param as_dict:
+    :return:
+    """
     if not isinstance(src_file, (str, type(None))):
         raise TypeError('src_file must be str, is {}.'.format(type(src_file)))
 
@@ -3631,6 +4422,11 @@ def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
 
 
 def get_dp_fmt_info(dp_name):
+    """
+
+    :param dp_name:
+    :return:
+    """
     que = 'SELECT pcf_name FROM pcf where pcf_pid is not NULL and pcf_descr="{}"'.format(dp_name)
     mib_name = scoped_session_idb.execute(que).fetchall()[0]
     return mib_name
@@ -3648,6 +4444,16 @@ def get_dp_fmt_info(dp_name):
 
 
 def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+    """
+
+    :param ccf_descr:
+    :param pool_name:
+    :param preamble:
+    :param options:
+    :param comment:
+    :param add_parcfg:
+    :return:
+    """
     try:
         cmd, pars = list(get_tc_list(ccf_descr).items())[0]
     except IndexError:
@@ -3657,6 +4463,17 @@ def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', opti
 
 
 def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+    """
+
+    :param cmd:
+    :param pars:
+    :param pool_name:
+    :param preamble:
+    :param options:
+    :param comment:
+    :param add_parcfg:
+    :return:
+    """
     if comment:
         commentstr = "# TC({},{}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
         newline = '\n'
@@ -3694,6 +4511,7 @@ def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='
 def parsinfo_to_str(pars, separator=None):
     """
     Return list of editable parameter names based on get_tc_list info
+
     :param pars:
     :param separator:
     :return:
@@ -3707,6 +4525,7 @@ def parsinfo_to_str(pars, separator=None):
 def on_open_univie_clicked(button):
     """
     Called by all applications, and called by the univie button to set up the starting options
+
     :param button:
     :return:
     """
@@ -3718,6 +4537,7 @@ def on_open_univie_clicked(button):
 def about_dialog(parent=None, action=None):
     """
     Called by the Univie Button, option About, pops up the Credits Window
+
     :param parent: Instance of the calling Gtk Window, for the Gtk.Dialog
     :param action: Simply the calling button
     :return:
@@ -3747,14 +4567,15 @@ def about_dialog(parent=None, action=None):
 
 def change_communication_func(main_instance=None,new_main=None,new_main_nbr=None,application=None,application_nbr=1,parentwin=None):
     """
-    Called by the Univie button, option Communication, Used to change the main_application for each project
+    Called by the UVIE button, option Communication. Used to change the main_application for each project
     (main_instance), also possible to only change main communication for one application
+
     :param new_main:The new main_application to be called every time in the future
     :param new_main_nbr: The instance of the new main_application
     :param application:The application to change the main communication for, None if chang for all
-    :param application_nbr:The instance of :param application
-    :param main_instance:The project in which the changes should accure
-    :param parentwin:Instance of a Gtk.Window for the Gtk.Dialog, None if called from a command line
+    :param application_nbr:The instance of *application*
+    :param main_instance:The project in which the changes should apply
+    :param parentwin:Instance of a Gtk.Window for the Gtk.Dialog, *None* if called from a command line
     :return:
     """
     save_com = {}
@@ -3801,6 +4622,7 @@ def change_communication_func(main_instance=None,new_main=None,new_main_nbr=None
 def change_main_communication(new_main, new_main_nbr, main_instance, own_bus_name=None):
     """
     Changes the main_communication for the entire main_instance (project)
+
     :param new_main: The new main_application to be called every time in the future
     :param new_main_nbr: The instance of the new main_application
     :param main_instance: The application to change the main communication for, None if chang for all
@@ -3826,6 +4648,7 @@ def add_decode_parameter(parentwin=None):  # , label=None, fmt=None, bytepos=Non
     """
     Add a parameter which can be used in a User DEFined packet, only defined by the format and can therefore only be
     used if the package is decoded in the given order
+
     :param parentwin: For graphical usage
     :return:
     """
@@ -3867,14 +4690,15 @@ def add_decode_parameter(parentwin=None):  # , label=None, fmt=None, bytepos=Non
 def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameters=None, parentwin=None):
     """
     Add User DEFined packet with decoding info for TM not defined in IDB
-    @param label: Name of new defined packet
-    @param st: Service Type
-    @param sst: Sub Service Type
-    @param apid:
-    @param sid:
-    @param parameters: list of parameters
-    @param parentwin:
-    @return:
+
+    :param label: Name of new defined packet
+    :param st: Service Type
+    :param sst: Sub Service Type
+    :param apid:
+    :param sid:
+    :param parameters: list of parameters
+    :param parentwin:
+    :return:
     """
 
     if label and st and sst and apid:
@@ -3916,8 +4740,9 @@ def add_tm_decoder(label=None, st=None, sst=None, apid=None, sid=None, parameter
 def _parameter_decoding_info(param, check_curtx=False):
     """
     Return parameter info tuple used for TM decoding
-    @param param:
-    @return:
+
+    :param param:
+    :return:
     """
 
     if param[1] not in ['user_defined', 'user_defined_nopos', 'dp_item']:
@@ -3963,6 +4788,15 @@ def _parameter_decoding_info(param, check_curtx=False):
 
 
 def create_hk_decoder(sid, *dp_ids, apid=None):
+    """
+    Create a decoder to interpret custom HK packets not defined in the MIB
+
+    :param sid: SID of the custom HK
+    :param dp_ids: list of parameters in the custom HK
+    :param apid: APID of the custom HK packet
+    :return:
+
+    """
     parameters = [(dp_id, 'dp_item') for dp_id in dp_ids]
 
     if apid is None:
@@ -3989,17 +4823,18 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
                        bitlen=None, parentwin=None):
     """
     Add a stand-alone (i.e. with positional info) User DEFined parameter
-    @param parameter:
-    @param apid:
-    @param st:
-    @param sst:
-    @param sid:
-    @param bytepos:
-    @param fmt:
-    @param offbi:
-    @param bitlen:
-    @param parentwin:
-    @return:
+
+    :param parameter:
+    :param apid:
+    :param st:
+    :param sst:
+    :param sid:
+    :param bytepos:
+    :param fmt:
+    :param offbi:
+    :param bitlen:
+    :param parentwin:
+    :return:
     """
     # If a Gtk Parent Window is given, open the Dialog window to specify the details for the parameter
     if parentwin is not None:
@@ -4096,6 +4931,12 @@ def add_user_parameter(parameter=None, apid=None, st=None, sst=None, sid=None, b
 
 # Removes a user defined Parameter
 def remove_user_parameter(parname=None, parentwin=None):
+    """
+
+    :param parname:
+    :param parentwin:
+    :return:
+    """
     # If a Parameter is given delete the parameter
     if parname and cfg.has_option(CFG_SECT_PLOT_PARAMETERS, parname):
         cfg.remove_option_from_file(CFG_SECT_PLOT_PARAMETERS, parname)
@@ -4124,6 +4965,12 @@ def remove_user_parameter(parname=None, parentwin=None):
 
 # Edit an existing user defined Parameter
 def edit_user_parameter(parentwin=None, parname=None):
+    """
+
+    :param parentwin:
+    :param parname:
+    :return:
+    """
 
     # if an existing parameter is given, open same window as for adding a parameter, but pass along the existing information
     # simply overwrite the existing parameter with the new one
@@ -4190,6 +5037,7 @@ def edit_user_parameter(parentwin=None, parname=None):
 def read_plm_gateway_data(raw):
     """
     Interprets raw data from SMILE SXI PLM SpW Gateway data port (5000) and returns SpW packet(s) plus decoded PLM header data (see H8823-UM-HVS-0001)
+
     :param raw: binary data as received from PLM Gateway
     :return:
     """
@@ -4203,6 +5051,7 @@ def read_plm_gateway_data(raw):
 def pack_plm_gateway_data(raw):
     """
     Pack data for TC to SMILE SXI PLM SpW Gateway data port (5000) (see H8823-UM-HVS-0001)
+
     :param raw: binary SpW packet
     :return:
     """
@@ -4238,10 +5087,11 @@ def get_spw_from_plm_gw(sock_plm, sock_gnd, strip_spw=4):
 def setup_gw_spw_routing(gw_hp, gnd_hp, tc_hp=None, spw_head=b'\xfe\x02\x00\x00'):
     """
     A router for the single-port HVS SpW Brick that handles the HVS and SpW protocol for the CCS
-    @param gw_hp:
-    @param gnd_hp:
-    @param tc_hp:
-    @param spw_head:
+
+    :param gw_hp:
+    :param gnd_hp:
+    :param tc_hp:
+    :param spw_head:
     """
     gw = socket.socket()
     gw.settimeout(10)
@@ -4310,7 +5160,12 @@ def _gresb_pack(pkt, protocol_id=0, hdr_endianess='big'):
 
 
 def get_gresb_pkt(gresb, gnd_s, hdr_endianess='big'):
+    """
 
+    :param gresb:
+    :param gnd_s:
+    :param hdr_endianess:
+    """
     data = b''
     while len(data) < 4:
         data += gresb.recv(4 - len(data))
@@ -4328,11 +5183,12 @@ def get_gresb_pkt(gresb, gnd_s, hdr_endianess='big'):
 def setup_gresb_routing(gresb_hp, gnd_hp, tc_hp=None, protocol_id=0, hdr_endianess='big'):
     """
     Handle GRESB protocol for CCS
-    @param gresb_hp:
-    @param gnd_hp:
-    @param tc_hp:
-    @param protocol_id:
-    @param hdr_endianess:
+
+    :param gresb_hp:
+    :param gnd_hp:
+    :param tc_hp:
+    :param protocol_id:
+    :param hdr_endianess:
     """
     gresb = socket.socket()
     gresb.settimeout(10)
@@ -4396,8 +5252,9 @@ def setup_gresb_routing(gresb_hp, gnd_hp, tc_hp=None, protocol_id=0, hdr_endiane
 def extract_spw(stream):
     """
     Read SpW packets from a byte stream
-    @param stream:
-    @return:
+
+    :param stream:
+    :return:
     """
 
     pkt_size_stream = b''
@@ -4475,6 +5332,13 @@ def extract_spw(stream):
 #  @param mode      Type of the saved file. _binary_ or _hex_
 #  @param st_filter Packets of that service type will be saved
 def savepool(filename, pool_name, mode='binary', st_filter=None):
+    """
+
+    :param filename:
+    :param pool_name:
+    :param mode:
+    :param st_filter:
+    """
     # get new session for saving process
     logger.info('Saving pool content to disk...')
     tmlist = list(get_packets_from_pool(pool_name))
@@ -4485,12 +5349,13 @@ def savepool(filename, pool_name, mode='binary', st_filter=None):
 
 def get_packets_from_pool(pool_name, indices=None, st=None, sst=None, apid=None, **kwargs):
     """
-    @param pool_name:
-    @param indices:
-    @param st:
-    @param sst:
-    @param apid:
-    @return:
+
+    :param pool_name:
+    :param indices:
+    :param st:
+    :param sst:
+    :param apid:
+    :return:
     """
     new_session = scoped_session_storage
 
@@ -4523,6 +5388,8 @@ def get_packets_from_pool(pool_name, indices=None, st=None, sst=None, apid=None,
 def add_tst_import_paths():
     """
     Include all paths to TST files that could potentially be used.
+
+    :return:
     """
     # Add general tst path
     sys.path.append(cfg.get('paths', 'tst'))
@@ -4544,12 +5411,21 @@ def add_tst_import_paths():
 
 
 def interleave_lists(*args):
+    """
+
+    :param args:
+    :return:
+    """
     if len({len(x) for x in args}) > 1:
         logger.warning('Iterables are not of the same length, result will be truncated to the shortest input!')
     return [i for j in zip(*args) for i in j]
 
 
 def create_format_model():
+    """
+
+    :return:
+    """
     store = Gtk.ListStore(str)
     for fmt in fmtlist.keys():
         if fmt != 'bit*':
@@ -4560,7 +5436,12 @@ def create_format_model():
 
 
 def _get_displayed_pool_path(pool_name=None):
-    """Try to get name of pool currently displayed in poolviewer or loaded in current poolmanager session"""
+    """
+    Try to get name of pool currently displayed in poolviewer or loaded in current poolmanager session
+
+    :param pool_name:
+    :return:
+    """
 
     if pool_name is None:
         pv = get_module_handle('poolviewer', timeout=1)
@@ -4581,10 +5462,22 @@ def _get_displayed_pool_path(pool_name=None):
         return
 
 
-#  Collect TM13 packets
 def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=None, join=True, collect_all=False,
                sdu=None, verbose=True):
+    """
+    Collect and group S13 down transfer packet trains
 
+    :param pool_name:
+    :param starttime:
+    :param endtime:
+    :param startidx:
+    :param endidx:
+    :param join:
+    :param collect_all:
+    :param sdu:
+    :param verbose:
+    :return:
+    """
     if not os.path.isfile(pool_name):
         logger.debug('{} is not a file, looking it up in DB'.format(pool_name))
         # try fetching pool info from pools opened in viewer
@@ -4717,16 +5610,17 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
 def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=False, sdu=None, startidx=None,
                     endidx=None, verbose=True):
     """
-    Dump 13,2 data to disk. For pools loaded from a file, pool_name must be the absolute path of that file.
-    @param pool_name:
-    @param starttime:
-    @param endtime:
-    @param outdir:
-    @param dump_all:
-    @param sdu:
-    @param startidx:
-    @param endidx:
-    @param verbose:
+    Dump S13 down transfer data to disk. For pools loaded from a file, pool_name must be the absolute path of that file.
+
+    :param pool_name:
+    :param starttime:
+    :param endtime:
+    :param outdir:
+    :param dump_all:
+    :param sdu:
+    :param startidx:
+    :param endidx:
+    :param verbose:
     """
 
     if not os.path.exists(outdir):
@@ -4763,7 +5657,9 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
 
 
 class TestReport:
-
+    """
+    Provides functions for interactive test reporting
+    """
     def __init__(self, filename, version, idb_version, gui=False, delimiter='|'):
         super(TestReport, self).__init__()
         self.specfile = filename
@@ -4790,7 +5686,12 @@ class TestReport:
                 self.step_rowid[items[0]] = i
 
     def execute_step(self, step, ask=True):
+        """
 
+        :param step:
+        :param ask:
+        :return:
+        """
         if not ask:
             return
 
@@ -4827,7 +5728,11 @@ class TestReport:
             return
 
     def verify_step(self, step):
+        """
 
+        :param step:
+        :return:
+        """
         try:
             ver_msg = '{}:\n{}'.format(step.upper(), self.report[self.step_rowid[str(step)]][2])
             if self.gui:
@@ -4859,6 +5764,11 @@ class TestReport:
         self.report[self.step_rowid[str(step)]][3] = result
 
     def export(self, reportdir=None, reportfile=None):
+        """
+
+        :param reportdir:
+        :param reportfile:
+        """
         if reportfile is None:
             if reportdir is None:
                 reportfile = self.specfile.replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version)).replace('/testspec/', '/testrep/')
@@ -4878,7 +5788,9 @@ class TestReport:
 
 
 class TestReportGUI(Gtk.MessageDialog):
-
+    """
+    GUI for the TestReport class
+    """
     def __init__(self, testlabel, message):
         super(TestReportGUI, self).__init__(title=testlabel,
                                             buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -4904,7 +5816,9 @@ class TestReportGUI(Gtk.MessageDialog):
 
 
 class TestExecGUI(Gtk.MessageDialog):
-
+    """
+    Dialog window to confirm test step execution
+    """
     def __init__(self, testlabel, message):
         super(TestExecGUI, self).__init__(title=testlabel,
                                           buttons=(# Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -4925,6 +5839,9 @@ class TestExecGUI(Gtk.MessageDialog):
 
 
 class TmParameterDecoderDialog(Gtk.Dialog):
+    """
+    Interface to define custom paramters
+    """
     def __init__(self, parent=None):
         Gtk.Dialog.__init__(self, "Add User Parameter", parent, 0,
                             buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
@@ -4967,12 +5884,21 @@ class TmParameterDecoderDialog(Gtk.Dialog):
         self.show_all()
 
     def check_ok_sensitive(self, unused_widget, button):
+        """
+
+        :param unused_widget:
+        :param button:
+        """
         if len(self.label.get_text()) == 0 or not self.format.get_active_text():
             button.set_sensitive(False)
         else:
             button.set_sensitive(True)
 
     def bitlen_active(self, widget):
+        """
+
+        :param widget:
+        """
         if widget.get_active_text().endswith('*'):
             self.bitlen.set_sensitive(True)
             # if widget.get_active_text().startswith(('ascii', 'oct')):
@@ -4984,6 +5910,9 @@ class TmParameterDecoderDialog(Gtk.Dialog):
 
 
 class TmDecoderDialog(Gtk.Dialog):
+    """
+    Interface to define custom packet structures
+    """
     def __init__(self, logger, parameter_set=None, parent=None):
         Gtk.Dialog.__init__(self, "Build User Defined Packet Structure", parent, 0)
         self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
@@ -5009,6 +5938,11 @@ class TmDecoderDialog(Gtk.Dialog):
         self.show_all()
 
     def create_view(self, parameter_set=None):
+        """
+
+        :param parameter_set:
+        :return:
+        """
         parameter_view = self.create_param_view()
         packet = None
 
@@ -5103,6 +6037,10 @@ class TmDecoderDialog(Gtk.Dialog):
         return box
 
     def create_param_view(self):
+        """
+
+        :return:
+        """
         self.treeview = Gtk.TreeView(self.create_parameter_model())
 
         self.treeview.append_column(Gtk.TreeViewColumn("Parameters", Gtk.CellRendererText(), text=0))
@@ -5121,6 +6059,11 @@ class TmDecoderDialog(Gtk.Dialog):
         return sw
 
     def create_slot(self, group=None):
+        """
+
+        :param group:
+        :return:
+        """
         self.parameter_list = Gtk.ListStore(str, str)
         treeview = Gtk.TreeView(self.parameter_list)
         treeview.set_reorderable(True)
@@ -5159,6 +6102,11 @@ class TmDecoderDialog(Gtk.Dialog):
         return vbox
 
     def name_to_descr(self, name):
+        """
+
+        :param name:
+        :return:
+        """
         dbcon = self.session_factory_idb
         dbres = dbcon.execute('SELECT pcf_descr, pcf_name FROM pcf WHERE pcf_name="{}"'.format(name))
         name = dbres.fetchall()
@@ -5192,6 +6140,10 @@ class TmDecoderDialog(Gtk.Dialog):
     #     return parameter_model
 
     def create_parameter_model(self):
+        """
+
+        :return:
+        """
         parameter_model = Gtk.TreeStore(str, str)
         self.store = parameter_model
 
@@ -5242,6 +6194,12 @@ class TmDecoderDialog(Gtk.Dialog):
         return parameter_model
 
     def add_parameter(self, widget, listmodel):
+        """
+
+        :param widget:
+        :param listmodel:
+        :return:
+        """
         par_model, par_iter = self.treeview.get_selection().get_selected()
         if par_model[par_iter][1] is None:
             return
@@ -5262,6 +6220,12 @@ class TmDecoderDialog(Gtk.Dialog):
         return
 
     def remove_parameter(self, widget, listview):
+        """
+
+        :param widget:
+        :param listview:
+        :return:
+        """
         model, modeliter = listview.get_selection().get_selected()
 
         if modeliter is None:
@@ -5271,6 +6235,10 @@ class TmDecoderDialog(Gtk.Dialog):
         return
 
     def check_entry(self, widget):
+        """
+
+        :param widget:
+        """
         if self.apid.get_text_length() and self.st.get_text_length() and self.sst.get_text_length \
                 and self.label.get_text_length():
             self.ok_button.set_sensitive(True)
@@ -5279,6 +6247,9 @@ class TmDecoderDialog(Gtk.Dialog):
 
 
 class UserParameterDialog(Gtk.MessageDialog):
+    """
+    Interface to edit a user-defined parameter
+    """
     def __init__(self, parent=None, edit=None):
         Gtk.Dialog.__init__(self, "Edit User Parameter", parent, 0,
                             buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
@@ -5377,6 +6348,11 @@ class UserParameterDialog(Gtk.MessageDialog):
         self.show_all()
 
     def check_entry(self, widget, ok_button):
+        """
+
+        :param widget:
+        :param ok_button:
+        """
         if self.apid.get_text_length() and self.st.get_text_length() and self.sst.get_text_length \
                 and self.label.get_text_length() and self.bytepos.get_text_length():
             ok_button.set_sensitive(True)
@@ -5384,6 +6360,10 @@ class UserParameterDialog(Gtk.MessageDialog):
             ok_button.set_sensitive(False)
 
     def bitlen_active(self, widget):
+        """
+
+        :param widget:
+        """
         if widget.get_active_text() == 'uint*':
             self.bitlen.set_sensitive(True)
             self.offbi.set_sensitive(True)
@@ -5478,9 +6458,12 @@ class UserParameterDialog(Gtk.MessageDialog):
 
 
 class ChangeCommunicationDialog(Gtk.Dialog):
+    """
+    This dialog is used to manage the main_communication in the CCS via a GUI
+    """
     def __init__(self, cfg, main_instance, parent=None):
         """
-        This Dialog is used to manage the main_communication in the CCS with a GUI
+
         :param cfg: Is the config file
         :param main_instance: Is the project name
         :param parent: Given Gtk.Window instance
@@ -5516,7 +6499,8 @@ class ChangeCommunicationDialog(Gtk.Dialog):
     def setup_change_box(self):
         """
         Sets up the main Box in which the change happens
-        :return: A Gtk.Box
+
+        :return: a Gtk.Box
         """
         main_box = Gtk.HBox()
 
@@ -5553,6 +6537,7 @@ class ChangeCommunicationDialog(Gtk.Dialog):
     def get_entry_list(self, app):
         """
         Returns a List of all active instance of the given application in this main_instance (project)
+
         :param app: application name (poolviewer,...)
         :return: liststore and listplace
         """
@@ -5580,6 +6565,7 @@ class ChangeCommunicationDialog(Gtk.Dialog):
     def main_com_changed(self, widget):
         """
         Is called when some connection is changed
+
         :param widget:
         :return:
         """
@@ -5595,6 +6581,7 @@ class ChangeCommunicationDialog(Gtk.Dialog):
     def get_tick_box(self):
         """
         Creates the Check Button
+
         :return: a Gtk.Box
         """
         main_box = Gtk.VBox()
@@ -5610,7 +6597,7 @@ class ChangeCommunicationDialog(Gtk.Dialog):
 
 class ProjectDialog(Gtk.Dialog):
     """
-    Dialog that pops up at CCS/TST startup to allow for project and IDB configuration
+    Dialog that optionally pops up at CCS/TST start-up to allow for project and IDB configuration
     """
 
     def __init__(self):
