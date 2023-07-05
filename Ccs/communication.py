@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-General purpose socket communication utility functions
+General purpose socket communication utilities
 
 """
 import queue
@@ -12,6 +12,10 @@ import time
 
 
 class Connector:
+    """
+    Utility class for bidirectional socket handling
+    """
+
     RECV_NBYTES = 4096
 
     def __init__(self, host, port, is_server=False, response_to=2, recv_nbytes_min=0, save_to_file=None, msgdecoding='hex', resp_decoder=None):
@@ -156,6 +160,11 @@ class Connector:
         self.response_to = seconds
 
     def start_receiver(self, procfunc=None):
+        """
+
+        :param procfunc: function that must return a list
+        :return:
+        """
         if self.conn is None:
             print('No connection')
             return
@@ -168,6 +177,9 @@ class Connector:
 
 
 class Receiver:
+    """
+    Reads and processes data from sockets
+    """
 
     RECV_BYTES = 4096
     SEL_TIMEOUT = 2

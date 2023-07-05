@@ -303,6 +303,23 @@ def _hexasciify(value, nchars, signed=False):
         return value
 
 
+class Signal:
+
+    EGSE_PSU_OK = 1
+    EGSE_FEE_DIG_OK = 2
+    EGSE_RSE_OK = 3
+    EGSE_PIN_PULL_OK = 4
+    EGSE_FEE_ANA_OK = 5
+
+    EGSE_I_FEE = 1
+    EGSE_I_PSU = 2
+    EGSE_I_HEATER = 3
+    EGSE_I_RSE = 4
+
+    FEE_Thermistor = 1
+    CDD_Thermistor = 2
+
+
 def response_proc_func(rawdata):
     pkts = rawdata.split(EOP)
     pkts.remove(b'')
