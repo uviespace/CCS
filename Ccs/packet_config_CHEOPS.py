@@ -36,6 +36,9 @@ PUS_PKT_VERS_NUM = 0  # 0 for space packets
 PUS_VERSION = 1
 MAX_PKT_LEN = 1024  # bytes
 
+TMTC = {0: 'TM', 1: 'TC'}
+TSYNC_FLAG = {0: 'U', 1: 'S', 5: 'S'}
+
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
     ("PKT_TYPE", ctypes.c_uint16, 1),
