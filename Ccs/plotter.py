@@ -1,4 +1,5 @@
 import json
+import os.path
 import struct
 import threading
 import time
@@ -75,6 +76,8 @@ class PlotViewer(Gtk.Window):
         self.data_max_idx = None
         self.pi1_lut = {}
 
+        self._pkt_buffer = {}  # local store for TM packets extracted from SQL DB, for speedup
+
         self.cfg = confignator.get_config()
 
         # Set up the logger
@@ -103,7 +106,7 @@ class PlotViewer(Gtk.Window):
         self.user_tm_decoders = cfl.user_tm_decoders_func()
 
         self.canvas = self.create_canvas()
-        toolbar = self.create_toolbar(self.loaded_pool)
+        toolbar = self.create_toolbar()  # self.loaded_pool)
 
         param_view = self.create_param_view()
 
@@ -111,7 +114,7 @@ class PlotViewer(Gtk.Window):
         box.pack_start(hbox, 1, 1, 0)
 
         hbox.pack_start(self.canvas, 1, 1, 0)
-        hbox.pack_start(param_view, 1, 1, 0)
+        hbox.pack_start(param_view, 0, 0, 0)
 
         navbar = self._create_navbar()
         box.pack_start(navbar, 0, 0, 0)
@@ -137,7 +140,7 @@ class PlotViewer(Gtk.Window):
 
         self.pool_selector.set_active_iter(self.pool_selector_pools.get_iter(0))
 
-    def create_toolbar(self, pool_info=None):
+    def create_toolbar(self):  #, pool_info=None):
         toolbar = Gtk.HBox()
 
         # if pool_selector is not None:
@@ -155,7 +158,14 @@ class PlotViewer(Gtk.Window):
         self.pool_selector = Gtk.ComboBoxText(tooltip_text='Select Pool to Plot')
         self.pool_selector_pools = Gtk.ListStore(str, int, str, bool)
 
-        self.pool_selector_pools.append(['Select Pool', 0, 'Select Pool', False])
+        # self.pool_selector_pools.append(['Select Pool', 0, 'Select Pool', False])
+        if self.loaded_pool is not None and isinstance(self.loaded_pool, str):
+            res = self.session_factory_storage.execute('SELECT * FROM tm_pool WHERE pool_name="{}"'.format(self.loaded_pool))
+            try:
+                iid, filename, protocol, modtime = res.fetchall()[0]
+                self.pool_selector_pools.append([filename, modtime, filename, bool(not filename.count('/'))])
+            except IndexError:
+                self.logger.error('Could not load pool {}'.format(self.loaded_pool))
 
         self.pool_selector.set_model(self.pool_selector_pools)
         #self.pool_selector.set_entry_text_column(2)
@@ -191,6 +201,11 @@ class PlotViewer(Gtk.Window):
         self.show_limits.set_tooltip_text('Show/hide parameter limits')
         self.show_limits.connect("toggled", self._toggle_limits)
         toolbar.pack_start(self.show_limits, 0, 0, 0)
+
+        self.calibrate = Gtk.CheckButton(label='Cal', active=True)
+        self.calibrate.set_tooltip_text('Plot engineering values, if available')
+        # self.calibrate.connect("toggled", self._toggle_limits)
+        toolbar.pack_start(self.calibrate, 0, 0, 0)
 
         toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 0)
 
@@ -669,6 +684,9 @@ class PlotViewer(Gtk.Window):
         return sid_offset, sid_bitlen // 8
 
     def plot_parameter(self, widget=None, parameter=None):
+
+        nocal = not self.calibrate.get_active()
+
         if parameter is not None:
             hk, parameter = parameter
         else:
@@ -735,8 +753,24 @@ class PlotViewer(Gtk.Window):
 
         try:
             # TODO: speedup?
-            xy, (descr, unit) = cfl.get_param_values([row.raw for row in rows.yield_per(1000)], hk, parameter,
-                                                     numerical=True, tmfilter=False)
+            if hk in self._pkt_buffer:
+                bufidx, pkts = self._pkt_buffer[hk]
+
+                rows = cfl.filter_rows(rows, idx_from=bufidx+1)
+                if rows.first() is not None:
+                    bufidx = rows.order_by(DbTelemetry.idx.desc()).first().idx
+                    pkts += [row.raw for row in rows.yield_per(1000)]
+                    self._pkt_buffer[hk] = (bufidx, pkts)
+
+            else:
+                pkts = [row.raw for row in rows.yield_per(1000)]
+                if len(pkts) > 0:
+                    bufidx = rows.order_by(DbTelemetry.idx.desc()).first().idx
+                    self._pkt_buffer[hk] = (bufidx, pkts)
+
+            xy, (descr, unit) = cfl.get_param_values(pkts, hk=hk, param=parameter,
+                                                     numerical=True, tmfilter=False, nocal=nocal)
+
             if len(xy) == 0:
                 return
 
@@ -748,7 +782,8 @@ class PlotViewer(Gtk.Window):
         # store packet info for update worker
         self.data_dict[hk + ':' + descr] = xy
         self.data_dict_info[hk + ':' + descr] = {}
-        self.data_dict_info[hk + ':' + descr]['idx_last'] = rows.order_by(DbTelemetry.idx.desc()).first().idx
+        self.data_dict_info[hk + ':' + descr]['idx_last'] = bufidx
+        # self.data_dict_info[hk + ':' + descr]['idx_last'] = rows.order_by(DbTelemetry.idx.desc()).first().idx
         self.data_dict_info[hk + ':' + descr]['st'] = st
         self.data_dict_info[hk + ':' + descr]['sst'] = sst
         self.data_dict_info[hk + ':' + descr]['apid'] = apid

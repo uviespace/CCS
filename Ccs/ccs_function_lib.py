@@ -58,6 +58,11 @@ except SQLOperationalError as err:
     logger.critical(err)
     sys.exit()
 
+# MIB caches to reduce SQL load
+_pcf_cache = {}
+_cap_cache = {}
+_txp_cache = {}
+
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
 
@@ -124,6 +129,12 @@ else:
     user_tm_decoders = {}
 
 
+def _reset_mib_caches():
+    _pcf_cache.clear()
+    _cap_cache.clear()
+    _txp_cache.clear()
+
+
 def _add_log_socket_handler():
     global logger
     # check if a handler is already present
@@ -150,6 +161,9 @@ def set_scoped_session_idb_version(idb_version=None):
     global scoped_session_idb
     scoped_session_idb.close()
     scoped_session_idb = scoped_session_maker('idb', idb_version=idb_version)
+
+    _reset_mib_caches()
+
     logger.info('MIB SQL reconnect ({})'.format(idb_version))
 
 
