@@ -708,8 +708,13 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
     tmtcname = " / ".join(tmtcnames)
 
     if nocal:
-        def _get_val_func(x):
-            return [str(x[2]), str(x[4][0]), '']
+        # check if packet size is variable (because of different returned data structure)
+        if not isinstance(sourcedata[0][-1], tuple):
+            def _get_val_func(x):
+                return [str(x[2]), str(x[4]), '']
+        else:
+            def _get_val_func(x):
+                return [str(x[2]), str(x[4][0]), '']
     else:
         def _get_val_func(x):
             return [str(x[2]), str(x[0]), none_to_empty(x[1])]
