@@ -112,6 +112,8 @@ class TMPoolView(Gtk.Window):
     shown_limit = 0
     only_scroll = False
 
+    CELLPAD_MAGIC = float(cfg['ccs-misc']['viewer_cell_pad'])
+
     def __init__(self, cfg=cfg, pool_name=None, cfilters='default', standalone=False):
         Gtk.Window.__init__(self, title="Pool View", default_height=800, default_width=1100)
 
@@ -578,7 +580,12 @@ class TMPoolView(Gtk.Window):
 
         if self.active_pool_info.pool_name not in (None, ''):
             self.adj.set_upper(self.count_current_pool_rows())
-        self.adj.set_page_size(50)
+        height = self.treeview.get_allocated_height()
+        column = self.treeview.get_column(0)
+        cell_pad = column.get_cells()[0].get_padding()[1]
+        cell = column.cell_get_size()[-1] + cell_pad * self.CELLPAD_MAGIC
+        nlines = height // cell
+        self.adj.set_page_size(nlines)
         scrollbar.connect('value_changed', self._on_scrollbar_changed, self.adj, False)
         scrollbar.connect('button-press-event', self.scroll_bar)
         # scrollbar.connect('value_changed', self.reselect_rows)
@@ -629,8 +636,11 @@ class TMPoolView(Gtk.Window):
     def set_number_of_treeview_rows(self, widget=None, allocation=None):
         # alloc = widget.get_allocation()
         height = self.treeview.get_allocated_height()
-        cell = 25
-        # cell = self.treeview.get_columns()[0].cell_get_size()[-1] + 2
+        # height = self.treeview.get_visible_rect().height
+        # cell = 25
+        column = self.treeview.get_column(0)
+        cell_pad = column.get_cells()[0].get_padding()[1]
+        cell = column.cell_get_size()[-1] + cell_pad * self.CELLPAD_MAGIC
         nlines = height // cell
         self.adj.set_page_size(nlines - 1)
         # self._scroll_treeview()
@@ -878,7 +888,7 @@ class TMPoolView(Gtk.Window):
                 return x[0] < x[2]
             elif x[1] == '>':
                 return x[0] > x[2]
-            
+
         # for fid in self.filter_rules:
         #     ff = self.filter_rules[fid]
         #     if ff[1] == '==':
@@ -2106,7 +2116,6 @@ class TMPoolView(Gtk.Window):
                 type = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name)
                 self.Active_Pool_Info_append([pool_name, type.modification_time, pool_name, False])
 
-
             new_session.close()
 
         self.update_columns()
@@ -2120,7 +2129,6 @@ class TMPoolView(Gtk.Window):
         self.adj.set_upper(self.count_current_pool_rows())
         self.adj.set_value(0)
         self._on_scrollbar_changed(adj=self.adj)
-
 
         # queue = self.queues[pool_name]
         #
@@ -2255,7 +2263,6 @@ class TMPoolView(Gtk.Window):
             poolmgr = cfl.dbus_connection('poolmanager', instance)
             cfl.Functions(poolmgr, 'loaded_pools_func', self.active_pool_info.pool_name, self.active_pool_info)
         return
-
 
     def create_tm_data_viewer(self):
         box = Gtk.VBox()
