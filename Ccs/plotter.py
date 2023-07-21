@@ -83,12 +83,6 @@ class PlotViewer(Gtk.Window):
         # Set up the logger
         self.logger = cfl.start_logging('ParameterPlotter')
 
-        # Specify which Pool should be used
-        if loaded_pool is not None:
-            self.loaded_pool = loaded_pool
-        else:
-            self.loaded_pool = None
-
         self.refresh_rate = refresh_rate
 
         if not self.cfg.has_section(cfl.CFG_SECT_PLOT_PARAMETERS):
@@ -97,6 +91,17 @@ class PlotViewer(Gtk.Window):
 
         self.session_factory_idb = scoped_session_maker('idb')
         self.session_factory_storage = scoped_session_maker('storage')
+
+        # load specified pool
+        if loaded_pool is not None and isinstance(loaded_pool, str):
+            res = self.session_factory_storage.execute('SELECT * FROM tm_pool WHERE pool_name="{}"'.format(loaded_pool))
+            try:
+                iid, filename, protocol, modtime = res.fetchall()[0]
+                self.loaded_pool = ActivePoolInfo(filename, modtime, filename, bool(not filename.count('/')))
+            except IndexError:
+                self.logger.error('Could not load pool {}'.format(loaded_pool))
+        else:
+            self.loaded_pool = None
 
         box = Gtk.VBox()
         self.add(box)
@@ -138,7 +143,7 @@ class PlotViewer(Gtk.Window):
         self.live_plot_switch.set_active(start_live)
         self.show_all()
 
-        self.pool_selector.set_active_iter(self.pool_selector_pools.get_iter(0))
+        # self.pool_selector.set_active_iter(self.pool_selector_pools.get_iter(0))
 
     def create_toolbar(self):  #, pool_info=None):
         toolbar = Gtk.HBox()
@@ -158,17 +163,10 @@ class PlotViewer(Gtk.Window):
         self.pool_selector = Gtk.ComboBoxText(tooltip_text='Select Pool to Plot')
         self.pool_selector_pools = Gtk.ListStore(str, int, str, bool)
 
-        # self.pool_selector_pools.append(['Select Pool', 0, 'Select Pool', False])
-        if self.loaded_pool is not None and isinstance(self.loaded_pool, str):
-            res = self.session_factory_storage.execute('SELECT * FROM tm_pool WHERE pool_name="{}"'.format(self.loaded_pool))
-            try:
-                iid, filename, protocol, modtime = res.fetchall()[0]
-                self.pool_selector_pools.append([filename, modtime, filename, bool(not filename.count('/'))])
-            except IndexError:
-                self.logger.error('Could not load pool {}'.format(self.loaded_pool))
+        if self.loaded_pool is not None and isinstance(self.loaded_pool, ActivePoolInfo):
+            self.pool_selector_pools.append([*self.loaded_pool])
 
         self.pool_selector.set_model(self.pool_selector_pools)
-        #self.pool_selector.set_entry_text_column(2)
         self.pool_selector.connect('changed', self.pool_changed)
 
         toolbar.pack_start(self.pool_selector, 0, 0, 0)
@@ -949,6 +947,8 @@ class PlotViewer(Gtk.Window):
         # xmin, xmax = self.subplot.get_xlim()
         lines = self.subplot.lines
 
+        nocal = not self.calibrate.get_active()
+
         for line in lines:
             parameter = line.get_label()
             if not parameter.startswith('_lim_'):
@@ -963,7 +963,7 @@ class PlotViewer(Gtk.Window):
 
                 try:
                     # xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True)[0]
-                    xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True, tmfilter=False)[0]
+                    xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True, tmfilter=False, nocal=nocal)[0]
                     idx_new = new_rows.order_by(DbTelemetry.idx.desc()).first().idx
                 except ValueError:
                     continue
@@ -1032,9 +1032,12 @@ class PlotViewer(Gtk.Window):
 
     def update_plot(self):
         while self.liveplot:
+            t1 = time.time()
             # GLib.idle_add(self.update_plot_worker, priority=GLib.PRIORITY_HIGH)
             self.update_plot_worker()
-            time.sleep(self.refresh_rate)
+            dt = self.refresh_rate - (time.time() - t1)
+            if dt > 0:
+                time.sleep(dt)
 
     def set_refresh_rate(self, rate):
         self.refresh_rate = rate
@@ -1196,7 +1199,7 @@ class PlotViewer(Gtk.Window):
 
         if self.loaded_pool:
             #self.update_pool_view()
-            self.pool_changed(self.pool_selector, self.loaded_pool)
+            self.pool_changed(self.pool_selector, pool=True) #self.loaded_pool)
 
         #if self.loaded_pool:
         #    self.select_pool(pool=self.loaded_pool)
