@@ -3,6 +3,7 @@ IWF EGSE communication library
 
 Ref: SMILE-IWF-PL-IF-048
 """
+import numpy as np
 
 PORT = 8089
 
@@ -43,6 +44,13 @@ RESPONSE_ID = {
     b'v': ('changedFEEPWRReportPeriod', 4),
     b'w': ('changedRSEReportPeriod', 4)
 }
+
+
+# load calibration curve for CCD temperature to PWM set point
+try:
+    _pwm_t_cal = np.loadtxt('ccd_pwm_t_cal.dat', unpack=True)
+except FileNotFoundError:
+    _pwm_t_cal = None
 
 
 class Command:
@@ -325,3 +333,52 @@ def response_proc_func(rawdata):
     pkts.remove(b'')
     proc_pkts = [(RESPONSE_ID.get(pkt[0:1], 'UKNOWN'), pkt.decode('ascii', errors='replace')) for pkt in pkts]
     return proc_pkts
+
+
+def ccd_pwm_from_temp(t, cal_file=None):
+    """
+    Calculate the pwm value for EGSE command set_pwm from temperature *t*, according to pwm_t_cal
+
+    :param t:
+    :param cal_file:
+    :return:
+    """
+
+    if cal_file is not None:
+        cal = np.loadtxt(cal_file, unpack=True)
+        pwm = np.round(np.interp(t, *cal, left=-1, right=-1))
+
+    else:
+        if _pwm_t_cal is not None:
+            pwm = np.round(np.interp(t, *_pwm_t_cal, left=-1, right=-1))
+        else:
+            print('No calibration curve defined')
+            return
+
+    if isinstance(pwm, np.ndarray):
+        return np.array(pwm, dtype=int)
+    else:
+        return int(pwm)
+
+
+def adu_to_ana_adcihtr(adu):
+    """
+    Calculate the 'analogue' value IWF_EGSE_I_HEATER needed for set_psu_analogue_value that corresponds to the equivalent digital HK ADU value
+
+    :param adu:
+    :return:
+    """
+
+    # this has linear behaviour
+    adu_min = 3950
+    adu_max = 12650
+    ana_min = 0
+    ana_max = 3276
+
+    if adu < adu_min:
+        return adu_min
+    elif adu > adu_max:
+        return adu_max
+    else:
+        return ((adu - adu_min) / (adu_max - adu_min)) * (ana_max - ana_min)
+
