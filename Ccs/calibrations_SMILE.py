@@ -173,7 +173,7 @@ def t_ccd_deg_to_adu_oper(t, warn=True):
     if not ((_ccd_temp_adu_array[0].min() <= t) & (t <= _ccd_temp_adu_array[0].max())).all() and warn:
         print('WARNING! Value(s) outside operational range ({} - {})!'.format(_ccd_temp_adu_array[0].min(),
                                                                               _ccd_temp_adu_array[0].max()))
-    return round(_ccd_temp_fit_adu_inv(t))
+    return np.rint(_ccd_temp_fit_adu_inv(t)).astype(int)
 
 
 def t_ccd_adu_to_deg_nonoper(adu):
@@ -181,7 +181,7 @@ def t_ccd_adu_to_deg_nonoper(adu):
 
 
 def t_ccd_deg_to_adu_nonoper(t):
-    return round(((t * V_T0.CCD * K_T.CCD - ADC_OFFSET + V_T0.CCD) * (2 ** 14 - 1)) / ADC_INPRNG)
+    return np.rint(((t * V_T0.CCD * K_T.CCD - ADC_OFFSET + V_T0.CCD) * (2 ** 14 - 1)) / ADC_INPRNG).astype(int)
 
 
 def t_ccd_adu_to_deg(adu):
@@ -209,7 +209,7 @@ def t_ccd_fee_deg_to_adu(t):
     :param t:
     :return:
     """
-    return round((t + T_ZERO) / (4.096 * 338.581) * 65535)
+    return np.rint((t + T_ZERO) / (4.096 * 338.581) * 65535).astype(int)
 
 
 def t_temp1_adu_to_deg(adu):
@@ -217,7 +217,7 @@ def t_temp1_adu_to_deg(adu):
 
 
 def t_temp1_deg_to_adu(t):
-    return round(((t * V_T0.TEMP1 * K_T.TEMP1 - ADC_OFFSET + V_T0.TEMP1) * (2 ** 14 - 1)) / ADC_INPRNG)
+    return np.rint(((t * V_T0.TEMP1 * K_T.TEMP1 - ADC_OFFSET + V_T0.TEMP1) * (2 ** 14 - 1)) / ADC_INPRNG).astype(int)
 
 
 def t_fee_adu_to_deg(adu):
@@ -225,7 +225,7 @@ def t_fee_adu_to_deg(adu):
 
 
 def t_fee_deg_to_adu(t):
-    return round(((t * V_T0.FEE * K_T.FEE - ADC_OFFSET + V_T0.FEE) * (2 ** 14 - 1)) / ADC_INPRNG)
+    return np.rint(((t * V_T0.FEE * K_T.FEE - ADC_OFFSET + V_T0.FEE) * (2 ** 14 - 1)) / ADC_INPRNG).astype(int)
 
 
 def t_rse_adu_to_deg(adu):
@@ -233,7 +233,7 @@ def t_rse_adu_to_deg(adu):
 
 
 def t_rse_deg_to_adu(t):
-    return round(4096 / (76.56 / (17.59246 - (3.908 - 0.00116 * t) ** 2) + 1))
+    return np.rint(4096 / (76.56 / (17.59246 - (3.908 - 0.00116 * t) ** 2) + 1)).astype(int)
 
 
 def t_psu_adu_to_deg(adu):
@@ -283,7 +283,7 @@ def u_dpu_adu_to_volt(adu, signal):
 
 
 def u_dpu_volt_to_adu(u, signal):
-    return round(((u / K_DPU[signal] - ADC_OFFSET) * (2 ** 14 - 1)) / ADC_INPRNG)
+    return np.rint(((u / K_DPU[signal] - ADC_OFFSET) * (2 ** 14 - 1)) / ADC_INPRNG).astype(int)
 
 
 def i_psu_adu_to_amp(adu, signal):
@@ -291,7 +291,7 @@ def i_psu_adu_to_amp(adu, signal):
 
 
 def i_psu_amp_to_adu(i, signal):
-    return round((((i - PSU_OFFSET[signal]) / K_PSU[signal] - ADC_OFFSET) * (2 ** 14 - 1)) / ADC_INPRNG)
+    return np.rint((((i - PSU_OFFSET[signal]) / K_PSU[signal] - ADC_OFFSET) * (2 ** 14 - 1)) / ADC_INPRNG).astype(int)
 
 
 def calibrate(adu, signal):
@@ -354,7 +354,19 @@ class CalibrationTables:
         # x = np.linspace(self.BOUND_L, self.BOUND_U, 60, dtype=int)
         self.temperature = {}
         for sig in vars(Temp):
-            if sig.startswith('ADC'):
+            # CCD TEMP
+            if sig == 'ADC_TEMP_CCD':
+                label = getattr(Temp, sig)
+                lmts = getattr(Limits, sig)
+                x = np.linspace(6000, 11700, 60, dtype=int)
+                self.temperature[label] = np.array([x, t_adu_to_deg(x, label)])
+            # PSU TEMP
+            elif sig == 'ADC_PSU_TEMP':
+                label = getattr(Temp, sig)
+                lmts = getattr(Limits, sig)
+                x = np.linspace(int(lmts[0]*0.9), 11650, 50, dtype=int)
+                self.temperature[label] = np.array([x, t_adu_to_deg(x, label)])
+            elif sig.startswith('ADC'):
                 label = getattr(Temp, sig)
                 lmts = getattr(Limits, sig)
                 x = np.linspace(int(lmts[0]*0.9), int(lmts[-1]*1.1), 50, dtype=int)
@@ -528,5 +540,6 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     ct = CalibrationTables()
-    # ct.plot(Temp.ADC_PSU_TEMP)
+    ct._plot(Temp.ADC_PSU_TEMP)
+    # ct.write_to_files('/home/marko/space/CCS/calibrations')
     lmt = LimitTables()
