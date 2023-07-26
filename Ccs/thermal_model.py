@@ -13,9 +13,16 @@ import calibrations_SMILE as cal
 
 from ccs_function_lib import get_pool_rows, filter_rows
 
-
 SIGMA_SB = 5.6703744191844314e-08
 TZERO = 273.15
+
+VCTRL_MIN = 0.4
+VCTRL_MAX = 2.9
+VHTR_MIN = 0.
+VHTR_MAX = 14.
+
+# linfit = np.polynomial.polynomial.Polynomial.fit((VCTRL_MIN, VCTRL_MAX), (VHTR_MIN, VHTR_MAX), 1)
+# a0, a1 = linfit.convert().coef
 
 rng = np.random.default_rng()
 
@@ -48,7 +55,7 @@ def log_norm(n, a, b):
 
 def sigmoid(n, a, b):
     x = np.linspace(-b, b, n)
-    y = x / (1 + abs(x))
+    y = x / (1 + np.abs(x))
     yn = normalise(y)
     return yn
 
@@ -91,17 +98,13 @@ def vctrl_to_vhtr(vctrl):
     :param vctrl:
     :return:
     """
-    vctrl_min = 0.2
-    vctrl_max = 3.1
-    vhtr_min = 0.
-    vhtr_max = 14.
 
-    if vctrl < vctrl_min:
-        return vhtr_min
-    elif vctrl > vctrl_max:
-        return vhtr_max
+    if vctrl < VCTRL_MIN:
+        return VHTR_MIN
+    elif vctrl > VCTRL_MAX:
+        return VHTR_MAX
     else:
-        return ((vctrl - vctrl_min) / (vctrl_max - vctrl_min)) * (vhtr_max - vhtr_min)
+        return ((vctrl - VCTRL_MIN) / (VCTRL_MAX - VCTRL_MIN)) * (VHTR_MAX - VHTR_MIN)
 
 
 class ThermalModel:
@@ -153,7 +156,7 @@ class ThermalModel:
             n0 = 0
         
         df = np.diff(self._delay_func(n-n0+1, 1, self.f_k))
-        assert df.sum() == 1.
+        assert df.sum().round(3) == 1.  # make sure energy is conserved
 
         return np.concatenate([np.zeros(n0), df])
 
@@ -173,18 +176,18 @@ class ThermalModel:
 
     def cool(self):
         return self.rad_area * self.epsilon * SIGMA_SB * (ctok(self.T)**4 - ctok(self.T0)**4)
-        
+
     def heat(self):
         self.heat_pipe += self.htr_pwr * self.heat_distr
         addheat = self.heat_pipe[0]
         self.heat_pipe = np.roll(self.heat_pipe, -1)
         self.heat_pipe[-1] = 0
         return addheat
-        
+
     def calc_t_new(self):
         heatpwr = self.heat()
         coolpwr = self.cool()
-        return self.T + (heatpwr * self.step - coolpwr * self.step) / (cp_al(ctok(self.T)) * self.mass), heatpwr, coolpwr
+        return self.T + ((heatpwr - coolpwr) * self.step) / (cp_al(ctok(self.T)) * self.mass), heatpwr, coolpwr
 
     def start(self):
 
