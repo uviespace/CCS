@@ -140,6 +140,8 @@ class ThermalModel:
         self.htr_pwr = 0
         self.htr_cur = 0
 
+        self.inst_heat = 0  # additional, immediate heat input (e.g., from CCD, etc.)
+
         self._evolving = False
         self.record = record
         self.log = []
@@ -179,7 +181,8 @@ class ThermalModel:
 
     def heat(self):
         self.heat_pipe += self.htr_pwr * self.heat_distr
-        addheat = self.heat_pipe[0]
+        addheat = self.heat_pipe[0] + self.inst_heat
+        #print(self.heat_pipe, self.heat_pipe.sum(), self.htr_pwr,self.inst_heat)
         self.heat_pipe = np.roll(self.heat_pipe, -1)
         self.heat_pipe[-1] = 0
         return addheat

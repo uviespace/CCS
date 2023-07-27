@@ -19,7 +19,7 @@ class ThermalController:
     VCTRLUPPERVOLT = 2.8
     MAXDELTAVOLTAGE = 0.2
 
-    def __init__(self, temp_ref, coeffP, coeffI, offset, exec_per, model=None):
+    def __init__(self, temp_ref, coeffP, coeffI, offset, exec_per, model=None, pi=True, deltaTmax=1.):
 
         self.tempRef = temp_ref
         self.coeffP = coeffP
@@ -37,6 +37,13 @@ class ThermalController:
         self.hctrl_par_exec_per = exec_per
         self._algo_active = False
 
+        if pi:
+            self.calc_vctrl = self.do_pi_vctrl
+        else:
+            self.calc_vctrl = self.on_off_vctrl
+
+        self.deltaTmax = deltaTmax
+
         self.model = model
         self.log = []
 
@@ -45,7 +52,7 @@ class ThermalController:
     def set_temp_ref(self, temp):
         self.tempRef = temp
 
-    def calculate_vctrl(self, temp):
+    def do_pi_vctrl(self, temp):
 
         deltaTime = self.hctrl_par_exec_per * self.ASW_PERIOD_MS / 1000
         integ = self.integOld + deltaTime * (self.tempRef - self.tempOld)
@@ -69,11 +76,11 @@ class ThermalController:
 
         self.voltCtrlUint16 = vctrl_ana_to_dig(self.voltCtrl)
 
-    def on_off_vctrl(self, temp, deltaTmax=1.):
+    def on_off_vctrl(self, temp):
 
-        if temp > self.tempRef + deltaTmax:
+        if temp > self.tempRef + self.deltaTmax:
             v = self.voltCtrl - self.MAXDELTAVOLTAGE
-        elif temp < self.tempRef - deltaTmax:
+        elif temp < self.tempRef - self.deltaTmax:
             v = self.voltCtrl + self.MAXDELTAVOLTAGE
         else:
             v = self.voltCtrl
@@ -121,14 +128,13 @@ class ThermalController:
     def _step(self, t1, with_model=True, glitch=0):
         if with_model:
             self.temp = self.model.T_noisy + glitch
-            self.calculate_vctrl(self.temp)
-            # self.on_off_vctrl(self.temp)
+            self.calc_vctrl(self.temp)
             self.model.set_heater_power(vctrl=self.voltCtrl)
 
             self.log.append((t1, self.tempRef, self.temp, self.voltCtrl, self.coeffI * self.integOld, self.coeffP * (self.tempRef - self.temp)))
             
         else:
-            self.calculate_vctrl(self.temp)
+            self.calc_vctrl(self.temp)
 
     def stop_algo(self):
         self._algo_active = False
