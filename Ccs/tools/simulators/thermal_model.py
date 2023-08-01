@@ -91,6 +91,26 @@ def cp_al(T):
     return 10**(a+b*(np.log10(T)) + c*(np.log10(T))**2 + d*(np.log10(T))**3 + e*(np.log10(T))**4 + f*(np.log10(T))**5 + g*(np.log10(T))**6 + h*(np.log10(T))**7 + i*(np.log10(T))**8)
 
 
+def k_al(T):
+    """
+    Calculate thermal conductivity of Aluminium 6061-T6 at a given temperature between 4 an 300 K. From https://trc.nist.gov/cryogenics/materials/6061%20Aluminum/6061_T6Aluminum_rev.htm
+
+    :param T: Temperature in Kelvin
+    :return:
+    """
+    a = 0.07918
+    b = 1.0957
+    c = -0.07277
+    d = 0.08084
+    e = 0.02803
+    f = -0.09464
+    g = 0.04179
+    h = -0.00571
+    i = 0
+
+    return 10**(a+b*(np.log10(T)) + c*(np.log10(T))**2 + d*(np.log10(T))**3 + e*(np.log10(T))**4 + f*(np.log10(T))**5 + g*(np.log10(T))**6 + h*(np.log10(T))**7 + i*(np.log10(T))**8)
+
+
 def vctrl_to_vhtr(vctrl):
     """
     Calculate heater voltage from control voltage; linear behaviour
