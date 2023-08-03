@@ -1,5 +1,6 @@
 import json
 import os.path
+from packaging import version
 import struct
 import threading
 import time
@@ -31,6 +32,8 @@ from sqlalchemy.sql.expression import func
 # from sqlalchemy.orm import load_only
 
 import importlib
+
+MPL_VERSION = version.parse(matplotlib._get_version())
 
 cfg = confignator.get_config(check_interpolation=False)
 
@@ -266,8 +269,11 @@ class PlotViewer(Gtk.Window):
         return canvas
 
     def _create_navbar(self):
-        # navbar = NavigationToolbarX(self.canvas, self)
-        navbar = NavigationToolbar(self.canvas)  # , window=self)
+        # window argument to be removed
+        if MPL_VERSION < version.parse('3.6.0'):
+            navbar = NavigationToolbar(self.canvas, self)
+        else:
+            navbar = NavigationToolbar(self.canvas)
 
         limits = Gtk.HBox()
         self.xmin = Gtk.Entry()
