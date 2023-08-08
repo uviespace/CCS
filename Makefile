@@ -11,7 +11,7 @@ python-requirements:
 	@echo "+-----------------------------+"
 	@echo "| installing Python modules   |"
 	@echo "+-----------------------------+"
-		if [ -z $VIRTUAL_ENV ]; then pip install --user -U -r $(CURDIR)/requirements.txt; else pip install -U -r $(CURDIR)/requirements.txt; fi
+		if [ -z $(VIRTUAL_ENV) ]; then pip install --user --break-system-packages -U -r $(CURDIR)/requirements.txt; else pip install -U -r $(CURDIR)/requirements.txt; fi
 	@echo "+-----------------------------+"
 	@echo "| installed Python modules    |"
 	@echo "+-----------------------------+"
@@ -22,7 +22,7 @@ confignator:
 	@echo "| installing confignator Python package |"
 	@echo "+---------------------------------------+"
 		$(MAKE) build -C $(CURDIR)/Tst/confignator
-	    if [ -z $VIRTUAL_ENV ]; then pip install --user -U --force-reinstall $(CURDIR)/Tst/confignator/dist/*.whl; else pip install -U --force-reinstall $(CURDIR)/Tst/confignator/dist/*.whl; fi
+	    if [ -z $(VIRTUAL_ENV) ]; then pip install --user --break-system-packages -U --force-reinstall $(CURDIR)/Tst/confignator/dist/*.whl; else pip install -U --force-reinstall $(CURDIR)/Tst/confignator/dist/*.whl; fi
 		$(MAKE) build-doc -C $(CURDIR)/Tst/confignator
 	@echo "+--------------------------------------+"
 	@echo "| installed confignator Python package |"
@@ -86,3 +86,4 @@ set-start-scripts-permissions:
 	@echo "| setting permissions for the start scripts (execute) |"
 	@echo "+-----------------------------------------------------+"
 	    $(MAKE) all -C $(CURDIR)/Tst/
+
