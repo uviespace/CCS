@@ -11,6 +11,7 @@ import getpass
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import text
 
 
 sdir = os.path.dirname(os.path.abspath(__file__))
@@ -62,11 +63,11 @@ def create_schema():
 
     # delete database schema
     print('...drop schema {}'.format(DBNAME))
-    s.execute('DROP SCHEMA IF EXISTS {}'.format(DBNAME))
+    s.execute(text('DROP SCHEMA IF EXISTS {}'.format(DBNAME)))
 
     # create database schema
     print('...create schema {}'.format(DBNAME))
-    s.execute(open(WBSQL).read())
+    s.execute(text(open(WBSQL).read()))
     s.close()
 
 
@@ -86,7 +87,7 @@ def import_mib():
         rows = [('"' + i.replace('\t', '","').strip() + '"').replace('""', 'DEFAULT') for i in mfile]
         try:
             for row in rows:
-                s.execute('INSERT IGNORE INTO {} VALUES ({})'.format(fn[:-4], row))  # IGNORE truncates too long strings
+                s.execute(text('INSERT IGNORE INTO {} VALUES ({})'.format(fn[:-4], row)))  # IGNORE truncates too long strings
         except Exception as err:
             s.rollback()
             s.close()
