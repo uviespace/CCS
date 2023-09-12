@@ -3000,9 +3000,10 @@ class TMPoolView(Gtk.Window):
             self.stop_butt.set_sensitive(True)
         else:
             self.stop_butt.set_sensitive(False)
-        refresh_rate = 1
 
-        GLib.timeout_add(refresh_rate * 1000, self.show_data_rate, refresh_rate, instance, priority=GLib.PRIORITY_DEFAULT)
+        refresh_rate = 1  # in Hz
+
+        GLib.timeout_add(1000 / refresh_rate, self.show_data_rate, refresh_rate, instance, priority=GLib.PRIORITY_DEFAULT)
         return True
 
     def collect_packet_data(self, widget):
@@ -3323,6 +3324,7 @@ class TMPoolView(Gtk.Window):
             trashbytes, tc_data_rate, data_rate = pmgr.Functions('calc_data_rate', self.active_pool_info.filename, refresh_rate)
             self.statusbar.push(0, 'Trash: {:d} B | TC: {:7.3f} KiB/s | TM: {:7.3f} KiB/s'.format(
                 trashbytes, tc_data_rate/1024, data_rate/1024))
+            self.statusbar.set_tooltip_text('TC: {:7.3f} kbps | TM: {:7.3f} kbps'.format(tc_data_rate/1000*8, data_rate/1000*8))
         except Exception as err:
             self.logger.debug(err)
 
