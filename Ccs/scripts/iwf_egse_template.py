@@ -19,7 +19,7 @@ econ.send(iwf.Command.set_psu_ok_signal(1,1), rx=False)  # set IWF_EGSE_PSU_OK =
 econ.send(iwf.Command.set_psu_ok_signal(3,1), rx=False)  # set IWF_EGSE_RSE_OK = 1
 econ.send(iwf.Command.set_psu_ok_signal(4,1), rx=False)  # set IWF_EGSE_PIN_PULL_OK = 1
 econ.send(iwf.Command.set_rsm_end_switch(1,1), rx=False)  # set IWF_EGSE_CLOSE_POS = 1; response 'R7' -> only for EBOX
-econ.send(iwf.Command.set_psu_analogue_value(iwf.Signal.EGSE_I_HEATER, 0), rx=False)  # set IWF_EGSE_I_HEATER
+econ.send(iwf.Command.set_psu_analogue_value(iwf.Signal.EGSE_I_HEATER, 2000), rx=False)  # set IWF_EGSE_I_HEATER
 econ.send(iwf.Command.set_pwm(2, 1663), rx=False)  # set CCD Thermistor
 
 econ.send(iwf.Command.inject_errors(6,0,3,0,11,0), rx=False)  # inject RSE error

@@ -288,7 +288,7 @@ class Receiver:
                 continue
             except Exception as err:
                 print('Processing error:', err)
-                break
+                self._isrunning = False
 
         print('Processing stopped')
         self.proc_data_fd.close()
@@ -327,4 +327,4 @@ def proc_func_generic(data, ts=None):
     else:
         ts = '{:.6f}'.format(ts)
 
-    return [(ts, str(data))]
+    return [ts, str(data)]
