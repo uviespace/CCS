@@ -13,6 +13,8 @@ import os
 import json
 import sys
 
+MIB_VERSION = '1.5'
+
 
 def run(jfile, outfile, reportfunc=False, specfile=None):
 
@@ -39,15 +41,17 @@ def run(jfile, outfile, reportfunc=False, specfile=None):
             specfile = '{}-TS-{}.csv_PIPE'.format(data['_name'], data['_spec_version'])
         script += 'specfile = "{}"\n'.format(specfile)
         script += 'rep_version = 1\n'
-        script += 'mib_version = "3.4"\n'
+        script += 'mib_version = "{}"\n'.format(MIB_VERSION)
         script += 'ask_tc_exec = True\n'
         script += 'report = cfl.TestReport(specfile, rep_version, mib_version, gui=True)\n\n'
 
-    script += '# Precond.\n# {}\n'.format(data['_precon_descr'])
+    script += '# Precond.\n# {}\n#! CCS.BREAKPOINT\n\n'.format(data['_precon_descr'])
     # script += '{}\n\n\n'.format(data['_precon_code'].strip())  # Add the precondition code
 
     for step in data['sequences'][0]['steps']:
         comment = '# COMMENT: {}\n'.format(step['_step_comment'].strip()) if step['_step_comment'] != '' else ''
+        cmd_code = step['_command_code'].strip()
+        cmd_code += '\n' if cmd_code else ''
 
         if reportfunc:
             step_tag = 'Step {}'.format(step['_step_number'])
@@ -60,13 +64,13 @@ def run(jfile, outfile, reportfunc=False, specfile=None):
         txt = '# STEP {}\n' \
               '# {}\n' \
               '{}' \
-              '{}\n' \
-              '# VERIFICATION: {}\n{}{}\n\n'.format(step['_step_number'], step['_description'].strip(), exec_step,
-                                                  step['_command_code'].strip(),
-                                                  step['_verification_description'].strip(),
-                                                  verif_step,
-                                                  # step['_verification_code'].strip(), # Add verification code
-                                                  comment)
+              '{}' \
+              '# VERIFICATION: {}\n{}{}\n#! CCS.BREAKPOINT\n\n'.format(step['_step_number'], step['_description'].strip(), exec_step,
+                                                                      cmd_code,
+                                                                      step['_verification_description'].strip(),
+                                                                      verif_step,
+                                                                      # step['_verification_code'].strip(), # Add verification code
+                                                                      comment)
 
         script += txt
 
