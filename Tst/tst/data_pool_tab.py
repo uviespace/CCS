@@ -101,10 +101,15 @@ class DataPoolTable(Gtk.Grid):
 
         # creating the treeview, making it use the filter a model, adding columns
         self.treeview = Gtk.TreeView.new_with_model(Gtk.TreeModelSort(self.data_pool_filter))
-        for i, column_title in enumerate(["PID", "NAME", "DATATYPE", "MULT", "PAR/VAR", "DESCR"]):
+        for i, column_title in enumerate(["PID", "NAME", "DATATYPE", "MULT", "VALUE", "DESCR"]):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+
+            if column_title == "VALUE":
+                column.set_fixed_width(200)
+
             column.set_sort_column_id(i)
+            column.set_resizable(True)
             self.treeview.append_column(column)
 
         # setting up layout, treeview in scrollwindow

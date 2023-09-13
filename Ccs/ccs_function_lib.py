@@ -4407,7 +4407,7 @@ def get_data_pool_items(pcf_descr=None, src_file=None, as_dict=False):
                 dp_item = line.strip().split('|')
                 # check for format
                 if len(dp_item) == 9:
-                    data_pool.append(dp_item[:2][::-1] + [dp_item[2]] + dp_item[4:6] + [dp_item[7]])  # PID, NAME, TYPE, MULT, KIND, DESCR
+                    data_pool.append(dp_item[:2][::-1] + [dp_item[2]] + [dp_item[4]] + dp_item[6:8])  # PID, NAME, TYPE, MULT, VALUE, DESCR
                 else:
                     raise ValueError('Wrong format of input line in {}.'.format(src_file))
 
