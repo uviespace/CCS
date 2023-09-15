@@ -20,6 +20,7 @@ import time
 import dbus
 import socket
 import os
+from pathlib import Path
 import glob
 import numpy as np
 import logging.handlers
@@ -5799,6 +5800,8 @@ class TestReport:
         self.report[2][3] = time.strftime('%Y-%m-%d')
 
         buf = '\n'.join([self.delimiter.join(self.report[line]) for line in range(len(self.report))])
+
+        Path(os.path.dirname(reportfile)).mkdir(parents=True, exist_ok=True)  # create directory if it does not exist
 
         with open(reportfile, 'w') as fd:
             fd.write(buf + '\n')
