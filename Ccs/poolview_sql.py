@@ -3321,10 +3321,10 @@ class TMPoolView(Gtk.Window):
             instance = 1
         try:
             pmgr = cfl.dbus_connection('poolmanager', instance)
-            trashbytes, tc_data_rate, data_rate = pmgr.Functions('calc_data_rate', self.active_pool_info.filename, refresh_rate)
+            trashbytes, tc_data_rate, data_rate, tc_rx_bytes = pmgr.Functions('calc_data_rate', self.active_pool_info.filename, refresh_rate)
             self.statusbar.push(0, 'Trash: {:d} B | TC: {:7.3f} KiB/s | TM: {:7.3f} KiB/s'.format(
                 trashbytes, tc_data_rate/1024, data_rate/1024))
-            self.statusbar.set_tooltip_text('TC: {:7.3f} kbps | TM: {:7.3f} kbps'.format(tc_data_rate/1000*8, data_rate/1000*8))
+            self.statusbar.set_tooltip_text('TCRX: {:d} B | TC: {:7.3f} kbps | TM: {:7.3f} kbps'.format(tc_rx_bytes, tc_data_rate/1000*8, data_rate/1000*8))
         except Exception as err:
             self.logger.debug(err)
 

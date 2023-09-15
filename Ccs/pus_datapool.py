@@ -132,6 +132,7 @@ class DatapoolManager:
         self.pool_rows = {}  # entries in MySQL "tm_pool" table
         self.databuflen = 0
         self.tc_databuflen = 0
+        self.tc_databuflen_rx = 0  # counts the received bytes on the TC connection, if drop_rx=True
         self.trashbytes = {None: 0}
         self.state = {}
         self.filtered_pckts = {}
@@ -994,7 +995,7 @@ class DatapoolManager:
                     buf = sockfd.recv(1024)
 
                 with self.lock:
-                    self.databuflen += len(buf)
+                    self.tc_databuflen_rx += len(buf)
             except socket.timeout:
                 self.logger.debug('Socket timeout {}:{} [TC RX]'.format(host, port))
                 continue
@@ -1552,7 +1553,7 @@ class DatapoolManager:
                     trashbytes = 0
             else:
                 trashbytes = 0
-            return [trashbytes, tc_data_rate, data_rate]
+            return [trashbytes, tc_data_rate, data_rate, self.tc_databuflen_rx]
 
     def spw_receiver_del_old_pool(self, pool_name, try_delete=True, delete_abandoned=True):
         new_session = self.session_factory_storage
