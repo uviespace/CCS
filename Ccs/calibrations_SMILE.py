@@ -583,9 +583,9 @@ def t_ccd_fee_deg_to_adu(t, ccd):
     :return:
     """
     if ccd == 2:
-        return (cal_pt2000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain
+        return np.rint((cal_pt2000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain).astype(int)
     elif ccd == 4:
-        return (cal_pt2000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain
+        return np.rint((cal_pt2000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain).astype(int)
     else:
         raise ValueError("CCD must be either 2 or 4!")
 
