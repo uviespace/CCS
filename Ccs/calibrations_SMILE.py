@@ -523,13 +523,20 @@ SIGNAL_DBS_IASW = {SIGNAL_IASW_DBS[k]: k for k in SIGNAL_IASW_DBS}
 
 
 def cal_pt1000(temp):
+    return cal_ptx(temp, 1000)
+
+
+def cal_pt2000(temp):
+    return cal_ptx(temp, 2000)
+
+
+def cal_ptx(temp, R0):
     """
-    Standard DIN EN 60751 PT1000 transfer curve (-200 - 850°C)
+    Standard DIN EN 60751 PTX transfer curve (-200 - 850°C)
 
     :param temp: temperature in °C
     :return: resistance in Ohm
     """
-    R0 = 1000
     A = 3.9083e-3
     B = -5.775e-7
     C = -4.183e-12
@@ -547,22 +554,22 @@ def cal_pt1000(temp):
 
 
 _ptx = np.arange(-200, 851)
-_pty = cal_pt1000(_ptx)
-_pt1000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT1000 curve for Ohm to °C conversion
+_pty = cal_pt2000(_ptx)
+_pt2000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT2000 curve for Ohm to °C conversion
 
 
 def t_ccd_fee_adu_to_deg(adu, ccd):
     """
-    For CCD temperature reported in FEE HK
+    For CCD temperature reported in FEE HK. Uses PT2000?
 
     :param adu:
     :param ccd:
     :return:
     """
     if ccd == 2:
-        return _pt1000_curve_inv(adu * FEE_CCD2TsA_gain + FEE_CCD2TsA_offset)
+        return _pt2000_curve_inv(adu * FEE_CCD2TsA_gain + FEE_CCD2TsA_offset)
     elif ccd == 4:
-        return _pt1000_curve_inv(adu * FEE_CCD4TsB_gain + FEE_CCD4TsB_offset)
+        return _pt2000_curve_inv(adu * FEE_CCD4TsB_gain + FEE_CCD4TsB_offset)
     else:
         raise ValueError("CCD must be either 2 or 4!")
 
@@ -576,9 +583,9 @@ def t_ccd_fee_deg_to_adu(t, ccd):
     :return:
     """
     if ccd == 2:
-        return (cal_pt1000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain
+        return (cal_pt2000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain
     elif ccd == 4:
-        return (cal_pt1000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain
+        return (cal_pt2000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain
     else:
         raise ValueError("CCD must be either 2 or 4!")
 
