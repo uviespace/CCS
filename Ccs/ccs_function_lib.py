@@ -3810,6 +3810,87 @@ def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61
     source_to_srec('srec_binary_source.TC', output_srec, memaddr=imageaddr)
 
 
+def srec_to_s6(fname, memid, memaddr, segid, tcname=None, linesperpack=50, max_pkt_size=MAX_PKT_LEN, image_crc=True):
+    # get service 6,2 info from MIB
+    apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
+    pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + SEG_HEADER_LEN + SEG_SPARE_LEN + SEG_CRC_LEN + len(
+        endspares) + PEC_LEN
+    payload_len = max_pkt_size - pkt_overhead
+
+    memid = get_mem_id(memid, memid_ref)
+
+    pckts = []
+
+    f = open(fname, 'r').readlines()[1:]
+    lines = [p[12:-3] for p in f]
+    data_size = len(''.join(lines)) // 2
+    startaddr = int(f[0][4:12], 16)
+
+    upload_bytes = b''
+    linecount = 0
+    bcnt = 0
+    pcnt = 0
+    ptot = None
+
+    while linecount < len(f) - 1:
+
+        t1 = time.time()
+
+        linepacklist = []
+        for n in range(linesperpack):
+            if linecount >= (len(lines) - 1):
+                break
+
+            if (len(''.join(linepacklist)) + len(lines[linecount])) // 2 > payload_len:  # ensure max_pkt_size
+                break
+
+            linepacklist.append(lines[linecount])
+            linelength = len(lines[linecount]) // 2
+            if int(f[linecount + 1][4:12], 16) != (int(f[linecount][4:12], 16) + linelength):
+                linecount += 1
+                newstartaddr = int(f[linecount][4:12], 16)
+                break
+            else:
+                linecount += 1
+                newstartaddr = int(f[linecount][4:12], 16)
+
+        linepack = bytes.fromhex(''.join(linepacklist))
+        dlen = len(linepack)
+        bcnt += dlen
+        # segment header, see IWF DBS HW SW ICD
+        data = struct.pack(SEG_HEADER_FMT, segid, startaddr, dlen // 4) + linepack + bytes(SEG_SPARE_LEN)
+        data = data + crc(data).to_bytes(SEG_CRC_LEN, 'big')
+
+        # create PUS packet
+        packetdata = struct.pack(fmt, memid, memaddr, len(data)) + data + endspares
+        seq_cnt = counters.setdefault(apid, 0)
+        puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=seq_cnt, ack=0b1001)
+
+        if len(puspckt) > MAX_PKT_LEN:
+            logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
+
+        pckts.append(puspckt)
+
+        # collect all uploaded segments for CRC at the end
+        upload_bytes += data
+        pcnt += 1
+
+        startaddr = newstartaddr
+        memaddr += len(data)
+        counters[apid] += 1
+
+    packetdata = struct.pack(fmt, memid, memaddr, 12) + bytes(12) + endspares
+    puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=counters[apid], ack=0b1001)
+    counters[apid] += 1
+    pckts.append(puspckt)
+
+    if image_crc:
+        # return total length of uploaded data (without termination segment) and CRC over entire image, including segment headers
+        return pckts, len(upload_bytes), crc(upload_bytes)
+
+    return pckts
+
+
 def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
                 max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
     """

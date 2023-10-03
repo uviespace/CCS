@@ -15,6 +15,12 @@ T_ZERO = 273.15
 ADC_INPRNG = 7.34783  # V
 ADC_OFFSET = -1.69565  # V
 
+# FEE HK gains/offsets
+FEE_CCD2TsA_gain = 0.013772489
+FEE_CCD2TsA_offset = 542.131358
+FEE_CCD4TsB_gain = 0.013680992
+FEE_CCD4TsB_offset = 525.103894
+
 
 class Dpu:
 
@@ -190,26 +196,6 @@ def t_ccd_adu_to_deg(adu):
 
 def t_ccd_deg_to_adu(t):
     return np.where(t <= _ccd_temp_adu_array[0].max(), t_ccd_deg_to_adu_oper(t, warn=False), t_ccd_deg_to_adu_nonoper(t))
-
-
-def t_ccd_fee_adu_to_deg(adu):
-    """
-    For CCD temperature reported in FEE HK
-
-    :param adu:
-    :return:
-    """
-    return adu / 65535 * 4.096 * 338.581 - T_ZERO
-
-
-def t_ccd_fee_deg_to_adu(t):
-    """
-    For CCD temperature reported in FEE HK
-
-    :param t:
-    :return:
-    """
-    return np.rint((t + T_ZERO) / (4.096 * 338.581) * 65535).astype(int)
 
 
 def t_temp1_adu_to_deg(adu):
@@ -534,6 +520,75 @@ SIGNAL_IASW_DBS = {
 }
 
 SIGNAL_DBS_IASW = {SIGNAL_IASW_DBS[k]: k for k in SIGNAL_IASW_DBS}
+
+
+def cal_pt1000(temp):
+    return cal_ptx(temp, 1000)
+
+
+def cal_pt2000(temp):
+    return cal_ptx(temp, 2000)
+
+
+def cal_ptx(temp, R0):
+    """
+    Standard DIN EN 60751 PTX transfer curve (-200 - 850°C)
+
+    :param temp: temperature in °C
+    :return: resistance in Ohm
+    """
+    A = 3.9083e-3
+    B = -5.775e-7
+    C = -4.183e-12
+
+    def subzero():
+        return R0 * (1 + A*temp + B*temp**2 + C*(temp - 100)*temp**3)
+
+    def abovezero():
+        return R0 * (1 + A*temp + B*temp**2)
+
+    if (np.array(temp) < -200).any() or (np.array(temp) > 850).any():
+        print("WARNING: Value(s) outside calibrated range (-200 - 850°C)!")
+
+    return np.where(temp > 0, abovezero(), subzero())
+
+
+_ptx = np.arange(-200, 851)
+_pty = cal_pt2000(_ptx)
+_pt2000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT2000 curve for Ohm to °C conversion
+
+
+def t_ccd_fee_adu_to_deg(adu, ccd):
+    """
+    For CCD temperature reported in FEE HK. Uses PT2000?
+
+    :param adu:
+    :param ccd:
+    :return:
+    """
+    if ccd == 2:
+        return _pt2000_curve_inv(adu * FEE_CCD2TsA_gain + FEE_CCD2TsA_offset)
+    elif ccd == 4:
+        return _pt2000_curve_inv(adu * FEE_CCD4TsB_gain + FEE_CCD4TsB_offset)
+    else:
+        raise ValueError("CCD must be either 2 or 4!")
+
+
+def t_ccd_fee_deg_to_adu(t, ccd):
+    """
+    For CCD temperature reported in FEE HK
+
+    :param t:
+    :param ccd:
+    :return:
+    """
+    if ccd == 2:
+        return np.rint((cal_pt2000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain).astype(int)
+    elif ccd == 4:
+        return np.rint((cal_pt2000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain).astype(int)
+    else:
+        raise ValueError("CCD must be either 2 or 4!")
+
 
 if __name__ == '__main__':
 
