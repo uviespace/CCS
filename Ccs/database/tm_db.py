@@ -279,8 +279,8 @@ def scoped_session_maker(db_schema, idb_version=None):
         return
     _engine = create_engine(gen_mysql_conn_str(schema=schema), echo="-v" in sys.argv, pool_size=15)
     session_factory = sessionmaker(bind=_engine)
-    # scoped_session_factory = scoped_session(session_factory)
-    scoped_session_factory = scoped_session_v2(session_factory)
+    scoped_session_factory = scoped_session(session_factory)
+    #scoped_session_factory = scoped_session_v2(session_factory)
     return scoped_session_factory
 
 
