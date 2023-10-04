@@ -5757,6 +5757,132 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     return filedict
 
 
+class DbTools:
+    """
+    SQL database management helpers
+    """
+
+    @staticmethod
+    def recover_from_db(pool_name=None, iid=None, dump=False):
+        """
+        Recover TMTC packets not stored on disk from DB
+        @param pool_name:
+        @param iid:
+        @param dump:
+        @return:
+        """
+        new_session = scoped_session_storage
+        if pool_name:
+            rows = new_session.query(
+                DbTelemetry).join(
+                DbTelemetryPool, DbTelemetry.pool_id == DbTelemetryPool.iid).filter(
+                DbTelemetryPool.pool_name == pool_name)
+        elif iid:
+            rows = new_session.query(
+                DbTelemetry).join(
+                DbTelemetryPool, DbTelemetry.pool_id == DbTelemetryPool.iid).filter(
+                DbTelemetryPool.iid == iid)
+        else:
+            logger.error('Must give pool_name or iid')
+            return None
+
+        if dump:
+            with open(dump, 'wb') as fdesc:
+                fdesc.write(b''.join([row.raw for row in rows]))
+        new_session.close()
+        return rows
+
+    @staticmethod
+    def clear_from_db(pool_name, answer=''):
+        """
+        Remove pool pool_name from DB
+        @param pool_name:
+        @param answer:
+        @return:
+        """
+        # answer = ''
+        while answer.lower() not in ['yes', 'no', 'y', 'n']:
+            answer = input("Clear pool\n >{}<\nfrom DB? (yes/no)\n".format(pool_name))
+        if answer.lower() in ['yes', 'y']:
+            new_session = scoped_session_storage
+            indb = new_session.execute('select * from tm_pool where pool_name="{}"'.format(pool_name))
+            if len(indb.fetchall()) == 0:
+                logger.error('POOL\n >{}<\nNOT IN DB!'.format(pool_name))
+                return
+            new_session.execute(
+                'delete tm from tm inner join tm_pool on tm.pool_id=tm_pool.iid where tm_pool.pool_name="{}"'.format(
+                    pool_name))
+            new_session.execute('delete tm_pool from tm_pool where tm_pool.pool_name="{}"'.format(pool_name))
+            # new_session.flush()
+            new_session.commit()
+            new_session.close()
+            logger.info('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
+        return
+
+    @staticmethod
+    def _clear_db():
+        """
+        Delete all pools from DB
+        @return:
+        """
+        answer = ''
+        while answer.lower() not in ['yes', 'no', 'y', 'n']:
+            answer = input(" > > > Clear all TMTC data from DB? < < < (yes/no)\n".upper())
+        if answer.lower() in ['yes', 'y']:
+            new_session = scoped_session_storage
+            new_session.execute('delete tm from tm inner join tm_pool on tm.pool_id=tm_pool.iid')
+            new_session.execute('delete tm_pool from tm_pool')
+            # new_session.flush()
+            new_session.commit()
+            new_session.close()
+            logger.info('>>> DELETED ALL POOLS FROM DB <<<')
+        return
+
+    @staticmethod
+    def _purge_db_logs(date=None):
+        """
+        Purge binary MySQL logs before _date_
+        @param date: ISO formatted date string; defaults to now, if None
+        """
+        if date is None:
+            now = datetime.datetime.now()
+            date = datetime.datetime.strftime(now, '%Y-%m-%d %H:%M:%S')
+        new_session = scoped_session_storage
+        new_session.execute('PURGE BINARY LOGS BEFORE "{:s}"'.format(date))
+        new_session.close()
+
+    @staticmethod
+    def delete_abandoned_rows(timestamp=None):
+        new_session = scoped_session_storage
+        try:
+            if timestamp is None:
+                new_session.execute(
+                    'DELETE tm FROM tm INNER JOIN tm_pool ON tm.pool_id=tm_pool.iid WHERE \
+                    tm_pool.pool_name LIKE "---TO-BE-DELETED%"')
+                new_session.execute(
+                    'DELETE rmap_tm FROM rmap_tm INNER JOIN tm_pool ON rmap_tm.pool_id=tm_pool.iid WHERE \
+                    tm_pool.pool_name LIKE "---TO-BE-DELETED%"')
+                new_session.execute(
+                    'DELETE feedata_tm FROM feedata_tm INNER JOIN tm_pool ON feedata_tm.pool_id=tm_pool.iid WHERE \
+                    tm_pool.pool_name LIKE "---TO-BE-DELETED%"')
+                new_session.execute('DELETE tm_pool FROM tm_pool WHERE tm_pool.pool_name LIKE "---TO-BE-DELETED%"')
+            else:
+                new_session.execute(
+                    'DELETE tm FROM tm INNER JOIN tm_pool ON tm.pool_id=tm_pool.iid WHERE \
+                    tm_pool.pool_name="---TO-BE-DELETED{}"'.format(timestamp))
+                new_session.execute('DELETE tm_pool FROM tm_pool WHERE tm_pool.pool_name="---TO-BE-DELETED{}"'.format(
+                    timestamp))
+
+            new_session.commit()
+            return 0
+        except Exception as err:
+            logger.error("Error trying to delete old DB rows: {}".format(err))
+            new_session.rollback()
+            return 1
+        finally:
+            new_session.close()
+
+
 class TestReport:
     """
     Provides functions for interactive test reporting
