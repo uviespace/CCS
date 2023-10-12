@@ -554,22 +554,22 @@ def cal_ptx(temp, R0):
 
 
 _ptx = np.arange(-200, 851)
-_pty = cal_pt2000(_ptx)
-_pt2000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT2000 curve for Ohm to °C conversion
+_pty = cal_pt1000(_ptx)
+_pt1000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT1000 curve for Ohm to °C conversion
 
 
 def t_ccd_fee_adu_to_deg(adu, ccd):
     """
-    For CCD temperature reported in FEE HK. Uses PT2000?
+    For CCD temperature reported in FEE HK. Uses PT1000!
 
     :param adu:
     :param ccd:
     :return:
     """
     if ccd == 2:
-        return _pt2000_curve_inv(adu * FEE_CCD2TsA_gain + FEE_CCD2TsA_offset)
+        return _pt1000_curve_inv(adu * FEE_CCD2TsA_gain + FEE_CCD2TsA_offset)
     elif ccd == 4:
-        return _pt2000_curve_inv(adu * FEE_CCD4TsB_gain + FEE_CCD4TsB_offset)
+        return _pt1000_curve_inv(adu * FEE_CCD4TsB_gain + FEE_CCD4TsB_offset)
     else:
         raise ValueError("CCD must be either 2 or 4!")
 
@@ -583,9 +583,9 @@ def t_ccd_fee_deg_to_adu(t, ccd):
     :return:
     """
     if ccd == 2:
-        return np.rint((cal_pt2000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain).astype(int)
+        return np.rint((cal_pt1000(t) - FEE_CCD2TsA_offset) / FEE_CCD2TsA_gain).astype(int)
     elif ccd == 4:
-        return np.rint((cal_pt2000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain).astype(int)
+        return np.rint((cal_pt1000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain).astype(int)
     else:
         raise ValueError("CCD must be either 2 or 4!")
 
@@ -595,6 +595,6 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     ct = CalibrationTables()
-    ct._plot(Temp.ADC_PSU_TEMP)
+    ct._plot(Temp.ADC_TEMP_CCD)
     # ct.write_to_files('/home/marko/space/CCS/calibrations')
     lmt = LimitTables()
