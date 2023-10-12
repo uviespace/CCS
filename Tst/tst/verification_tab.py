@@ -171,6 +171,7 @@ class VerificationTable(Gtk.Grid):
             # print(name_string)
 
             selected_data_for_drag_drop = name_string
+            # ToDo: selected_data_for_drag_drop = "result = " + name_string
             # selected_data_for_drag_drop = cfl.verification_template(name_string)
                 # str(verification_name) + "\n ST = " + str(ST) + "\n SST = " + str(SST) + "\n Time = 2"
             # selected_data_for_drag_drop = "{} ({}, {})".format((name, ST, SST))

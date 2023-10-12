@@ -1338,6 +1338,16 @@ def get_5_1_tc_acknow(pool_name="LIVE", tm_name="name", parameter_1=5, parameter
 
 
 def check_if_packet_is_received(ST=1,SST=7,pool_name="LIVE"):
+    """
+    Checks if a certain type of packet has been received
+    :param ST: int
+        The subtype of the packet that should be checked for
+    :param SST: int
+        The subsubtype of the packet that should be checked for
+    :param pool_name: str
+         Name of the TM pool in the database
+    """
+
     assert isinstance(pool_name, str)
     assert isinstance(ST, int)
     assert isinstance(SST, int)
@@ -1352,10 +1362,11 @@ def check_if_packet_is_received(ST=1,SST=7,pool_name="LIVE"):
     for i in range(len(raw_packet_list)):
         packet = cfl.get_header_parameters_detailed(raw_packet_list[i])
 
-        print(packet)
+        # print(packet)
 
         current_packet_ST = packet[10][1]
         current_packet_SST = packet[11][1]
+
 
 
         try:
@@ -1363,16 +1374,14 @@ def check_if_packet_is_received(ST=1,SST=7,pool_name="LIVE"):
         except:
             current_timestamp = ""
 
+        # print(current_packet_ST, current_packet_SST, current_timestamp)
+
         if current_packet_ST == ST and current_packet_SST == SST:
             print("Match")
             print(ST, SST, current_timestamp)
             return True
         else:
             continue
-
-
-
-
 
         # print(time)
 
