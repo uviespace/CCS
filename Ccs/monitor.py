@@ -289,6 +289,7 @@ class ParameterMonitor(Gtk.Window):
 
                 else:
                     box.pktid = tuple(pktid)
+                    udtype, parameter = parameter.split(':')
                     dbres = dbcon.execute('SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_categ,pcf.pcf_unit,ocf.ocf_nbool,\
                                         ocp.ocp_lvalu,ocp.ocp_hvalu from pcf left join ocf on pcf.pcf_name=ocf.ocf_name\
                                         left join ocp on ocf_name=ocp_name where pcf.pcf_name="{}"'.format(parameter))
@@ -541,6 +542,7 @@ class ParameterMonitor(Gtk.Window):
         pinfo = cfl._parameter_decoding_info((name, udtype), check_curtx=True)
 
         ptc, pfc = pinfo[2:4]
+        curtx = pinfo[4]
 
         if ptc in [7]:
             return ''
@@ -548,6 +550,8 @@ class ParameterMonitor(Gtk.Window):
             return '.13G'
         elif ptc in [8]:
             return 's'
+        elif curtx is not None:  # numerically calibrated
+            return '.7G'
         else:
             return 'd'
 
@@ -997,7 +1001,7 @@ class MonitorSetupDialog(Gtk.Dialog):
             params = dbres.fetchall()
 
             for par in params:
-                parameter_model.append(it, [par[0], str(par[1:])])
+                parameter_model.append(it, [par[0], str(['MIB:' + par[1]] + list(par[2:]))])
 
         dbcon.close()
 

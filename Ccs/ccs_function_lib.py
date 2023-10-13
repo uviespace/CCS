@@ -693,7 +693,7 @@ def user_tm_decoders_func():
     return user_tm_decoders
 
 
-def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=False, nocal=False):
+def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=False, nocal=False, floatfmt=None):
     """
     Return a formatted string containing all the decoded source data of TM packet _tm_
 
@@ -705,7 +705,7 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
     :param nocal:
     :return:
     """
-    sourcedata, tmtcnames = Tmdata(tm, udef=udef)
+    sourcedata, tmtcnames = Tmdata(tm, udef=udef, floatfmt=floatfmt)
     tmtcname = " / ".join(tmtcnames)
 
     if nocal:
@@ -746,7 +746,7 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
 #
 #  Decode source data field of TM packet
 #  @param tm TM packet bytestring
-def Tmdata(tm, udef=False):
+def Tmdata(tm, udef=False, floatfmt=None):
     """
 
     :param tm:
@@ -779,7 +779,7 @@ def Tmdata(tm, udef=False):
             else:
                 vals_params = read_variable_pckt(data, params)
 
-            tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
+            tmdata = [(get_calibrated(i[0], j[0], floatfmt=floatfmt), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
             tmname = ['USER DEFINED: {}'.format(user_label)]
 
             return tmdata, tmname
@@ -840,7 +840,7 @@ def Tmdata(tm, udef=False):
             dbres = dbcon.execute(que)
             params = dbres.fetchall()
             vals_params = decode_pus(data, params)
-            tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
+            tmdata = [(get_calibrated(i[0], j[0], floatfmt=floatfmt), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         elif params is not None:
             # Length of a parameter which should be decoded according to given position
@@ -850,7 +850,7 @@ def Tmdata(tm, udef=False):
             else:
                 vals_params = read_variable_pckt(data, params)
 
-            tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
+            tmdata = [(get_calibrated(i[0], j[0], floatfmt=floatfmt), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         else:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,\
@@ -861,7 +861,7 @@ def Tmdata(tm, udef=False):
             params_in = dbres.fetchall()
 
             vals_params = read_variable_pckt(data, params_in)
-            tmdata = [(get_calibrated(i[0], j), i[6], i[1], pidfmt(i[7]), j) for j, i in vals_params]
+            tmdata = [(get_calibrated(i[0], j, floatfmt=floatfmt), i[6], i[1], pidfmt(i[7]), j) for j, i in vals_params]
             # tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         if spid is not None:
@@ -1713,7 +1713,7 @@ def pidfmt_reverse(val):
 #  Calibrate raw parameter values
 #  @param pcf_name PCF_NAME
 #  @param rawval   Raw value of the parameter
-def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False):
+def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False, floatfmt=None):
     """
 
     :param pcf_name:
@@ -1771,7 +1771,7 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
         if nocal:
             return rawval
         else:
-            return get_cap_yval(pcf_name, rawval)
+            return get_cap_yval(pcf_name, rawval) if floatfmt is None else format(get_cap_yval(pcf_name, rawval), floatfmt)
     elif curtx is not None and categ == 'S':
         if numerical or nocal:
             return rawval
@@ -1826,7 +1826,7 @@ def get_cap_yval(pcf_name, xval, properties=None, dbcon=None):
     # if yval == np.nan:
     #     logger.info('Calibration of {} failed. Value {} outside calibrated range {}-{}'.format(pcf_name, xval, xvals.min(), xvals.max()))
 
-    return format(yval, 'g')
+    return yval  # format(yval, 'g')
 
 
 ##

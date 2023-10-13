@@ -989,116 +989,6 @@ class TMPoolView(Gtk.Window):
             #print(something, self.shown_offset, self.shown_upper_limit)
         self.treeview.thaw_child_notify()   # Tell GTk to reload
 
-        '''
-        # ndel = len(self.pool_liststore)
-        unfiltered_rows = dbrows[2]
-        sorted = dbrows[1]
-        dbrows = dbrows[0]
-        if not dbrows:
-            return
-
-        self.shown_lock.acquire()
-        #self.treeview.freeze_child_notify()
-        #self.pool_liststore.clear()
-
-        if self.shown_diff or self.shown_diff == 0:
-            if self.shown_diff > 0:
-                self.treeview.freeze_child_notify()
-                self.pool_liststore.clear()
-                if sorted:
-                    dbrows = unfiltered_rows.offset(self.shown_offset + self.shown_limit - self.shown_buffer).limit(self.shown_diff)
-                else:
-                    dbrows = unfiltered_rows.filter(DbTelemetry.idx > (self.shown_offset + self.shown_limit - self.shown_buffer)).limit(
-                        self.shown_diff)
-
-                #for row in self.pool_liststore:
-                #    if row[0] == range(self.shown_upper_limit, self.shown_upper_limit - self.shown_diff):
-                #        self.pool_liststore.remove(row.iter)
-
-                if self.shown_offset > self.shown_buffer:
-                    del self.shown_all_rows[0:self.shown_diff]
-
-                x = 0
-                for tm_row in self.shown_all_rows:
-                    if x in range(self.shown_offset + self.shown_diff - self.shown_upper_limit,
-                                  self.shown_offset + self.shown_diff + int(
-                                      self.adj.get_page_size()) - self.shown_upper_limit):
-                        self.pool_liststore.append(tm_row)
-                    x += 1
-
-                if not self.dbrows_list:
-                    t_shown_rows = threading.Thread(target=self.update_shown_buffer)
-                    t_shown_rows.daemon = True
-                    t_shown_rows.start()
-
-                self.dbrows_list.append([dbrows, self.shown_diff])
-                self.treeview.thaw_child_notify()
-
-            elif self.shown_diff == 0:
-                pass
-
-            else:
-                self.treeview.freeze_child_notify()
-                self.pool_liststore.clear()
-                if sorted:
-                    if self.shown_upper_limit > abs(self.shown_diff):
-                        dbrows = unfiltered_rows.offset((self.shown_upper_limit + self.shown_diff)).limit(
-                            self.shown_diff * -1)
-                    else:
-                        dbrows = unfiltered_rows.offset(0).limit(self.shown_diff * -1)
-                else:
-                    if self.shown_upper_limit > abs(self.shown_diff):
-                        dbrows = unfiltered_rows.filter(
-                            DbTelemetry.idx > (self.shown_upper_limit + self.shown_diff)).limit(
-                            self.shown_diff * -1)
-                    else:
-                        dbrows = unfiltered_rows.filter(DbTelemetry.idx > 0).limit(self.shown_diff * -1)
-
-                #for row in self.pool_liststore:
-                #    if row[0] == range(self.offset + self.shown_limit - self.shown_buffer + self.shown_diff,
-                #                       self.offset + self.shown_limit - self.shown_buffer):
-                #        self.pool_liststore.remove(row.iter)
-
-                self.shown_all_rows = self.shown_all_rows[:self.shown_diff]
-
-                if not self.dbrows_list:
-                    t_shown_rows = threading.Thread(target=self.update_shown_buffer)
-                    t_shown_rows.daemon = True
-                    t_shown_rows.start()
-
-                x = 0
-                for tm_row in self.shown_all_rows:
-                    if x in range(self.shown_offset + self.shown_diff - self.shown_upper_limit,
-                                  self.shown_offset + self.shown_diff + int(self.adj.get_page_size()) - self.shown_upper_limit):
-                        self.pool_liststore.append(tm_row)
-                    #if x in range(self.shown_offset + self.shown_diff - self.shown_upper_limit,
-                    #              self.shown_offset - self.shown_upper_limit):
-                        #self.pool_liststore.insert(0, tm_row)
-                    x += 1
-                self.dbrows_list.append([dbrows, self.shown_diff])
-                self.treeview.thaw_child_notify()
-
-            self.shown_offset = 0 if self.shown_offset < 0 else self.shown_offset + self.shown_diff
-            self.shown_upper_limit = 0 if (self.shown_offset - self.shown_buffer) < 0 else self.shown_offset -self.shown_buffer
-            #thread1 = threading.Thread(target=self.update_shown_buffer, kwargs={'rows': dbrows})
-            #thread1.daemon = True
-            #thread1.start()
-
-        else:
-            self.treeview.freeze_child_notify()
-            self.pool_liststore.clear()
-            self.reload_all_shown_rows(dbrows)
-            self.dbrows_list = []
-            self.treeview.thaw_child_notify()
-        #print(time.time()-starttime)
-        # del self.pool_liststore[:ndel]
-        #self.treeview.thaw_child_notify()
-        self.shown_lock.release()
-        self.loaded = 1
-        return
-        '''
-        return
-
     def reload_all_shown_rows(self, dbrows):
         """
         Reload all Packages (shown and in buffer) from the Database
@@ -2557,7 +2447,7 @@ class TMPoolView(Gtk.Window):
             importlib.reload(cfl)
 
     @delayed(10)
-    def set_tm_data_view(self, selection=None, event=None, change_columns=False):
+    def set_tm_data_view(self, selection=None, event=None, change_columns=False, floatfmt='.7G'):
         if not self.active_pool_info:
             self.logger.warning('No active pool')
             return
@@ -2630,11 +2520,11 @@ class TMPoolView(Gtk.Window):
             nocalibration = not self.calibrated_switch.get_active()
             try:
                 if self.UDEF:
-                    data = cfl.Tmformatted(tm, textmode=False, udef=True, nocal=nocalibration)
+                    data = cfl.Tmformatted(tm, textmode=False, udef=True, nocal=nocalibration, floatfmt=floatfmt)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
                 else:
-                    data = cfl.Tmformatted(tm, textmode=False, nocal=nocalibration)
+                    data = cfl.Tmformatted(tm, textmode=False, nocal=nocalibration, floatfmt=floatfmt)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
 
