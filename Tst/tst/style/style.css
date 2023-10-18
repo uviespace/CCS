@@ -127,3 +127,13 @@
 .highlight-2 {
     border-color: orange;
 }
+
+.board {
+    background-color: @bg_color;
+}
+.text-view {
+    padding: 3px;
+}
+/*.cond-dialog label{
+    font-weight: bold;
+}*/

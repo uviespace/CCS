@@ -42,8 +42,8 @@ def query_code_types():
         session.expunge_all()
     return data
 
-# -------------- Pre-Post Condition -------------------
 
+# -------------- Pre-Post Condition -------------------
 def write_into_pre_post_con(code_type, name, description, code_block):
     # Check if the name already exists
     data = get_pre_post_con(code_type)
@@ -64,10 +64,12 @@ def delete_db_row_pre_post(id):
 
 def get_pre_post_con(code_type):
     with db_schema.session_scope() as session:
-        data = session.query(Pre_Post_Con).filter(Pre_Post_Con.type.contains(code_type)).all()
+        if code_type is None:
+            data = session.query(Pre_Post_Con).all()
+        else:
+            data = session.query(Pre_Post_Con).filter(Pre_Post_Con.type.contains(code_type)).all()
         session.expunge_all()
     return data
-
 
 
 if __name__ == '__main__':

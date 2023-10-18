@@ -7,7 +7,7 @@ This file documents the required steps to get the UVIE EGSE software up and runn
 2) Required packages/devtools
     - make
     - gtk3
-    - gtksourceview3 [<=3.24.11-1]
+    - gtksourceview3
     - python-pip
     - python-gobject
     - dbus-python
@@ -33,6 +33,9 @@ This file documents the required steps to get the UVIE EGSE software up and runn
    'make python-requirements' in the CCS base directory or use 'pip install [--user] -r requirements.txt'.
    If using a venv, it must have been created using the --system-site-packages option.
    For more details, see requirements.txt
+   Since Python 3.11, pip --user installs of packages are denied by default to avoid conflicts with
+   system-managed packages - the recommended solution is to use a venv. Alternatively, installing in
+   local userspace is still possible by passing the --break-system-packages flag.
 
 
 # INSTALLATION

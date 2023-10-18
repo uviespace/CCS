@@ -6,11 +6,13 @@
             <section>
                 <item>
                     <attribute name="label" translatable="yes">New</attribute>
-                    <attribute name="action">win.make_new_test</attribute>
+                    <attribute name="action">win.makenewtest</attribute>
+                    <attribute name="accel">&lt;Primary&gt;n</attribute>
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Open</attribute>
                     <attribute name="action">win.open</attribute>
+                    <attribute name="accel">&lt;Primary&gt;o</attribute>
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Save</attribute>
@@ -19,7 +21,8 @@
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Save as</attribute>
-                    <attribute name="action">win.save_as</attribute>
+                    <attribute name="action">win.saveas</attribute>
+                    <attribute name="accel">&lt;Shift&gt;&lt;Primary&gt;s</attribute>
                 </item>
                 <item>
                     <attribute name="label" translatable="yes">Import CSV</attribute>
@@ -95,10 +98,10 @@
                     <attribute name="label" translatable="yes">Show JSON of the model</attribute>
                     <attribute name="action">win.model_viewer_toggle_hide</attribute>
                 </item>
-                <item>
+<!--                <item>
                     <attribute name="label" translatable="yes">Apply CSS</attribute>
                     <attribute name="action">win.apply_css</attribute>
-                </item>
+                </item>-->
                 <item>
                     <attribute name="label" translatable="yes">About</attribute>
                     <attribute name="action">win.about_us</attribute>

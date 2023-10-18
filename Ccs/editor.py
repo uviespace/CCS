@@ -34,6 +34,8 @@ action_folder = cfg.get('ccs-paths', 'actions')
 scripts = glob.glob(os.path.join(cfg.get('paths', 'ccs'), "scripts/*.py"))
 script_actions = '\n'.join(["<menuitem action='{}' />".format(os.path.split(script)[-1][:-3]) for script in scripts])
 
+LOG_UPDT_PER = 2000  # ms
+
 UI_INFO = """
 <ui>
   <menubar name='MenuBar'>
@@ -55,18 +57,23 @@ UI_INFO = """
       <menuitem action='EditPaste' />
       <separator />
       <menuitem action='EditFind' />
+      <menuitem action='EditComment' />
       <separator />
       <menuitem action='EditPreferences' />
+      <menuitem action='EditStyle' />
     </menu>
     <menu action='ModulesMenu'>
       <menuitem action='Poolviewer' />
       <menuitem action='Poolmanager' />
       <menuitem action='Plotter' />
       <menuitem action='Monitor' />
+      <menuitem action='TST' />
     </menu>
     <menu action='ToolsMenu'>
       <menuitem action='ActionButtons' />
+      <menuitem action='ReconnectSQL' />
       <menuitem action='RestartTerminal' />
+      <menuitem action='ClearLog' />
     </menu>
     <menu action='ScriptsMenu'>
         {}    
@@ -81,23 +88,23 @@ UI_INFO = """
 VTE_VERSION = "{}.{}.{}".format(Vte.MAJOR_VERSION, Vte.MINOR_VERSION, Vte.MICRO_VERSION)
 
 
-class SearchDialog(Gtk.Dialog):
-    def __init__(self, parent):
-        Gtk.Dialog.__init__(self, "Search", parent,
-                            Gtk.DialogFlags.MODAL, buttons=(Gtk.STOCK_FIND, Gtk.ResponseType.OK,
-                                                            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
-
-        box = self.get_content_area()
-        box.set_spacing(5)
-        box.set_homogeneous(True)
-
-        label = Gtk.Label("Insert text you want to search for:")
-        box.add(label)
-
-        self.entry = Gtk.Entry()
-        box.add(self.entry)
-
-        self.show_all()
+# class SearchDialog(Gtk.Dialog):
+#     def __init__(self, parent):
+#         Gtk.Dialog.__init__(self, "Search", parent,
+#                             Gtk.DialogFlags.MODAL, buttons=(Gtk.STOCK_FIND, Gtk.ResponseType.OK,
+#                                                             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
+#
+#         box = self.get_content_area()
+#         box.set_spacing(5)
+#         box.set_homogeneous(True)
+#
+#         label = Gtk.Label("Insert text you want to search for:")
+#         box.add(label)
+#
+#         self.entry = Gtk.Entry()
+#         box.add(self.entry)
+#
+#         self.show_all()
 
 
 class IPythonTerminal(Vte.Terminal):
@@ -134,7 +141,8 @@ class IPythonTerminal(Vte.Terminal):
             else:
                 return self.feed_child(msg, len(msg))
         else:
-            return self.feed_child_binary(msg.encode())
+            msg_enc = msg.encode('utf-8') if msg is not None else msg
+            return self.feed_child(msg_enc)
 
 
 class CcsEditor(Gtk.Window):
@@ -161,25 +169,36 @@ class CcsEditor(Gtk.Window):
         self.add(self.paned)
 
         self.grid = Gtk.Grid()
+        self.grid.connect('key-release-event', self._kill_search)
         self.paned.add1(self.grid)
 
         menubar = self.create_menus()
         self.grid.attach(menubar, 0, 0, 3, 1)
 
+        toolbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         toolbar = self.create_toolbar()
-        self.grid.attach(toolbar, 0, 1, 2, 1)
+        toolbox.pack_start(toolbar, 1, 1, 0)
+        self.univie_box = self.create_univie_box()
+        toolbox.pack_end(self.univie_box, 0, 0, 0)
+        self.grid.attach(toolbox, 0, 1, 3, 1)
+
+        self.search_context = None
+        self.editor_notebook = Gtk.Notebook()
+        self.editor_notebook.set_scrollable(True)
+        self.editor_notebook.connect('switch-page', self._set_search_context)
 
         self.searchbar = self.create_searchbar()
         self.grid.attach(self.searchbar, 0, 2, 3, 1)
 
-        self.univie_box = self.create_univie_box()
-        self.grid.attach(self.univie_box, 2, 1, 1, 1)
-
         self.sourcemarks = {}
         self.create_mark_attributes()
 
-        self.editor_notebook = Gtk.Notebook(scrollable=True)
         self.grid.attach(self.editor_notebook, 0, 3, 3, 1)
+
+        if self.cfg.has_option('ccs-editor', 'color_scheme'):
+            self._update_style_schemes(self.cfg.get('ccs-editor', 'color_scheme'))
+        else:
+            self.style_scheme = None
 
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
@@ -198,9 +217,10 @@ class CcsEditor(Gtk.Window):
         self.nb.append_page(self.logwin, tab_label=Gtk.Label(label='Log', angle=270))
         self.paned.add2(self.nb)
 
-        self.log_file = None  # save the shown text from the log file tab
-        # Update the log-file view window every 2 seconds
-        GLib.timeout_add(2000, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
+        self.log_file = None
+        self.log_file_text = None  # save the shown text from the log file tab
+        # Update the log-file view window every LOG_UPDT_PER milliseconds
+        GLib.timeout_add(LOG_UPDT_PER, self.switch_notebook_page, self.logwin, self.logwintext, self.logbuffer)
 
         self.ipython_view.connect("size-allocate", self.console_autoscroll, self.ipython_view)
 
@@ -216,8 +236,19 @@ class CcsEditor(Gtk.Window):
         self.connect("delete-event", self.quit_func)
         # self.connect("delete-event", self.tcpserver_shutdown)
         self.connect('key-press-event', self.key_pressed)
-        # self.open_file("startpv.py")
+
+        # self._apply_css(cssfile='style.css')
         self.show_all()
+
+    def _apply_css(self, cssfile=None, data=None):
+        style_provider = Gtk.CssProvider()
+        if data is not None:
+            style_provider.load_from_data(data)
+        if cssfile is not None:
+            style_provider.load_from_path(cssfile)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(),
+                                                 style_provider,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def timeout(self, sec):
         print(self.cfg['ccs-database']['commit_interval'])
@@ -268,7 +299,6 @@ class CcsEditor(Gtk.Window):
         @return: -
         """
 
-        ######
         # This function exists in every app, but is different here, be careful!
 
         self.my_bus_name = My_Bus_Name
@@ -321,10 +351,9 @@ class CcsEditor(Gtk.Window):
                                          " = dbus.SessionBus().get_object('" + str(My_Bus_Name) +
                                          "', '/MessageListener')")
 
-        #####
         # Connect to all running applications for terminal
         our_con = []
-        #Search for all applications
+        # Search for all applications
         for service in dbus.SessionBus().list_names():
             if service.startswith('com'):
                 our_con.append(service)
@@ -382,7 +411,6 @@ class CcsEditor(Gtk.Window):
                             self._to_console_via_socket("editor" + str(service[-1]) +
                                                         " = dbus.SessionBus().get_object('" + str(service) +
                                                         "', '/MessageListener')")
-        return
 
     def restart_terminal(self):
 
@@ -402,9 +430,9 @@ class CcsEditor(Gtk.Window):
 
         self.ipython_view.connect("size-allocate", self.console_autoscroll, self.ipython_view)
 
-        self.ed_host, self.ed_port = self.cfg.get('ccs-misc', 'editor_host'), int(self.cfg.get('ccs-misc', 'editor_ul_port'))  # Get standart port
+        self.ed_host, self.ed_port = self.cfg.get('ccs-misc', 'editor_host'), int(self.cfg.get('ccs-misc', 'editor_ul_port'))  # Get standard port
 
-        # Connect to standart port if possible otherwise use a random alternative
+        # Connect to standard port if possible otherwise use a random alternative
         try:
             self.setup_editor_socket(self.ed_host, self.ed_port)
         except OSError:
@@ -530,63 +558,21 @@ class CcsEditor(Gtk.Window):
         while self.is_editor_socket_active:
             self.console_sock, addr = sock_csl.accept()
             line = self.console_sock.recv(2**16).decode()
-            # if line.startswith('exec:'):
-            #     exec(line.strip('exec:'))
-            # elif line.startswith('get:'):
-            #     buf = pickle.dumps(line.strip('get:'))
-            #     self.console_sock.sendall(buf)
-            # else:
-            #     workaround for IP5
-            #     for line in line.split('\n'):
-            #         while 1:
-            #             if self.feed_ready:
-            #                 GLib.idle_add(self.process_line_idle, line)
-            #                 # self.feed_ready = False
-            #                 break
-            #             else:
-            #                 time.sleep(0.01)
             GLib.idle_add(self.process_line_idle, line)
-            self.console_sock.sendall(b'ACK ' + line.encode()[:1020])
+            self.console_sock.sendall(b'ACK ' + line.encode()[:60])
             self.console_sock.close()
         sock_csl.close()
 
     def process_line_idle(self, line):
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
-        # line += '\n'
-        # print(line)
         if not line.endswith('\n'):
             line += '\n'
-        # if line.count('\n') > 1:
-        #     self.ipython_view.feed_child('%cpaste\n', len('%cpaste\n'))
-        #     time.sleep(0.01)
-        #     line += '\n--\n'
-        # if len(line.split('\n')) > 2:
         if line.count('\n') > 2:
-            if VTE_VERSION < '0.52.3':
-                self.ipython_view.feed_child('%cpaste\n', 8)
-                time.sleep(0.2)  # wait for interpreter to return before feeding new code
-                self.ipython_view.feed_child(line, len(line))
-                self.ipython_view.feed_child('--\n', 3)
-            else:
-                self.ipython_view.feed_child_binary('%cpaste\n'.encode())
-                time.sleep(0.2)  # wait for interpreter to return before feeding new code
-                self.ipython_view.feed_child_binary(line.encode())
-                self.ipython_view.feed_child_binary('--\n'.encode())
-            # self.ipython_view.feed_child('%cpaste\n'+line+'--\n', len(line)+11)
-            # for line in line.split('\n'):
-            #     while 1:
-            #         if self.feed_ready:
-            #             self.feed_ready = False
-            #             self.ipython_view.feed_child(line+'\n', len(line)+1)
-            #             break
-            #         else:
-            #             time.sleep(0.01)
+            self.ipython_view.feed_child_compat('%cpaste\n')
+            time.sleep(0.2)  # wait for interpreter to return before feeding new code
+            self.ipython_view.feed_child_compat(line)
+            self.ipython_view.feed_child_compat('--\n')
         else:
-            if VTE_VERSION < '0.52.3':
-                self.ipython_view.feed_child(line, len(line))
-            else:
-                self.ipython_view.feed_child_binary(line.encode())
+            self.ipython_view.feed_child_compat(line)
 
     def create_mark_attributes(self):
         self.mark_play = GtkSource.MarkAttributes()
@@ -641,6 +627,7 @@ class CcsEditor(Gtk.Window):
 
         action = Gtk.Action(name="FileSaveAs", label="_Save As", tooltip=None, stock_id=Gtk.STOCK_SAVE_AS)
         action.connect("activate", self.on_menu_file_saveas)
+        action_group.add_action_with_accel(action, "<control><shift>S")
         action_group.add_action(action)
 
         action = Gtk.Action(name="FileQuit", label="_Quit", tooltip=None, stock_id=Gtk.STOCK_QUIT)
@@ -675,44 +662,40 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self.on_search_clicked)
         action_group.add_action_with_accel(action, "<control>F")
 
-        action = Gtk.Action(name="EditPreferences", label="_Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
+        action = Gtk.Action(name="EditComment", label="Comment Lines", tooltip=None)
+        action.connect("activate", self._on_comment_lines)
+        action_group.add_action_with_accel(action, "<control>T")
+
+        action = Gtk.Action(name="EditPreferences", label="Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
         action.connect("activate", cfl.start_config_editor)
         action_group.add_action(action)
 
-    # def create_pool_menu(self, action_group):
-    #     action = Gtk.Action(name="PoolMenu", label="_Pool", tooltip=None, stock_id=None, sensitive=False)
-    #     action_group.add_action(action)
-    #
-    #     action = Gtk.Action(name="SelectConfig", label="_Select Configuration", tooltip=None, stock_id=None)
-    #     action.connect("activate", self._on_select_pool_config)
-    #     action_group.add_action(action)
-    #
-    #     action = Gtk.Action(name="EditConfig", label="_Edit Configuration", tooltip=None, stock_id=None)
-    #     action.connect("activate", self._on_edit_pool_config)
-    #     action_group.add_action(action)
-    #
-    #     action = Gtk.Action(name="CreateConfig", label="_Create Configuration", tooltip=None, stock_id=None)
-    #     action.connect("activate", self._on_create_pool_config)
-    #     action_group.add_action(action)
+        action = Gtk.Action(name="EditStyle", label="Set Editor Style", tooltip=None)
+        action.connect("activate", self._on_set_style)
+        action_group.add_action(action)
 
     def create_modules_menu(self, action_group):
         action = Gtk.Action(name="ModulesMenu", label="_Modules", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Poolviewer", label="_Start Poolviewer", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Poolviewer", label="_Poolviewer", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_poolviewer)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Poolmanager", label="_Start Poolmanager", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Poolmanager", label="_Poolmanager", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_poolmanager)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Plotter", label="_Start Plotter", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Plotter", label="_Plotter", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_plotter)
         action_group.add_action(action)
 
-        action = Gtk.Action(name="Monitor", label="_Start Monitor", tooltip=None, stock_id=None)
+        action = Gtk.Action(name="Monitor", label="_Monitor", tooltip=None, stock_id=None)
         action.connect("activate", self._on_start_monitor)
+        action_group.add_action(action)
+
+        action = Gtk.Action(name="TST", label="_Test Specification Tool", tooltip=None, stock_id=None)
+        action.connect("activate", self._on_start_tst)
         action_group.add_action(action)
 
     def create_tools_menu(self, action_group):
@@ -723,8 +706,17 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self._on_show_action_window)
         action_group.add_action(action)
 
+        action = Gtk.Action(name="ReconnectSQL", label="_Reconnect SQL",
+                            tooltip="Reconnect, in case 'SQL server has gone away'", stock_id=None)
+        action.connect("activate", self._on_reconnect_sql)
+        action_group.add_action(action)
+
         action = Gtk.Action(name="RestartTerminal", label="_Restart Terminal", tooltip=None, stock_id=None)
         action.connect("activate", self._on_restart_terminal)
+        action_group.add_action(action)
+
+        action = Gtk.Action(name="ClearLog", label="_Clear Log", tooltip=None, stock_id=None)
+        action.connect("activate", self._on_clear_log)
         action_group.add_action(action)
 
     def create_scripts_menu(self, action_group):
@@ -770,58 +762,71 @@ class CcsEditor(Gtk.Window):
     def _on_menu_file_new(self, widget=None, filename=None):
         self.notebook_open_tab()
 
-    # def _on_select_pool_config(self, action):
-    #     print('TODO')
-    #
-    # def _on_edit_pool_config(self, action):
-    #     print('TODO')
-    #
-    # def _on_create_pool_config(self, action):
-    #     cfg_dialog = config_dialog.CreateConfig(self)
-    #     response = cfg_dialog.run()
-    #
-    #     config = cfg_dialog.get_config()
-    #     cfg_dialog.destroy()
-    #
-    #     if response == Gtk.ResponseType.CANCEL:
-    #         return
-    #
-    #     dialog = Gtk.FileChooserDialog(title="Save file as", parent=None,
-    #                                    action=Gtk.FileChooserAction.SAVE)
-    #     dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-    #                        Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
-    #
-    #     dialog.set_transient_for(self)
-    #
-    #     response = dialog.run()
-    #
-    #     if response == Gtk.ResponseType.OK:
-    #         filename = dialog.get_filename()
-    #         with open(filename, 'w') as fdesc:
-    #             config.write(fdesc)
-    #             fdesc.close()
-    #
-    #     dialog.destroy()
+    def _on_comment_lines(self, widget=None):
+        view = self._get_active_view()
+        textbuffer = view.get_buffer()
+
+        hs = textbuffer.get_has_selection()
+
+        if hs:
+            x, y = textbuffer.get_selection_bounds()
+
+            # remember selected part for re-selection at the end
+            ix = x.get_offset()
+            iyl, iyo = y.get_line(), y.get_line_offset()
+
+            x.set_line_offset(0)
+            tt = x.get_text(y)
+            lnlist = tt.split('\n')
+            if all([ln.startswith('#') for ln in lnlist]):
+                newbuf = []
+                for ln in lnlist:
+                    newbuf.append(ln[1:])
+                tr = '\n'.join(newbuf)
+                ix -= 1
+                iyo -= 1
+            else:
+                tr = '#' + tt.replace('\n', '\n#')
+                ix += 1
+                iyo += 1
+
+        else:
+            x = textbuffer.get_iter_at_mark(textbuffer.get_insert())
+            x.set_line_offset(0)
+            y = x.copy()
+            y.forward_to_line_end()
+            tt = x.get_text(y)
+
+            if tt.startswith('#'):
+                tr = tt[1:]
+            else:
+                tr = '#' + tt
+
+        textbuffer.delete(x, y)
+        textbuffer.insert(x, tr, len(tr))
+
+        if hs:
+            x = textbuffer.get_iter_at_offset(ix)
+            y = textbuffer.get_iter_at_line_offset(iyl, iyo)
+            textbuffer.select_range(x, y)
 
     def _on_start_poolviewer(self, action):
         cfl.start_pv()
-        return
 
     def _on_start_poolmanager(self, action):
         cfl.start_pmgr()
-        return
 
     def _on_start_plotter(self, action):
         cfl.start_plotter()
-        return
 
     def _on_start_monitor(self, action):
         cfl.start_monitor()
-        return
+
+    def _on_start_tst(self, action):
+        cfl.start_tst()
 
     def _on_open_poolmanager_gui(self, action):
         cfl.start_pmgr()
-        return
 
     def _on_show_action_window(self, action):
         if hasattr(self, 'action_button_window'):
@@ -830,9 +835,11 @@ class CcsEditor(Gtk.Window):
                 return
         self.action_button_window = ActionWindow(self)
 
+    def _on_reconnect_sql(self, action):
+        self._to_console('cfl.scoped_session_idb.close()')
+
     def _on_restart_terminal(self, action):
         self.restart_terminal()
-        return
 
     def _on_open_script(self, action, filename):
         if os.path.isfile(filename):
@@ -843,15 +850,16 @@ class CcsEditor(Gtk.Window):
 
     def _on_select_about_dialog(self, action):
         cfl.about_dialog(self)
-        return
 
     def _get_active_view(self):
         nbpage = self.editor_notebook.get_current_page()
         scrolled_window = self.editor_notebook.get_nth_page(nbpage)
+
+        if scrolled_window is None:
+            return
+
         view = scrolled_window.get_child()
         return view
-
-    """ TODO: unsaved buffer warning on delete/destroy """
 
     def notebook_open_tab(self, filename=None):
 
@@ -875,6 +883,7 @@ class CcsEditor(Gtk.Window):
 
         sourceview = self.create_textview(filename)
         self.editor_notebook.append_page(sourceview, hbox)
+        self.editor_notebook.set_tab_reorderable(sourceview, True)
 
         button.connect("clicked", self._notebook_close_tab, sourceview)
 
@@ -1036,7 +1045,7 @@ class CcsEditor(Gtk.Window):
 
     def add_file_dialog_filters(self, dialog):
         filter_py = Gtk.FileFilter()
-        filter_py.set_name("All Python Files")
+        filter_py.set_name("Python Files")
         filter_py.add_mime_type("text/x-python")
         dialog.add_filter(filter_py)
 
@@ -1114,28 +1123,21 @@ class CcsEditor(Gtk.Window):
         # button_reload_config.connect("clicked", self.reload_config)
         # toolbar.add(button_reload_config)
 
-        toolbar.add(Gtk.SeparatorToolItem())
-
-        # button_reset_ns = Gtk.ToolButton()
-        # button_reset_ns.set_icon_name("edit-clear")
-        # button_reset_ns.set_tooltip_text('Reset console namespace')
-        # button_reset_ns.connect('clicked', self.reset_ns)
-        # toolbar.add(button_reset_ns)
-
         return toolbar
 
     def create_action_buttons(self, toolbar, targets, nbutt=10):
         for n in range(nbutt):
             button_action = Gtk.ToolButton()
 
-            button_img_path = os.path.join(pixmap_folder, self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
-            except:
-                self.logger.warning('Could not load image {}'.format(button_img_path))
-                pixmap_path = os.path.join(pixmap_folder, 'action.png')
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
-            icon = Gtk.Image.new_from_pixbuf(pixbuf)
+            # button_img_path = os.path.join(pixmap_folder, self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
+            # try:
+            #     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
+            # except:
+            #     self.logger.warning('Could not load image {}'.format(button_img_path))
+            #     pixmap_path = os.path.join(pixmap_folder, 'action.png')
+            #     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
+            # icon = Gtk.Image.new_from_pixbuf(pixbuf)
+            icon = self._get_toolbutton_icon(self.cfg.get('ccs-actions', 'action{}_img'.format(n + 1)))
             button_action.set_icon_widget(icon)
             button_action.set_name('action{}'.format(n + 1))
             button_action.set_tooltip_text(os.path.join(action_folder, self.cfg.get('ccs-actions', 'action{}'.format(n + 1))))
@@ -1157,18 +1159,25 @@ class CcsEditor(Gtk.Window):
 
         widget.set_tooltip_text(filename)
 
-    def action_context_menu(self, action):
+    def action_context_menu(self, action_button):
+        action = action_button.get_name()
         menu = Gtk.Menu()
 
         item = Gtk.MenuItem(label='Open action script file')
         item.connect('activate', self.show_action_script, action)
         menu.append(item)
+        item1 = Gtk.MenuItem(label='Set action script file')
+        item1.connect('activate', self._set_action_button_script, action_button)
+        menu.append(item1)
+        item2 = Gtk.MenuItem(label='Set button icon')
+        item2.connect('activate', self._set_action_button_icon, action_button)
+        menu.append(item2)
         return menu
 
     def show_action_context(self, widget, event):
         if event.button != 3:
             return
-        menu = self.action_context_menu(widget.get_name())
+        menu = self.action_context_menu(widget)
         menu.show_all()
         menu.popup(None, None, None, None, 3, event.time)
 
@@ -1176,7 +1185,58 @@ class CcsEditor(Gtk.Window):
         if action is None:
             return
         self.open_file(os.path.join(action_folder, self.cfg.get('ccs-actions', action)))
-        return
+
+    def _set_action_button_script(self, widget, action):
+        if action is None:
+            return
+
+        dialog = Gtk.FileChooserDialog('Select action script')
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        self.add_file_dialog_filters(dialog)
+        resp = dialog.run()
+
+        if resp == Gtk.ResponseType.OK:
+            fname = dialog.get_filename()
+            action.set_tooltip_text(fname)
+            if os.path.dirname(fname) == action_folder:
+                fname = os.path.basename(fname)
+
+            self.cfg.save_option_to_file('ccs-actions', action.get_name(), fname)
+
+        dialog.destroy()
+
+    def _set_action_button_icon(self, widget, action):
+        if action is None:
+            return
+
+        dialog = Gtk.FileChooserDialog(title='Select action icon')
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        resp = dialog.run()
+        if resp == Gtk.ResponseType.OK:
+            fname = dialog.get_filename()
+            if os.path.dirname(fname) == pixmap_folder:
+                fname = os.path.basename(fname)
+            icon = self._get_toolbutton_icon(fname)
+            action.set_icon_widget(icon)
+            action.show_all()
+            self.cfg.save_option_to_file('ccs-actions', action.get_name() + '_img', fname)
+
+        dialog.destroy()
+
+    def _get_toolbutton_icon(self, icon_path):
+        button_img_path = os.path.join(pixmap_folder, icon_path)
+
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(button_img_path, 36, 36)
+        except Exception as err:
+            self.logger.debug(err)
+            self.logger.warning('Could not load image {}'.format(button_img_path))
+            pixmap_path = os.path.join(pixmap_folder, 'action.png')
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(pixmap_path, 36, 36)
+
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+
+        return icon
 
     def open_file(self, filename):
 
@@ -1246,40 +1306,96 @@ class CcsEditor(Gtk.Window):
         searchbar = Gtk.SearchBar.new()
         searchbar.set_search_mode(False)
         searchbar.set_show_close_button(True)
-        searchentry = Gtk.SearchEntry(width_chars=30)
+        self.searchentry = Gtk.SearchEntry(width_chars=40)
 
-        searchentry.connect('search-changed', self.search_and_mark)
-        searchentry.connect('next-match', self._on_search_next, searchentry)
-        searchentry.connect('previous-match', self._on_search_previous, searchentry)
+        # self.searchentry.connect('search-changed', self.search_and_mark)
+        self.searchentry.connect('search-changed', self._on_search_changed)
+        self.searchentry.connect('activate', self._on_search_next2)
+        # self.searchentry.connect('next-match', self._on_search_next)
+        self.searchentry.connect('next-match', self._on_search_next2)
+        # self.searchentry.connect('previous-match', self._on_search_previous)
+        self.searchentry.connect('previous-match', self._on_search_prev2)
+
+        self._init_search_settings()
 
         next = Gtk.Button.new_from_icon_name('go-down-symbolic', Gtk.IconSize.BUTTON)
-        next.connect('clicked', self._on_search_next, searchentry)
+        next.connect('clicked', self._on_search_next2)
         prev = Gtk.Button.new_from_icon_name('go-up-symbolic', Gtk.IconSize.BUTTON)
-        prev.connect('clicked', self._on_search_previous, searchentry)
+        prev.connect('clicked', self._on_search_prev2)
+
+        csens = Gtk.CheckButton.new_with_label('match case')
+        csens.connect('toggled', self._set_case_sensitive)
 
         hbox = Gtk.HBox()
         searchbar.add(hbox)
-        hbox.pack_start(searchentry, 0, 0, 0)
+        hbox.pack_start(self.searchentry, 1, 1, 4)
         hbox.pack_start(prev, 0, 0, 0)
         hbox.pack_start(next, 0, 0, 0)
+        hbox.pack_start(csens, 0, 0, 6)
 
         return searchbar
+
+    def _set_case_sensitive(self, widget):
+        self.search_settings.set_case_sensitive(widget.get_active())
+
+    def _on_search_changed(self, widget):
+        self.findtext(start_offset=0)
+
+    def _on_search_next2(self, widget):
+        self.findtext()
+
+    def _on_search_prev2(self, *args):
+        self.findtext(start_offset=0, back=True)
+
+    def _init_search_settings(self):
+        self.search_settings = GtkSource.SearchSettings()
+        self.search_settings.set_case_sensitive(False)
+        self.search_settings.set_wrap_around(True)
+        self.searchentry.bind_property('text', self.search_settings, 'search-text')
+
+    def _set_search_context(self, notebook, nbchild, nbpage, *args):
+        self.current_view = nbchild.get_child()
+        self.current_buffer = self.current_view.get_buffer()
+        self.search_context = GtkSource.SearchContext.new(self.current_buffer, self.search_settings)
+
+    def findtext(self, start_offset=1, back=False):
+        buf = self.current_buffer
+        insert = buf.get_iter_at_mark(buf.get_insert())
+        insert.forward_chars(start_offset)
+
+        if not back:
+            match, start_iter, end_iter, wrapped = self.search_context.forward2(insert)
+        else:
+            match, start_iter, end_iter, wrapped = self.search_context.backward2(insert)
+
+        if match:
+            buf.place_cursor(start_iter)
+            buf.move_mark(buf.get_selection_bound(), end_iter)
+            self.current_view.scroll_to_mark(buf.get_insert(), 0.25, True, 0.5, 0.5)
+            return True
+        else:
+            buf.place_cursor(buf.get_iter_at_mark(buf.get_insert()))
+
+    def _kill_search(self, widget, evt, *args):
+        if evt.keyval == Gdk.KEY_Escape:
+            self.searchentry.delete_text(0, -1)
+            self.searchbar.set_search_mode(False)
 
     def create_textview(self, filename=None):
         scrolledwindow = Gtk.ScrolledWindow()
         scrolledwindow.set_hexpand(True)
         scrolledwindow.set_vexpand(True)
 
-        textview = GtkSource.View(buffer=GtkSource.Buffer())
+        textview = GtkSource.View()
+        textview.set_buffer(GtkSource.Buffer())
 
         textview.set_wrap_mode(Gtk.WrapMode.WORD)
 
-        # textview.set_properties(insert_spaces_instead_of_tabs=True)
+        textview.set_properties(insert_spaces_instead_of_tabs=True)
         textview.set_properties(show_line_numbers=True)
         textview.set_properties(auto_indent=True)
         # textview.set_properties(highlight_current_line = True)
-        # textview.set_properties(monospace = True)
-        textview.modify_font(Pango.FontDescription('monospace 10'))
+        textview.set_properties(monospace=True)
         textview.set_properties(tab_width=4)
         textview.set_show_line_marks(True)
         textview.connect('line-mark-activated', self.line_mark_activated)
@@ -1297,7 +1413,7 @@ class CcsEditor(Gtk.Window):
                                            GtkSource.SpaceTypeFlags.NEWLINE)
             drawer.set_enable_matrix(True)
 
-        textview.modify_font(Pango.FontDescription('monospace ' + str(self.cfg['ccs-editor']['font_size'])))
+        self._apply_css(data='grid textview {{font-size :{}pt}}'.format(self.cfg['ccs-editor']['font_size']).encode())
 
         textview.set_mark_attributes("play", self.mark_play, 1)
         textview.set_mark_attributes("break", self.mark_break, 2)
@@ -1307,6 +1423,9 @@ class CcsEditor(Gtk.Window):
         language = lang_manager.get_language('python3')
 
         textbuffer.set_language(language)
+
+        if self.style_scheme is not None:
+            textbuffer.set_style_scheme(self.style_scheme)
 
         scrolledwindow.add(textview)
 
@@ -1318,24 +1437,29 @@ class CcsEditor(Gtk.Window):
         manage communication
         :return:
         """
-        univie_box = Gtk.HBox()
+        univie_box = Gtk.Toolbar()
         univie_button = Gtk.ToolButton()
         # button_run_nextline.set_icon_name("media-playback-start-symbolic")
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(pixmap_folder, 'Icon_Space_blau_en.png'), 48, 48)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         univie_button.set_icon_widget(icon)
-        univie_button.set_tooltip_text('Applications and About')
+        univie_button.set_tooltip_text('Application Drawer')
         univie_button.connect("clicked", self.on_univie_button)
         univie_box.add(univie_button)
 
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())  # + '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, True, True, 0)
+
+        # Add the TST option
+        conn_button = Gtk.Button.new_with_label('Test Specification Tool')
+        conn_button.connect("clicked", cfl.start_tst)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
@@ -1352,11 +1476,29 @@ class CcsEditor(Gtk.Window):
         about_button.connect("clicked", self._on_select_about_dialog)
         vbox.pack_start(about_button, True, True, 10)
 
+        # Add the close modules button
+        kill_button = Gtk.Button.new_with_label('Close modules')
+        kill_button.connect("clicked", self._close_modules_cmd)
+        vbox.pack_start(kill_button, True, True, 0)
+
         self.popover.add(vbox)
         self.popover.set_position(Gtk.PositionType.BOTTOM)
         self.popover.set_relative_to(univie_button)
 
         return univie_box
+
+    def _close_modules_cmd(self, *args):
+        dialog = Gtk.MessageDialog()
+        dialog.add_buttons(Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES,)
+        dialog.set_markup('<b>Close all modules?</b>')
+        response = dialog.run()
+        if response == Gtk.ResponseType.YES:
+            dialog.destroy()
+        else:
+            dialog.destroy()
+            return
+
+        self._to_console('cfl._close_modules()')
 
     def on_univie_button(self, action):
         """
@@ -1420,8 +1562,6 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(begin, end, True)
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
         self._to_console(line)
 
         return iter
@@ -1435,25 +1575,21 @@ class CcsEditor(Gtk.Window):
             mark = self.sourcemarks[textbuffer]
             start = textbuffer.get_iter_at_mark(mark)
         else:
-            start = textbuffer.get_start_iter()  # init
+            start = textbuffer.get_start_iter()
+            self._set_play_mark(view, start)
+            mark = self.sourcemarks[textbuffer]
 
-        #start = textbuffer.get_iter_at_line(iter.get_line())
-        #end = textbuffer.get_end_iter()
+        # bp = textbuffer.forward_iter_to_source_mark(stop, "break")
+        bp = mark.next()  # only works if no category is given!?
 
-        stop = start.copy()
-        bp = textbuffer.forward_iter_to_source_mark(stop, "break")  #TODO
-
-        if bp is False:
-            stop = textbuffer.get_end_iter()#end
+        if bp is not None:
+            stop = textbuffer.get_iter_at_mark(bp)
+        else:
+            stop = textbuffer.get_end_iter()
 
         """ dump line into console """
         line = textbuffer.get_text(start, stop, True)
-        line += str('\n\n')
-
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
-        #self._to_console(line, editor_read=True)
-        self._to_console_via_socket(line)
+        self._to_console(line)
 
         self._set_play_mark(view, stop)
 
@@ -1473,15 +1609,9 @@ class CcsEditor(Gtk.Window):
 
         """ dump line into console """
         line = textbuffer.get_text(start, end, True)
-        line += str('\n\n')
-
-        # self.ipython_view.text_buffer.insert_at_cursor(line, len(line))
-        # self.ipython_view._processLine()
-        #self._to_console(line, editor_read=True)
-        self._to_console_via_socket(line)
+        self._to_console(line)
 
         self._set_play_mark(view, end)
-
 
     def _to_console_via_socket(self, buf):
         '''
@@ -1498,78 +1628,47 @@ class CcsEditor(Gtk.Window):
         editor_sock.close()
         return ack
 
-    #TODO: Very interesting behaviour by the editor console if every execution is done by the '_to_console' command,
-    # at the beginnig everything works fine, run all and run line by line, if a function is executed the same is true,
-    # but not if the function is first executed by run all and than by run line per line... the console just deletes
-    # the command befor it is executed, run all is now executed via socket everything works fine, changes would just be
-    # a visual plus, and the addvatage to use the built in command to communicate with the console,
-    # #### Additionally: using python 3.8 or newer, _to_console function does not yet work... but _to_conosle_via_socket
-    # works for every version, therefore it is used as long no solution is found
-
-
-    def _to_console(self, buf, execute=True, editor_read=False):
+    def _to_console(self, buf, execute=True, editor_read=False, protect_input=False):
         '''
         This function sends data to the IPython Terminal, Gtk.VteTerminal has a built in function to do this
         @param buf: String that should be sent
         @return: acknowledgment from the IPython Terminal
         '''
-        shown_length = 10   # This is the length execution line in the terminal has if no code was given
+        if protect_input:
+            shown_length = 10   # This is the length execution line in the terminal has if no code was given
 
-        last_row_pos = self.ipython_view.get_cursor_position()  # Get the last row
-        # Get the text that is written in the last row
-        terminal_text = self.ipython_view.get_text_range(last_row_pos[1], 0, last_row_pos[1] + 1, -1, None)[0]
-        entry_length = len(terminal_text)
+            last_row_pos = self.ipython_view.get_cursor_position()  # Get the last row
+            # Get the text that is written in the last row
+            terminal_text = self.ipython_view.get_text_range(last_row_pos[1], 0, last_row_pos[1] + 1, -1, None)[0]
+            entry_length = len(terminal_text)
 
-        # Check if code is entered into the terminal which was not executed yet
-        if len(terminal_text) > shown_length:
-            saved_text = terminal_text[8:-2]
+            # Check if code is entered into the terminal which was not executed yet
+            if len(terminal_text) > shown_length:
+                saved_text = terminal_text[8:-2]
+            else:
+                saved_text = ''
+
+            # If code was entered delete it, otherwise the new command would be added at the end
+            while entry_length > shown_length:
+                self.ipython_view.feed_child_compat('\b', len('\b'))
+                shown_length += 1
         else:
-            saved_text = ''
-
-        # If code was entered delete it, otherwise the new command would be added at the end
-        while entry_length > shown_length:
-            self.ipython_view.feed_child_compat('\b', len('\b'))
-            shown_length += 1
+            saved_text = None
 
         if not buf.endswith('\n'):
             buf += '\n'
 
         if buf.count('\n') > 2:
-            self.ipython_view.feed_child_compat('%cpaste\n')
+            self.ipython_view.feed_child_compat('%cpaste -q\n')
             time.sleep(0.2)
             self.ipython_view.feed_child_compat(buf)
-            ack = self.ipython_view.feed_child_compat('--\n', 3)
-
-            # if VTE_VERSION < '0.52.3':
-            #     self.ipython_view.feed_child('%cpaste\n', 8)
-            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
-            #     self.ipython_view.feed_child(buf, len(buf))
-            #     ack = self.ipython_view.feed_child('--\n', 3)
-            # else:
-            #     self.ipython_view.feed_child_binary('%cpaste\n'.encode())
-            #     time.sleep(0.2)  # wait for interpreter to return before feeding new code
-            #     self.ipython_view.feed_child_binary(buf.encode())
-            #     ack = self.ipython_view.feed_child_binary('--\n'.encode())
+            ack = self.ipython_view.feed_child_compat('--\n')
         else:
             ack = self.ipython_view.feed_child_compat(buf)
-
-            # if VTE_VERSION < '0.52.3':
-            #     ack = self.ipython_view.feed_child(buf, len(buf))
-            # else:
-            #     ack = self.ipython_view.feed_child_binary(buf.encode())
-
-        # execute = '\n'  # Without this command would be written to terminal but not executed
-        # ack = self.ipython_view.feed_child(buf + execute, len(buf + execute))
 
         # Write the previously deleted code back to the terminal
         if saved_text:
             self.ipython_view.feed_child_compat(saved_text, len(saved_text))
-
-        #editor_sock = socket.socket()
-        #editor_sock.connect((self.ed_host, self.ed_port))
-        #editor_sock.send(buf.encode())
-        #ack = editor_sock.recv(1024)
-        #editor_sock.close()
 
         return ack
 
@@ -1577,70 +1676,45 @@ class CcsEditor(Gtk.Window):
         self.searchbar.set_search_mode(not self.searchbar.get_search_mode())
         if self.searchbar.get_search_mode():
             self.searchbar.get_child().get_child().get_children()[1].get_children()[0].get_children()[0].grab_focus()
-        '''
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
 
-        tag_clear = textbuffer.create_tag(background='white')
-        textbuffer.apply_tag(tag_clear, *textbuffer.get_bounds())
+    # def search_and_mark(self, widget=None, start=None, direction='next'):
+    #     searchtext = self.searchentry.get_text()
+    #     view = self._get_active_view()
+    #     textbuffer = view.get_buffer()
+    #     if start is None:
+    #         start, end = textbuffer.get_bounds()
+    #     else:
+    #         start = textbuffer.get_iter_at_mark(start)
+    #         end = textbuffer.get_end_iter()
+    #     # tag_found = textbuffer.create_tag(background='limegreen')#, foreground='black')
+    #
+    #     if direction == 'next':
+    #         found = start.forward_search(searchtext, 0)
+    #     else:
+    #         found = start.backward_search(searchtext, 0)
+    #
+    #     if found:
+    #         start, end = found
+    #         textbuffer.select_range(start, end)
+    #         if direction == 'next':
+    #             last_search_pos = textbuffer.create_mark('last_search_pos', end, False)
+    #         else:
+    #             last_search_pos = textbuffer.create_mark('last_search_pos', start, False)
+    #         # textbuffer.apply_tag(tag_found, match_start, match_end)
+    #         # view.scroll_to_iter(match_start,0.,False,0,0)
+    #         view.scroll_mark_onscreen(last_search_pos)
 
-        dialog = SearchDialog(self)
+    # def _on_search_next(self, widget, *args):
+    #     view = self._get_active_view()
+    #     textbuffer = view.get_buffer()
+    #     last_search_pos = textbuffer.get_mark('last_search_pos')
+    #     self.search_and_mark(start=last_search_pos, direction='next')
 
-        response = dialog.run()
-
-        if response == Gtk.ResponseType.OK:
-            cursor_mark = textbuffer.get_insert()
-            start = textbuffer.get_iter_at_mark(cursor_mark)
-
-            if start.get_offset() == textbuffer.get_char_count():
-                start = textbuffer.get_start_iter()
-
-            self.search_and_mark(textbuffer, dialog.entry.get_text(), start)
-
-        dialog.destroy()
-        '''
-
-    def search_and_mark(self, searchentry, start=None, direction='next'):
-        searchtext = searchentry.get_text()
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-        if start == None:
-            start, end = textbuffer.get_bounds()
-        else:
-            start = textbuffer.get_iter_at_mark(start)
-            end = textbuffer.get_end_iter()
-        # tag_found = textbuffer.create_tag(background='limegreen')#, foreground='black')
-
-        if direction == 'next':
-            found = start.forward_search(searchtext, 0)
-        else:
-            found = start.backward_search(searchtext, 0)
-
-        if found:
-            start, end = found
-            textbuffer.select_range(start, end)
-            if direction == 'next':
-                last_search_pos = textbuffer.create_mark('last_search_pos', end, False)
-            else:
-                last_search_pos = textbuffer.create_mark('last_search_pos', start, False)
-            # textbuffer.apply_tag(tag_found, match_start, match_end)
-            # view.scroll_to_iter(match_start,0.,False,0,0)
-            view.scroll_mark_onscreen(last_search_pos)
-        return
-
-    def _on_search_next(self, widget, searchentry, last_search_pos=None):
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-        last_search_pos = textbuffer.get_mark('last_search_pos')
-        self.search_and_mark(searchentry=searchentry, start=last_search_pos, direction='next')
-        return
-
-    def _on_search_previous(self, widget, searchentry, last_search_pos=None):
-        view = self._get_active_view()
-        textbuffer = view.get_buffer()
-        last_search_pos = textbuffer.get_mark('last_search_pos')
-        self.search_and_mark(searchentry=searchentry, start=last_search_pos, direction='prev')
-        return
+    # def _on_search_previous(self, widget, *args):
+    #     view = self._get_active_view()
+    #     textbuffer = view.get_buffer()
+    #     last_search_pos = textbuffer.get_mark('last_search_pos')
+    #     self.search_and_mark(start=last_search_pos, direction='prev')
 
     def on_button_action(self, widget):
         action_name = widget.get_name()
@@ -1698,26 +1772,59 @@ class CcsEditor(Gtk.Window):
         filelist = glob.glob(os.path.join(self.logdir, '*.log'))
         filelist.sort(reverse=True)
         if not filelist:
-            self.logger.info('No log files to track!')
+            self.logger.warning('No log files to track!')
             return True
-        with open(filelist[0], 'r') as fd:
+        self.log_file = filelist[0]
+        with open(self.log_file, 'r') as fd:
             file = fd.read()
-        if self.log_file is None:
+        if self.log_file_text is None:
             logwin.remove(logwin.get_child())
-            buffer.set_text('CCS Applications Log ({}):\n'.format(os.path.basename(filelist[0])))
+            buffer.set_text('CCS Applications Log ({}):\n'.format(os.path.basename(self.log_file)))
             end = buffer.get_end_iter()
             buffer.insert(end, '\n')
             end = buffer.get_end_iter()
             buffer.insert(end, file)
             logwin.add(view)
         else:
-            new_text = file[len(self.log_file):]
+            new_text = file[len(self.log_file_text):]
             if new_text:
                 end = buffer.get_end_iter()
                 buffer.insert(end, new_text)
 
-        self.log_file = file
+        self.log_file_text = file
         return True
+
+    def _on_clear_log(self, *args):
+        try:
+            with open(self.log_file, 'w') as fd:
+                fd.write('{}.000: Log truncated\n'.format(time.strftime('%Y-%m-%d %H:%M:%S')))
+            self.log_file_text = None
+            self.switch_notebook_page(self.logwin, self.logwintext, self.logbuffer)
+        except Exception as err:
+            self.logger.error(err)
+
+    def _on_set_style(self, widget):
+        dialog = StyleChooserDialog(scheme=self.style_scheme)
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            style = dialog.styleschemechooser.get_style_scheme().get_id()
+            style_manager = GtkSource.StyleSchemeManager.get_default()
+            scheme = style_manager.get_scheme(style)
+            self._update_style_schemes(scheme)
+            self.cfg.save_option_to_file('ccs-editor', 'color_scheme', style)
+
+        dialog.destroy()
+
+    def _update_style_schemes(self, scheme):
+        if isinstance(scheme, str):
+            style_manager = GtkSource.StyleSchemeManager.get_default()
+            scheme = style_manager.get_scheme(scheme)
+
+        self.style_scheme = scheme
+        for tab in self.editor_notebook:
+            buf = tab.get_child().get_buffer()
+            buf.set_style_scheme(scheme)
 
 
 class UnsavedBufferDialog(Gtk.MessageDialog):
@@ -1766,6 +1873,23 @@ class ActionWindow(Gtk.Window):
             grid.attach(button, i % ncolumns, i//2, 1, 1)
 
         self.add(grid)
+        self.show_all()
+
+
+class StyleChooserDialog(Gtk.Dialog):
+
+    def __init__(self, scheme=None):
+        super(StyleChooserDialog, self).__init__(title='Choose Style', use_header_bar=True)
+
+        self.styleschemechooser = GtkSource.StyleSchemeChooserWidget()
+
+        if scheme is not None:
+            self.styleschemechooser.set_style_scheme(scheme)
+
+        self.get_content_area().add(self.styleschemechooser)
+
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+
         self.show_all()
 
 

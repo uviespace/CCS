@@ -11,34 +11,39 @@ sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 
-try:
-    DP_ITEMS_SRC_FILE = confignator.get_option('database', 'datapool-items')
-except confignator.config.configparser.NoOptionError:
-    DP_ITEMS_SRC_FILE = None
 
 logger = logging.getLogger()
+DP_ITEMS_SRC_FILE = cfl.DP_ITEMS_SRC_FILE
 
 
 def reload_dp_data():
     global DP_ITEMS_SRC_FILE
-    global dictionary_of_data_pool
+    # global dictionary_of_data_pool
     global list_of_data_pool
     global data_pool_sublist
 
     try:
-        dictionary_of_data_pool = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
+        list_of_data_pool, _src = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
     except (FileNotFoundError, ValueError):
         logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
-        dictionary_of_data_pool = cfl.get_data_pool_items()
+        list_of_data_pool, _src = cfl.get_data_pool_items()
 
-    if not isinstance(dictionary_of_data_pool, list):
-        list_of_data_pool = list(dictionary_of_data_pool.keys())
+    # check if DP items are from MIB or CSV
+    if not _src:
         data_pool_sublist = get_data_pool_sublist()
     else:
-        data_pool_sublist = dictionary_of_data_pool
+        data_pool_sublist = list_of_data_pool
+
+    # if not isinstance(list_of_data_pool, list):
+    #     data_pool_sublist = get_data_pool_sublist()
+    # else:
+    #     data_pool_sublist = dictionary_of_data_pool
 
 
 def get_data_pool_sublist():
+
+    data_pool_sublist.clear()  # clear content from previously selected MIB
+
     for counter in list_of_data_pool:
         pcf_pid = str(int(counter[0]))  # cast PID to int in case data type is wrong in MIB SQL (e.g. in CHEOPS)
         pcf_descr = str(counter[1])
@@ -57,16 +62,21 @@ def get_data_pool_sublist():
 
 data_pool_sublist = []
 try:
-    dictionary_of_data_pool = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
+    list_of_data_pool, _src = cfl.get_data_pool_items(src_file=DP_ITEMS_SRC_FILE)
 except (FileNotFoundError, ValueError):
     logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
-    dictionary_of_data_pool = cfl.get_data_pool_items()
+    list_of_data_pool, _src = cfl.get_data_pool_items()
 
-if not isinstance(dictionary_of_data_pool, list):
-    list_of_data_pool = list(dictionary_of_data_pool.keys())
+# check if DP items are from MIB or CSV
+if not _src:
     data_pool_sublist = get_data_pool_sublist()
 else:
-    data_pool_sublist = dictionary_of_data_pool
+    data_pool_sublist = list_of_data_pool
+
+# if not isinstance(list_of_data_pool, list):
+#     data_pool_sublist = get_data_pool_sublist()
+# else:
+#     data_pool_sublist = list_of_data_pool
 
 
 class DataPoolTable(Gtk.Grid):
@@ -84,25 +94,23 @@ class DataPoolTable(Gtk.Grid):
         # setting the filter function
         self.data_pool_filter.set_visible_func(self.data_pool_filter_func)
 
-        self.pid = None
-
-        # Create ListStores for the ComboBoxes
-        # self.pid_liststore = Gtk.ListStore(str)
-        # for pid_ref in pid_list:
-        #     self.pid_liststore.append([pid_ref, ])
-        # self.current_filter_type = None
+        # filter entry
+        self.filter_entry = Gtk.SearchEntry()
+        self.filter_entry.connect('search-changed', self.do_filter)
+        self.attach(self.filter_entry, 0, 0, 8, 1)
 
         # creating the treeview, making it use the filter a model, adding columns
         self.treeview = Gtk.TreeView.new_with_model(Gtk.TreeModelSort(self.data_pool_filter))
-        for i, column_title in enumerate(["PID", "NAME", "DATATYPE", "MULT", "PAR/VAR", "DESCR"]):
+        for i, column_title in enumerate(["PID", "NAME", "DATATYPE", "MULT", "VALUE", "DESCR"]):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
-            column.set_sort_column_id(i)
-            self.treeview.append_column(column)
 
-        # Handle selection
-        self.selected_row = self.treeview.get_selection()
-        #self.selected_row.connect("changed", self.item_selected)
+            if column_title == "VALUE":
+                column.set_fixed_width(200)
+
+            column.set_sort_column_id(i)
+            column.set_resizable(True)
+            self.treeview.append_column(column)
 
         # setting up layout, treeview in scrollwindow
         self.scrollable_treelist = Gtk.ScrolledWindow()
@@ -125,43 +133,29 @@ class DataPoolTable(Gtk.Grid):
 
         self.show_all()
 
+    def do_filter(self, widget, *args):
+        self.current_filter_data_pool = widget.get_text()
+        self.data_pool_filter.refilter()
+
     def on_treeview_clicked(self, widget, event):
         if event.button == 3:
             self.rcl_menu.popup_at_pointer()
 
-    def copy_cell_content(self, cell_idx):
+    def copy_cell_content(self, cell_idx, as_string=False):
         treeselection = self.treeview.get_selection()
         model, it = treeselection.get_selected()
         if model is not None and it is not None:
-            self.clipboard.set_text(model[it][cell_idx], -1)
-
-    def on_pid_combo_changed(self, combo):
-        combo_iter = combo.get_active_iter()
-        if combo_iter is not None:
-            model = combo.get_model()
-            number = model[combo_iter][0]
-            self.current_filter_data_pool = int(number)
-
-        self.data_pool_filter.refilter()
-
-    def on_clear_button_clicked(self, widget):
-        self.current_filter_data_pool = None
-        self.data_pool_filter.refilter()
-
-    def item_selected(self, selection):
-        model, row = selection.get_selected()
-        if row is not None:
-            self.pid = model[row][:2]
+            if as_string:
+                self.clipboard.set_text('"{}"'.format(model[it][cell_idx]), -1)
+            else:
+                self.clipboard.set_text(model[it][cell_idx], -1)
 
     def data_pool_filter_func(self, model, iter, data):
-
-        if (
-                self.current_filter_data_pool is None
-                or self.current_filter_data_pool == "None"
-        ):
+        if not self.current_filter_data_pool:
             return True
         else:
-            return model[iter][0] == self.current_filter_data_pool
+            # match search string in PID, NAME, DESCR columns
+            return ' '.join([*model[iter][:2], model[iter][5]]).lower().count(self.current_filter_data_pool.lower())
 
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
@@ -180,11 +174,18 @@ class TreeRightClickMenu(Gtk.Menu):
         entry_2 = Gtk.MenuItem('Copy NAME')
         self.attach(entry_2, 0, 1, 1, 2)
         entry_2.show()
+        entry_3 = Gtk.MenuItem('Copy NAME as string')
+        self.attach(entry_3, 0, 1, 2, 3)
+        entry_3.show()
         entry_1.connect('activate', self.on_copy_pid, cruf)
         entry_2.connect('activate', self.on_copy_name, cruf)
+        entry_3.connect('activate', self.on_copy_name_as_string, cruf)
 
     def on_copy_pid(self, menu_item, cruf, *args):
         cruf.copy_cell_content(0)
 
     def on_copy_name(self, menu_item, cruf, *args):
         cruf.copy_cell_content(1)
+
+    def on_copy_name_as_string(self, menu_item, cruf, *args):
+        cruf.copy_cell_content(1, as_string=True)

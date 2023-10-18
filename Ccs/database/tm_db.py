@@ -10,6 +10,7 @@ from sqlalchemy import (
     Column, Integer, Boolean, Unicode, Index, UniqueConstraint, ForeignKey, create_engine, engine)
 from sqlalchemy.dialects.mysql import VARBINARY
 from sqlalchemy.orm import sessionmaker, relationship, scoped_session
+from sqlalchemy.sql import text
 # from sqlalchemy.orm.session import Session
 
 # Use for SQlite
@@ -232,8 +233,6 @@ class FEEDataTelemetryPool(FEEDATA_BASE):  # type: ignore
 def gen_mysql_conn_str(user=config_db.user, pw=config_db.pw, host=config_db.host, schema=''):
     return engine.url.URL.create(drivername='mysql', username=user, password=pw, host=host, database=schema)
 
-#SQLSOCKET=''
-
 
 def create_storage_db(protocol='PUS', force=False):
     if protocol.upper() not in ['PUS', 'RMAP', 'FEEDATA', 'ALL']:
@@ -243,8 +242,8 @@ def create_storage_db(protocol='PUS', force=False):
         print('Creating schema "{}" for {} data storage...'.format(config_db.storage_schema_name, protocol.upper()))
         _engine = create_engine(gen_mysql_conn_str(), echo="-v" in sys.argv)
         if force:
-            _engine.execute('DROP SCHEMA IF EXISTS {}'.format(config_db.storage_schema_name))
-        _engine.execute('CREATE SCHEMA IF NOT EXISTS {}'.format(config_db.storage_schema_name))
+            _engine.execute(text('DROP SCHEMA IF EXISTS {}'.format(config_db.storage_schema_name)))
+        _engine.execute(text('CREATE SCHEMA IF NOT EXISTS {}'.format(config_db.storage_schema_name)))
         _engine.dispose()
         _engine = create_engine(gen_mysql_conn_str(schema=config_db.storage_schema_name), echo="-v" in sys.argv)
         for protocol in protocols:
@@ -254,8 +253,8 @@ def create_storage_db(protocol='PUS', force=False):
         print('Creating schema "{}" for {} data storage...'.format(config_db.storage_schema_name, protocol.upper()))
         _engine = create_engine(gen_mysql_conn_str(), echo="-v" in sys.argv)
         if force:
-            _engine.execute('DROP SCHEMA IF EXISTS {}'.format(config_db.storage_schema_name))
-        _engine.execute('CREATE SCHEMA IF NOT EXISTS {}'.format(config_db.storage_schema_name))
+            _engine.execute(text('DROP SCHEMA IF EXISTS {}'.format(config_db.storage_schema_name)))
+        _engine.execute(text('CREATE SCHEMA IF NOT EXISTS {}'.format(config_db.storage_schema_name)))
         _engine.dispose()
         _engine = create_engine(gen_mysql_conn_str(schema=config_db.storage_schema_name), echo="-v" in sys.argv)
         protocols[protocol.upper()][1].metadata.create_all(_engine)
@@ -281,7 +280,17 @@ def scoped_session_maker(db_schema, idb_version=None):
     _engine = create_engine(gen_mysql_conn_str(schema=schema), echo="-v" in sys.argv, pool_size=15)
     session_factory = sessionmaker(bind=_engine)
     scoped_session_factory = scoped_session(session_factory)
+    #scoped_session_factory = scoped_session_v2(session_factory)
     return scoped_session_factory
+
+
+class scoped_session_v2(scoped_session):
+    """
+    Wrapper class to cast SQL query statement string to TextClause before execution, as this is required since SQLAlchemy 2.0.
+    """
+
+    def execute(self, x, *args, **kwargs):
+        return super().execute(text(x), *args, **kwargs)
 
 
 # def load_telemetry_file(dummy: str) -> None:

@@ -16,14 +16,11 @@ import toolbox
 import cairo
 import sys
 
-
 import confignator
 ccs_path = confignator.get_option('paths', 'ccs')
 sys.path.append(ccs_path)
-sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
 
 import ccs_function_lib as cfl
-import tm
 
 lm = GtkSource.LanguageManager()
 lngg = lm.get_language('python')
@@ -79,7 +76,7 @@ class Board(Gtk.Box):
         * a instance of a grid is added
         * drag and drop is set up
         """
-        #assert isinstance(model, data_model.TestSpecification)
+        # assert isinstance(model, data_model.TestSpecification)
         self.model = model
         self.app = app
         self._filename = filename
@@ -89,16 +86,15 @@ class Board(Gtk.Box):
         # Save Button in TST clicked for first time, Always do save_as to not overwrite something, used in tst.py
         self._ask_overwrite = True
 
-        Gtk.Box.__init__(self)
+        # Gtk.Box.__init__(self)
+        super(Board, self).__init__()
         self.set_orientation(Gtk.Orientation.VERTICAL)
 
         # test meta data
-        self.test_meta_data_box = Gtk.Box()
+        self.test_meta_data_box = Gtk.Box(margin=5)
         self.test_meta_data_box.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.test_meta_data_labels = Gtk.Box()
-        self.test_meta_data_labels.set_orientation(Gtk.Orientation.VERTICAL)
-        self.test_meta_data_entries = Gtk.Box()
-        self.test_meta_data_entries.set_orientation(Gtk.Orientation.VERTICAL)
+
+        self.test_meta_data_info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.test_meta_data_pre_post_con = Gtk.Box()
         self.test_meta_data_pre_post_con.set_orientation(Gtk.Orientation.VERTICAL)
         self.test_meta_data_pre_post_con_edit = Gtk.Box()
@@ -106,87 +102,98 @@ class Board(Gtk.Box):
         # name of the test
         self.test_meta_data_name_label = Gtk.Label()
         self.test_meta_data_name_label.set_text('Name of the test:')
-        self.test_meta_data_labels.pack_start(self.test_meta_data_name_label, True, True, 0)
-        self.test_meta_data_name = Gtk.Entry()
-        self.test_meta_data_name.set_placeholder_text('< name of the test>')
-        self.test_meta_data_entries.pack_start(self.test_meta_data_name, True, True, 0)
+        self.test_meta_data_name = Gtk.Entry(width_chars=25)
+        self.test_meta_data_name.set_placeholder_text('< name of the test >')
+        self.test_meta_data_name_box = Gtk.Box(spacing=5, orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_name_box.pack_start(self.test_meta_data_name_label, False, False, 4)
+        self.test_meta_data_name_box.pack_end(self.test_meta_data_name, False, False, 0)
+        self.test_meta_data_info.pack_start(self.test_meta_data_name_box, True, True, 0)
         # test description
         self.test_meta_data_desc_label = Gtk.Label()
-        self.test_meta_data_desc_label.set_text('Description of the test:')
-        self.test_meta_data_labels.pack_start(self.test_meta_data_desc_label, True, True, 0)
-        self.test_meta_data_desc = Gtk.Entry()
-        self.test_meta_data_desc.set_placeholder_text('< description of the test>')
-        self.test_meta_data_entries.pack_start(self.test_meta_data_desc, True, True, 0)
+        self.test_meta_data_desc_label.set_text('Short description:')
+        self.test_meta_data_desc = Gtk.Entry(width_chars=25)
+        self.test_meta_data_desc.set_placeholder_text('< description of the test >')
+        self.test_meta_data_desc_box = Gtk.Box(spacing=5, orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_desc_box.pack_start(self.test_meta_data_desc_label, False, False, 4)
+        self.test_meta_data_desc_box.pack_end(self.test_meta_data_desc, False, False, 0)
+        self.test_meta_data_info.pack_start(self.test_meta_data_desc_box, True, True, 0)
         # spec_version
         self.test_meta_data_spec_version_label = Gtk.Label()
-        self.test_meta_data_spec_version_label.set_text('Spec Version:')
-        self.test_meta_data_labels.pack_start(self.test_meta_data_spec_version_label, True, True, 0)
-        self.test_meta_data_spec_version = Gtk.Entry()
+        self.test_meta_data_spec_version_label.set_text('Spec. version:')
+        self.test_meta_data_spec_version = Gtk.Entry(width_chars=25)
         self.test_meta_data_spec_version.set_placeholder_text('< spec version >')
-        self.test_meta_data_entries.pack_start(self.test_meta_data_spec_version, True, True, 0)
+        self.test_meta_data_spec_box = Gtk.Box(spacing=5, orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_spec_box.pack_start(self.test_meta_data_spec_version_label, False, False, 4)
+        self.test_meta_data_spec_box.pack_end(self.test_meta_data_spec_version, False, False, 0)
+        self.test_meta_data_info.pack_start(self.test_meta_data_spec_box, True, True, 0)
         # IASW Software Version
         self.test_meta_data_iasw_version_label = Gtk.Label()
-        self.test_meta_data_iasw_version_label.set_text('IASW Version:')
-        self.test_meta_data_labels.pack_start(self.test_meta_data_iasw_version_label, True, True, 0)
-        self.test_meta_data_iasw_version = Gtk.Entry()
+        self.test_meta_data_iasw_version_label.set_text('IASW version:')
+        self.test_meta_data_iasw_version = Gtk.Entry(width_chars=25)
         self.test_meta_data_iasw_version.set_placeholder_text('< IASW version >')
-        self.test_meta_data_entries.pack_start(self.test_meta_data_iasw_version, True, True, 0)
+        self.test_meta_data_iasw_box = Gtk.Box(spacing=5, orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_iasw_box.pack_start(self.test_meta_data_iasw_version_label, False, False, 4)
+        self.test_meta_data_iasw_box.pack_end(self.test_meta_data_iasw_version, False, False, 0)
+        self.test_meta_data_info.pack_start(self.test_meta_data_iasw_box, True, True, 0)
         # checkbox for locking the step numbers
         self.test_is_locked_label = Gtk.Label()
         self.test_is_locked_label.set_text(_('Lock step enumeration:'))
-        self.test_meta_data_labels.pack_start(self.test_is_locked_label, True, True, 0)
         self.text_meta_data_test_is_locked = Gtk.CheckButton()
-        self.test_meta_data_entries.pack_start(self.text_meta_data_test_is_locked, True, True, 0)
+        self.test_meta_data_is_locked_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_is_locked_box.pack_start(self.test_is_locked_label, False, False, 4)
+        self.test_meta_data_is_locked_box.pack_start(self.text_meta_data_test_is_locked, True, True, 4)
+        self.test_meta_data_info.pack_start(self.test_meta_data_is_locked_box, True, True, 15)
 
         # Add pre post condition selections
         # Pre conditions
         self.precon_selection_label = Gtk.Label()
-        self.precon_selection_label.set_text('Pre-Conditions:')
+        self.precon_selection_label.set_text('Pre-conditions:')
         self.precon_selection = Gtk.ComboBoxText()
         self.set_precon_model()
         self.precon_selection.connect("changed", self.on_precon_changed)
         # Post conditions
         self.postcon_selection_label = Gtk.Label()
-        self.postcon_selection_label.set_text('Post-Conditions:')
+        self.postcon_selection_label.set_text('Post-conditions:')
         self.postcon_selection = Gtk.ComboBoxText()
         self.set_postcon_model()
         self.postcon_selection.connect("changed", self.on_postcon_changed)
-
-        # add to pre post box
-        self.test_meta_data_pre_post_con.pack_start(self.precon_selection_label, False, True, 0)
-        self.test_meta_data_pre_post_con.pack_start(self.precon_selection, False, True, 0)
-        self.test_meta_data_pre_post_con.pack_start(self.postcon_selection_label, False, True, 0)
-        self.test_meta_data_pre_post_con.pack_start(self.postcon_selection, False, True, 0)
-        self.test_meta_data_box.set_spacing(20)
-
         # Add Edit Buttons
         self.precon_edit_button = Gtk.Button.new_with_label('Edit')
         self.precon_edit_button.connect("clicked", self.precon_edit_clicked)
         self.postcon_edit_button = Gtk.Button.new_with_label('Edit')
         self.postcon_edit_button.connect("clicked", self.postcon_edit_clicked)
+        precon_line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        precon_line.pack_start(self.precon_selection, False, True, 0)
+        precon_line.pack_start(self.precon_edit_button, False, True, 0)
 
-        self.test_meta_data_pre_post_con_edit.pack_start(self.precon_edit_button, False, True, 17)
-        self.test_meta_data_pre_post_con_edit.pack_start(self.postcon_edit_button, False, True, 0)
+        postcon_line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        postcon_line.pack_start(self.postcon_selection, False, True, 0)
+        postcon_line.pack_start(self.postcon_edit_button, False, True, 0)
 
-        self.test_comment_box = Gtk.Box()
+        # add to pre post box
+        self.test_meta_data_pre_post_con.pack_start(self.precon_selection_label, False, True, 0)
+        self.test_meta_data_pre_post_con.pack_start(precon_line, False, True, 2)
+        self.test_meta_data_pre_post_con.pack_start(self.postcon_selection_label, False, True, 2)
+        self.test_meta_data_pre_post_con.pack_start(postcon_line, False, True, 0)
+        self.test_meta_data_box.set_spacing(20)
+
+        self.test_comment_box = Gtk.Box(spacing=2)
         self.test_comment_box.set_orientation(Gtk.Orientation.VERTICAL)
-        self.lbl_box_comment = Gtk.Box()
-        self.lbl_box_comment.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.label_comment = Gtk.Label.new()
-        self.label_comment.set_text(_('Test Comment:'))
-        self.lbl_box_comment.pack_start(self.label_comment, False, False, 0)
+        self.label_comment = Gtk.Label()
+        self.label_comment.set_halign(Gtk.Align.START)
+        self.label_comment.set_text(_('Test comment:'))
         # Make the area where the real command is entered
         self.comment_scrolled_window = Gtk.ScrolledWindow()
         # self.comment_scrolled_window.set_size_request(200, 100)
         self.test_meta_data_comment = Gtk.TextView.new()
+        Gtk.StyleContext.add_class(self.test_meta_data_comment.get_style_context(), 'text-view')
         self.comment_scrolled_window.add(self.test_meta_data_comment)
 
-        self.test_comment_box.pack_start(self.lbl_box_comment, False, False, 0)
+        self.test_comment_box.pack_start(self.label_comment, False, False, 0)
         self.test_comment_box.pack_start(self.comment_scrolled_window, True, True, 0)
 
         # add the meta data
-        self.test_meta_data_box.pack_start(self.test_meta_data_labels, False, True, 0)
-        self.test_meta_data_box.pack_start(self.test_meta_data_entries, False, True, 0)
+        self.test_meta_data_box.pack_start(self.test_meta_data_info, False, True, 0)
         self.test_meta_data_box.pack_start(self.test_meta_data_pre_post_con, False, True, 0)
         self.test_meta_data_box.pack_start(self.test_meta_data_pre_post_con_edit, False, True, 0)
         self.test_meta_data_box.pack_start(self.test_comment_box, True, True, 0)
@@ -241,6 +248,8 @@ class Board(Gtk.Box):
         self.test_meta_data_iasw_version.connect('changed', self.on_test_iasw_version_change)
         self.text_meta_data_test_is_locked.connect('toggled', self.on_test_locked_toggled)
         self.test_meta_data_comment.get_buffer().connect('changed', self.on_comment_change)
+
+        Gtk.StyleContext.add_class(self.get_style_context(), 'board')
 
     @property
     def test_is_locked(self):
@@ -373,7 +382,7 @@ class Board(Gtk.Box):
         self.app.update_model_viewer()
 
     def set_precon_model(self, active_name=None):
-        section_dict = db_interaction.get_pre_post_con('pre')
+        section_dict = db_interaction.get_pre_post_con(None)
         active_nbr = 0
         for count, condition in enumerate(section_dict):
             self.precon_selection.append_text(condition.name)
@@ -389,20 +398,16 @@ class Board(Gtk.Box):
         # update the model
         self.model.precon_name = precon_name
         # Set the Precon Description
-        section_dict = db_interaction.get_pre_post_con('pre')
+        section_dict = db_interaction.get_pre_post_con(None)
         for condition in section_dict:
             if condition.name == precon_name:
                 self.model.precon_descr = condition.description
                 self.model.precon_code = condition.condition
         # update the data model viewer
         self.app.update_model_viewer()
-        #current_model = self.app.current_model()
-        #if current_model:
-        #    current_model.precon = precon_name
-        return
 
     def set_postcon_model(self, active_name=None):
-        section_dict = db_interaction.get_pre_post_con('post')
+        section_dict = db_interaction.get_pre_post_con(None)
         active_nbr = 0
         for count, condition in enumerate(section_dict):
             self.postcon_selection.append_text(condition.name)
@@ -418,19 +423,13 @@ class Board(Gtk.Box):
         # update the model
         self.model.postcon_name = postcon_name
         # Set the Postcon Description
-        section_dict = db_interaction.get_pre_post_con('post')
+        section_dict = db_interaction.get_pre_post_con(None)
         for condition in section_dict:
             if condition.name == postcon_name:
                 self.model.postcon_descr = condition.description
                 self.model.postcon_code = condition.condition
         # update the data model viewer
         self.app.update_model_viewer()
-        #current_model = self.app.current_model()
-        #if current_model:
-        #    current_model.postcon = postcon_name
-        return
-
-
 
     def precon_edit_clicked(self, widget):
         dialog = Edit_Pre_Post_Con_Dialog(self, 'pre', self.precon_selection.get_active())
@@ -634,12 +633,6 @@ class StepWidget(Gtk.EventBox):
         self.btn_execute_step.set_tooltip_text(_('Execute step'))
         self.btn_execute_step.connect('clicked', self.on_execute_step)
 
-        # TODO: find better suited icon for execute verification button
-        self.btn_execute_verification = Gtk.ToolButton()
-        self.btn_execute_verification.set_icon_name("media-playback-start-symbolic-down")
-        self.btn_execute_verification.set_tooltip_text(_("Execute Verification"))
-        self.btn_execute_verification.connect("clicked", self.on_execute_verification)
-
         self.text_label_event_box = Gtk.EventBox()
         self.text_label_event_box.set_visible_window(False)
         self.text_label_event_box.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
@@ -659,7 +652,6 @@ class StepWidget(Gtk.EventBox):
         self.tbox.pack_end(self.btn_delete_step, False, False, 0)
         self.tbox.pack_end(self.is_active, False, False, 0)
         self.tbox.pack_end(self.btn_execute_step, False, False, 0)
-        self.tbox.pack_end(self.btn_execute_verification, False, False, 0)
 
         self.vbox.pack_start(self.tbox, True, True, 0)
 
@@ -690,8 +682,9 @@ class StepWidget(Gtk.EventBox):
         # self.desc_scrolled_window.set_size_request(50, 100)
         # self.detail_box.pack_start(self.desc_scrolled_window, False, True, 0)
         self.desc_text_view = Gtk.TextView.new()
+        Gtk.StyleContext.add_class(self.desc_text_view.get_style_context(), 'text-view')
         self.desc_text_view.set_wrap_mode(Gtk.WrapMode.WORD)
-        self.desc_text_view.set_accepts_tab(False)
+        # self.desc_text_view.set_accepts_tab(False)
         self.desc_scrolled_window.add(self.desc_text_view)
         self.desc_text_buffer = self.desc_text_view.get_buffer()
 
@@ -706,6 +699,7 @@ class StepWidget(Gtk.EventBox):
         self.step_comment_scrolled_window = Gtk.ScrolledWindow()
         # self.step_comment_scrolled_window.set_size_request(200, 100)
         self.step_comment_view = GtkSource.View()
+        Gtk.StyleContext.add_class(self.step_comment_view.get_style_context(), 'text-view')
         self.step_comment_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.step_comment_view.set_show_line_numbers(False)
         self.step_comment_scrolled_window.add(self.step_comment_view)
@@ -769,18 +763,19 @@ class StepWidget(Gtk.EventBox):
         self.whole_verification_box.set_column_homogeneous(True)
 
         # Left side of the verification area, where the verification-commands a entered
-        # Make the label, inside a own Box to show it on the left side
+        # Make the label, inside an own Box to show it on the left side
         self.lbl_box_verification = Gtk.Box()
         self.lbl_box_verification.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.verification_label = Gtk.Label.new()
-        self.verification_label.set_text(_('Verification'))
-        #self.btn_exec_verification = Gtk.Button.new_from_icon_name(icon_name='media-playback-start', size=Gtk.IconSize.BUTTON)
-        #self.btn_exec_verification.connect('clicked', self.on_exec_verification)
+        self.verification_label.set_text(_('Verification Code'))
+        self.verification_label.set_tooltip_text(_('The verification code-block must define a variable "result" that is TRUE/FALSE'))
+        # self.btn_exec_verification = Gtk.Button.new_from_icon_name(icon_name='media-playback-start', size=Gtk.IconSize.BUTTON)
+        # self.btn_exec_verification.connect('clicked', self.on_exec_verification)
         self.lbl_box_verification.pack_start(self.verification_label, False, False, 0)
         # self.lbl_box_verification.pack_start(self.btn_exec_verification, False, False, 0)
-        #self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
+        # self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
         self.verification_scrolled_window = Gtk.ScrolledWindow()
-        self.verification_scrolled_window.set_size_request(50, 200)
+        #self.verification_scrolled_window.set_size_request(50, 100)
         self.verification_view = GtkSource.View()
         self.verification_view.set_auto_indent(True)
         self.verification_view.set_show_line_numbers(True)
@@ -805,6 +800,7 @@ class StepWidget(Gtk.EventBox):
         self.verification_description_scrolled_window = Gtk.ScrolledWindow()
         #self.verification_comment_scrolled_window.set_size_request(200, 100)
         self.verification_description_view = GtkSource.View()
+        Gtk.StyleContext.add_class(self.verification_description_view.get_style_context(), 'text-view')
         self.verification_description_view.set_show_line_numbers(False)
         self.verification_description_view.set_wrap_mode(Gtk.WrapMode.WORD)
         self.verification_description_scrolled_window.add(self.verification_description_view)
@@ -1309,7 +1305,6 @@ class StepWidget(Gtk.EventBox):
         # Connect to the editor and send the commands to the terminal via D-Bus
         ed = cfl.dbus_connection('editor')
         cfl.Functions(ed, '_to_console_via_socket', commands)
-
         #import editor
         #x = editor.CcsEditor()
         #x._to_console_via_socket(commands)
@@ -1317,32 +1312,8 @@ class StepWidget(Gtk.EventBox):
     def on_exec_verification(self, button):
         # get the code of the commands out of the buffer of the widget
         verification = self.get_verification_from_widget()
-
-        # Check if CCS is open
-        if not cfl.is_open('editor'):
-            print('CCS-Editor has to be started first')
-            logger.info('CCS-Editor has to be running if a step should be executed')
-            return
         #ack = misc.to_console_via_socket(verification)
         #print(ack)
-
-    def on_execute_verification(self, *args):
-        if not cfl.is_open("editor"):
-            print('CCS-Editor has to be started first')
-            logger.info('CCS-Editor has to be running if a step should be executed')
-            return
-
-        commands = str(self.get_verification_from_widget())
-
-        if len(commands) == 0:
-            return
-
-        # execute_function = exec(commands)
-        # print(execute_function)
-
-
-        ed = cfl.dbus_connection("editor")
-        cfl.Functions(ed, "_to_console_via_socket", commands)
 
     def on_execute_step(self, *args):
         if not cfl.is_open('editor'):
@@ -1351,20 +1322,12 @@ class StepWidget(Gtk.EventBox):
             return
 
         commands = str(self.get_commands_from_widget())
-        commands2 = str(self.get_verification_from_widget())
-
 
         if len(commands) == 0:
             return
 
-        # if len(commands2) == 0:
-        #    return
-
-        # verification.read_verification(commands2)
-
         ed = cfl.dbus_connection('editor')
         cfl.Functions(ed, '_to_console_via_socket', commands)
-        # cfl.Functions(ed, '_to_console_via_socket', commands2)
 
     def on_toggle_detail(self, toolbutton, *args):
         """
@@ -1676,8 +1639,8 @@ class StepRightClickMenu(Gtk.Menu):
 
 class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
     def __init__(self, parent, pre_post, selection):
-        #Gtk.Dialog.__init__(self, title='PRE-Conditions', transient_for=parent, flags=0)
-        Gtk.Dialog.__init__(self, title=pre_post.upper() + ' -Conditions')
+        # Gtk.Dialog.__init__(self, title=pre_post.upper() + ' -Conditions')
+        super(Edit_Pre_Post_Con_Dialog, self).__init__(title=pre_post.upper() + '-conditions')
         self.add_buttons(
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
         )
@@ -1686,7 +1649,8 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.win = parent
         self.file_path = os.path.join(confignator.get_option('paths', 'tst'),
                                       'tst/generator_templates/co_'+pre_post+'_condition_entry.py')
-        self.pre_post = pre_post
+        # self.pre_post = pre_post
+        self.pre_post = None
 
         self.make_section_dict()
 
@@ -1695,14 +1659,15 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.show_all()
 
     def make_section_dict(self):
-        if self.pre_post == 'pre':
-            self.section_dict = db_interaction.get_pre_post_con('pre')
-        else:
-            self.section_dict = db_interaction.get_pre_post_con('post')
+        # if self.pre_post == 'pre':
+        #     self.section_dict = db_interaction.get_pre_post_con('pre')
+        # else:
+        #     self.section_dict = db_interaction.get_pre_post_con('post')
+        self.section_dict = db_interaction.get_pre_post_con(None)
 
     def view(self):
-        self.main_box = Gtk.Box()
-        self.main_box.set_orientation(Gtk.Orientation.VERTICAL)
+        # self.main_box = Gtk.Box()
+        # self.main_box.set_orientation(Gtk.Orientation.VERTICAL)
 
         self.selection_box = Gtk.Box()
         self.selection_box.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -1727,13 +1692,18 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.selection_box.pack_start(self.delete_button, False, True, 0)
 
         box = self.get_content_area()
-        box.pack_start(self.selection_box, False, True, 0)
+        # Gtk.StyleContext.add_class(box.get_style_context(), 'cond-dialog')
+        # box.set_margin_top(5)
+        # box.set_margin_bottom(5)
+        # box.set_margin_left(5)
+        # box.set_margin_right(5)
+        box.pack_start(self.selection_box, False, True, 3)
         box.pack_start(self.descr_lbl_box, False, False, 0)
         box.pack_start(self.descr_scrolled_window, False, False, 0)
         box.pack_start(self.con_lbl_box, False, False, 0)
         box.pack_start(self.con_scrolled_window, True, True, 0)
-        #box.add(self.selection_box)
-        #box.pack_end(self.scrolled_window, True, True, 0)
+        # box.add(self.selection_box)
+        # box.pack_end(self.scrolled_window, True, True, 0)
 
     def make_con_sections_model(self):
         for condition in self.section_dict:
@@ -1791,7 +1761,7 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         # Label in a Box to have it on the left boarder
         self.descr_lbl_box = Gtk.HBox()
         descr_lbl = Gtk.Label()
-        descr_lbl.set_text('Description: ')
+        descr_lbl.set_text('Description')
         self.descr_lbl_box.pack_start(descr_lbl, False, False, 0)
 
         # a scrollbar for the child widget (that is going to be the textview)
@@ -1815,11 +1785,11 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         # Label in a Box to have it on the left boarder
         self.con_lbl_box = Gtk.HBox()
         con_lbl = Gtk.Label()
-        con_lbl.set_text('Condition: ')
+        con_lbl.set_text('Condition')
         self.con_lbl_box.pack_start(con_lbl, False, False, 0)
 
         self.con_scrolled_window = Gtk.ScrolledWindow()
-        self.con_scrolled_window.set_tooltip_text('Set variable "success" to True/False, to check if {}-Conditon is fulfilled'.format(self.pre_post.upper()))
+        self.con_scrolled_window.set_tooltip_text('Set variable "success" to True/False to check if conditon is fulfilled')
         #self.commands_scrolled_window.set_size_request(50, 100)
         self.con_view = GtkSource.View()
         self.con_view.set_auto_indent(True)
@@ -1832,12 +1802,3 @@ class Edit_Pre_Post_Con_Dialog(Gtk.Dialog):
         self.con_buffer.set_language(lngg)
         # self.commands_buffer.set_style_scheme(self.board.current_scheme)
         self.con_scrolled_window.add(self.con_view)
-
-        #box = self.get_content_area()
-        #box.add(self.selection_box)
-
-        return
-
-
-
-

@@ -1,0 +1,130 @@
+\documentclass{report}[a4paper]
+%\usepackage[left = 2cm, right=2cm, top = 1cm]{geometry}
+\usepackage[top = 2cm, bottom = 5cm]{geometry}
+
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+
+%\PassOptionsToPackage{table}{xcolor}
+
+\usepackage{lastpage}
+%\usepackage{geometry}
+\input{../shared/template/fonts.tex}
+\input{../shared/template/colours.tex}
+\input{../shared/template/size.tex}
+\input{../shared/template/figures.tex}
+\input{../shared/template/util.tex}
+
+\usepackage{tabu}
+\usepackage{colortbl}
+\usepackage{graphicx}
+
+\usepackage{array, ltxtable}
+\usepackage[most]{tcolorbox}
+
+
+\usepackage[some]{background}
+\usepackage{tikz}
+\usetikzlibrary{babel}
+\backgroundsetup{
+scale=1,
+angle=0,
+opacity=1,
+placement=top,
+contents={
+	\begin{tikzpicture}[remember picture, blend mode = multiply]
+		% field heights from top down: x | x | x/2 | remainder
+		%
+		\fill[white]		(-0.5\paperwidth,                 0.0)
+							rectangle (0.5\paperwidth,       -3.0\logospacing);
+		\fill[uvie-blue!75]	(-0.5\paperwidth,                -3.0\logospacing)
+							rectangle (0.5\paperwidth, -2.0 * 3.0\logospacing);
+		\fill[uvie-blue]	(-0.5\paperwidth,          -2.0 * 3.0\logospacing)
+							rectangle (0.5\paperwidth, -2.5 * 3.0\logospacing);
+		% mext can be image or colour, but must overlap with 3rd bar in multiply
+		% blend mode
+		% todo: make conditional on image option
+		\fill[uvie-blue!75]	(-0.5\paperwidth,          -2.0 * 3.0\logospacing)
+							rectangle (0.5\paperwidth,       -1.0\paperheight);
+	\end{tikzpicture}}
+}
+%
+
+
+\makeatletter
+\let\doctitle\@title
+\makeatother
+
+\makeatletter
+\let\docdatever\@date
+\makeatother
+
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+\def\ifalogo{\includegraphics[height = \medlogoheight]{../shared/images/uni_logo_astrophysik_cmyk.eps}}
+\fancypagestyle{plain}{ % call style plain so it is used by chapter pages as well
+	\fancyhf{}
+	\fancyhead[R]{
+		\fontspec{MyriadPro}\docdatever \\
+		\vspace{2em}
+		Page \thepage\ of \pageref*{LastPage} 
+	}
+
+	\fancyhead[C]{
+		{
+			\fontspec{MyriadPro}
+			\documentid \\
+			\vspace{.7em}
+			\doctitle
+			\vspace{.9em}
+		}
+	}
+	\fancyhead[L]{
+		\ifalogo%
+	}
+}
+\setlength\headheight{80pt}
+\pagestyle{plain}
+
+
+% def \preparedby, \checkedby, \approvedby, \documentid, \docdatever, \doctitle
+\def\approvalpage{
+	\clearpage
+	\pagestyle{empty}
+	\null
+	\vfil
+
+	{\fontspec{MyriadPro}\fontsize{20}{24}\selectfont\color{uvie-blue}
+	 \doctitle}
+
+	\vspace*{1\baselineskip}
+
+	\begin{tabular}{@{}ll}
+		\textbf{Reference:}   & \documentid \\[2ex]
+		\textbf{Version:}     & \docdatever \\[6ex]
+		\textbf{Prepared by:} & \preparedby \\[1ex]
+		\textbf{Checked by:}  & \checkedby  \\[1ex]
+		\textbf{Approved by:} & \approvedby \\[1ex]
+	\end{tabular}
+
+	\vspace*{0.5\baselineskip}
+	{\footnotesize \affiliations}
+
+
+	\vfill
+
+	\begin{minipage}[b]{0.9\textwidth}
+	\footnotesize\raggedright
+	\setlength{\parskip}{0.5\baselineskip}
+	Copyright \copyright \the\year\ \par
+	Permission is granted to copy, distribute and\slash or modify this
+	document under the terms of the GNU Free Documentation License,
+	Version 1.3 or any later version published by the Free Software
+	Foundation; with no Front-Cover, no Logos of the University of Vienna.
+	\end{minipage}
+	\vspace*{2\baselineskip}
+	\cleardoublepage
+
+	\pagestyle{plain}
+}

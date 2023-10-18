@@ -26,14 +26,18 @@ def dummy_data_code_block():
                   description="Increase the HK Frequency",
                   comment="Increase the Frequncy to 1 HK per second",
                   command_code="cfl.Tcsend_DB('SASW ModHkPeriodCmd', 1, 8, pool_name='new_tmtc_pool')"),
-        Pre_Post_Con(type="pre",
-                  name="None",
-                  description="No Pre-Condition needed",
-                  condition="logger.info('No pre-conditions have been given')\nsuccess = True"),
-        Pre_Post_Con(type="post",
+        # Pre_Post_Con(type="pre",
+        #           name="None",
+        #           description="No Pre-Condition needed",
+        #           condition="logger.info('No pre-conditions have been given')\nsuccess = True"),
+        # Pre_Post_Con(type="post",
+        #              name="None",
+        #              description="No Post-Condition needed",
+        #              condition="logger.info('No post-conditions have been given')\nsuccess = True")
+        Pre_Post_Con(type=None,
                      name="None",
-                     description="No Post-Condition needed",
-                     condition="logger.info('No post-conditions have been given')\nsuccess = True")
+                     description="No pre/post-condition needed",
+                     condition="logger.info('No pre/post-conditions have been given')\nsuccess = True")
 
     ])
 

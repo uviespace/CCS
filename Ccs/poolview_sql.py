@@ -1,3 +1,4 @@
+import io
 import os
 import importlib
 import json
@@ -22,7 +23,7 @@ matplotlib.use('Gtk3Cairo')
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify, Pango  # NOQA
 
 from event_storm_squasher import delayed
 
@@ -49,49 +50,49 @@ ActivePoolInfo = NamedTuple(
         ('pool_name', str),
         ('live', bool)])
 
-fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
-           'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
+# fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
+#            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
 
 class TMPoolView(Gtk.Window):
-    # (label, data columnt alignment)
+    # (label, data column alignment)
 
     column_labels = {'PUS': [('#', 1), ('TM/TC', 1), ("APID", 1), ("SEQ", 1), ("len-7", 1), ("ST", 1), ("SST", 1),
                              ("Dest ID", 1), ("Time", 1), ("Data", 0)],
-                     'RMAP': [('#', 1), ('R/W', 1), ('Verify data', 1), ('Reply', 1), ('Key', 1), ('Transaction ID', 1),
-                              ('Address', 1), ('Data Length', 1), ('Raw', 0)],
-                     'FEE': [('#', 1), ('Type', 1), ('Frame cnt', 1), ('Seq cnt', 1), ('Raw', 0)]}
+                     'RMAP': [('#', 1), ('TYPE', 1), ('R/W', 1), ('VERIFY', 1), ('REPLY', 1), ('INCR', 1),
+                              ('KEY/STAT', 1), ('TA ID', 1), ('ADDRESS', 1), ('DATALEN', 1), ('RAW', 0)],
+                     'FEE': [('#', 1), ('TYPE', 1), ('FRAME CNT', 1), ('SEQ', 1), ('RAW', 0)]}
 
     tm_columns = {'PUS': {'#': [DbTelemetry.idx, 0, None], 'TM/TC': [DbTelemetry.is_tm, 0, None],
                           "APID": [DbTelemetry.apid, 0, None], "SEQ": [DbTelemetry.seq, 0, None],
                           "len-7": [DbTelemetry.len_7, 0, None], "ST": [DbTelemetry.stc, 0, None],
                           "SST": [DbTelemetry.sst, 0, None], "Dest ID": [DbTelemetry.destID, 0, None],
                           "Time": [DbTelemetry.timestamp, 0, None], "Data": [DbTelemetry.data, 0, None]},
-                  'RMAP': {'#': [RMapTelemetry.idx, 0, None], 'R/W': [RMapTelemetry.write, 0, None],
-                           "Verify data": [RMapTelemetry.verify, 0, None], "Reply": [RMapTelemetry.reply, 0, None],
-                           "Key": [RMapTelemetry.keystat, 0, None], "Transaction ID": [RMapTelemetry.taid, 0, None],
-                           "Address": [RMapTelemetry.addr, 0, None], "Data Length": [RMapTelemetry.datalen, 0, None],
-                           "Raw": [RMapTelemetry.raw, 0, None]},
-                  'FEE': {'#': [FEEDataTelemetry.idx, 0, None], 'Type': [FEEDataTelemetry.type, 0, None],
-                          "Frame cnt": [FEEDataTelemetry.framecnt, 0, None],
-                          "Seq cnt": [FEEDataTelemetry.seqcnt, 0, None],
-                          "Raw": [FEEDataTelemetry.raw, 0, None]}}
+                  'RMAP': {'#': [RMapTelemetry.idx, 0, None], 'TYPE': [RMapTelemetry.cmd, 0, None],
+                           'R/W': [RMapTelemetry.write, 0, None], "VERIFY": [RMapTelemetry.verify, 0, None],
+                           "REPLY": [RMapTelemetry.reply, 0, None], 'INCR': [RMapTelemetry.increment, 0, None],
+                           "KEY": [RMapTelemetry.keystat, 0, None], "TA ID": [RMapTelemetry.taid, 0, None],
+                           "ADDRESS": [RMapTelemetry.addr, 0, None], "DATALEN": [RMapTelemetry.datalen, 0, None],
+                           "RAW": [RMapTelemetry.raw, 0, None]},
+                  'FEE': {'#': [FEEDataTelemetry.idx, 0, None], 'TYPE': [FEEDataTelemetry.type, 0, None],
+                          "FRAME CNT": [FEEDataTelemetry.framecnt, 0, None],
+                          "SEQ": [FEEDataTelemetry.seqcnt, 0, None],
+                          "RAW": [FEEDataTelemetry.raw, 0, None]}}
 
     sort_order_dict = {0: Gtk.SortType.ASCENDING, 1: Gtk.SortType.ASCENDING, 2: Gtk.SortType.DESCENDING}
     filter_rules = {}
     rule_box = None
     tmtc = {0: 'TM', 1: 'TC'}
     w_r = {0: 'R', 1: 'W'}
-    autoscroll = 1
-    autoselect = 1
+    cmd_repl = {0: 'rep', 1: 'cmd'}
     sort_order = Gtk.SortType.ASCENDING
     pckt_queue = None
     queues = {}
     row_colour = ''
     colour_filters = {}
-    active_pool_info = None  # type: Union[None, ActivePoolInfo]
+    # active_pool_info = None  # type: Union[None, ActivePoolInfo]
     decoding_type = 'PUS'
     live_signal = {True: '[LIVE]', False: None}
     currently_selected = set()
@@ -111,12 +112,15 @@ class TMPoolView(Gtk.Window):
     shown_limit = 0
     only_scroll = False
 
+    CELLPAD_MAGIC = float(cfg['ccs-misc']['viewer_cell_pad'])
+
     def __init__(self, cfg=cfg, pool_name=None, cfilters='default', standalone=False):
         Gtk.Window.__init__(self, title="Pool View", default_height=800, default_width=1100)
 
         self.refresh_treeview_active = False
         self.cnt = 0
-        self.active_pool_info = ActivePoolInfo(None, None, None, None)
+        # self.active_pool_info = ActivePoolInfo(None, None, None, None)
+        self.active_pool_info = ActivePoolInfo('', 0, '', False)
         self.set_border_width(2)
         self.set_resizable(True)
         self.set_default_size(1150, 1280)
@@ -127,6 +131,9 @@ class TMPoolView(Gtk.Window):
 
         # self.cfg = confignator.get_config()
         self.cfg = cfg
+
+        self.autoscroll = 1
+        self.autoselect = 1
 
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, wide_handle=True, position=400)
 
@@ -571,9 +578,14 @@ class TMPoolView(Gtk.Window):
         self.adj = scrollbar.get_adjustment()
         # get size of tmpool
 
-        if self.active_pool_info.pool_name is not None:
+        if self.active_pool_info.pool_name not in (None, ''):
             self.adj.set_upper(self.count_current_pool_rows())
-        self.adj.set_page_size(25)
+        height = self.treeview.get_allocated_height()
+        column = self.treeview.get_column(0)
+        cell_pad = column.get_cells()[0].get_padding()[1]
+        cell = column.cell_get_size()[-1] + cell_pad * self.CELLPAD_MAGIC
+        nlines = height // cell
+        self.adj.set_page_size(nlines)
         scrollbar.connect('value_changed', self._on_scrollbar_changed, self.adj, False)
         scrollbar.connect('button-press-event', self.scroll_bar)
         # scrollbar.connect('value_changed', self.reselect_rows)
@@ -595,7 +607,7 @@ class TMPoolView(Gtk.Window):
     def create_treeview_columns(self):
         for i, (column_title, align) in enumerate(self.column_labels[self.decoding_type]):
             render = Gtk.CellRendererText(xalign=align)
-            if column_title == "Data":
+            if column_title in ('Data', 'RAW'):
                 render.set_property('font', 'Monospace')
 
             column = Gtk.TreeViewColumn(column_title, render, text=i)
@@ -624,7 +636,11 @@ class TMPoolView(Gtk.Window):
     def set_number_of_treeview_rows(self, widget=None, allocation=None):
         # alloc = widget.get_allocation()
         height = self.treeview.get_allocated_height()
-        cell = 25  #self.treeview.get_columns()[0].cell_get_size()[-1] + 2
+        # height = self.treeview.get_visible_rect().height
+        # cell = 25
+        column = self.treeview.get_column(0)
+        cell_pad = column.get_cells()[0].get_padding()[1]
+        cell = column.cell_get_size()[-1] + cell_pad * self.CELLPAD_MAGIC
         nlines = height // cell
         self.adj.set_page_size(nlines - 1)
         # self._scroll_treeview()
@@ -861,9 +877,6 @@ class TMPoolView(Gtk.Window):
         #print('TIME:::', time.time()-starttime)
         self.treeview.thaw_child_notify()
 
-
-        return
-
     def _filter_rows(self, rows):
         
         def f_rule(x):
@@ -875,7 +888,7 @@ class TMPoolView(Gtk.Window):
                 return x[0] < x[2]
             elif x[1] == '>':
                 return x[0] > x[2]
-            
+
         # for fid in self.filter_rules:
         #     ff = self.filter_rules[fid]
         #     if ff[1] == '==':
@@ -975,116 +988,6 @@ class TMPoolView(Gtk.Window):
         #print(something)
             #print(something, self.shown_offset, self.shown_upper_limit)
         self.treeview.thaw_child_notify()   # Tell GTk to reload
-
-        '''
-        # ndel = len(self.pool_liststore)
-        unfiltered_rows = dbrows[2]
-        sorted = dbrows[1]
-        dbrows = dbrows[0]
-        if not dbrows:
-            return
-
-        self.shown_lock.acquire()
-        #self.treeview.freeze_child_notify()
-        #self.pool_liststore.clear()
-
-        if self.shown_diff or self.shown_diff == 0:
-            if self.shown_diff > 0:
-                self.treeview.freeze_child_notify()
-                self.pool_liststore.clear()
-                if sorted:
-                    dbrows = unfiltered_rows.offset(self.shown_offset + self.shown_limit - self.shown_buffer).limit(self.shown_diff)
-                else:
-                    dbrows = unfiltered_rows.filter(DbTelemetry.idx > (self.shown_offset + self.shown_limit - self.shown_buffer)).limit(
-                        self.shown_diff)
-
-                #for row in self.pool_liststore:
-                #    if row[0] == range(self.shown_upper_limit, self.shown_upper_limit - self.shown_diff):
-                #        self.pool_liststore.remove(row.iter)
-
-                if self.shown_offset > self.shown_buffer:
-                    del self.shown_all_rows[0:self.shown_diff]
-
-                x = 0
-                for tm_row in self.shown_all_rows:
-                    if x in range(self.shown_offset + self.shown_diff - self.shown_upper_limit,
-                                  self.shown_offset + self.shown_diff + int(
-                                      self.adj.get_page_size()) - self.shown_upper_limit):
-                        self.pool_liststore.append(tm_row)
-                    x += 1
-
-                if not self.dbrows_list:
-                    t_shown_rows = threading.Thread(target=self.update_shown_buffer)
-                    t_shown_rows.daemon = True
-                    t_shown_rows.start()
-
-                self.dbrows_list.append([dbrows, self.shown_diff])
-                self.treeview.thaw_child_notify()
-
-            elif self.shown_diff == 0:
-                pass
-
-            else:
-                self.treeview.freeze_child_notify()
-                self.pool_liststore.clear()
-                if sorted:
-                    if self.shown_upper_limit > abs(self.shown_diff):
-                        dbrows = unfiltered_rows.offset((self.shown_upper_limit + self.shown_diff)).limit(
-                            self.shown_diff * -1)
-                    else:
-                        dbrows = unfiltered_rows.offset(0).limit(self.shown_diff * -1)
-                else:
-                    if self.shown_upper_limit > abs(self.shown_diff):
-                        dbrows = unfiltered_rows.filter(
-                            DbTelemetry.idx > (self.shown_upper_limit + self.shown_diff)).limit(
-                            self.shown_diff * -1)
-                    else:
-                        dbrows = unfiltered_rows.filter(DbTelemetry.idx > 0).limit(self.shown_diff * -1)
-
-                #for row in self.pool_liststore:
-                #    if row[0] == range(self.offset + self.shown_limit - self.shown_buffer + self.shown_diff,
-                #                       self.offset + self.shown_limit - self.shown_buffer):
-                #        self.pool_liststore.remove(row.iter)
-
-                self.shown_all_rows = self.shown_all_rows[:self.shown_diff]
-
-                if not self.dbrows_list:
-                    t_shown_rows = threading.Thread(target=self.update_shown_buffer)
-                    t_shown_rows.daemon = True
-                    t_shown_rows.start()
-
-                x = 0
-                for tm_row in self.shown_all_rows:
-                    if x in range(self.shown_offset + self.shown_diff - self.shown_upper_limit,
-                                  self.shown_offset + self.shown_diff + int(self.adj.get_page_size()) - self.shown_upper_limit):
-                        self.pool_liststore.append(tm_row)
-                    #if x in range(self.shown_offset + self.shown_diff - self.shown_upper_limit,
-                    #              self.shown_offset - self.shown_upper_limit):
-                        #self.pool_liststore.insert(0, tm_row)
-                    x += 1
-                self.dbrows_list.append([dbrows, self.shown_diff])
-                self.treeview.thaw_child_notify()
-
-            self.shown_offset = 0 if self.shown_offset < 0 else self.shown_offset + self.shown_diff
-            self.shown_upper_limit = 0 if (self.shown_offset - self.shown_buffer) < 0 else self.shown_offset -self.shown_buffer
-            #thread1 = threading.Thread(target=self.update_shown_buffer, kwargs={'rows': dbrows})
-            #thread1.daemon = True
-            #thread1.start()
-
-        else:
-            self.treeview.freeze_child_notify()
-            self.pool_liststore.clear()
-            self.reload_all_shown_rows(dbrows)
-            self.dbrows_list = []
-            self.treeview.thaw_child_notify()
-        #print(time.time()-starttime)
-        # del self.pool_liststore[:ndel]
-        #self.treeview.thaw_child_notify()
-        self.shown_lock.release()
-        self.loaded = 1
-        return
-        '''
-        return
 
     def reload_all_shown_rows(self, dbrows):
         """
@@ -1316,7 +1219,6 @@ class TMPoolView(Gtk.Window):
             #new_session.close()
             self.shown_lock.release()
 
-
         '''
         running = True
         self.shown_lock.acquire()
@@ -1352,13 +1254,12 @@ class TMPoolView(Gtk.Window):
                 print(2)
         self.dbrows_list = []
         '''
-        return
 
     def format_loaded_rows(self, dbrows):
         '''
         This function converts every packet into a readable form
-        @param dbrows: The rows gotten from SQL query
-        @return: Same Rows in readable form
+        @param dbrows: The rows from SQL query
+        @return: rows in readable form
         '''
 
         tm_rows = []
@@ -1369,17 +1270,24 @@ class TMPoolView(Gtk.Window):
                 tm_rows.append(tm_row)
         elif self.decoding_type == 'RMAP':
             for tm in dbrows:
-                tm_row = [tm.idx, self.w_r[tm.write], tm.verify, tm.reply, tm.keystat, tm.taid, tm.addr, tm.datalen,
-                          tm.raw.hex()]
+                tm_row = [tm.idx, self.cmd_repl[tm.cmd], self.w_r[tm.write], int(tm.verify), int(tm.reply),
+                          int(tm.increment), '0x{:02X}'.format(tm.keystat), tm.taid, self._addr_fmt_hex_str(tm.addr),
+                          tm.datalen, tm.raw.hex()]
                 tm_rows.append(tm_row)
         elif self.decoding_type == 'FEE':
             for tm in dbrows:
                 tm_row = [tm.idx, tm.type, tm.framecnt, tm.seqcnt, tm.raw.hex()]
                 tm_rows.append(tm_row)
         else:
-            self.logger.error('Error in format_loaded_rows_poolviewer, given Format is not valid')
-
+            self.logger.error('Unsupported packet format!')
         return tm_rows
+
+    @staticmethod
+    def _addr_fmt_hex_str(x):
+        if x is not None:
+            return '0x{:08X}'.format(x)
+        else:
+            return ''
 
     def tree_selection_changed(self, selection):
         mode = selection.get_mode()
@@ -1647,12 +1555,11 @@ class TMPoolView(Gtk.Window):
         if self.decoding_type == 'PUS':
             return Gtk.ListStore('guint', str, 'guint', 'guint', 'guint', 'guint', 'guint', 'guint', str, str)
         elif self.decoding_type == 'RMAP':
-            return Gtk.ListStore('guint', str, bool, bool, 'guint', 'guint', 'guint', 'guint', str)
+            return Gtk.ListStore('guint', str, str, 'guint', 'guint', 'guint', str, 'guint', str, 'guint', str)
         elif self.decoding_type == 'FEE':
             return Gtk.ListStore('guint', 'guint', 'guint', 'guint', str)
         else:
             self.logger.error('Decoding Type is an unknown value')
-            return
 
     def set_keybinds(self):
 
@@ -1676,9 +1583,12 @@ class TMPoolView(Gtk.Window):
 
         self.pool_selector.set_model(pool_names)
 
-        cell = Gtk.CellRendererText(foreground='red')
-        self.pool_selector.pack_start(cell, 0)
-        self.pool_selector.add_attribute(cell, 'text', 1)
+        type_cell = Gtk.CellRendererText(foreground='gray', style=Pango.Style.ITALIC)
+        self.pool_selector.pack_start(type_cell, 0)
+        self.pool_selector.add_attribute(type_cell, 'text', 2)
+        state_cell = Gtk.CellRendererText(foreground='red')
+        self.pool_selector.pack_start(state_cell, 0)
+        self.pool_selector.add_attribute(state_cell, 'text', 1)
 
         self.pool_selector.connect('changed', self.select_pool)
 
@@ -2096,7 +2006,6 @@ class TMPoolView(Gtk.Window):
                 type = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name)
                 self.Active_Pool_Info_append([pool_name, type.modification_time, pool_name, False])
 
-
             new_session.close()
 
         self.update_columns()
@@ -2110,7 +2019,6 @@ class TMPoolView(Gtk.Window):
         self.adj.set_upper(self.count_current_pool_rows())
         self.adj.set_value(0)
         self._on_scrollbar_changed(adj=self.adj)
-
 
         # queue = self.queues[pool_name]
         #
@@ -2160,16 +2068,26 @@ class TMPoolView(Gtk.Window):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize() + '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
-            vbox.pack_start(start_button, False, True, 10)
+            vbox.pack_start(start_button, False, True, 0)
+
+        # Add the TST option
+        conn_button = Gtk.Button.new_with_label('Test Specification Tool')
+        conn_button.connect("clicked", cfl.start_tst)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
         conn_button.connect("clicked", self.on_communication_dialog)
-        vbox.pack_start(conn_button, False, True, 10)
+        vbox.pack_start(conn_button, True, True, 0)
+
+        # Add the configuration manager option
+        conn_button = Gtk.Button.new_with_label('Preferences')
+        conn_button.connect("clicked", cfl.start_config_editor)
+        vbox.pack_start(conn_button, True, True, 0)
 
         # Add the option to see the Credits
         about_button = Gtk.Button.new_with_label('About')
@@ -2214,7 +2132,7 @@ class TMPoolView(Gtk.Window):
         changed = False
         #self.select_pool(False, new_pool=pool_name)
         model = self.pool_selector.get_model()
-        #It will check all entries in the Pool selector and change to the one if possible
+        # It will check all entries in the Pool selector and change to the one if possible
         count = 0
         while count < len(model):
             value = model.get_value(model.get_iter(count), 0)  # Get the value
@@ -2236,7 +2154,6 @@ class TMPoolView(Gtk.Window):
             cfl.Functions(poolmgr, 'loaded_pools_func', self.active_pool_info.pool_name, self.active_pool_info)
         return
 
-
     def create_tm_data_viewer(self):
         box = Gtk.VBox()
 
@@ -2247,18 +2164,25 @@ class TMPoolView(Gtk.Window):
 
         self.rawswitch = Gtk.CheckButton.new_with_label('Decode Source Data')
         self.rawswitch.connect('toggled', self.set_tm_data_view, None, True)
-        # self.sortswitch = Gtk.CheckButton.new_with_label('Sort by Name')
-        # self.sortswitch.connect('toggled', self.set_tm_data_view, )
-        #switchbox = Gtk.Box(Gtk.Orientation.HORIZONTAL)
-        switchbox = Gtk.HBox()
+        self.rawswitch.connect('toggled', self._update_user_tm_decoders)
+        switchbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         switchbox.pack_start(self.rawswitch, 0, 0, 0)
-        # switchbox.pack_end(self.sortswitch, 0, 0, 0)
+
+        self.calibrated_switch = Gtk.CheckButton.new_with_label('Calibrated')
+        self.calibrated_switch.set_sensitive(False)
+        self.calibrated_switch.connect('toggled', self.set_tm_data_view, None, True)
+        self.rawswitch.connect('toggled', self._enable_calibrated_switch)
+
+        switchbox.pack_start(self.calibrated_switch, 0, 0, 0)
+
+        ctrlbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        ctrlbox.pack_start(switchbox, 0, 0, 0)
 
         self.hexview = Gtk.Label()
         self.hexview.set_selectable(True)
-        switchbox.pack_end(self.hexview, 1, 1, 0)
+        ctrlbox.pack_end(self.hexview, 1, 1, 0)
 
-        box.pack_start(switchbox, 0, 0, 3)
+        box.pack_start(ctrlbox, 0, 0, 3)
 
         scrolled_header_view = Gtk.ScrolledWindow()
         scrolled_header_view.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
@@ -2276,11 +2200,27 @@ class TMPoolView(Gtk.Window):
 
         return box
 
+    def _enable_calibrated_switch(self, *args):
+        if self.rawswitch.get_active():
+            self.calibrated_switch.set_sensitive(True)
+            self.calibrated_switch.set_active(True)
+        else:
+            self.calibrated_switch.set_sensitive(False)
+            self.calibrated_switch.set_active(False)
+
     def create_tm_data_viewer_list(self, decode=False, create=False):
         tm_data_model = Gtk.ListStore(str, str, str, str)
         if create:
             listview = Gtk.TreeView()
             listview.set_model(tm_data_model)
+
+            # Set up Drag and Drop
+            listview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)
+            listview.drag_source_set_target_list(None)
+            listview.drag_source_add_text_targets()
+
+            listview.connect("drag-data-get", self.on_drag_tmdata_get)
+
         else:
             listview = self.tm_data_view
             for c in listview.get_columns():
@@ -2306,7 +2246,7 @@ class TMPoolView(Gtk.Window):
             listview.set_tooltip_column(3)
 
         else:
-            for i, column_title in enumerate(['bytepos', 'hex', 'decimal', 'ascii']):
+            for i, column_title in enumerate(['BYTEPOS', 'HEX', 'DEC', 'ASCII']):
                 render = Gtk.CellRendererText()
                 column = Gtk.TreeViewColumn(column_title, render, text=i)
                 # column.set_cell_data_func(render, self.text_colour2)
@@ -2316,26 +2256,35 @@ class TMPoolView(Gtk.Window):
         if create:
             return listview
 
+    def on_drag_tmdata_get(self, treeview, drag_context, selection_data, info, time, *args):
+        treeselection = treeview.get_selection()
+        model, my_iter = treeselection.get_selected()
+        selection_data.set_text('{} = {}'.format(*model[my_iter][:2]), -1)
+
     def create_decoder_bar(self):
         box = Gtk.VBox()
 
         box1 = Gtk.HBox()
-        package_button = Gtk.Button(label = 'Add Package to Decode')
+        package_button = Gtk.Button(label='Create TM Structure')
         package_button.set_image(Gtk.Image.new_from_icon_name('list-add', Gtk.IconSize.MENU))
-        package_button.set_tooltip_text('Add User Defined Package to Decode')
+        package_button.set_tooltip_text('Create user defined TM packet structure')
         package_button.set_always_show_image(True)
 
-        parameter_button = Gtk.Button()
+        parameter_button = Gtk.Button(label='Create Parameter')
         parameter_button.set_image(Gtk.Image.new_from_icon_name('list-add', Gtk.IconSize.MENU))
-        parameter_button.set_tooltip_text('Add User Defined Parameter to use in Package')
+        parameter_button.set_tooltip_text('Create user defined parameter')
         parameter_button.set_always_show_image(True)
+
+        decode_udef_check = Gtk.CheckButton.new_with_label('UDEF')
+        decode_udef_check.set_tooltip_text('Force decoding with custom packet structures')
 
         package_button.connect('clicked', self.add_new_user_package)
         parameter_button.connect('clicked', self.add_decode_parameter)
+        decode_udef_check.connect('toggled', self.set_decoding_order)
 
         box1.pack_start(package_button, 0, 0, 0)
         box1.pack_start(parameter_button, 0, 0, 0)
-
+        box1.pack_start(decode_udef_check, 0, 0, 2)
 
         box2 = Gtk.HBox()
 
@@ -2343,37 +2292,32 @@ class TMPoolView(Gtk.Window):
         decoder_name.set_tooltip_text('Label')
         decoder_name_entry = decoder_name.get_child()
         decoder_name_entry.set_placeholder_text('Label')
-        decoder_name_entry.set_width_chars(5)
+        decoder_name_entry.set_width_chars(10)
 
         decoder_name.set_model(self.create_decoder_model())
 
         bytepos = Gtk.Entry()
-        bytepos.set_placeholder_text('Offset+{}'.format(TM_HEADER_LEN))
-        bytepos.set_tooltip_text('Offset+{}'.format(TM_HEADER_LEN))
-        bytepos.set_width_chars(5)
+        bytepos.set_placeholder_text('Offset')  # +{}'.format(TM_HEADER_LEN))
+        bytepos.set_tooltip_text('Offset')  # +{}'.format(TM_HEADER_LEN))
+        bytepos.set_width_chars(7)
 
         bytelength = Gtk.Entry()
         bytelength.set_placeholder_text('Length')
         bytelength.set_tooltip_text('Length')
-        bytelength.set_width_chars(5)
+        bytelength.set_width_chars(7)
 
         add_button = Gtk.Button(label=' Decoder')
         add_button.set_image(Gtk.Image.new_from_icon_name('list-add', Gtk.IconSize.MENU))
+        add_button.set_tooltip_text('Add byte decoder')
         add_button.set_always_show_image(True)
-
-        decode_udef_check = Gtk.CheckButton.new_with_label('UDEF')
-        decode_udef_check.set_tooltip_text('Use User-defined Packets first for Decoding')
 
         decoder_name.connect('changed', self.fill_decoder_mask, bytepos, bytelength)
         add_button.connect('clicked', self.add_decoder, decoder_name, bytepos, bytelength)
-        decode_udef_check.connect('toggled', self.set_decoding_order)
 
-
-        box2.pack_start(decoder_name, 0, 0, 0)
-        box2.pack_start(bytepos, 0, 0, 1)
-        box2.pack_start(bytelength, 0, 0, 1)
+        box2.pack_start(decoder_name, 0, 1, 0)
+        box2.pack_start(bytepos, 0, 0, 0)
+        box2.pack_start(bytelength, 0, 0, 0)
         box2.pack_start(add_button, 0, 0, 0)
-        box2.pack_start(decode_udef_check, 0, 0, 0)
 
         box.pack_start(box1, 0, 0, 0)
         box.pack_start(box2, 0, 0, 0)
@@ -2398,8 +2342,6 @@ class TMPoolView(Gtk.Window):
 
         self.set_tm_data_view()
 
-        return
-
     def create_decoder_model(self):
         model = Gtk.ListStore(str)
 
@@ -2420,17 +2362,17 @@ class TMPoolView(Gtk.Window):
         # if not self.cfg.has_option('user_decoders',decoder):
         #    return
 
-        if self.cfg.has_option('ccs-plot_parameters', decoder):
-            data = json.loads(self.cfg['ccs-plot_parameters'][decoder])
+        if self.cfg.has_option('ccs-user_decoders', decoder):
+            data = json.loads(self.cfg['ccs-user_decoders'][decoder])
 
             bytepos.set_text(str(data['bytepos']))
-            bytelen.set_text(str(struct.calcsize(data['format'])))
+            bytelen.set_text(str(data['bytelen']))
 
     def add_decoder(self, widget, decoder_name, byteoffset, bytelength):
         try:
-            label, bytepos, bytelen = decoder_name.get_active_text(), int(byteoffset.get_text()), int(
-                bytelength.get_text())
-        except:
+            label, bytepos, bytelen = decoder_name.get_active_text(), int(byteoffset.get_text()), int(bytelength.get_text())
+        except Exception as err:
+            self.logger.info(err)
             return
 
         if label in (None, ''):
@@ -2446,7 +2388,7 @@ class TMPoolView(Gtk.Window):
 
         box = Gtk.HBox()
 
-        name = Gtk.Label(decoder_name.get_active_text())
+        name = Gtk.Label(label=decoder_name.get_active_text())
         name.set_tooltip_text('bytes {}-{}'.format(bytepos, bytepos + bytelen - 1))
         hexa = Gtk.Label()
         uint = Gtk.Label()
@@ -2476,7 +2418,7 @@ class TMPoolView(Gtk.Window):
         self.show_all()
 
     def set_decoder_view(self, tm):
-        decoders = self.decoder_box.get_children()[1:]
+        decoders = self.decoder_box.get_children()[0].get_children()[2:]
 
         for decoder in decoders:
             try:
@@ -2487,7 +2429,8 @@ class TMPoolView(Gtk.Window):
                 hexa.set_label(byts.hex().upper())
                 uint.set_label(str(int.from_bytes(byts, 'big')))
                 bina.set_label(bin(int.from_bytes(byts, 'big'))[2:])
-            except:
+            except Exception as err:
+                self.logger.info(err)
                 hexa.set_label('###')
                 uint.set_label('###')
                 bina.set_label('###')
@@ -2497,17 +2440,23 @@ class TMPoolView(Gtk.Window):
             model, treepath = widget.get_selected_rows()
             if treepath:
                 value = model[treepath[0]][3]
-                #print(list(model[treepath[0]]))
-                #print(value)
-                #print(type(value))
                 self.hexview.set_text(value)
 
+    def _update_user_tm_decoders(self, widget):
+        if widget.get_active():
+            importlib.reload(cfl)
+
     @delayed(10)
-    def set_tm_data_view(self, selection=None, event=None, change_columns=False):
-        if not self.active_pool_info or not self.decoding_type == 'PUS':
-            self.logger.info('Can not decode parameters for RMAP or FEE data packets')
+    def set_tm_data_view(self, selection=None, event=None, change_columns=False, floatfmt='.7G'):
+        if not self.active_pool_info:
+            self.logger.warning('No active pool')
+            return
+
+        if self.decoding_type != 'PUS' and self.rawswitch.get_active():
+            self.logger.info('Cannot decode parameters for RMAP or FEE data packets')
             buf = Gtk.TextBuffer(text='Parameter view not available for non-PUS packets')
             self.tm_header_view.set_buffer(buf)
+            self.tm_data_view.get_model().clear()
             return
 
         if change_columns:
@@ -2548,7 +2497,6 @@ class TMPoolView(Gtk.Window):
             self.last_decoded_row = rowidx
 
         tm_index = model[treepath[0]][0]
-        # tm_index = self.active_row
         new_session = self.session_factory_storage
         raw = new_session.query(
             Telemetry[self.decoding_type].raw
@@ -2563,35 +2511,41 @@ class TMPoolView(Gtk.Window):
             new_session.close()
             return
         tm = raw[0]
-        # new_session.commit()
         new_session.close()
         self.set_decoder_view(tm)
 
         if self.rawswitch.get_active():
             self.tm_header_view.set_monospace(False)
             datamodel.clear()
+            nocalibration = not self.calibrated_switch.get_active()
             try:
-                # buf = Gtk.TextBuffer(text=self.ccs.Tmformatted(tm, sort_by_name=self.sortswitch.get_active()))
                 if self.UDEF:
-                    data = cfl.Tmformatted(tm, textmode=False, UDEF=True)
+                    data = cfl.Tmformatted(tm, textmode=False, udef=True, nocal=nocalibration, floatfmt=floatfmt)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
                 else:
-                    data = cfl.Tmformatted(tm, textmode=False)
+                    data = cfl.Tmformatted(tm, textmode=False, nocal=nocalibration, floatfmt=floatfmt)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
 
             except Exception as error:
                 buf = Gtk.TextBuffer(text='Error in decoding packet data:\n{}\n'.format(error))
-                # print(traceback.format_exc())
 
         else:
             self.tm_header_view.set_monospace(False)
-            head = cfl.Tm_header_formatted(tm, detailed=True)
-            headlen = TC_HEADER_LEN if (tm[0] >> 4 & 1) else TM_HEADER_LEN
+
+            if self.decoding_type != 'PUS':
+                tmio = io.BytesIO(tm)
+                headers, _, _ = cfl.extract_spw(tmio)
+                header = headers[0].raw
+                headlen = len(header)
+                head = cfl.spw_header_formatted(headers[0])
+            else:
+                head = cfl.Tm_header_formatted(tm, detailed=True)
+                headlen = TC_HEADER_LEN if (tm[0] >> 4 & 1) else TM_HEADER_LEN
 
             tmsource = tm[headlen:]
-            byteview = [[str(n + headlen), '{:02X}'.format(i), str(i), ascii(chr(i)).strip("'")] for n, i in enumerate(tmsource[:-PEC_LEN])]
+            byteview = [[str(n + headlen), '{:02X}'.format(i), str(i), ascii(chr(i)).strip("'")] for n, i in enumerate(tmsource[:])]
             self._feed_tm_data_view_model(datamodel, byteview)
             buf = Gtk.TextBuffer(text=head + '\n')
 
@@ -2919,9 +2873,7 @@ class TMPoolView(Gtk.Window):
         else:
             # If not PUS open all other possible types but show RMAP
             for packet_type in Telemetry:
-                if packet_type == 'PUS':
-                    pass
-                elif packet_type == 'RMAP':
+                if packet_type == 'RMAP':
                     model = self.pool_selector.get_model()
                     iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], packet_type])
                     self.pool_selector.set_active_iter(iter)   # Always show the RMAP pool when created
@@ -2938,9 +2890,10 @@ class TMPoolView(Gtk.Window):
             self.stop_butt.set_sensitive(True)
         else:
             self.stop_butt.set_sensitive(False)
-        refresh_rate = 1
 
-        GLib.timeout_add(refresh_rate * 1000, self.show_data_rate, refresh_rate, instance, priority=GLib.PRIORITY_DEFAULT)
+        refresh_rate = 1  # in Hz
+
+        GLib.timeout_add(1000 / refresh_rate, self.show_data_rate, refresh_rate, instance, priority=GLib.PRIORITY_DEFAULT)
         return True
 
     def collect_packet_data(self, widget):
@@ -3055,11 +3008,7 @@ class TMPoolView(Gtk.Window):
         res = self.session_factory_storage.execute(que)
         return [row[1] for row in res]
 
-    def plot_parameters(self, widget=None, parameters={}, start_live=False):
-        #if self.active_pool_info is None:
-        #    self.logger.warning('Cannot open plot window without pool!')
-        #    print('Cannot open plot window without pool!')
-        #    return
+    def plot_parameters(self, widget=None, parameters=None, start_live=False):
 
         cfl.start_plotter(pool_name=self.active_pool_info.pool_name)
 
@@ -3225,10 +3174,7 @@ class TMPoolView(Gtk.Window):
             # cnt = rows.count()
             cnt = rows.order_by(Telemetry[self.decoding_type].idx.desc()).first().idx
             # print(cnt)
-            rows = rows.filter(Telemetry[self.decoding_type].idx > (cnt - 100)).offset(100 - 25
-                                                                     ).limit(
-                25
-            ).all()
+            rows = rows.filter(Telemetry[self.decoding_type].idx > (cnt - 100)).offset(100 - 25).limit(25).all()
             # rr=[row for row in rows]
             self.logger.info('fetched', rows[-1].idx, cnt, 'at', time.time())
             dbcon.close()
@@ -3265,9 +3211,10 @@ class TMPoolView(Gtk.Window):
             instance = 1
         try:
             pmgr = cfl.dbus_connection('poolmanager', instance)
-            trashbytes, tc_data_rate, data_rate = pmgr.Functions('calc_data_rate', self.active_pool_info.filename, refresh_rate)
+            trashbytes, tc_data_rate, data_rate, tc_rx_bytes = pmgr.Functions('calc_data_rate', self.active_pool_info.filename, refresh_rate)
             self.statusbar.push(0, 'Trash: {:d} B | TC: {:7.3f} KiB/s | TM: {:7.3f} KiB/s'.format(
                 trashbytes, tc_data_rate/1024, data_rate/1024))
+            self.statusbar.set_tooltip_text('TCRX: {:d} B | TC: {:7.3f} kbps | TM: {:7.3f} kbps'.format(tc_rx_bytes, tc_data_rate/1000*8, data_rate/1000*8))
         except Exception as err:
             self.logger.debug(err)
 
@@ -3314,8 +3261,7 @@ class ExtractionDialog(Gtk.MessageDialog):
 class SavePoolDialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None, decoding_type='PUS'):
         super(SavePoolDialog, self).__init__(title="Save packets", parent=parent, action=Gtk.FileChooserAction.SAVE)
-        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                                      Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
 
         # self.set_transient_for(parent)
 

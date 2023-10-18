@@ -1,0 +1,347 @@
+\usepackage[xindy, nopostdot, numberedsection, style=super, section, toc, acronyms, nogroupskip]{glossaries}
+\usepackage{xparse}
+
+\setlength{\glsdescwidth}{0.8\textwidth}
+\renewcommand{\glsnamefont}[1]{\textbf{#1}}
+
+% label, acronym, name, description
+\DeclareDocumentCommand{\newdualentry}{ m m m m } {
+	\newglossaryentry{gls-#1}{
+	name={#3 (\gls{#1})},
+	description={#4}, nonumberlist
+	}
+	\newglossaryentry{#1}{
+		type=\acronymtype,
+		name={#2},
+		first={#3 (#2)},
+		firstplural={#3s (#2s)},
+		see={[Glossary:]{\gls{gls-#1}}},
+		description=\glslink{gls-#1}{#3},
+		nonumberlist
+	}%
+}
+%%% \gls{ABBREV} to point at Acronym/Abbreviation index
+%%% \gls{gls-ABBREV} to point to glossary
+
+\makeglossaries
+\newdualentry{ADC}%
+  {ADC}%
+  {Analog to Digital Converter}%
+  {An Analog to Digital Converter is a system that converts an analog signal
+   into a quantized digital signal. Its counterpart is the \gls{DAC}.}%
+
+\newdualentry{API}%
+  {API}%
+  {Application Programming Interface}%
+  {The Application Programming Interface defines how a developer can write
+   a program that requests services from an operating system or application.
+   \glspl{API} are implemented by function calls composed of verbs and nouns,
+   i.e. a function to execute on an object.}%
+
+\newdualentry{BSP}%
+  {BSP}%
+  {Board Support Package}%
+  {A Board Support Package is the implementation of a specific interface defined
+   by the abstract layer of an operating system that enables the latter to run
+   on the particular hardware platform.}%
+
+\newdualentry{CPU}%
+  {CPU}%
+  {Central Processing Unit}%
+  {The Central Processing Unit is the electronic circuitry that interprets
+  instructions of a computer program and performs control logic, arithmetic,
+  and input/output operations specified by the instructions. It maintains
+  high-level control of peripheral components, such as memory and other devices.}%
+
+\newdualentry{DAC}%
+  {DAC}%
+  {Digital to Analog Converter}%
+  {A Digital to Analog Converter is a system that converts a quantized digital
+   signal into an analog signal. Its counterpart is the \gls{ADC}.}%
+
+\newdualentry{DMA}%
+  {DMA}%
+  {Direct Memory Access}%
+  {Direct Memory Access is a feature of a computer system that allows hardware
+   subsystems to access main system \gls{gls-RAM} directly, thereby bypassing
+   the \gls{gls-CPU}.}%
+
+\newacronym{DRD}{DRD}{Document Requirements Definition}
+
+\newdualentry{DSP}%
+  {DSP}%
+  {Digital Signal Processor}%
+  {A Digital Signal Processor is a specialised processor with its architecture %
+   targeting the operational needs of digital signal processing.}%
+
+\newglossaryentry{Doxygen}{
+  name={Doxygen},
+  description={Doxygen is a documentation generator for writing software %
+   	       reference documentation.},
+  nonumberlist
+  }
+
+\newdualentry{ELF}%
+  {ELF}%
+  {Executable and Linkable Format}%
+  {The Executable and Linkable Format is a common standard file format for
+   executables, object code, shared libraries, and core dumps.}%
+
+\newacronym{FDIR}{FDIR}{Fault Detection, Isolation and Recovery}
+
+\newdualentry{FIFO}%
+  {FIFO}%
+  {First In - First Out}%
+  {In FIFO processing, the "head" element of a queue is processed first.
+   Once complete, the element is removed and the next element in line becomes
+   the new queue head.}%
+
+\newdualentry{FPU}%
+  {FPU}%
+  {Floating Point Unit}%
+  {A co-processor unit that specialises in floating-point calculations.}%
+
+\newdualentry{ILP}%
+  {ILP}%
+  {Instruction Level Parallelism}%
+  {Instruction-level parallelism (ILP) is a measure of how many instructions in
+   a computer program can be executed simultaneously by the \gls{CPU}.}%
+
+\newdualentry{ISR}%
+  {ISR}%
+  {Interrupt Service Routine}%
+  {An Interrupt Service Routine is a function that handles the actions needed
+   to service an interrupt.}%
+
+\newacronym{FSW}{FSW}{Flight Software}
+
+\newdualentry{GCC}%
+  {GCC}%
+  {GNU Compiler Collection}%
+  {The GNU Compiler Collection is a compiler system produced by the
+   GNU project. It is part of the GNU toolchain collection of programming
+   tools.}%
+
+\newglossaryentry{GNU}{
+  name={GNU},
+  description={GNU is a recursive acronym that stands for "GNU's Not Unix!".
+	      The GNU project is a free software collaboration project announced
+	      in 1987. Users are free to run GNU-licensed software, share, copy,
+	      distribute, study and modify it. GNU software guarantees these
+	      freedom-rights legally via its license and is thefore free
+      	      software.},
+  nonumberlist
+}
+
+\newglossaryentry{LEON2}{
+  name={LEON2},
+  description={The LEON2 is a synthesisable VHDL model of a 32-bit processor
+	       compliant with the SPARC V8 architecture. It is highly
+	       configurable and particularly suitable for \gls{SoC} designs.
+	       Its source code is available under the GNU LGPL license},
+  nonumberlist
+  }
+
+\newglossaryentry{LEON3}{
+  name={LEON3},
+  description={The LEON3 is an updated version of the \gls{LEON2}, changes
+	       include \gls{gls-SMP} support and a deeper instruction pipeline},
+  nonumberlist
+  }
+
+\newglossaryentry{LEON3-FT}{
+  name={LEON3-FT},
+  description={The LEON3-FT is a fault-tolerant version of the \gls{LEON3}.
+  	       Changes to the base version include autonomous error handling,
+       	       cache locking and different cache replacement strategies.},
+  nonumberlist
+  }
+
+\newdualentry{MMU}%
+  {MMU}%
+  {Memory Management Unit}%
+  {A Memory Management Unit performs address space translation between physical
+   and virtual memory pages and protects unprivileged access to certain memory
+   regions.}%
+
+\newdualentry{MPPB}%
+  {MPPB}%
+  {Massively Parallel Processor Breadboarding system}%
+  {The Massively Parallel Processor Breadboarding system is a proof-of-concept %
+   design for a space-hardened, fault-tolerant multi-DSP system with various %
+   subsystems to build a powerful digital signal processing system with a high %
+   data throughput. Its distinguishing features are the \gls{gls-NoC} and the
+   \gls{Xentium} \glspl{DSP} controlled by a \gls{LEON2} processor.
+   It was developed under ESA contract 21986 by Recore Systems B.V.}%
+
+\newacronym{NCR}{NCR}{Non-Conformance Reports}
+
+\newdualentry{NGAPP}%
+  {NGAPP}%
+  {Next Generation Astronomy Processing Platform}%
+  {Next Generation Astronomy Processing Platform was an evaluation of the
+   \gls{MPPB} performed in a joint effort of RUAG Space Austria and the
+   Department of Astrophysics of the University of Vienna.
+   The project was funded under ESA contract 40000107815/13/NL/EL/f.}%
+
+\newdualentry{NoC}%
+  {NoC}%
+  {Network On Chip}%
+  {A Network On Chip is a communication system on an integrated circuit that
+   applies (packet based) networking to on-chip communication. It offers
+   improvements over more conventional bus interconnects and is more scalable
+   and power efficient in complex \gls{gls-SoC} desgins.}%
+
+\newacronym{NRB}{NRB}{Nonconformance Review Board}
+
+\newacronym{PA}{PA}{Product Assurance}
+
+\newacronym{PAM}{PAM}{Product Assurance Manager}
+
+\newdualentry{POSIX}
+  {POSIX}
+  {Portable Operating System Interface}
+  {The Portable Operating System Interface is a family of standards specified
+   by the IEEE Computer Society for maintaining compatibility between
+   operating systems.}%
+
+\newdualentry{PUS}
+  {PUS}
+  {Packet Utilisation Standard}
+  {The Packet Utilisation Standard addresses the end-to-end transport of telemetry
+   and telecommand data between user applications on the ground and applications
+   onboard a satellite. See also ECSS-E-70-41A.}%
+
+\newdualentry{RAM}%
+  {RAM}%
+  {Random-Access Memory}%
+  {Random-Access Memory is a type of memory where each memory cell may be
+   accessed directly via their memory addresses.}%
+
+\newacronym{RID}{RID}{Review Item Discrepancy}
+
+\newdualentry{RISC}%
+  {RISC}%
+  {Reduced Instruction Set Computing}%
+  {RISC is a \gls{CPU} design strategy that intends to improve performance by
+   combining a simplified instruction set with a microprocessor architecture
+   that is capable of executing an instruction in a smaller number of clock
+   cycles.}%
+
+\newdualentry{RMAP}%
+  {RMAP}%
+  {Remote Memory Access Protocol}%
+  {The Remote Memory Access Protocol is a form of \gls{SpaceWire} communication
+   that transparently communicates writes to memory mapped regions between
+   different hardware devices.}%
+
+
+\newdualentry{RR}%
+  {RR}%
+  {Round Robin}%
+  {Round Robin is a scheduling algorithm where time slices are assigned in equal
+   poritions and in circular order. In the context of threads, priorities are
+   usually only used to control re-scheduling order when a mutex is accessed by
+   a thread.}%
+
+\newacronym{RSA}{RSA}{RUAG Space Austria}
+
+\newacronym{SCF}{SCF}{Software Configuration File}
+
+\newacronym{SDD}{SDD}{Software Design Document}
+
+\newacronym{SDP}{SDP}{Software Development Plan}
+
+\newdualentry{SMP}%
+  {SMP}%
+  {Symmetric Multiprocessing}%
+  {Symmetric Multiprocessing denotes computer architectures, where two or more
+   identical processors are connected to the same periphery and are controlled
+   by the same operating system instance.}%
+
+\newacronym{SPAMR}{SPAMR}{Software Product Assurance Milestone Report}
+
+\newacronym{SPR}{SPR}{Software Problems Reports}
+
+\newacronym{SSS}{SSS}{System Software Specification}
+
+\newacronym{SRD}{SRD}{Software Release Document}
+
+\newacronym{SRS}{SRS}{Software Requirement Specification}
+
+\newdualentry{SoC}%
+  {SoC}%
+  {System On Chip}%
+  {A System On Chip is an integrated circuit that combines all components of a %
+   computer or other electronic system into a single chip.}%
+
+\newglossaryentry{SpaceWire}{
+  name={SpaceWire},
+  description={SpaceWire is a spacecraft communication network based in part
+               on the IEEE 1355 standard of communications.},
+  nonumberlist
+  }
+
+\newglossaryentry{SPARC}{
+  name={SPARC},
+  description={SPARC ("scalable processor architecture") is a \gls{gls-RISC}
+  	       instruction set architecture developed by Sun Microsystems in
+	       the 1980s. The distinct feature of SPARC processors is the high
+	       number of \gls{gls-CPU} registers that are accessed similarly to
+	       stack variables via ``sliding windows''.},
+  nonumberlist
+  }
+
+
+\newacronym{SQ}{SQ}{Software Quality}
+
+\newacronym{SQAM}{SQAM}{Software Quality Assurance Manager}
+
+\newdualentry{SSDP} % label
+  {SSDP}            % abbreviation
+  {Scalable Sensor Data Processor}  % long form
+  {The Scalable Sensor Data Processor (SSDP) is a next generation on-board %
+   data processing mixed-signal ASIC, envisaged to be used in future scientific %
+   payloads requiring high-performance on-board processing capabilities. %
+   It is built opon a heterogeneous multicore architecture, combining two %
+   \gls{Xentium} \gls{DSP} cores with a general-purpose \gls{LEON3-FT} control %
+   processor in a \gls{gls-NoC}.} % description
+
+\newacronym{SQA}{SQA}{Software Quality Assurance}
+
+\newdualentry{TCM}%
+  {TCM}%
+  {Tightly-Coupled Memory}%
+  {Tightly-Coupled Memory is the local data memory that is directly accessible %
+   by a Xentium's load/store unit. It can be viewed as a completely %
+   program-controlled data cache.}%
+
+
+\newacronym{TP}{TP}{Test Plan}
+\newacronym{TS}{TS}{Test Specification}
+
+\newacronym{UVIE}{UVIE}{University of Vienna}
+
+\newdualentry{VLIW}%
+  {VLIW}%
+  {Very Long Instruction Word}%
+  {Very Long Instruction Word is a processor architecture design concept that
+   exploits \gls{gls-ILP}. This approach allows higher performance at a smaller
+   silicone footprint compared to serialised instruction processors, as no
+   instruction re-ordering logic to exploit superscalar capabilities of the
+   processor must be integrated on the chip, but requires either code to be
+   tuned manually or a very sophisticated compiler to exploit the full potential
+   of the processor.}%
+
+\newglossaryentry{Xentium}{
+  name={Xentium},
+  description={The Xentium is a high performance \gls{gls-VLIW} \gls{DSP} core.
+               It operates 10 parallel execution slots supporting 32/40 bit
+	       scalar and two 16-bit element vector operations.},
+  nonumberlist
+  }
+
+
+% do not remove
+\glsresetall
+\makeglossaries

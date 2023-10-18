@@ -8,6 +8,8 @@ Author: Marko Mecina (MM)
 
 import ctypes
 import datetime
+import struct
+
 from s2k_partypes import ptt
 import crcmod
 
@@ -28,8 +30,14 @@ rmapcrc = crcmod.mkCrcFun(0x107, rev=True, initCrc=0, xorOut=0)
 PEC_LEN = 2  # in bytes
 RMAP_PEC_LEN = 1
 
+# PUS packet structure definition
+
+PUS_PKT_VERS_NUM = 0  # 0 for space packets
 PUS_VERSION = 1
 MAX_PKT_LEN = 1024  # bytes
+
+TMTC = {0: 'TM', 1: 'TC'}
+TSYNC_FLAG = {0: 'U', 1: 'S', 5: 'S'}
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
@@ -126,6 +134,16 @@ def calc_timestamp(time, sync=0, return_bytes=False):
 # TM_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TM_SECONDARY_HEADER]) // 8
 # TC_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TC_SECONDARY_HEADER]) // 8
 
+class RawGetterSetter:
+
+    @property
+    def raw(self):
+        return bytes(self.bin)
+
+    @raw.setter
+    def raw(self, rawdata):
+        self.bin[:] = rawdata
+
 
 class PHeaderBits(ctypes.BigEndianStructure):
     _pack_ = 1
@@ -135,7 +153,7 @@ class PHeaderBits(ctypes.BigEndianStructure):
 P_HEADER_LEN = ctypes.sizeof(PHeaderBits)
 
 
-class PHeader(ctypes.Union):
+class PHeader(ctypes.Union, RawGetterSetter):
     _pack_ = 1
     _fields_ = [
         ('bits', PHeaderBits),
@@ -151,12 +169,18 @@ class TMHeaderBits(ctypes.BigEndianStructure):
 TM_HEADER_LEN = ctypes.sizeof(TMHeaderBits)
 
 
-class TMHeader(ctypes.Union):
+class TMHeader(ctypes.Union, RawGetterSetter):
     _pack_ = 1
     _fields_ = [
         ('bits', TMHeaderBits),
         ('bin', ctypes.c_ubyte * TM_HEADER_LEN)
     ]
+
+    def __init__(self):
+        super(TMHeader, self).__init__()
+        self.bits.PKT_VERS_NUM = PUS_PKT_VERS_NUM
+        self.bits.PKT_TYPE = 0
+        self.bits.PUS_VERSION = PUS_VERSION
 
 
 class TCHeaderBits(ctypes.BigEndianStructure):
@@ -167,12 +191,18 @@ class TCHeaderBits(ctypes.BigEndianStructure):
 TC_HEADER_LEN = ctypes.sizeof(TCHeaderBits)
 
 
-class TCHeader(ctypes.Union):
+class TCHeader(ctypes.Union, RawGetterSetter):
     _pack_ = 1
     _fields_ = [
         ('bits', TCHeaderBits),
         ('bin', ctypes.c_ubyte * TC_HEADER_LEN)
     ]
+
+    def __init__(self, *args, **kw):
+        super(TCHeader, self).__init__(*args, **kw)
+        self.bits.PKT_VERS_NUM = PUS_PKT_VERS_NUM
+        self.bits.PKT_TYPE = 1
+        self.bits.PUS_VERSION = PUS_VERSION
 
 
 CUC_OFFSET = TMHeaderBits.CTIME.offset
@@ -182,18 +212,6 @@ SPW_PROTOCOL_IDS = {
     "FEEDATA": 0xF0,
     "CCSDS": 0x02
 }
-
-
-class RawGetterSetter:
-
-    @property
-    def raw(self):
-        return bytes(self.bin)
-
-    @raw.setter
-    def raw(self, rawdata):
-        self.bin[:] = rawdata
-
 
 # RMAP packet structure definitions
 
@@ -271,12 +289,18 @@ FEEDATA_TRANSFER_HEADER = [
 
 
 class RMapCommandHeaderBits(ctypes.BigEndianStructure):
+    _pack_ = 1
+    _fields_ = [(label, ctype, bits) for label, ctype, bits in RMAP_COMMAND_HEADER]
 
     def __init__(self):
         raise NotImplementedError('Not available in project CHEOPS')
 
 
+RMAP_COMMAND_HEADER_LEN = ctypes.sizeof(RMapCommandHeaderBits)  # sum([x[2] for x in RMAP_COMMAND_HEADER]) // 8
+
+
 class RMapCommandHeader(ctypes.Union, RawGetterSetter):
+
 
     def __init__(self):
         raise NotImplementedError('Not available in project CHEOPS')
@@ -357,3 +381,15 @@ class EventDetectionData(ctypes.Union):
 
     def __init__(self):
         raise NotImplementedError('Not available in project CHEOPS')
+
+
+# S13 data header format, using python struct conventions
+S13_FMT_OBSID = 'I'
+S13_FMT_TIME = 'I'
+S13_FMT_FTIME = 'H'
+S13_FMT_COUNTER = 'H'
+_S13_HEADER_FMT = S13_FMT_OBSID + S13_FMT_TIME + S13_FMT_FTIME + S13_FMT_COUNTER
+
+
+def s13_unpack_data_header(buf):
+    return struct.unpack('>' + _S13_HEADER_FMT, buf[:struct.calcsize(_S13_HEADER_FMT)])

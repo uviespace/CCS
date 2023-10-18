@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# this script should provide an easy way to execute single steps of the test IASW_1_DB
+# this script should provide an easy way to execute single steps of a test
 import logging
 import threading
 import os
@@ -27,12 +27,15 @@ import ${testSpecFileName}_verification
 importlib.reload(${testSpecFileName}_command)
 importlib.reload(${testSpecFileName}_verification)
 
-# create a instance of the test and the verification
+# create an instance of the test and the verification
 testinstance = ${testSpecFileName}_command.${testSpecClassName}(do_verification=True)
 verification_instance = ${testSpecFileName}_verification.${testSpecClassName}Verification()
 
-# define the pool name
-pool_name = 'new_tmtc_pool'
+# SETUP
+pool_name = 'LIVE'
+save_pool = False
+verify_offline = False
+interactive = False
 
 #! CCS.BREAKPOINT
 # run the whole test
@@ -40,13 +43,13 @@ threading.Thread(target=testinstance.run,
                  kwargs={'pool_name': pool_name},
                  daemon=True).start()
 
-if False:
+if save_pool:
     # Save the pool to a file
     threading.Thread(target=testinstance.save_pool_in_file,
                      kwargs={'pool_name': pool_name,
                              'save_pool': True},
                      daemon=True).start()
-if False:
+if verify_offline:
     # do Verification of command log file and saved pool
     threading.Thread(target=verification_instance.verify,
                      kwargs={'command_log_file':'logs_test_runs/Simple_Example_command_cmd.log',
@@ -58,6 +61,6 @@ if False:
 # Run the test step by step
 
 #! CCS.BREAKPOINT
-if False:
+if interactive:
     # Pre-Conditions: $TestPreconDescription
     threading.Thread(target=testinstance.establish_preconditions, kwargs={'pool_name': pool_name}, daemon=True).start()

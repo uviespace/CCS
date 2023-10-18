@@ -201,7 +201,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.product_paths = []
 
         # actions
-        action = Gio.SimpleAction.new('make_new_test', None)
+        action = Gio.SimpleAction.new('makenewtest', None)
         action.connect('activate', self.on_new_test)
         self.add_action(action)
 
@@ -213,7 +213,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action.connect('activate', self.on_save)
         self.add_action(action)
 
-        action = Gio.SimpleAction.new('save_as', None)
+        action = Gio.SimpleAction.new('saveas', None)
         action.connect('activate', self.on_save_as)
         self.add_action(action)
 
@@ -265,15 +265,29 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_save.set_icon_name('document-save')
         self.btn_save.set_tooltip_text('Save')
         self.btn_save.connect('clicked', self.on_save)
+        self.btn_save_as = Gtk.ToolButton()
+        self.btn_save_as.set_icon_name('document-save-as')
+        self.btn_save_as.set_tooltip_text('Save as')
+        self.btn_save_as.connect('clicked', self.on_save_as)
         # self.btn_show_model_viewer = Gtk.ToolButton()
         # self.btn_show_model_viewer.set_icon_name('accessories-dictionary-symbolic')
         # self.btn_show_model_viewer.set_tooltip_text('Show/hide model viewer')
         # self.btn_show_model_viewer.connect('clicked', self.model_viewer_toggle_hide)
-        self.btn_generate_products = Gtk.ToolButton()
-        self.btn_generate_products.set_label('Generate scripts')
-        self.btn_generate_products.set_icon_name('text-x-python')
-        self.btn_generate_products.set_tooltip_text('Generate command.py, verification.py and manually.py')
-        self.btn_generate_products.connect('clicked', self.on_generate_products)
+        self.btn_export_csv = Gtk.ToolButton()
+        self.btn_export_csv.set_label('Export to CSV')
+        self.btn_export_csv.set_icon_name('text-csv')
+        self.btn_export_csv.set_tooltip_text('Export current spec to CSV')
+        self.btn_export_csv.connect('clicked', self.on_generate_csv)
+        # self.btn_generate_products = Gtk.ToolButton()
+        # self.btn_generate_products.set_label('Generate scripts')
+        # self.btn_generate_products.set_icon_name('text-x-python')
+        # self.btn_generate_products.set_tooltip_text('Generate command.py, verification.py and manually.py')
+        # self.btn_generate_products.connect('clicked', self.on_generate_products)
+        self.btn_generate_script = Gtk.ToolButton()
+        self.btn_generate_script.set_label('Generate scripts')
+        self.btn_generate_script.set_icon_name('text-x-python')
+        self.btn_generate_script.set_tooltip_text('Generate Python script of the current test')
+        self.btn_generate_script.connect('clicked', self.on_generate_barescript)
 
         self.btn_start_ccs_editor = Gtk.ToolButton()
         self.btn_start_ccs_editor.set_label('Start CCS')
@@ -294,10 +308,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_new_file, 0)
         self.toolbar.insert(self.btn_open_file, 1)
         self.toolbar.insert(self.btn_save, 2)
+        self.toolbar.insert(self.btn_save_as, 3)
         # self.toolbar.insert(self.btn_show_model_viewer, 2)
-        self.toolbar.insert(self.btn_generate_products, 3)
-        self.toolbar.insert(self.btn_start_ccs_editor, 4)
-        self.toolbar.insert(self.btn_open_progress_view, 5)
+        self.toolbar.insert(self.btn_export_csv, 4)
+        # self.toolbar.insert(self.btn_generate_products, 5)
+        self.toolbar.insert(self.btn_generate_script, 5)
+        self.toolbar.insert(self.btn_start_ccs_editor, 6)
+        self.toolbar.insert(self.btn_open_progress_view, 7)
         
         # IDB chooser
         self.idb_chooser = Gtk.ToolButton()
@@ -307,12 +324,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.idb_chooser.set_label_widget(label)
         self.idb_chooser.set_tooltip_text('Select IDB')
         self.idb_chooser.connect('clicked', self.on_set_idb_version)
-        self.toolbar.insert(self.idb_chooser, 6)
+        self.toolbar.insert(self.idb_chooser, 8)
 
         # separator
         sepa = Gtk.SeparatorToolItem()
         sepa.set_expand(True)
-        self.toolbar.insert(sepa, 7)
+        self.toolbar.insert(sepa, 9)
 
         # logo
         self.unilogo = Gtk.ToolButton()
@@ -321,7 +338,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.unilogo.set_icon_widget(icon)
         self.unilogo.connect('clicked', self.on_about)
-        self.toolbar.insert(self.unilogo, 8)
+        self.toolbar.insert(self.unilogo, 10)
         self.box.pack_start(self.toolbar, False, True, 0)
         
         self.info_bar = None
@@ -332,6 +349,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         # add the notebook for the test specifications
         self.notebook = Gtk.Notebook()
+        self.notebook.set_scrollable(True)
         self.notebook.connect('switch-page', self.update_model_viewer)
         self.work_desk.pack1(self.notebook)
 
@@ -489,6 +507,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
             label_text = 'New test'
         label = self.notebook_page_label(label_text=label_text)
         page_index = self.notebook.append_page(child=test_instance.view, tab_label=label)
+        self.notebook.set_tab_reorderable(test_instance.view, True)
+
         # reload the data of the widgets, in order to display it
         test_instance.view.update_widget_data()
         self.show_all()
@@ -500,10 +520,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
         label = Gtk.Label()
         label.set_text(label_text)
         btn_close = Gtk.Button.new_from_icon_name('window-close-symbolic', Gtk.IconSize.BUTTON)
-        btn_close.set_tooltip_text('Close')
+        btn_close.set_tooltip_text('close')
+        btn_close.set_relief(Gtk.ReliefStyle.NONE)
         btn_close.connect('clicked', self.on_close_clicked)
         box.pack_start(label, True, True, 0)
-        box.pack_start(btn_close, True, True, 0)
+        box.pack_start(btn_close, True, True, 3)
         box.show_all()
         return box
 
@@ -649,6 +670,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
     def save_as_file_dialog(self):
         current_test = self.current_test_instance()
+
+        if current_test is None:
+            return
+
         current_name = self.current_model().name
         current_model = self.current_model()
         dialog = Gtk.FileChooserDialog('Please choose a file',
@@ -874,13 +899,13 @@ class TstAppWindow(Gtk.ApplicationWindow):
         """
         Generates a compact python test file without all the additional stuff from on_generate_scripts
         """
-        dialog = Gtk.FileChooserDialog(
-            title="Save script as", parent=self, action=Gtk.FileChooserAction.SAVE)
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_SAVE,
-            Gtk.ResponseType.OK, )
+        # dialog = Gtk.FileChooserDialog(
+        #     title="Save script as", parent=self, action=Gtk.FileChooserAction.SAVE)
+        # dialog.add_buttons(
+        #     Gtk.STOCK_CANCEL,
+        #     Gtk.ResponseType.CANCEL,
+        #     Gtk.STOCK_SAVE,
+        #     Gtk.ResponseType.OK, )
 
         if self.current_test_instance():
             # current_json_filename = self.current_test_instance().filename
@@ -889,22 +914,22 @@ class TstAppWindow(Gtk.ApplicationWindow):
             logger.error('Small Script can not be generated without JSON file')
             return
 
+        dialog = ScriptExportDialog()
+
         outfile_basic = '{}-TS-{}.py'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
+        dialog.set_do_overwrite_confirmation(True)
 
         response = dialog.run()
-        while response == Gtk.ResponseType.OK:
-            if os.path.exists(dialog.get_filename()):
-                if not self.existing_file_dialog(dialog.get_filename()):
-                    response = dialog.run()
-                    continue
-            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename())
+        if response == Gtk.ResponseType.OK:
+            report = dialog.report.get_active()
+            spec = dialog.csvspec.get_filename()
+
+            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename(), reportfunc=report, specfile=spec)
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
-            break
 
         dialog.destroy()
-        return
 
     def on_generate_csv(self, *args):
         """
@@ -928,16 +953,18 @@ class TstAppWindow(Gtk.ApplicationWindow):
         outfile_basic = '{}-TS-{}.csv_PIPE'.format(current_model.name, current_model.spec_version)
         dialog.set_current_name(outfile_basic)
         dialog.set_current_folder(cfg.get('tst-history', 'last-folder'))
+        dialog.set_do_overwrite_confirmation(True)
 
         response = dialog.run()
-        while response == Gtk.ResponseType.OK:
-            if os.path.exists(dialog.get_filename()):
-                if not self.existing_file_dialog(dialog.get_filename()):
-                    response = dialog.run()
-                    continue
+        if response == Gtk.ResponseType.OK:
+            # while response == Gtk.ResponseType.OK:
+            #     if os.path.exists(dialog.get_filename()):
+            #         if not self.existing_file_dialog(dialog.get_filename()):
+            #             response = dialog.run()
+            #             continue
             json_to_csv.run(current_model.encode_to_json(), dialog.get_filename())
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
-            break
+            # break
 
         dialog.destroy()
         return
@@ -1104,8 +1131,8 @@ class TstAppWindow(Gtk.ApplicationWindow):
         about_dialog.set_program_name('Test Specification Tool')
         about_dialog.set_copyright('UVIE 08/2022')
         about_dialog.set_license_type(Gtk.License.MPL_2_0)
-        about_dialog.present()
-        return
+        about_dialog.run()
+        about_dialog.destroy()
 
     def on_set_idb_version(self, widget):
         self.reconnect_mib()
@@ -1253,6 +1280,41 @@ def run():
 
     applica = TstApp(bus_name, Gio.ApplicationFlags.FLAGS_NONE, logger=logger)
     applica.run()
+
+
+class ScriptExportDialog(Gtk.FileChooserDialog):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(title="Save script as", action=Gtk.FileChooserAction.SAVE)
+        self.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_SAVE,
+            Gtk.ResponseType.OK, )
+
+        area = self.get_content_area()
+        hbox = Gtk.HBox()
+        hbox.set_border_width(10)
+
+        self.report = Gtk.CheckButton.new_with_label('Reporting')
+        self.report.set_tooltip_text('Add interactive reporting')
+        self.report.connect('toggled', self.check_report)
+
+        self.csvspec = Gtk.FileChooserButton()
+        self.csvspec.set_tooltip_text('Select corresponding CSV spec file')
+        self.csvspec.set_sensitive(False)
+
+        hbox.pack_start(self.report, 0, 0, 0)
+        hbox.pack_start(self.csvspec, 1, 1, 0)
+        area.add(hbox)
+
+        self.show_all()
+
+    def check_report(self, widget, *args):
+        if widget.get_active():
+            self.csvspec.set_sensitive(True)
+        else:
+            self.csvspec.set_sensitive(False)
 
 
 if __name__ == '__main__':

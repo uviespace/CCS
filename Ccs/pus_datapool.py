@@ -30,6 +30,7 @@ from typing import NamedTuple
 from collections import deque
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker, FEEDataTelemetry, RMapTelemetry
 import importlib
+from sqlalchemy.exc import OperationalError as SQLOperationalError
 
 
 cfg = confignator.get_config(check_interpolation=False)
@@ -42,18 +43,22 @@ TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN
      packet_config.TC_HEADER_LEN, packet_config.P_HEADER_LEN, packet_config.PEC_LEN, packet_config.MAX_PKT_LEN,
      packet_config.timepack, packet_config.timecal]
 
-RMapCommandHeader, RMapReplyWriteHeader, RMapReplyReadHeader = packet_config.RMapCommandHeader, \
-                                                               packet_config.RMapReplyWriteHeader, \
-                                                               packet_config.RMapReplyReadHeader
+# RMAP and FEE protocols are only supported in SMILE
+if project.endswith('SMILE'):
+    RMapCommandHeader, RMapReplyWriteHeader, RMapReplyReadHeader = packet_config.RMapCommandHeader, \
+                                                                   packet_config.RMapReplyWriteHeader, \
+                                                                   packet_config.RMapReplyReadHeader
 
-RMAP_COMMAND_HEADER_LEN, RMAP_REPLY_WRITE_HEADER_LEN, RMAP_REPLY_READ_HEADER_LEN, RMAP_PEC_LEN = \
-    packet_config.RMAP_COMMAND_HEADER_LEN, packet_config.RMAP_REPLY_WRITE_HEADER_LEN, \
-    packet_config.RMAP_REPLY_READ_HEADER_LEN, packet_config.RMAP_PEC_LEN
+    RMAP_COMMAND_HEADER_LEN, RMAP_REPLY_WRITE_HEADER_LEN, RMAP_REPLY_READ_HEADER_LEN, RMAP_PEC_LEN = \
+        packet_config.RMAP_COMMAND_HEADER_LEN, packet_config.RMAP_REPLY_WRITE_HEADER_LEN, \
+        packet_config.RMAP_REPLY_READ_HEADER_LEN, packet_config.RMAP_PEC_LEN
 
 PLM_PKT_PREFIX_TM = packet_config.PLM_PKT_PREFIX_TM
 PLM_PKT_PREFIX_TC = packet_config.PLM_PKT_PREFIX_TC
 PLM_PKT_PREFIX_TC_SEND = packet_config.PLM_PKT_PREFIX_TC_SEND
 PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
+
+SOCK_TO_LIMIT = 900  # number of tm_recv socket timeouts before SQL session reconnect
 
 communication = {}
 for name in cfg['ccs-dbus_names']:
@@ -74,9 +79,6 @@ def get_scoped_session_factory():
 class DatapoolManager:
     # pecmodes = ['ignore', 'warn', 'discard']
 
-    # defaults
-    pecmode = 'warn'
-
     # crcfunc = packet_config.puscrc
     # crcfunc_rmap = packet_config.rmapcrc
 
@@ -89,8 +91,10 @@ class DatapoolManager:
     PROTOCOL_IDS = {packet_config.SPW_PROTOCOL_IDS[key]: key for key in packet_config.SPW_PROTOCOL_IDS}
     # MAX_PKT_LEN = packet_config.RMAP_MAX_PKT_LEN
 
-    tmtc = {0: 'TM', 1: 'TC'}
-    tsync_flag = {0: 'U', 1: 'S', 5: 'S'}
+    tmtc = cfl.tmtc
+    tsync_flag = cfl.tsync_flag
+    # tmtc = {0: 'TM', 1: 'TC'}
+    # tsync_flag = {0: 'U', 1: 'S', 5: 'S'}
 
     lock = threading.Lock()
     own_gui = None
@@ -108,6 +112,7 @@ class DatapoolManager:
         self.cfg = confignator.get_config()
 
         self.commit_interval = float(self.cfg['ccs-database']['commit_interval'])
+        self.pecmode = self.cfg['ccs-misc']['pec_mode'].lower()
 
         # Set up the logger
         self.logger = cfl.start_logging('PoolManager')
@@ -127,6 +132,7 @@ class DatapoolManager:
         self.pool_rows = {}  # entries in MySQL "tm_pool" table
         self.databuflen = 0
         self.tc_databuflen = 0
+        self.tc_databuflen_rx = 0  # counts the received bytes on the TC connection, if drop_rx=True
         self.trashbytes = {None: 0}
         self.state = {}
         self.filtered_pckts = {}
@@ -230,7 +236,7 @@ class DatapoolManager:
             # new_session.flush()
             new_session.commit()
             new_session.close()
-            self.lo('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
+            self.logger.info('DELETED POOL\n >{}<\nFROM DB'.format(pool_name))
         return
 
     def _clear_db(self):
@@ -285,9 +291,11 @@ class DatapoolManager:
                     timestamp))
 
             new_session.commit()
+            return 0
         except Exception as err:
             self.logger.error("Error trying to delete old DB rows: {}".format(err))
             new_session.rollback()
+            return 1
         finally:
             new_session.close()
 
@@ -406,7 +414,7 @@ class DatapoolManager:
             self.logger.warning('"{}" is not a supported protocol, aborting.'.format(protocol))
             return
 
-        self.logger.info('Recording from new connection {}:{} to pool "{}" using {} protocol.'.format(host, port, protocol, pool_name))
+        self.logger.info('Recording from new connection {}:{} to pool "{}" using {} protocol.'.format(host, port, pool_name, protocol))
         new_session = self.session_factory_storage
         while True:
             dbrow = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
@@ -456,7 +464,7 @@ class DatapoolManager:
         return
 
     def connect_tc(self, pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, is_server=False, options='',
-                   override_with_options=False):
+                   override_with_options=False, use_socket=None):
 
         # override variables that are set in the options string
         if bool(override_with_options):
@@ -466,32 +474,46 @@ class DatapoolManager:
             drop_rx = override.get('drop_rx', drop_rx)
             timeout = override.get('timeout', timeout)
             is_server = override.get('is_server', is_server)
+            use_socket = override.get('use_socket', use_socket)
             # options = override.get('options', options)
 
-        if is_server:
-            socketserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            socketserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            socketserver.settimeout(timeout)
-            socketserver.bind((host, port))
-            socketserver.listen()
-            try:
-                sockfd, addr = socketserver.accept()
-            except socket.timeout:
-                socketserver.close()
-                self.logger.error("Connection timeout, no client has connected to {}:{}".format(host, port))
-                return
+        if use_socket is not None:
+            if isinstance(use_socket, socket.socket):
+                sockfd = use_socket
+            elif isinstance(use_socket, str):
+                try:
+                    sockfd = self.connections[use_socket]['socket']
+                except KeyError:
+                    self.logger.error('No existing socket found for "{}"'.format(use_socket))
+                    raise KeyError('No existing socket found for "{}"'.format(use_socket))
+            else:
+                self.logger.error('use_socket must be of type str or socket')
+                raise TypeError('use_socket must be of type str or socket')
         else:
-            sockfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sockfd.settimeout(timeout)
+            if is_server:
+                socketserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                socketserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                socketserver.settimeout(timeout)
+                socketserver.bind((host, port))
+                socketserver.listen()
+                try:
+                    sockfd, addr = socketserver.accept()
+                except socket.timeout:
+                    socketserver.close()
+                    self.logger.error("Connection timeout, no client has connected to {}:{}".format(host, port))
+                    return
+            else:
+                sockfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sockfd.settimeout(timeout)
 
-            if pool_name in self.tc_connections:
-                self.logger.warning('Pool "{}" already has TC connection to {}!'.format(pool_name, self.tc_connections[pool_name]['socket'].getpeername()))
-                return
-            try:
-                sockfd.connect((host, port))
-            except ConnectionRefusedError:
-                self.logger.error("Connection to {}:{} refused".format(host, port))
-                return
+                if pool_name in self.tc_connections:
+                    self.logger.warning('Pool "{}" already has TC connection to {}!'.format(pool_name, self.tc_connections[pool_name]['socket'].getpeername()))
+                    return
+                try:
+                    sockfd.connect((host, port))
+                except ConnectionRefusedError:
+                    self.logger.error("Connection to {}:{} refused".format(host, port))
+                    return
 
         self.tc_sock = sockfd
         self.tc_name = pool_name
@@ -648,16 +670,17 @@ class DatapoolManager:
         # if not pool_name in self.state:
         #     start_new = True
 
-        new_session = self.session_factory_storage
+        new_session = self.session_factory_storage()
+        _tocnt = 0  # timeout counter
+        creation_time = round(time.time())
 
         # If no TC Pool has been started start new one
         if start_new:
             pool_row = DbTelemetryPool(
                 pool_name=pool_name,
-                modification_time=time.time(),
+                modification_time=creation_time,
                 protocol=protocol)
             new_session.add(pool_row)
-            # new_session.flush()
             new_session.commit()
             self.trashbytes[pool_name] = 0
             self.state[pool_name] = 1
@@ -706,6 +729,7 @@ class DatapoolManager:
         # set short timeout to commit last packet, in case no further one is received
         sockfd.settimeout(1.)
 
+        checkcrc = True if self.pecmode in ('warn', 'discard') else False
         pkt_size_stream = b''
         while self.connections[pool_name]['recording']:
             if sockfd.fileno() < 0:
@@ -771,29 +795,30 @@ class DatapoolManager:
                             break
                         buf += d
 
-                    while self.crc_check(buf):
-                        buf = buf[1:] + tail
-                        self.trashbytes[pool_name] += 1
-                        while len(buf) < 6:
-                            buf += sockfd.recv(6 - len(buf))
-                        pkt_len = struct.unpack('>4xH', buf[:6])[0] + 7
-                        if pkt_len > MAX_PKT_LEN:
-                            tail = b''
-                            continue
-                        while pkt_len > len(buf):
-                            buf += sockfd.recv(pkt_len - len(buf))
-                        if pkt_len < len(buf):
-                            tail = buf[pkt_len:]
-                            buf = buf[:pkt_len]
-                        else:
-                            tail = b''
+                    # if self.pecmode == 'discard':
+                    # process if wrong CRC?
+                    # while self.crc_check(buf):
+                    #     buf = buf[1:] + tail
+                    #     self.trashbytes[pool_name] += 1
+                    #     while len(buf) < 6:
+                    #         buf += sockfd.recv(6 - len(buf))
+                    #     pkt_len = struct.unpack('>4xH', buf[:6])[0] + 7
+                    #     if pkt_len > MAX_PKT_LEN:
+                    #         tail = b''
+                    #         continue
+                    #     while pkt_len > len(buf):
+                    #         buf += sockfd.recv(pkt_len - len(buf))
+                    #     if pkt_len < len(buf):
+                    #         tail = buf[pkt_len:]
+                    #         buf = buf[:pkt_len]
+                    #     else:
+                    #         tail = b''
+
                     pkt_size_stream = tail
 
-                # buf = sockfd.recv(self.pckt_size_max)
                 if not buf:
                     break
-                with self.lock:
-                    self.databuflen += len(buf)
+
                 if not drop_rx:
                     if pckt_filter:
                         for pkt in self.extract_pus(buf):
@@ -802,27 +827,47 @@ class DatapoolManager:
                                 self.filtered_pckts[pool_name].append(buf)
                             else:
                                 self.decode_tmdump_and_process_packets_internal(pkt, process_tm, pckt_decoded=tm,
-                                                                                checkcrc=False)
+                                                                                checkcrc=checkcrc)
                     else:
-                        self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=False)
+                        self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=checkcrc)
+
+                    _tocnt = 0
+
+                with self.lock:
+                    self.databuflen += len(buf)
+
             except socket.timeout as e:
-                self.logger.info('Socket timeout ({}:{})'.format(host, port))
+                # self.logger.debug('Socket timeout ({}:{})'.format(host, port))
+                # reconnect SQL session handle after x socket timeouts to avoid SQL timeout
+                _tocnt += 1
                 new_session.commit()
-                continue
+                if _tocnt > SOCK_TO_LIMIT:
+                    new_session.close()
+                    pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name,
+                                                                         DbTelemetryPool.modification_time == creation_time).first()
+                    self.logger.debug('SQL session reconnected, SOCK_SQL_TO_LIMIT reached ({})'.format(SOCK_TO_LIMIT))
+                    _tocnt = 0
+            except SQLOperationalError as e:
+                self.logger.warning(e)
+                new_session.close()
+                pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name,
+                                                                     DbTelemetryPool.modification_time == creation_time).first()
+                pkt_size_stream = buf + pkt_size_stream  # re-read buffer in next loop since DB insertion has failed
             except socket.error as e:
                 self.logger.error('Socket error ({}:{})'.format(host, port))
                 self.logger.exception(e)
-                # self.logger.error('ERROR: socket error')
-                self.connections[pool_name]['recording'] = False
                 break
             except struct.error as e:
                 self.logger.error('Lost connection to {}:{}'.format(host, port))
                 self.logger.exception(e)
-                self.connections[pool_name]['recording'] = False
                 break
-        # if self.state[pool_row.pool_name] % 10 != 0:
+            except Exception as e:
+                self.logger.exception(e)
+                break
+
         new_session.commit()
         new_session.close()
+        self.connections[pool_name]['recording'] = False
         self.logger.warning('Disconnected from ' + str(host) + ':' + str(port))
         sockfd.close()
 
@@ -929,7 +974,7 @@ class DatapoolManager:
                     buf = ack
 
                 # PUS, just read packets and discard them
-                else:
+                elif protocol.lower() == 'pus':
                     pkt_size_stream = sockfd.recv(6)
                     while len(pkt_size_stream) < 6:
                         data = sockfd.recv(1)
@@ -945,10 +990,14 @@ class DatapoolManager:
                             break
                         buf += d
 
+                # any other protocol, just read from socket and discard
+                else:
+                    buf = sockfd.recv(1024)
+
                 with self.lock:
-                    self.databuflen += len(buf)
+                    self.tc_databuflen_rx += len(buf)
             except socket.timeout:
-                self.logger.info('Socket timeout {}:{} [TC RX]'.format(host, port))
+                self.logger.debug('Socket timeout {}:{} [TC RX]'.format(host, port))
                 continue
             except socket.error:
                 self.logger.error('Socket error')
@@ -979,26 +1028,12 @@ class DatapoolManager:
         else:
             buf_to_send = buf
 
-        self.logger.debug('tc_send: pool_name = {}'.format(pool_name))
-        self.logger.debug('tc_send: buf = {}'.format(buf_to_send))
-
         if pool_name not in self.loaded_pools:
             self.logger.warning("Cannot add TC to {}. Pool not loaded.".format(pool_name))
             return
         # self.logger.debug('tc_send: tc_connections = {}'.format(self.tc_connections))
 
-        try:
-            self.tc_connections[pool_name]['socket'].send(buf_to_send)
-        except Exception as err:
-            self.logger.error('Failed to send packet of length {} to {} [{}].'.format(
-                len(buf_to_send), pool_name, self.tc_connections[pool_name]['socket'].getpeername()))
-            return
-
-        with self.lock:
-            self.tc_databuflen += len(buf_to_send)
-
-        new_session = self.session_factory_storage
-
+        new_session = self.session_factory_storage()
         pool_row = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
 
         # TC normally just take the information which pool it is from the first Row, But if a Pool is given with only
@@ -1022,6 +1057,19 @@ class DatapoolManager:
             self.trashbytes[pool_name] = 0
             self.state[pool_name] = 1
             self.last_commit_time = time.time()
+
+        try:
+            self.tc_connections[pool_name]['socket'].send(buf_to_send)
+        except Exception as err:
+            self.logger.error('Failed to send packet of length {} to {} [{}].'.format(
+                len(buf_to_send), pool_name, self.tc_connections[pool_name]['socket'].getpeername()))
+            return
+
+        self.logger.debug('tc_send: pool_name = {}'.format(pool_name))
+        self.logger.debug('tc_send: buf = {}'.format(buf_to_send))
+
+        with self.lock:
+            self.tc_databuflen += len(buf_to_send)
 
         def process_tm(tmd, tm_raw):
             tm = tmd[0]
@@ -1052,35 +1100,31 @@ class DatapoolManager:
             self.state[pool_row.pool_name] += 1
             new_session.commit()
 
-        self.decode_tmdump_and_process_packets_internal(buf, process_tm)
+        if self.tc_connections[pool_name]['protocol'].upper() in ('PUS', 'PLMSIM'):
+            checkcrc = True
+            self.decode_tmdump_and_process_packets_internal(buf, process_tm, checkcrc=checkcrc)
+
+        # if TC is not PUS, also handle it properly
+        elif self.tc_connections[pool_name]['protocol'].upper() == 'SPW':
+            buf = io.BytesIO(buf)
+            headers, pkts, _ = self.extract_spw(buf)
+            for header, pkt in zip(headers, pkts):
+                self.process_rmap(header, pkt, pool_name, pool_row=pool_row)
+        else:
+            self.logger.warning('Unknown TC protocol, cannot store {} in DB'.format(buf))
         new_session.close()
-        return
 
     def crc_check(self, pckt):
-        # return bool(self.crcfunc(pckt))
-        return bool(packet_config.puscrc(pckt))
+        return cfl.crc_check(pckt)
 
     def read_pus(self, data):
         """
         Read single PUS packet from buffer
 
-        @param data: has to be seekable
+        @param data: has to be peekable
         @return: single PUS packet as byte string or _None_
         """
-        pus_size = data.peek(10)
-
-        if len(pus_size) >= 6:
-            pus_size = pus_size[4:6]
-        elif 0 < len(pus_size) < 6:
-            start_pos = data.tell()
-            pus_size = data.read(6)[4:6]
-            data.seek(start_pos)
-        elif len(pus_size) == 0:
-            return
-
-        # packet size is header size (6) + pus size field + 1
-        pckt_size = int.from_bytes(pus_size, 'big') + 7
-        return data.read(pckt_size)
+        return cfl.read_pus(data)
 
     def extract_pus(self, data):
         """
@@ -1088,17 +1132,7 @@ class DatapoolManager:
         @param data:
         @return:
         """
-        pckts = []
-        if isinstance(data, bytes):
-            data = io.BufferedReader(io.BytesIO(data))
-
-        while True:
-            pckt = self.read_pus(data)
-            if pckt is not None:
-                pckts.append(pckt)
-            else:
-                break
-        return pckts
+        return cfl.extract_pus(data)
 
     def extract_pus_brute_search(self, data, filename=None):
         """
@@ -1107,79 +1141,25 @@ class DatapoolManager:
         @param filename:
         @return:
         """
-
-        pckts = []
-        if isinstance(data, bytes):
-            data = io.BufferedReader(io.BytesIO(data))
-        elif isinstance(data, io.BufferedReader):
-            pass
-        else:
-            raise TypeError('Cannot handle input of type {}'.format(type(data)))
-
-        while True:
-            pos = data.tell()
-            pckt = self.read_pus(data)
-            if pckt is not None:
-                if not self.crc_check(pckt):
-                    pckts.append(pckt)
-                else:
-                    data.seek(pos + 1)
-                    if filename is not None:
-                        self.trashbytes[filename] += 1
-            else:
-                break
-
-        return pckts
+        return cfl.extract_pus_brute_search(data, filename=filename, trashcnt=self.trashbytes)
 
     # @staticmethod
     def unpack_pus(self, pckt):
         """
         Decode PUS and return header parameters and data field
+
         :param pckt:
         :return:
         """
-        try:
-            tmtc = pckt[0] >> 4 & 1
-            dhead = pckt[0] >> 3 & 1
-
-            if tmtc == 0 and dhead == 1 and (len(pckt) >= TM_HEADER_LEN):
-                header = TMHeader()
-                header.bin[:] = pckt[:TM_HEADER_LEN]
-                data = pckt[TM_HEADER_LEN:-PEC_LEN]
-                crc = pckt[-PEC_LEN:]
-
-            elif tmtc == 1 and dhead == 1 and (len(pckt) >= TC_HEADER_LEN):
-                header = TCHeader()
-                header.bin[:] = pckt[:TC_HEADER_LEN]
-                data = pckt[TC_HEADER_LEN:-PEC_LEN]
-                crc = pckt[-PEC_LEN:]
-
-            else:
-                header = PHeader()
-                header.bin[:P_HEADER_LEN] = pckt[:P_HEADER_LEN]
-                data = pckt[P_HEADER_LEN:]
-                crc = None
-
-            head_pars = header.bits
-
-        except Exception as err:
-            self.logger.warning('Error unpacking PUS packet: {}\n{}'.format(pckt, err))
-            head_pars = None
-            data = None
-            crc = None
-
-        finally:
-            return head_pars, data, crc
+        return cfl.unpack_pus(pckt, logger=self.logger)
 
     def cuc_time_str(self, head):
-        try:
-            if head.PKT_TYPE == 0 and head.SEC_HEAD_FLAG == 1:
-                return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], self.tsync_flag[head.TIMESYNC])
-            else:
-                return ''
-        except Exception as err:
-            self.logger.info(err)
-            return ''
+        """
+
+        :param head:
+        :return:
+        """
+        return cfl.cuc_time_str(head, logger=self.logger)
 
     def decode_tmdump_and_process_packets(self, filename, processor, brute=False):
         buf = open(filename, 'rb').read()
@@ -1192,8 +1172,6 @@ class DatapoolManager:
             processor(pckt_decoded, buf)
             return
 
-        decode = self.unpack_pus
-
         if brute:
             pckts = self.extract_pus_brute_search(buf, filename=filename)
             checkcrc = False  # CRC already performed during brute_search
@@ -1201,26 +1179,27 @@ class DatapoolManager:
             pckts = self.extract_pus(buf)
 
         for pckt in pckts:
+            # this CRC only works for PUS packets
             if checkcrc:
-                if self.crc_check(pckt):
+                calc = cfl.crc(pckt)
+                if calc:
+                    chk = int.from_bytes(pckt[-PEC_LEN:], 'big')
                     if self.pecmode == 'warn':
                         if len(pckt) > 7:
-                            self.logger.info(
-                                'decode_tmdump_and_process_packets_internal: [CRC error]: packet with seq nr ' + str(
-                                    int(pckt[5:7].hex(), 16)) + '\n')
+                            self.logger.warning('[CRC error]: is {:0{plen}X}, calc {:0{plen}X} [{}...]'.format(chk, calc, pckt[:6].hex().upper(), plen=PEC_LEN * 2))
                         else:
-                            self.logger.info('INVALID packet -- too short' + '\n')
+                            self.logger.warning('INVALID packet -- too short: {}'.format(pckt.hex().upper()))
                     elif self.pecmode == 'discard':
                         if len(pckt) > 7:
-                            self.logger.info(
-                                '[CRC error]: packet with seq nr ' + str(int(pckt[5:7].hex(), 16)) + ' (discarded)\n')
+                            self.logger.warning('[CRC error]: is {:0{plen}X}, calc {:0{plen}X}'.format(chk, calc, plen=PEC_LEN*2))
+                            self.logger.warning('[CRC error]: packet discarded: {}'.format(pckt.hex().upper()))
                         else:
-                            self.logger.info('INVALID packet -- too short' + '\n')
+                            self.logger.warning('INVALID packet -- too short: {}'.format(pckt.hex().upper()))
                         continue
 
-            pckt_decoded = decode(pckt)
+            pckt_decoded = self.unpack_pus(pckt)
             if pckt_decoded == (None, None, None):
-                self.logger.warning('Could not interpret bytestream: {}. DISCARDING DATA'.format(pckt.hex()))
+                self.logger.warning('Could not interpret packet: {}. DISCARDING DATA'.format(pckt.hex().upper()))
                 continue
             elif isinstance(pckt_decoded[0]._b_base_, PHeader):
                 self.logger.info('Non-PUS packet received: {}'.format(pckt))
@@ -1239,7 +1218,6 @@ class DatapoolManager:
 
         if protocol == 'PUS':
             buf = buf.read()
-            decode = self.unpack_pus
             if brute:
                 pckts = self.extract_pus_brute_search(buf, filename=filename)
                 checkcrc = False  # CRC already performed during brute_search
@@ -1266,7 +1244,7 @@ class DatapoolManager:
                                 self.logger.info('INVALID packet -- too short' + '\n')
                             continue
 
-                pcktdicts.append(processor(decode(pckt), pckt))
+                pcktdicts.append(processor(self.unpack_pus(pckt), pckt))
                 pcktcount += 1
                 if pcktcount % bulk_insert_size == 0:
                     new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
@@ -1543,20 +1521,20 @@ class DatapoolManager:
     def socket_send_packed_data(self, packdata, poolname):
         cncsocket = self.tc_connections[poolname]['socket']
         cncsocket.send(packdata)
-        received = None
+        received = b''
         try:
             received = cncsocket.recv(MAX_PKT_LEN)
             # self.logger.info.write(logtf(self.tnow()) + ' ' + recv[6:].decode() + ' [CnC]\n')
-            self.logger.info(received.decode(errors='replace') + ' [CnC]')
+            self.logger.info(received.decode('utf-8', errors='replace') + ' [CnC]')
             # logfile.flush()
             # s.close()
             # self.counters[1804] += 1
         except socket.timeout:
-            self.logger.error('Got a timeout')
-            self.logger.exception(socket.timeout)
+            # self.logger.error('Got a timeout')
+            self.logger.error(socket.timeout)
 
         # Dbus does not like original data type
-        if received is not None:
+        if received:
             received = dbus.ByteArray(received)
 
         return received
@@ -1575,7 +1553,7 @@ class DatapoolManager:
                     trashbytes = 0
             else:
                 trashbytes = 0
-            return [trashbytes, tc_data_rate, data_rate]
+            return [trashbytes, tc_data_rate, data_rate, self.tc_databuflen_rx]
 
     def spw_receiver_del_old_pool(self, pool_name, try_delete=True, delete_abandoned=True):
         new_session = self.session_factory_storage
@@ -1653,7 +1631,6 @@ class DatapoolManager:
                     return
 
                 pid, header, buf, pkt_size_stream = self.read_spw_from_socket(sockfd, pkt_size_stream)
-
                 if buf is None and pkt_size_stream is not None:
                     self.trashbytes[pool_name] += 1
                     continue
@@ -1732,7 +1709,7 @@ class DatapoolManager:
                 header.bits.PKT_TYPE == 0 and header.bits.WRITE == 1):
             pktsize = hsize
         else:
-            pktsize = hsize + header.bits.DATA_LEN + RMAP_PEC_LEN
+            pktsize = hsize + header.bits.DATA_LEN + RMAP_PEC_LEN  # TODO: data CRC from FEEsim?
 
         while len(buf) < pktsize:
             d = sockfd.recv(pktsize - len(buf))
@@ -1745,10 +1722,15 @@ class DatapoolManager:
 
         return pid, header, buf, pkt_size_stream
 
-    def process_rmap(self, header, raw, pool_name, db_insert=True):
+    def process_rmap(self, header, raw, pool_name, pool_row=None, db_insert=True):
+        dbsession = self.session_factory_storage
         pkt = header.bits
+        if pool_row is not None:
+            pool_id = pool_row.iid
+        else:
+            pool_id = self.pool_rows[pool_name].iid
         newdbrow = RMapTelemetry(
-            pool_id=self.pool_rows[pool_name].iid,
+            pool_id=pool_id,
             idx=self.state[pool_name],
             cmd=pkt.PKT_TYPE,
             write=pkt.WRITE,
@@ -1765,11 +1747,12 @@ class DatapoolManager:
             self.state[pool_name] += 1
             return newdbrow
 
-        self.session_factory_storage.add(newdbrow)
+        dbsession.add(newdbrow)
         self.state[pool_name] += 1
+        self.logger.debug('feed: {}'.format(newdbrow.raw.hex()))
         now = time.time()
         if (now - self.last_commit_time) > self.commit_interval:
-            self.session_factory_storage.commit()
+            dbsession.commit()
             self.last_commit_time = now
 
     def process_feedata(self, header, raw, pool_name):
@@ -1807,7 +1790,7 @@ class DatapoolManager:
                 break
             tla, pid = pkt_size_stream[:2]
 
-            if (tla == self.TLA) and (pid in self.PROTOCOL_IDS):
+            if pid in self.PROTOCOL_IDS:
                 buf = pkt_size_stream
             else:
                 pkt_size_stream = pkt_size_stream[1:]
@@ -1849,7 +1832,7 @@ class DatapoolManager:
             while len(buf) < pktsize:
                 data = stream.read(pktsize - len(buf))
                 if not data:
-                    return pckts, pkt_size_stream
+                    return headers, pckts, pkt_size_stream
                 buf += data
 
             buf = buf[:pktsize]
@@ -2189,16 +2172,16 @@ class PUSDatapoolManagerGUI(Gtk.ApplicationWindow):
         # Popover creates the popup menu over the button and lets one use multiple buttons for the same one
         self.popover = Gtk.Popover()
         # Add the different Starting Options
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
-            start_button = Gtk.Button.new_with_label("Start " + name.capitalize() + '   ')
+            start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
-            vbox.pack_start(start_button, False, True, 10)
+            vbox.pack_start(start_button, False, True, 0)
 
         # Add the manage connections option
         conn_button = Gtk.Button.new_with_label('Communication')
         conn_button.connect("clicked", self.on_communication_dialog)
-        vbox.pack_start(conn_button, False, True, 10)
+        vbox.pack_start(conn_button, False, True, 0)
 
         # Add the option to see the Credits
         about_button = Gtk.Button.new_with_label('About')
@@ -2573,6 +2556,21 @@ def run():
     Gtk.main()
 
 
+def _start_new_pmgr(*args):
+    dialog = Gtk.MessageDialog()
+    dialog.add_buttons(Gtk.STOCK_NO, Gtk.ResponseType.NO, Gtk.STOCK_YES, Gtk.ResponseType.YES,)
+    dialog.set_title('Poolmanager')
+    dialog.set_markup('A poolmanager instance is already running. Start another one?')
+    response = dialog.run()
+
+    if response == Gtk.ResponseType.YES:
+        dialog.destroy()
+        return True
+    else:
+        dialog.destroy()
+        return False
+
+
 if __name__ == "__main__":
 
     # Important to tell Dbus that Gtk loop can be used before the first dbus command
@@ -2586,6 +2584,12 @@ if __name__ == "__main__":
     # Check all dbus connections to find all running poolmanagers
     for service in dbus.SessionBus().list_names():
         if service.startswith(cfg['ccs-dbus_names']['poolmanager']):
+
+            # ask if new pmgr should be started if one is already running
+            start_new = _start_new_pmgr()
+            if not start_new:
+                sys.exit()
+
             managers.append(service)
             break
 
@@ -2633,69 +2637,3 @@ if __name__ == "__main__":
         # If no poolmanager with given instance name is found start a new poolmanager
         if startnew:
             run()
-
-'''
-    # Check if Poolmanager is already running
-    if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
-        pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        gui = pmgr.Variables('gui_running')
-        running = True
-    else:
-        running = False
-    #try:
-    #    dbus_type = dbus.SessionBus()
-    #    Bus_Name = cfg.get('ccs-dbus_names', 'poolmanager')
-    #    dbus_type.get_object(Bus_Name, '/MessageListener')
-    #    running = True
-    #except:
-    #    running = False
-
-    # If argument --gui is given and if poolmanager is not running start manager with GUI
-    if not '--nogui' in sys.argv and not running:
-        #sys.argv.remove('--gui')
-        pm = PUSDatapoolManager()
-
-        # pm.connect_to(label='new tm', host='127.0.0.1', port=5570, kind='TM')
-        # pm.connect_to(label='new tc', host='127.0.0.1', port=5571, kind='TC')
-        #signal.signal(signal.SIGINT, signal.SIG_DFL)
-
-        Bus_Name = cfg.get('ccs-dbus_names', 'poolmanager')
-        #DBusGMainLoop(set_as_default=True)
-        DBus_Basic.MessageListener(pm, Bus_Name, *sys.argv)
-
-        pm.start_gui()
-
-        Gtk.main()
-
-    # If Manager is not running start it without a GUI
-    elif not running:
-        Bus_Name = cfg.get('ccs-dbus_names', 'poolmanager')
-        #DBusGMainLoop(set_as_default=True)
-        pv = PUSDatapoolManager()
-        DBus_Basic.MessageListener(pv, Bus_Name, *sys.argv)
-
-        Gtk.main()
-
-    # If Manager is running and argument --background is given do nothing and keep Poolmanager running without a GUI
-    # Do the same if a GUI is already running (prevents 2 GUIs)
-    elif running and gui:
-        #sys.argv.remove('--gui')
-        pm = PUSDatapoolManager()
-
-        # pm.connect_to(label='new tm', host='127.0.0.1', port=5570, kind='TM')
-        # pm.connect_to(label='new tc', host='127.0.0.1', port=5571, kind='TC')
-        #signal.signal(signal.SIGINT, signal.SIG_DFL)
-
-        Bus_Name = cfg.get('ccs-dbus_names', 'poolmanager')
-        #DBusGMainLoop(set_as_default=True)
-        DBus_Basic.MessageListener(pm, Bus_Name, *sys.argv)
-
-        pm.start_gui()
-
-        Gtk.main()
-
-    # If Manager is Running and nothing else is given open the GUI
-    else:
-        pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        pmgr.Functions('start_gui')
-'''

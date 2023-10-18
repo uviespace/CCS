@@ -33,7 +33,7 @@ def run():
         for fname in files_to_open:
             win.open_file(fname)
     else:
-        win.open_file(os.path.join(confignator.get_option('paths', 'ccs'), 'getting_started.py'))
+        win.open_file(os.path.join(confignator.get_option('paths', 'ccs'), 'scripts/connection_setup.py'))
 
     bus_name = cfg.get('ccs-dbus_names', 'editor')
     DBus_Basic.MessageListener(win, bus_name, *sys.argv)

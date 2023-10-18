@@ -1,0 +1,510 @@
+
+\usepackage{xintexpr, xinttools}
+
+\usepackage{xr-hyper} % load before hyperref
+\usepackage{hyperref}% check if ok with hyperlinks
+\hypersetup{colorlinks=true, linkcolor=uvie-blue}
+
+\usepackage{xifthen}
+\usepackage{pifont}
+\usepackage{adjustbox}	% \rot
+
+\usepackage{stringstrings}
+
+\usepackage{csvsimple}
+
+\newcommand{\requirements}{}
+\newcommand{\designs}{}
+\providecommand*\phantomsection{}
+
+\makeatletter
+
+\newcommand{\req}[1]{%
+	\textbf{R-#1}%
+	\phantomsection
+	\def\@currentlabel{R-#1}%
+	\label{req@#1}%
+  	\@ifundefined {req@#1} {%
+  		\global\@namedef{req@#1}{}%
+  		\g@addto@macro\requirements{{req@#1}}%
+	}{}%
+}
+
+\newcommand{\reqgoal}[1]{%
+	\textbf{G-#1}%
+	\phantomsection
+	\def\@currentlabel{G-#1}%
+	\label{req@#1}%
+	\@ifundefined {req@#1} {%
+		\global\@namedef{req@#1}{}%
+		\g@addto@macro\requirements{{req@#1}}%
+	}{}%
+}
+
+\newcommand{\meetsthisreq}[1]{% (renamed from \meetsreq above)
+  \@ifundefined {req@#1@ismetby} {%
+  \global\@namedef{req@#1@ismetby}{}%
+  }{}% this is called multiple times when creating a table, generate only one
+  \ref{REQ-req@#1}%
+  \expandafter\g@addto@macro\csname req@#1@ismetby\expandafter\endcsname 
+              \expandafter {\expandafter{\@currentdesign}}%
+}
+
+\newcommand{\meetsreq}[1]{% (handles comma separated list)
+  \xintListWithSep{, }{\xintApply{ \meetsthisreq}{\xintCSVtoList{#1}}}%
+}
+
+
+
+\newcommand{\designswithreq}[1]% 
+% The space before \ref below is intentional and will be swallowed by \xintApply
+% It is not mandatory however, the thing works without it too.
+{\csname #1@ismetby\endcsname}
+
+\newcommand{\designswithreqref}[1]% 
+% The space before \ref below is intentional and will be swallowed by \xintApply
+% It is not mandatory however, the thing works without it too.
+{\xintListWithSep{, }{\xintApply { \ref}{\csname #1@ismetby\endcsname }}}
+
+\newcommand{\newdesign}[1]{%
+  	\textbf{D-#1}%
+  	\phantomsection
+  	\def\@currentlabel{D-#1}%
+	\label{design@#1}%
+  	\@ifundefined {design@#1} {%
+  		\global\@namedef{design@#1}{}%
+		\gdef\@currentdesign{design@#1}%
+  	\g@addto@macro\designs{{design@#1}}%
+	}{}
+}
+
+
+\newcommand{\design}[5]{%
+	\rowcolors{1}{white}{white}%
+	\begin{tcolorbox}[enhanced, notitle, clip upper,%
+			  sharp corners, colframe = white, colback = white,%
+		tabularx={%
+						  p{0.15\columnwidth}%
+				>{\arraybackslash\raggedright}p{0.10\columnwidth}%
+				>{\arraybackslash}X%
+			}%
+		]%
+	%
+	\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+	\cellcolor{uvie-blue!75}\color{white}\newdesign{#1} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{Identifier} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{Function} \\%
+	& #2 & #3%
+
+	\\%
+	\vspace{-1em}%
+	\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}
+	\color{uvie-blue!75}\textbf{Purpose} &%
+	\multicolumn{2}{|>{\arraybackslash\raggedright}X}{#4}%
+
+	\ifthenelse{\isempty{#5}} {}{%
+		\\%
+		\vspace{-1em}%
+		\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}
+		\color{uvie-blue!75}\textbf{Comment} &%
+		\multicolumn{2}{|>{\arraybackslash}X}{#5}%
+	}%
+	\vspace{1em}
+	\end{tcolorbox}%
+}
+
+
+
+
+
+\newcommand{\requirement}[4]{%
+	\rowcolors{1}{white}{white}%
+	\begin{tcolorbox}[enhanced, notitle, clip upper,%
+			  sharp corners, colframe = white, colback = white,%
+		tabularx={%
+						  p{0.15\columnwidth}%
+				>{\arraybackslash\raggedright}p{0.15\columnwidth}%
+				>{\arraybackslash}X%
+			}%
+		]%
+	%
+	\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+	\cellcolor{uvie-blue!75}\color{white}\req{#1} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{Short Text} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-blue!50}\color{white}\textbf{Software Requirement} \\%
+	& #2 & #3%
+
+	\ifthenelse{\isempty{#4}} {}{%
+		\\%
+		\vspace{-1em}%
+		\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+		\color{uvie-blue!75}\textbf{Comment}&%
+		\multicolumn{2}{|>{\arraybackslash}X}{#4}%
+	}%
+	\vspace{1em}
+	\end{tcolorbox}%
+}
+
+
+
+\newcommand{\goal}[4]{%
+	\rowcolors{1}{white}{white}%
+	\begin{tcolorbox}[enhanced, notitle, clip upper,%
+			  sharp corners, colframe = white, colback = white,%
+		tabularx={%
+						  p{0.15\columnwidth}%
+				>{\arraybackslash}p{0.2\columnwidth}%
+				>{\arraybackslash}X%
+			}%
+		]%
+	%
+	\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+	\cellcolor{uvie-gray!75}\color{white}\reqgoal{#1} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-gray!50}\color{white}\textbf{Short Text} &%
+	\vspace{-.65\baselineskip}%
+	\cellcolor{uvie-gray!50}\color{white}\textbf{Software Requirement} \\%
+	& #2 & #3%
+	\ifthenelse{\isempty{#4}} {}{%
+		\\%
+		\vspace{-1em}%
+		\arrayrulecolor{uvie-gray!75}\renewcommand{\arraystretch}{1.2}
+		\color{uvie-gray!75}\textbf{Comment} &%
+		\multicolumn{2}{|>{\arraybackslash}X}{#4}%
+	}%
+	\vspace{1em}
+	\end{tcolorbox}%
+}
+
+
+\newcommand{\importRequirementsOld}[2]{%
+	
+	\csvstyle{myImportReqStyle}{
+		head to column names,
+		%separator=semicolon,
+		filter=\equal{\Cat}{#2}
+	}
+
+	\csvreader[myImportReqStyle]{#1}{}
+	 {
+		\rowcolors{1}{white}{white}%
+		\begin{tcolorbox}[enhanced, notitle, clip upper,%
+				  sharp corners, colframe = white, colback = white,%
+			tabularx={%
+							  p{0.15\columnwidth}%
+					>{\arraybackslash\raggedright}p{0.15\columnwidth}%
+					>{\arraybackslash}X%
+				}%
+			]%
+		%
+		\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+		\cellcolor{uvie-blue!75}\color{white}\req{\Cat-\N/\Type\Ver} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Short Text} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Software Requirement} \\%
+		& \ShortText & \Text%
+
+		\ifthenelse{\equal{\TopLevelReq}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Top Level}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{}%
+			\\%
+			\vspace{-1em}%
+			\color{uvie-blue!75}\textbf{Requirement}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\TopLevelReq}%
+		}%
+		\vspace{1em}
+
+		\ifthenelse{\equal{\Comment}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Comment}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\Comment}%
+		}%
+		\vspace{1em}
+		\end{tcolorbox}%
+	}
+}
+
+
+\newcommand{\importRequirements}[2]{%
+	
+	\csvstyle{myImportReqStyle}{
+		head to column names,
+		separator=semicolon,
+		respect none,
+		filter=\equal{\Cat}{#2}
+	}
+
+	\csvreader[myImportReqStyle]{#1}{}
+	 {
+		\rowcolors{1}{white}{white}%
+		\begin{tcolorbox}[enhanced, notitle, clip upper,%
+				  sharp corners, colframe = white, colback = white,%
+			tabularx={%
+							  p{0.15\columnwidth}%
+					>{\arraybackslash\raggedright}p{0.15\columnwidth}%
+					>{\arraybackslash}X%
+				}%
+			]%
+		%
+		\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+		\cellcolor{uvie-blue!75}\color{white}\req{\Cat-\N/\Type\Ver} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Short Text} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Software Requirement} \\%
+		& \ShortText & \Text%
+
+		\ifthenelse{\equal{\TopLevelReq}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Top Level}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{}%
+			\\%
+			\vspace{-1em}%
+			\color{uvie-blue!75}\textbf{Requirement}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\TopLevelReq}%
+		}%
+		\vspace{1em}
+
+		\ifthenelse{\equal{\Comment}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Comment}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\Comment}%
+		}%
+		\vspace{1em}
+		\end{tcolorbox}%
+	}
+}
+
+\begin{comment}
+\newcommand{\importEcssRequirements}[2]{%
+	
+	\csvreader[head to column names,filter=\equal{\Proc}{#2}]{#1}{}
+	 {
+		\rowcolors{1}{white}{white}%
+		\begin{tcolorbox}[enhanced, notitle, clip upper,%
+				  sharp corners, colframe = white, colback = white,%
+			tabularx={%
+							  p{0.15\columnwidth}%
+					>{\arraybackslash\raggedright}p{0.15\columnwidth}%
+					>{\arraybackslash}X%
+				}%
+			]%
+		%
+		\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+		\cellcolor{uvie-blue!50}\color{white}\textbf{ID} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Req. Title} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Requirement Text} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Ap.} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Output} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-blue!50}\color{white}\textbf{Remarks} \\%
+		& \ShortText & \Text \Comment%
+
+		\ifthenelse{\equal{\TopLevelReq}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Top Level}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{}%
+			\\%
+			\vspace{-1em}%
+			\color{uvie-blue!75}\textbf{Requirement}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\TopLevelReq}%
+		}%
+		\vspace{1em}
+
+		\ifthenelse{\equal{\Comment}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Comment}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\Comment}%
+		}%
+		\vspace{1em}
+		\end{tcolorbox}%
+	}
+}
+\end{comment}
+
+\newcommand{\importGoals}[2]{%
+	
+	\csvreader[head to column names,filter=\equal{\Cat}{#2}]{#1}{}
+	{
+		\rowcolors{1}{white}{white}%
+		\begin{tcolorbox}[enhanced, notitle, clip upper,%
+				  sharp corners, colframe = white, colback = white,%
+			tabularx={%
+							  p{0.15\columnwidth}%
+					>{\arraybackslash}p{0.2\columnwidth}%
+					>{\arraybackslash}X%
+				}%
+			]%
+		%
+		\vspace{-.65\baselineskip}	% uuuaaahhh..why? :(
+		\cellcolor{uvie-gray!75}\color{white}\reqgoal{#1} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-gray!50}\color{white}\textbf{Short Text} &%
+		\vspace{-.65\baselineskip}%
+		\cellcolor{uvie-gray!50}\color{white}\textbf{Software Requirement} \\%
+		& \ShortText & \Text \Comment%
+	
+		\ifthenelse{\equal{\Comment}{}} {}{%
+			\\%
+			\vspace{-1em}%
+			\arrayrulecolor{uvie-blue!75}\renewcommand{\arraystretch}{1.2}%
+			\color{uvie-blue!75}\textbf{Comment}&%
+			\multicolumn{2}{|>{\arraybackslash}X}{\Comment}%
+		}%
+		\vspace{1em}
+		\end{tcolorbox}%
+	}
+}
+
+
+\newcommand{\exportrequirements}{%
+\message{reqstart exportrequirements}
+\AtEndDocument{%
+	\newwrite\reqfile
+	\immediate\openout\reqfile=requirements.list
+	\immediate\write\reqfile{\string\renewcommand{\string\requirements}{\requirements}}
+	\immediate\closeout\reqfile
+}
+\message{reqend exportrequirements}
+}%
+
+
+\makeatletter
+
+
+\newcommand*\traceabilitymatrix{%
+%
+	\newcommand{\numitems}[1]{{\expandafter\xintLength\expandafter{##1}}}%
+	\newcommand*\OK{\ding{51}}%
+%
+	\newcounter{numdesigns}%
+	\setcounter{numdesigns}{\numitems{\designs}}%
+	\stepcounter{numdesigns}%
+%
+	\newcommand*\rot{\multicolumn{1}{R{90}{0em}}}%
+%
+	%\begin{table}[h]
+	\newcolumntype{C}{>{\centering\arraybackslash} m{0.2cm}}%
+	\newcolumntype{R}[2]{>{\adjustbox{angle=##1,lap=\width-(##2)}\bgroup}l<{\egroup}}%
+	\rowcolors{1}{uvie-gray!25}{white}%
+	\begin{longtable}{c*{\value{numdesigns}}CC} %+1 linespacing column
+	\xintFor* ##1 in \designs \do {%
+		&  \rot{\fontspec{MyriadPro}\fontsize{8}{9}\ref{##1}\,\,\normalfont}%
+	} \\%
+	\endhead
+	% it's hilariously inefficient, faster methods are welcome...
+	\xintFor* ##1 in \requirements \do {%
+	% TODO: recolor link if goal
+	%	\isnextbyte[q]{R}{\string\ref{##1}} \par
+	%	\if T\theresult moopp\hypersetup{filecolor=uvie-burgundy}\fi
+
+		\fontspec{MyriadPro}\fontsize{8}{9}\ref{REQ-##1}\normalfont %
+		\hypersetup{filecolor=uvie-blue}
+		\xintFor* ##2 in \designs \do {%
+			&%
+			\xintFor* ##3 in {\designswithreq{##1}} \do {%
+				\ifthenelse{\equal{##2}{##3}} {%
+					\cellcolor{uvie-blue!50}%
+					%\OK
+					\xintBreakFor%
+				}{}%
+			}%
+		}\\[0.1cm]%
+	}%
+	\end{longtable}%
+	%\end{table}%
+}%
+
+
+\usepackage{stringstrings}
+
+\def\rereadauxdesignlabels{
+	\newtoks\designlist%
+	\newread\zz%
+	\immediate\openin\zz=\jobname.aux%
+	\loop%
+	\ifeof\zz\else%
+	\read\zz to \tmp%
+	\expandafter\findlabeldesign\tmp\relax\findlabel%
+	\repeat%
+}
+
+
+\long\def\findlabeldesign#1#2\findlabel{%
+ \ifx\newlabel#1\designlist\expandafter{\the\designlist\showlabeldesign#2}\fi}
+
+
+%hyperref has 4 felds in each label could use them but don't here
+\def\showlabeldesign#1#2{%
+	%\begin{minipage}{\textwidth}%
+	\findwords[q]{\expandafter\string\detokenize{#1}}{design}%
+		\ifnum\theresult>0%
+		\par\noindent\ref{#1}\dotfill\pageref{#1}
+
+		\fi%
+	%\end{minipage}%
+}
+
+
+\def\rereadauxrequirementlabels{
+	\message{reqstart rereadauxrequirementlabels}
+	\newtoks\requirementlist
+	\newread\zz
+	\immediate\openin\zz=\jobname.aux
+	\loop
+	\ifeof\zz\else
+	\message{.}
+	\read\zz to \tmp
+	\expandafter\findlabelrequirement\tmp\relax\findlabel
+	\repeat
+	\message{reqend rereadauxrequirementlabels}
+}
+
+
+\long\def\findlabelrequirement#1#2\findlabel{%
+ \ifx\newlabel#1\requirementlist\expandafter{\the\requirementlist\showlabelrequirement#2}\fi}
+
+\newsavebox{\fminipagebox}
+\NewDocumentEnvironment{fminipage}{m O{\fboxsep}}
+ {\par\kern#2\noindent\begin{lrbox}{\fminipagebox}
+  \begin{minipage}{#1}\ignorespaces}
+ {\end{minipage}\end{lrbox}%
+  \makebox[#1]{%
+    \kern\dimexpr-\fboxsep-\fboxrule\relax
+    \fbox{\usebox{\fminipagebox}}%
+    \kern\dimexpr-\fboxsep-\fboxrule\relax
+  }\par\kern#2
+ }
+
+
+%hyperref has 4 felds in each label could use them but don't here
+\def\showlabelrequirement#1#2{%
+	\begin{minipage}{\textwidth}%
+	\findwords[q]{\expandafter\string\detokenize{#1}}{req}%
+		\ifnum\theresult>0%
+		\par\noindent\ref{#1}\dotfill\pageref{#1}%
+		\fi%
+	\end{minipage}%
+}

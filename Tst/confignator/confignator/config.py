@@ -415,19 +415,18 @@ class Config(configparser.ConfigParser):
         :param str option: option name (case insensitive)
         :param str value: value which should be saved
         """
-        # find the file where the option is from
+        # find the file where the section/option is from
         occurrence = []
         for file in self.files:
             tempcfg = get_config(file_path=file, load_basic_files=False, load_denoted_files=False, check_interpolation=False)
-            found = tempcfg.has_option(section=section, option=option)
+            found = tempcfg.has_section(section=section)
             if found is True:
                 occurrence.append(file)
         if len(occurrence) == 0:
-            self.logger.warning('No configuration files with the entry [{}[{}] found'.format(section, option))
-            # ToDo: should it be saved as a new section & option? In which file?
-            self.logger.critical('# ToDo: should it be saved as a new section & option?')
+            self.logger.error('No configuration files with section [{}] found. Saving not possible.'.format(section))
+            # self.logger.error('should it be saved as a new section & option?')
         elif len(occurrence) > 1:
-            self.logger.error('Found the entry [{}][{}] in more than one configuration file. Saving not possible. Occurrences in: {}'.format(section, option, occurrence))
+            self.logger.error('Found section [{}] in more than one configuration file. Saving not possible. Occurrences in: {}'.format(section, occurrence))
         elif len(occurrence) == 1:
             # load the config (only the specified file, no other)
             tempcfg = get_config(file_path=occurrence[0], load_basic_files=False, load_denoted_files=False, check_interpolation=False)

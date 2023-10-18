@@ -198,16 +198,27 @@ class TcTable(Gtk.Grid):
         self.scrollable_treelist = Gtk.ScrolledWindow()
         self.scrollable_treelist.set_vexpand(True)
         self.scrollable_treelist.set_hexpand(True)
-        self.attach(self.scrollable_treelist, 0, 1, 8, 10)
+        self.paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
+        self.paned.set_wide_handle(True)
+        self.paned.set_position(int(cfl.cfg['tst-preferences']['main-window-height']) * 0.6)
+        # self.attach(self.scrollable_treelist, 0, 1, 8, 10)
+        self.attach(self.paned, 0, 1, 8, 10)
 
+        self.grid = Gtk.Grid()
+        self.paned.add1(self.grid)
+        # self.paned.add1(self.scrollable_treelist)
+
+        self.grid.attach(self.scrollable_treelist, 0, 1, 8, 10)
         self.scrollable_treelist.add(self.treeview)
 
         self.command_entry = Gtk.Entry()
         self.command_entry.set_placeholder_text("<Command Variables>")
-        self.attach_next_to(self.command_entry, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 1)
+        self.command_entry.set_editable(False)
+        self.grid.attach_next_to(self.command_entry, self.scrollable_treelist, Gtk.PositionType.BOTTOM, 8, 1)
 
         self.variable_box = CommandDescriptionBox()
-        self.attach_next_to(self.variable_box, self.command_entry, Gtk.PositionType.BOTTOM, 8, 5)
+        # self.attach_next_to(self.variable_box, self.command_entry, Gtk.PositionType.BOTTOM, 8, 5)
+        self.paned.add2(self.variable_box)
 
         # Set up Drag and Drop
         self.treeview.drag_source_set(Gdk.ModifierType.BUTTON1_MASK, [], Gdk.DragAction.COPY)

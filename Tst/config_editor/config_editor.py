@@ -73,6 +73,8 @@ module_logger.setLevel(level=logging.WARNING)
 
 SHOW_MERGE_PAGE = confignator.get_bool_option('config-editor-general', 'show-merge-page')
 
+FILE_CHOOSER_OPTIONS = ['basic-cfg', 'docu', 'log-file', 'datapool-items']
+
 
 def create_console_handler(frmt=logging_format):
     """
@@ -612,10 +614,17 @@ class OptionLine:
         self.set_data()
 
         self.option_entry.connect('changed', self.on_entry_edited)
-        if section == 'paths':
+
+        # add file chooser buttons for selected options
+        if 'paths' in section and option not in FILE_CHOOSER_OPTIONS:
             self.btn_choose_dir = Gtk.Button.new_from_icon_name('document-open-symbolic', Gtk.IconSize.BUTTON)
             self.btn_choose_dir.set_tooltip_text('Choose a path')
-            self.btn_choose_dir.connect('clicked', self.on_choose_dir)
+            self.btn_choose_dir.connect('clicked', self.on_choose_dir, True)
+
+        elif option in FILE_CHOOSER_OPTIONS:
+            self.btn_choose_dir = Gtk.Button.new_from_icon_name('document-open-symbolic', Gtk.IconSize.BUTTON)
+            self.btn_choose_dir.set_tooltip_text('Choose a path')
+            self.btn_choose_dir.connect('clicked', self.on_choose_dir, False)
 
     def get_entry_text(self):
         """ Get the current text of the entry field """
@@ -644,12 +653,17 @@ class OptionLine:
         self.set_label_text()
         self.set_entry_text()
 
-    def on_choose_dir(self, button):
+    def on_choose_dir(self, button, choose_dir):
         """ Event when the button to open a FileChooserDialog was clicked """
-        dialog = Gtk.FileChooserDialog('Please choose a file',
-                                       None,
-                                       Gtk.FileChooserAction.SELECT_FOLDER,
-                                       (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        if choose_dir:
+            dialog = Gtk.FileChooserDialog('Please choose a directory', None,
+                                           Gtk.FileChooserAction.SELECT_FOLDER,
+                                           (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        else:
+            dialog = Gtk.FileChooserDialog('Please choose a file',
+                                           None, 0,
+                                           (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             path = dialog.get_filename()

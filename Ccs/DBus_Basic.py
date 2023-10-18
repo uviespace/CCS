@@ -124,6 +124,10 @@ class MessageListener(dbus.service.Object):
             result = method_to_call(*args, **kwargs)
         except Exception as e:
             result = str(e)
+
+        if result is None:
+            return
+
         result = self.python_to_dbus(result, user_console=user_console)
         return result
 
