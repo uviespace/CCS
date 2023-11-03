@@ -793,4 +793,5 @@ _S13_HEADER_FMT = S13_FMT_OBSID + S13_FMT_TIME + S13_FMT_FTIME + S13_FMT_COUNTER
 
 
 def s13_unpack_data_header(buf):
+    raise NotImplementedError
     return struct.unpack('>' + _S13_HEADER_FMT, buf[:struct.calcsize(_S13_HEADER_FMT)])

@@ -5507,6 +5507,7 @@ def add_tst_import_paths():
     sys.path.append(cfg.get('paths', 'tst') + '/sketch_desk')
     sys.path.append(cfg.get('paths', 'tst') + '/test_specs')
     sys.path.append(cfg.get('paths', 'tst') + '/testing_library')
+    sys.path.append(cfg.get('paths', 'tst') + '/testing_library/testlib')
     # insert this to import the tst view.py, not the one in .local folder
     sys.path.insert(0, cfg.get('paths', 'tst') + '/tst')
 
@@ -5688,10 +5689,15 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
             continue
         else:
             pkts = [a.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] for a in tm_132.filter(DbTelemetry.idx > i.idx, DbTelemetry.idx < j.idx)]
+
+            # check for padding bytes in last packet
+            datalen = int.from_bytes(j.raw[S13_DATALEN_PAR_OFFSET:S13_DATALEN_PAR_OFFSET + S13_DATALEN_PAR_SIZE], 'big')
+            lastpktdata = j.raw[S13_HEADER_LEN_TOTAL:S13_HEADER_LEN_TOTAL + datalen]
+
             if join:
-                ces[float(i.timestamp[:-1])] = i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] + b''.join(pkts) + j.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]
+                ces[float(i.timestamp[:-1])] = i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] + b''.join(pkts) + lastpktdata
             else:
-                ces[float(i.timestamp[:-1])] = [i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]] + [b''.join(pkts)] + [j.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]]
+                ces[float(i.timestamp[:-1])] = [i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]] + pkts + [lastpktdata]
             k += 2
 
         cnt += 1
@@ -5738,6 +5744,11 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
 
         try:
             obsid, ctime, ftime, ctr = s13_unpack_data_header(ldt_dict[buf])
+        except NotImplementedError:
+            obsid = int(datetime.datetime.utcnow().strftime('%j'))
+            ctime = int(buf)
+            ftime = 0
+            ctr = crc(ldt_dict[buf])
         except ValueError as err:
             logger.error('Incompatible definition of S13 data header.')
             raise err
@@ -6940,7 +6951,11 @@ try:
     SDU_PAR_LENGTH = _s13_info[0][-1]
     # length of PUS + source header in S13 packets (i.e. data to be removed when collecting S13)
     S13_HEADER_LEN_TOTAL = TM_HEADER_LEN + sum([p[-1] for p in _s13_info])
+    S13_DATALEN_PAR_OFFSET, S13_DATALEN_PAR_SIZE = TM_HEADER_LEN + sum([x[1] for x in _s13_info[:-1]]), _s13_info[-1][1]
 except (SQLOperationalError, NotImplementedError, IndexError):
     logger.warning('Could not get S13 info from MIB, using default values')
     SDU_PAR_LENGTH = 1
     S13_HEADER_LEN_TOTAL = 21
+    S13_DATALEN_PAR_OFFSET = 19
+    S13_DATALEN_PAR_SIZE = 2
+
