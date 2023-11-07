@@ -100,7 +100,7 @@ class PlotViewer(Gtk.Window):
             res = self.session_factory_storage.execute('SELECT * FROM tm_pool WHERE pool_name="{}"'.format(loaded_pool))
             try:
                 iid, filename, protocol, modtime = res.fetchall()[0]
-                self.loaded_pool = ActivePoolInfo(filename, modtime, filename, bool(not filename.count('/')))
+                self.loaded_pool = ActivePoolInfo(filename, modtime, os.path.basename(filename), bool(not filename.count('/')))
             except IndexError:
                 self.logger.error('Could not load pool {}'.format(loaded_pool))
         else:

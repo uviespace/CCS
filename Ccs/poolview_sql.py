@@ -3010,7 +3010,7 @@ class TMPoolView(Gtk.Window):
 
     def plot_parameters(self, widget=None, parameters=None, start_live=False):
 
-        cfl.start_plotter(pool_name=self.active_pool_info.pool_name)
+        cfl.start_plotter(pool_name=self.active_pool_info.filename)
 
     def start_recording(self, widget=None):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
