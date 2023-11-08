@@ -1,7 +1,7 @@
 import json
 import os.path
 from packaging import version
-import struct
+# import struct
 import threading
 import time
 
@@ -28,7 +28,7 @@ from matplotlib.backends.backend_gtk3 import NavigationToolbar2GTK3 as Navigatio
 import numpy as np
 
 from database.tm_db import DbTelemetryPool, DbTelemetry, scoped_session_maker
-from sqlalchemy.sql.expression import func
+# from sqlalchemy.sql.expression import func
 # from sqlalchemy.orm import load_only
 
 import importlib
@@ -57,13 +57,13 @@ ActivePoolInfo = NamedTuple(
 # fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
 #            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
 
-# pi1_length_in_bits = {8: 'B', 16: 'H'}
-
 
 class PlotViewer(Gtk.Window):
 
-    def __init__(self, loaded_pool=None, refresh_rate=1, parameters=None, start_live=False, **kwargs):
+    def __init__(self, loaded_pool, refresh_rate=1, parameters=None, start_live=False, **kwargs):
         Gtk.Window.__init__(self)
+
+        assert isinstance(loaded_pool, str)
 
         Notify.init('PlotViewer')
         self.set_default_size(900, 560)
@@ -96,15 +96,14 @@ class PlotViewer(Gtk.Window):
         self.session_factory_storage = scoped_session_maker('storage')
 
         # load specified pool
-        if loaded_pool is not None and isinstance(loaded_pool, str):
-            res = self.session_factory_storage.execute('SELECT * FROM tm_pool WHERE pool_name="{}"'.format(loaded_pool))
-            try:
-                iid, filename, protocol, modtime = res.fetchall()[0]
-                self.loaded_pool = ActivePoolInfo(filename, modtime, os.path.basename(filename), bool(not filename.count('/')))
-            except IndexError:
-                self.logger.error('Could not load pool {}'.format(loaded_pool))
-        else:
+        res = self.session_factory_storage.execute('SELECT * FROM tm_pool WHERE pool_name="{}"'.format(loaded_pool))
+        try:
+            iid, filename, protocol, modtime = res.fetchall()[0]
+            self.loaded_pool = ActivePoolInfo(filename, modtime, os.path.basename(filename), bool(not filename.count('/')))
+        except IndexError:
             self.loaded_pool = None
+            self.logger.error('Could not load pool {}'.format(loaded_pool))
+            raise NameError('Pool {} not found'.format(loaded_pool))
 
         box = Gtk.VBox()
         self.add(box)
@@ -146,39 +145,15 @@ class PlotViewer(Gtk.Window):
         self.live_plot_switch.set_active(start_live)
         self.show_all()
 
-        # self.pool_selector.set_active_iter(self.pool_selector_pools.get_iter(0))
-
-    def create_toolbar(self):  #, pool_info=None):
+    def create_toolbar(self):
         toolbar = Gtk.HBox()
 
-        # if pool_selector is not None:
-        #     pools = Gtk.ListStore(str)
-        #     # pools = pool_selector.get_model()
-        #     for pool_name in self.loaded_pools:
-        #         pools.append(pool_name)
-        #     self.pool_box.set_model(pools)
-        #     self.pool_box.set_active(pool_selector.get_active())
-        # else:
-        #     pools = Gtk.ListStore(str)
-        #     [pools.append([pool]) for pool in self.pool.keys()]
-        #     self.pool_box.set_model(pools)
+        self.pool_label = Gtk.Label(tooltip_text=self.loaded_pool.filename)
+        self.pool_label.set_markup('<span foreground=\"#656565\">{}</span>'.format(self.loaded_pool.pool_name))
 
-        self.pool_selector = Gtk.ComboBoxText(tooltip_text='Select Pool to Plot')
-        self.pool_selector_pools = Gtk.ListStore(str, int, str, bool)
+        toolbar.pack_start(self.pool_label, 0, 0, 10)
 
-        if self.loaded_pool is not None and isinstance(self.loaded_pool, ActivePoolInfo):
-            self.pool_selector_pools.append([*self.loaded_pool])
-
-        self.pool_selector.set_model(self.pool_selector_pools)
-        self.pool_selector.connect('changed', self.pool_changed)
-
-        toolbar.pack_start(self.pool_selector, 0, 0, 0)
-        #self.pool_changed(self.pool_selector, 'Select Pool')
-
-        #self.select_pool_button = Gtk.Button.new_with_label("Select Pool")
-        #self.select_pool_button.connect("clicked", self.select_pool)
-        #toolbar.pack_start(self.select_pool_button, 0, 0, 0)
-        #toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 0)
+        toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 0)
 
         self.filter_tl2 = Gtk.CheckButton(label='t<2', active=True)
         self.filter_tl2.set_tooltip_text("Plot datapoints with CUC time < 2")
@@ -208,19 +183,19 @@ class PlotViewer(Gtk.Window):
         # self.calibrate.connect("toggled", self._toggle_limits)
         toolbar.pack_start(self.calibrate, 0, 0, 0)
 
-        toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 0)
+        # toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 5)
 
-        max_data_label = Gtk.Label(label='#')
-        max_data_label.set_tooltip_text('Plot at most ~NMAX data points (0 for unlimited), between MIN and MAX packet indices.')
-        self.max_data = Gtk.Entry()
-        self.max_data.set_width_chars(6)
-        self.max_data.set_alignment(1)
-        self.max_data.set_placeholder_text('NMAX')
-        self.max_data.set_input_purpose(Gtk.InputPurpose.DIGITS)
+        # max_data_label = Gtk.Label(label='#')
+        # max_data_label.set_tooltip_text('Plot at most ~NMAX data points (0 for unlimited), between MIN and MAX packet indices.')
+        # self.max_data = Gtk.Entry()
+        # self.max_data.set_width_chars(6)
+        # self.max_data.set_alignment(1)
+        # self.max_data.set_placeholder_text('NMAX')
+        # self.max_data.set_input_purpose(Gtk.InputPurpose.DIGITS)
         # self.max_data.connect('activate', self._set_max_datapoints)
-        self.max_data.set_tooltip_text('At most ~NMAX data points plotted (0 for unlimited)')
-        toolbar.pack_start(max_data_label, 0, 0, 3)
-        toolbar.pack_start(self.max_data, 0, 0, 0)
+        # self.max_data.set_tooltip_text('At most ~NMAX data points plotted (0 for unlimited)')
+        # toolbar.pack_start(max_data_label, 0, 0, 3)
+        # toolbar.pack_start(self.max_data, 0, 0, 0)
 
         self.min_idx = Gtk.Entry()
         self.min_idx.set_width_chars(7)
@@ -236,8 +211,6 @@ class PlotViewer(Gtk.Window):
         self.max_idx.set_tooltip_text('Get parameters up to packet index')
         toolbar.pack_start(self.min_idx, 0, 0, 0)
         toolbar.pack_start(self.max_idx, 0, 0, 0)
-
-        toolbar.pack_start(Gtk.Separator.new(Gtk.Orientation.VERTICAL), 0, 0, 0)
 
         self.live_plot_switch = Gtk.Switch()
         self.live_plot_switch.set_tooltip_text('Toggle real time parameter plotting')
@@ -415,120 +388,6 @@ class PlotViewer(Gtk.Window):
 
         return parameter_model
 
-    def pool_changed(self, combobox, pool=False):
-        if pool:
-            model = self.pool_selector.get_model()
-            count = 0
-            while count < len(model):
-                found_pool = []
-                x = 0
-                while x < 4:
-                    found_pool.append(model.get_value(model.get_iter(count), x))  # Get the value
-                    x += 1
-
-                value = found_pool[2]
-
-                if self.loaded_pool and value == self.loaded_pool.pool_name:
-                    self.pool_selector.set_active_iter(model.get_iter(count))
-                    self.loaded_pool = ActivePoolInfo(found_pool[0], found_pool[1], found_pool[2], found_pool[3])
-                    break
-                count += 1
-
-        else:
-            value = self.pool_selector.get_active_text()
-            model = self.pool_selector.get_model()
-            count = 0
-            while count < len(model):
-                found_pool = []
-                x = 0
-                while x < 4:
-                    found_pool.append(model.get_value(model.get_iter(count), x))  # Get the value
-                    x += 1
-
-                if value == found_pool[2]:
-                    self.pool_selector.set_active_iter(model.get_iter(count))
-                    self.loaded_pool = ActivePoolInfo(found_pool[0], found_pool[1], found_pool[2], found_pool[3])
-                    break
-                count += 1
-        return
-
-    def update_pool_view(self):
-
-        # Specify which Pool should be used
-        # Or check between which Pools should be selected
-        all_pools = None
-        if cfl.is_open('poolmanager'):
-            # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            pmgr = cfl.get_module_handle('poolmanager', instance=cfl.communication['poolmanager'])
-            all_pools = pmgr.Dictionaries('loaded_pools')
-            # all_pools = cfl.Dictionaries(pmgr, 'loaded_pools')
-            #if not all_pools:
-            #    found_pools = None
-            #elif len(active_pool) == 1:
-                #active_pool = list(active_pool.values())
-                #loaded_pool = ActivePoolInfo(active_pool[0][0],active_pool[0][1],active_pool[0][2],active_pool[0][3])
-                #self.loaded_pool = loaded_pool
-            #else:
-            #    found_pools = list(all_pools.keys())
-
-        elif cfl.is_open('poolviewer'):
-            # pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
-            pv = cfl.get_module_handle('poolviewer', instance=cfl.communication['poolviewer'])
-            all_pools = pv.Variables('active_pool_info')
-            # all_pools = cfl.Variables(pv, 'active_pool_info')
-            #if all_pools:
-                #loaded_pool = ActivePoolInfo(active_pool[0],active_pool[1],active_pool[2],active_pool[3])
-            #    found_pools = all_pools[2]
-            #else:
-            #    found_pools = None
-        #else:
-        #    pass
-
-        model = self.pool_selector.get_model()
-
-        #model.clear()
-
-        # Check which pool are already in the plotter and which have to be added
-
-        if isinstance(all_pools, dict):
-            # Loop over all pools that are in manager
-            for pool_info in all_pools.values():
-                x = False   # If the pool is already in the plotter
-                count = 0
-                while count < len(model):   # Loop over all entries in the model to compare to pool
-                    i = 0
-                    found_pool = [] # Entry in the model (liststore)
-                    # Get the full entry, only one of the four values can be gotten at a time -> do 4 times
-                    while i < 4:
-                        found_pool.append(model.get_value(model.get_iter(count), i))  # Get the value
-                        i += 1
-                    if pool_info == tuple(found_pool):  # Check if pools match
-                        x = True    # If at least one entry matches to the pool it is not necessary to add
-                    count += 1
-                if not x:   # Add a pool if it is not already in the model (liststore)
-                    model.append([pool_info[0], pool_info[1], pool_info[2], pool_info[3]])
-
-        elif all_pools and all_pools[2]:
-            pool_info = all_pools
-            x = False  # If the pool is already in the plotter
-            count = 0
-            while count < len(model):  # Loop over all entries in the model to compare to pool
-                i = 0
-                found_pool = []  # Entry in the model (liststore)
-                # Get the full entry, only one of the four values can be gotten at a time -> do 4 times
-                while i < 4:
-                    found_pool.append(model.get_value(model.get_iter(count), i))  # Get the value
-                    i += 1
-                if pool_info == tuple(found_pool):  # Check if pools match
-                    x = True  # If at least one entry matches to the pool it is not necessary to add
-                count += 1
-            if not x:  # Add a pool if it is not already in the model (liststore)
-                model.append([pool_info[0], pool_info[1], pool_info[2], pool_info[3]])
-
-        #if len(model) == 2:
-        #    self.pool_changed(False, pool_info[2])
-        return True
-
     def add_user_parameter(self, widget, treeview):
         parameter_model = treeview.get_model()
 
@@ -617,6 +476,9 @@ class PlotViewer(Gtk.Window):
         # Add the different Starting Options
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
+            # don't provide "start plotter"
+            if name == 'plotter':
+                continue
             start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, False, True, 0)
@@ -654,7 +516,8 @@ class PlotViewer(Gtk.Window):
         return
 
     def get_active_pool_name(self):
-        return self.pool_selector.get_active_text()
+        # return self.pool_selector.get_active_text()
+        return self.loaded_pool.filename
 
     def sid_position_query(self, st, sst, apid, sid):
 
@@ -857,20 +720,26 @@ class PlotViewer(Gtk.Window):
 
     def set_plot_range(self, rows):
         try:
-            self.data_min_idx = int(self.min_idx.get_text())
+            new_min_idx = int(self.min_idx.get_text())
+            if new_min_idx != self.data_min_idx:
+                self.data_min_idx = new_min_idx
+                self._pkt_buffer = {}
             rows = rows.filter(DbTelemetry.idx >= self.data_min_idx)
         except (TypeError, ValueError):
             self.data_min_idx = None
         try:
-            self.data_max_idx = int(self.max_idx.get_text())
+            new_max_idx = int(self.max_idx.get_text())
+            if new_max_idx != self.data_max_idx:
+                self.data_max_idx = new_max_idx
+                self._pkt_buffer = {}
             rows = rows.filter(DbTelemetry.idx <= self.data_max_idx)
         except (TypeError, ValueError):
             self.data_max_idx = None
 
-        try:
-            self.max_datapoints = int(self.max_data.get_text())
-        except (TypeError, ValueError):
-            self.max_datapoints = 0
+        # try:
+        #     self.max_datapoints = int(self.max_data.get_text())
+        # except (TypeError, ValueError):
+        #     self.max_datapoints = 0
 
         return rows
 
@@ -930,7 +799,7 @@ class PlotViewer(Gtk.Window):
                      self.data_dict.values()])
         except ValueError:
             n = 0
-        self.max_data.set_tooltip_text('{} datapoints'.format(n))
+        # self.max_data.set_tooltip_text('{} datapoints'.format(n))
         return n
 
     def clear_parameter(self, widget):
@@ -1135,81 +1004,6 @@ class PlotViewer(Gtk.Window):
     def live_plot_off(self, widget, dummy):
         self.liveplot = False
 
-    def select_pool(self, widget=None, pool=None):
-        if not pool:
-            dialog = SelectPoolDialog(self.logger, self.loaded_pool, parent=self)
-
-            while True:
-                response = dialog.run()
-                if response == Gtk.ResponseType.OK:
-                    try:
-                        pool = dialog.selected_pool
-                        self.loaded_pool = pool
-                        self.pool_label.set_text(self.loaded_pool.pool_name)
-                        break
-                    except:
-                        pass
-
-                else:
-                    break
-
-            dialog.destroy()
-
-        else:
-            self.loaded_pool = pool
-            self.pool_label.set_text(self.loaded_pool.pool_name)
-
-        return
-
-    def get_prev_loaded_pools(self):
-        #if self.loaded_pool:
-        #    return
-        if cfl.is_open('poolviewer'):
-            # pv = cfl.dbus_connection('poolviewer', cfl.communication['poolviewer'])
-            pv = cfl.get_module_handle('poolviewer')
-            active_pool = cfl.Variables(pv, 'active_pool_info')
-            #active_pool = pv.Variables('active_pool_info')
-            if active_pool and active_pool[0]:
-                loaded_pool = ActivePoolInfo(active_pool[0],active_pool[1],active_pool[2],active_pool[3])
-                self.loaded_pool = loaded_pool
-            #else:
-            #    Notify.Notification.new('No Pool could be found! Please open one and specify it.').show()
-            #    print('No Pool could be found! Please open one and specify it.')
-            #    self.loaded_pool = None
-
-        elif cfl.is_open('poolmanager'):
-            # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            pmgr = cfl.get_module_handle('poolmanager')
-            active_pool = cfl.Dictionaries(pmgr, 'loaded_pools')
-            #active_pool = pmgr.Dictionaries('loaded_pools')
-            #if not active_pool:
-            #    Notify.Notification.new('No Pool could be found! Please open one and specify it.').show()
-            #    print('No Pool could be found! Please open one and specify it.')
-            #    self.loaded_pool = None
-            #elif len(active_pool) == 1:
-            if len(active_pool) == 1:
-                active_pool = list(active_pool.values())
-                loaded_pool = ActivePoolInfo(active_pool[0][0],active_pool[0][1],active_pool[0][2],active_pool[0][3])
-                self.loaded_pool = loaded_pool
-            #else:
-                #sys.exit('There is more than one pool available! Please specify which one should be used, by selecting it '
-                      #'in the Poolviewer')
-                #print('Could not determin which Pool should be used. Please specify the Pool')
-                #Notify.Notification.new('Could not determin which Pool should be used. Please specify the Pool').show()
-                #self.loaded_pool = None
-        #else:
-            #sys.exit('No pool could be found! Please open one and try again.')
-            #Notify.Notification.new('No Pool could be found! Please open one and specify it.').show()
-            #print('No Pool could be found! Please open one and specify it.')
-            #self.loaded_pool = None
-
-        if self.loaded_pool:
-            #self.update_pool_view()
-            self.pool_changed(self.pool_selector, pool=True) #self.loaded_pool)
-
-        #if self.loaded_pool:
-        #    self.select_pool(pool=self.loaded_pool)
-
     def quit_func(self, *args):
         # Try to tell terminal in the editor that the variable is not longer availabe
         for service in dbus.SessionBus().list_names():
@@ -1317,83 +1111,77 @@ class PlotViewer(Gtk.Window):
                                      " = dbus.SessionBus().get_object('" + str(My_Bus_Name) +
                                      "', '/MessageListener')")
 
-        # Get the prev loaded Pools form Viewer and Manager if none is given
-        self.update_pool_view()
-        self.get_prev_loaded_pools()
-        GLib.timeout_add_seconds(5, self.update_pool_view)
-        return
-
 
 # This class seems to be no longer needed
-class NavigationToolbarX(NavigationToolbar):
-
-    def __init__(self, *args, **kwargs):
-        super(NavigationToolbarX, self).__init__(*args, **kwargs)
-        self._ids_zoom = []
-
-    # override this function to avoid call to Gtk.main_iteration,
-    # which causes crash when multiple PlotViewer instances are running
-    def set_cursor(self, cursor):
-        # self.canvas.get_property("window").set_cursor(cursord[cursor])
-        self.canvas.set_cursor(cursor)
-
-    def release_zoom(self, event):
-        """the release mouse button callback in zoom to rect mode"""
-        for zoom_id in self._ids_zoom:
-            self.canvas.mpl_disconnect(zoom_id)
-        # self._ids_zoom = []
-
-        self.remove_rubberband()
-
-        if not self._xypress:
-            return
-
-        last_a = []
-
-        for cur_xypress in self._xypress:
-            x, y = event.x, event.y
-            lastx, lasty, a, ind, view = cur_xypress
-            # ignore singular clicks - 5 pixels is a threshold
-            # allows the user to "cancel" a zoom action
-            # by zooming by less than 5 pixels
-            if ((abs(x - lastx) < 5 and self._zoom_mode!="y") or
-                    (abs(y - lasty) < 5 and self._zoom_mode!="x")):
-                self._xypress = None
-                self.release(event)
-                self.draw()
-                return
-
-            # detect twinx,y axes and avoid double zooming
-            twinx, twiny = False, False
-            if last_a:
-                for la in last_a:
-                    if a.get_shared_x_axes().joined(a, la):
-                        twinx = True
-                    if a.get_shared_y_axes().joined(a, la):
-                        twiny = True
-            last_a.append(a)
-
-            if self._button_pressed == 1:
-                direction = 'in'
-            elif self._button_pressed == 3:
-                direction = 'out'
-            else:
-                continue
-
-            a._set_view_from_bbox((lastx, lasty, x, y), direction,
-                                  self._zoom_mode, twinx, twiny)
-
-        xlim, ylim = a.get_xlim(), a.get_ylim()
-        self.canvas.get_parent().get_parent().get_parent().reduce_datapoints(xlim, ylim)
-
-        self.draw()
-        self._xypress = None
-        self._button_pressed = None
-
-        self._zoom_mode = None
-
-        self.push_current()
-        self.release(event)
+# class NavigationToolbarX(NavigationToolbar):
+#
+#     def __init__(self, *args, **kwargs):
+#         super(NavigationToolbarX, self).__init__(*args, **kwargs)
+#         self._ids_zoom = []
+#
+#     # override this function to avoid call to Gtk.main_iteration,
+#     # which causes crash when multiple PlotViewer instances are running
+#     def set_cursor(self, cursor):
+#         # self.canvas.get_property("window").set_cursor(cursord[cursor])
+#         self.canvas.set_cursor(cursor)
+#
+#     def release_zoom(self, event):
+#         """the release mouse button callback in zoom to rect mode"""
+#         for zoom_id in self._ids_zoom:
+#             self.canvas.mpl_disconnect(zoom_id)
+#         # self._ids_zoom = []
+#
+#         self.remove_rubberband()
+#
+#         if not self._xypress:
+#             return
+#
+#         last_a = []
+#
+#         for cur_xypress in self._xypress:
+#             x, y = event.x, event.y
+#             lastx, lasty, a, ind, view = cur_xypress
+#             # ignore singular clicks - 5 pixels is a threshold
+#             # allows the user to "cancel" a zoom action
+#             # by zooming by less than 5 pixels
+#             if ((abs(x - lastx) < 5 and self._zoom_mode!="y") or
+#                     (abs(y - lasty) < 5 and self._zoom_mode!="x")):
+#                 self._xypress = None
+#                 self.release(event)
+#                 self.draw()
+#                 return
+#
+#             # detect twinx,y axes and avoid double zooming
+#             twinx, twiny = False, False
+#             if last_a:
+#                 for la in last_a:
+#                     if a.get_shared_x_axes().joined(a, la):
+#                         twinx = True
+#                     if a.get_shared_y_axes().joined(a, la):
+#                         twiny = True
+#             last_a.append(a)
+#
+#             if self._button_pressed == 1:
+#                 direction = 'in'
+#             elif self._button_pressed == 3:
+#                 direction = 'out'
+#             else:
+#                 continue
+#
+#             a._set_view_from_bbox((lastx, lasty, x, y), direction,
+#                                   self._zoom_mode, twinx, twiny)
+#
+#         xlim, ylim = a.get_xlim(), a.get_ylim()
+#         self.canvas.get_parent().get_parent().get_parent().reduce_datapoints(xlim, ylim)
+#
+#         self.draw()
+#         self._xypress = None
+#         self._button_pressed = None
+#
+#         self._zoom_mode = None
+#
+#         self.push_current()
+#         self.release(event)
 
 
 class DataWindow(Gtk.Window):
@@ -1409,113 +1197,24 @@ class DataWindow(Gtk.Window):
         sv.add(self.textview)
 
 
-class SelectPoolDialog(Gtk.Dialog):
-
-    def __init__(self, logger, pool_list, parent=None):
-        Gtk.Dialog.__init__(self, "Pool Selection", parent, 0)
-        self.add_buttons(Gtk.STOCK_OK, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
-
-        self.explain_label = Gtk.Label()
-        self.explain_label.set_text("Please select one of the shown pools to plot.")
-
-        self.set_border_width(5)
-
-        box = self.get_content_area()
-        ok_button = self.get_action_area().get_children()[0]
-
-        self.bytebox = Gtk.HBox()
-        self.pools = self.check_for_multiple_pools()
-
-        if self.pools is not None:
-            if len(self.pools) == 1:
-                self.make_buttons(self.pools[0])
-            else:
-                for pool in self.pools:
-                    self.make_buttons(pool)
-
-            self.label = Gtk.Label()
-            self.label.set_text("Your selection is: ")
-
-        else:
-            self.label = Gtk.Label()
-            self.label.set_text("No pools could be found")
-            ok_button.set_sensitive(False)
-
-        box.pack_start(self.explain_label, 0, 0, 0)
-        box.pack_start(self.bytebox, 0, 0, 0)
-        box.pack_end(self.label, 0, 0, 0)
-        box.set_spacing(10)
-        self.show_all()
-
-    def check_for_multiple_pools(self):
-        # Specify which Pool should be used
-        # Or check between which Pools should be selected
-
-        if cfl.is_open('poolmanager'):
-            # pmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            pmgr = cfl.get_module_handle('poolmanager')
-            self.all_pools = pmgr.Dictionaries('loaded_pools')
-            if not self.all_pools:
-                self.loaded_pool = None
-            #elif len(active_pool) == 1:
-                #active_pool = list(active_pool.values())
-                #loaded_pool = ActivePoolInfo(active_pool[0][0],active_pool[0][1],active_pool[0][2],active_pool[0][3])
-                #self.loaded_pool = loaded_pool
-            else:
-                self.loaded_pool = list(self.all_pools.keys())
-
-        elif cfl.is_open('poolviewer'):
-            # pv = cfl.dbus_connection('poolviewer', cfl.communication['poolmanager'])
-            pv = cfl.get_module_handle('poolviewer')
-            self.all_pools = pv.Variables('active_pool_info')
-            if self.all_pools:
-                #loaded_pool = ActivePoolInfo(active_pool[0],active_pool[1],active_pool[2],active_pool[3])
-                self.loaded_pool = self.all_pools[2]
-            else:
-                self.loaded_pool=None
-
-        else:
-            self.loaded_pool = None
-
-        return self.loaded_pool
-
-    def make_buttons(self, button_name):
-        button = Gtk.Button.new_with_label(button_name)
-        button._value = button_name
-        button.connect("clicked", self.got_selection)
-        self.bytebox.pack_start(button, True, True, 0)
-
-    def got_selection(self, button):
-        pool = button._value
-        if isinstance(self.all_pools, dict):
-            pool_info = self.all_pools[pool]
-            self.selected_pool = ActivePoolInfo(pool_info[0],pool_info[1],pool_info[2],pool_info[3])
-            self.label.set_text("Your selection is: "+str(self.selected_pool[2]))
-            return
-        elif self.all_pools:
-            pool_info = self.all_pools
-            self.selected_pool = ActivePoolInfo(pool_info[0],pool_info[1],pool_info[2],pool_info[3])
-            self.label.set_text("Your selection is: " + str(self.selected_pool[2]))
-            return
-        else:
-            return None
-
-
 if __name__ == "__main__":
+
     if len(sys.argv) > 1:
         pool = sys.argv[1]
     else:
-        pool = None
+        print('No pool name specified!')
+        raise TypeError('Must specify pool name')
 
     # Important to tell Dbus that Gtk loop can be used before the first dbus command
     DBusGMainLoop(set_as_default=True)
-    if pool:
-        win = PlotViewer(loaded_pool=pool)
-    else:
-        win = PlotViewer()
+
+    win = PlotViewer(pool)
+
     Bus_Name = cfg.get('ccs-dbus_names', 'plotter')
+
     # DBusGMainLoop(set_as_default=True)
     DBus_Basic.MessageListener(win, Bus_Name, *sys.argv)
+
     win.connect("delete-event", win.quit_func)
     win.show_all()
     Gtk.main()

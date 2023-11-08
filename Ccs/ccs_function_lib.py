@@ -280,20 +280,19 @@ def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
 
 # Start Parameter Plotter
 # Argumnet gives the possibility to run file in the console to see print comands
-def start_plotter(pool_name=None, console=False, **kwargs):
+def start_plotter(pool_name, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Plotter and executes it
     
+    :param pool_name:
     :param console: If False will be run in Console, otherwise will be run in separate Environment
     :return:
     """
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'plotter.py')
 
-    if pool_name is not None:
-        start_app(file_path, directory, pool_name, console=console, **kwargs)
-    else:
-        start_app(file_path, directory, console=console, **kwargs)
+    start_app(file_path, directory, pool_name, console=console, **kwargs)
+
 
 def start_tst(console=False, **kwargs):
     """
@@ -2175,7 +2174,6 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         sst = int(userpar['SST'])
         apid = int(userpar['APID'])
         sid = None if (('SID' not in userpar) or (userpar['SID'] is None)) else int(userpar['SID'])
-        # tmlist_filt = Tm_filter_st(tmlist, userpar['ST'], userpar['SST'], apid=userpar['APID'], sid=sid)[-last:] if tmfilter else tmlist[-last:]
         offby, ufmt = userpar['bytepos'], userpar['format']
         offbi = userpar['offbi'] if 'offbi' in userpar else 0
         descr, unit, name = param, None, None
@@ -5588,21 +5586,6 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
         #     pool_name = pname
 
     rows = get_pool_rows(pool_name, check_existence=True)
-
-    # if starttime is None:
-    #     starttime = 0
-
-    # if start is not None:
-    #     starttime = float(rows.filter(DbTelemetry.idx == start).first().timestamp[:-1])
-
-    # if endtime is None:
-    #     endtime = get_last_pckt_time(pool_name, string=False)
-
-    # if end is not None:
-    #     endtime = float(rows.filter(DbTelemetry.idx == end).first().timestamp[:-1])
-
-    # if starttime is None or endtime is None:
-    #     raise ValueError('Specify start(time) and end(time)!')
 
     ces = {}
     # faster method to collect already completed TM13 transfers
