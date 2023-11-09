@@ -775,7 +775,7 @@ class StepWidget(Gtk.EventBox):
         # self.lbl_box_verification.pack_start(self.btn_exec_verification, False, False, 0)
         # self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
         self.verification_scrolled_window = Gtk.ScrolledWindow()
-        # self.verification_scrolled_window.set_size_request(50, 100)
+        #self.verification_scrolled_window.set_size_request(50, 100)
         self.verification_view = GtkSource.View()
         self.verification_view.set_auto_indent(True)
         self.verification_view.set_show_line_numbers(True)

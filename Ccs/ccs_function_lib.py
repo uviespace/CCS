@@ -4266,6 +4266,23 @@ def _get_upload_service_info(tcname=None):
 
     return apid, memid_ref, fmt, endspares
 
+"""
+Test Function to get tm and tc from database tm
+"""
+def get_acute_tm_tc(description=None):
+
+    if description is None:
+        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
+                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
+    else:
+        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
+                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
+
+"""
+Test function ends
+"""
+
+
 
 def get_tc_list(ccf_descr=None):
     """
