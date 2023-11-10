@@ -81,7 +81,7 @@ def run(jfile, outfile, reportfunc=False, specfile=None):
         script += '\nreport.export()\n\n'
 
     if outfile[-1] == '/':  # If path is given not the actual filename
-        outfile = outfile + data['_name'] + '-TS' + '-'.join(data['_spec_version']) + '.py'
+        outfile = outfile + data['_name'] + '-TS-' + '-'.join(data['_spec_version']) + '.py'
 
     with open(outfile, 'w') as fd:
         fd.write(script)
@@ -90,7 +90,7 @@ def run(jfile, outfile, reportfunc=False, specfile=None):
 if __name__ == '__main__':
     json_file_path = sys.argv[1]
 
-    if len(sys.argv) > 1:  # If filename is given
+    if len(sys.argv) > 2:  # If filename is given
         outputfile = sys.argv[2]
     else:  # If no filename is given take the working directory path, filename is used from the json file
         outputfile = os.getcwd() + '/'

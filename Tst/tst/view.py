@@ -184,8 +184,10 @@ class Board(Gtk.Box):
         self.label_comment.set_text(_('Test comment:'))
         # Make the area where the real command is entered
         self.comment_scrolled_window = Gtk.ScrolledWindow()
+        self.comment_scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         # self.comment_scrolled_window.set_size_request(200, 100)
         self.test_meta_data_comment = Gtk.TextView.new()
+        self.test_meta_data_comment.set_wrap_mode(Gtk.WrapMode.WORD)
         Gtk.StyleContext.add_class(self.test_meta_data_comment.get_style_context(), 'text-view')
         self.comment_scrolled_window.add(self.test_meta_data_comment)
 

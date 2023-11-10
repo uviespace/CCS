@@ -477,7 +477,7 @@ class PlotViewer(Gtk.Window):
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
             # don't provide "start plotter"
-            if name == 'plotter':
+            if name in ['plotter', 'monitor']:
                 continue
             start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)

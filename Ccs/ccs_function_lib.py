@@ -28,6 +28,7 @@ from database.tm_db import scoped_session_maker, DbTelemetry, DbTelemetryPool, R
 from sqlalchemy.exc import OperationalError as SQLOperationalError
 from sqlalchemy.sql.expression import func
 
+from typing import NamedTuple
 from s2k_partypes import ptt, ptt_reverse, ptype_parameters, ptype_values
 import confignator
 import importlib
@@ -128,6 +129,14 @@ if cfg.has_section('ccs-user_defined_packets'):
     user_tm_decoders = {k: json.loads(cfg['ccs-user_defined_packets'][k]) for k in cfg['ccs-user_defined_packets']}
 else:
     user_tm_decoders = {}
+
+
+ActivePoolInfo = NamedTuple(
+    'ActivePoolInfo', [
+        ('filename', str),
+        ('modification_time', int),
+        ('pool_name', str),
+        ('live', bool)])
 
 
 def _reset_mib_caches():
@@ -259,7 +268,7 @@ def start_editor(*files, console=False, **kwargs):
 
 # Start Parameter Monitor
 # Argumnet gives the possibility to run file in the console to see print comands
-def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
+def start_monitor(pool_name, parameter_set=None, console=False, **kwargs):
     """
     Gets the path of the Startfile for the Monitor and executes it
     
@@ -270,12 +279,10 @@ def start_monitor(pool_name=None, parameter_set=None, console=False, **kwargs):
     directory = cfg.get('paths', 'ccs')
     file_path = os.path.join(directory, 'monitor.py')
 
-    if pool_name is not None and parameter_set is not None:
+    if parameter_set is not None:
         start_app(file_path, directory, pool_name, parameter_set, console=console, **kwargs)
-    elif pool_name is not None:
-        start_app(file_path, directory, pool_name, console=console, **kwargs)
     else:
-        start_app(file_path, directory, console=console, **kwargs)
+        start_app(file_path, directory, pool_name, console=console, **kwargs)
 
 
 # Start Parameter Plotter
@@ -5768,9 +5775,10 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     return filedict
 
 
+import threading
 class DbTools:
     """
-    SQL database management helpers
+    SQL database management tools
     """
 
     @staticmethod
@@ -5892,6 +5900,280 @@ class DbTools:
             return 1
         finally:
             new_session.close()
+
+    @staticmethod
+    def sql_insert_binary_dump(filename, brute=False, force_db_import=False, protocol='PUS', pecmode='warn', parent=None):
+
+        active_pool_info = ActivePoolInfo(
+            filename,
+            int(os.path.getmtime(filename)),
+            os.path.basename(filename),
+            False)
+
+        new_session = scoped_session_storage
+        pool_exists_in_db_already = new_session.query(
+            DbTelemetryPool
+        ).filter(
+            DbTelemetryPool.pool_name == active_pool_info.filename,
+            DbTelemetryPool.modification_time == active_pool_info.modification_time
+        ).count() > 0
+        if (not pool_exists_in_db_already) or force_db_import:
+            if force_db_import:
+                del_time = time.strftime('%s')
+                new_session.execute(
+                    'UPDATE tm_pool SET pool_name="---TO-BE-DELETED{}" WHERE tm_pool.pool_name="{}"'.format(
+                        del_time, filename))
+                new_session.commit()
+                new_session.close()
+                # delete obsolete rows
+                del_thread = threading.Thread(target=DbTools.delete_abandoned_rows, args=[del_time], name='delete_abandoned')
+                del_thread.daemon = True
+                del_thread.start()
+
+            logger.info("Data not in DB - must import...")
+            loadinfo = LoadInfo(parent=parent)
+            # loadinfo.spinner.start()
+            # loadinfo.show_all()
+            _loader_thread = threading.Thread(target=DbTools.import_dump_in_db,
+                                              args=[active_pool_info, loadinfo],
+                                              kwargs={'brute': brute, 'protocol': protocol, 'pecmode': pecmode})
+            _loader_thread.daemon = True
+            _loader_thread.start()
+
+            logger.info('Loaded Pool:' + str(filename))
+
+        new_session.close()
+
+        logger.info('Loaded Pool:' + str(filename))
+
+        return active_pool_info
+
+    @staticmethod
+    def import_dump_in_db(pool_info, loadinfo, brute=False, protocol='PUS', pecmode='warn'):
+        loadinfo.ok_button.set_sensitive(False)
+        loadinfo.spinner.start()
+        new_session = scoped_session_storage
+        new_session.query(
+            DbTelemetryPool
+        ).filter(
+            DbTelemetryPool.pool_name == pool_info.filename
+        ).delete()
+        new_session.flush()
+        newPoolRow = DbTelemetryPool(
+            pool_name=pool_info.filename,
+            modification_time=pool_info.modification_time,
+            protocol=protocol)
+        new_session.add(newPoolRow)
+        new_session.flush()  # DB assigns auto-increment field (primary key iid) used below
+
+        bulk_insert_size = 1000  # number of rows to transfer in one transaction
+        state = [1]
+        protocol_ids = SPW_PROTOCOL_IDS_R
+
+        def mkdict_spw(head, tm_raw):
+            pkt = head.bits
+
+            if protocol_ids[pkt.PROTOCOL_ID] == 'RMAP':
+                pcktdict = dict(pool_id=newPoolRow.iid,
+                                idx=state[0],
+                                cmd=pkt.PKT_TYPE,
+                                write=pkt.WRITE,
+                                verify=pkt.VERIFY,
+                                reply=pkt.REPLY,
+                                increment=pkt.INCREMENT,
+                                keystat=pkt.KEY if pkt.PKT_TYPE == 1 else pkt.STATUS,
+                                taid=pkt.TRANSACTION_ID,
+                                addr=pkt.ADDR if pkt.PKT_TYPE == 1 else None,
+                                datalen=pkt.DATA_LEN if hasattr(pkt, 'DATA_LEN') else 0,
+                                raw=tm_raw)
+
+            elif protocol_ids[pkt.PROTOCOL_ID] == 'FEEDATA':
+                pcktdict = dict(pool_id=newPoolRow.iid,
+                                idx=state[0],
+                                pktlen=pkt.DATA_LEN,
+                                type=head.comptype,
+                                framecnt=pkt.FRAME_CNT,
+                                seqcnt=pkt.SEQ_CNT,
+                                raw=tm_raw)
+
+            else:
+                return
+
+            state[0] += 1
+            if state[0] % bulk_insert_size == 0:
+                GLib.idle_add(loadinfo.log.set_text, "Loaded {:d} rows.".format(state[0], ))
+            return pcktdict
+
+        def mkdict_pus(tmd, tm_raw, truncate=True):
+            tm = tmd[0]
+
+            pcktdict = dict(pool_id=newPoolRow.iid,
+                            idx=state[0],
+                            is_tm=tm.PKT_TYPE,
+                            apid=tm.APID,
+                            seq=tm.PKT_SEQ_CNT,
+                            len_7=tm.PKT_LEN,
+                            stc=tm.SERV_TYPE,
+                            sst=tm.SERV_SUB_TYPE,
+                            destID=tm.DEST_ID if tm.PKT_TYPE == 0 else tm.SOURCE_ID,
+                            timestamp=cuc_time_str(tm),
+                            data=tmd[1][:MAX_PKT_LEN],
+                            raw=tm_raw[:MAX_PKT_LEN])
+
+            state[0] += 1
+            if state[0] % bulk_insert_size == 0:
+                GLib.idle_add(loadinfo.log.set_text, "Loaded {:d} rows.".format(state[0], ))
+            return pcktdict
+
+        if protocol == 'PUS':
+            mkdict = mkdict_pus
+        elif protocol == 'SPW':
+            mkdict = mkdict_spw
+        else:
+            new_session.rollback()
+            new_session.close()
+            logger.info("Protocol '{}' not supported".format(protocol))
+            loadinfo.log.set_text("Protocol '{}' not supported".format(protocol))
+            loadinfo.spinner.stop()
+            loadinfo.ok_button.set_sensitive(True)
+            return
+
+        loadinfo.log.set_text("Parsing file...")
+        DbTools.db_bulk_insert(pool_info.filename, mkdict, bulk_insert_size=bulk_insert_size, brute=brute,
+                               protocol=protocol, pecmode=pecmode)
+
+        # self.pool.decode_tmdump_and_process_packets(pool_info.filename, process_tm, brute=brute)
+        new_session.commit()
+        logger.info("Loaded %d rows." % (state[0] - 1))
+        loadinfo.log.set_text("Loaded %d rows." % (state[0] - 1))
+        loadinfo.spinner.stop()
+        loadinfo.ok_button.set_sensitive(True)
+        # Ignore Reply is allowed here, since the instance is passed along
+        # pv.Functions('_set_list_and_display_Glib_idle_add', self.active_pool_info, int(self.my_bus_name[-1]), ignore_reply=True)
+        # GLib.idle_add(self._set_pool_list_and_display)
+        new_session.close()
+
+    @staticmethod
+    def db_bulk_insert(filename, processor, bulk_insert_size=1000, brute=False, checkcrc=True, protocol='PUS', pecmode='warn'):
+
+        with open(filename, 'rb') as buf:
+
+            pcktcount = 0
+
+            new_session = scoped_session_storage
+            new_session.execute('set unique_checks=0,foreign_key_checks=0')
+
+            if protocol == 'PUS':
+                buf = buf.read()
+                if brute:
+                    pckts = extract_pus_brute_search(buf, filename=filename)
+                    checkcrc = False  # CRC already performed during brute_search
+
+                else:
+                    pckts = extract_pus(buf)
+
+                pcktdicts = []
+                for pckt in pckts:
+                    if checkcrc:
+                        if crc_check(pckt):
+                            if pecmode == 'warn':
+                                if len(pckt) > 7:
+                                    logger.info('db_bulk_insert: [CRC error]: packet with seq nr ' + str(
+                                        int(pckt[5:7].hex(), 16)) + '\n')
+                                else:
+                                    logger.info('INVALID packet -- too short' + '\n')
+                            elif pecmode == 'discard':
+                                if len(pckt) > 7:
+                                    logger.info(
+                                        '[CRC error]: packet with seq nr ' + str(
+                                            int(pckt[5:7].hex(), 16)) + ' (discarded)\n')
+                                else:
+                                    logger.info('INVALID packet -- too short' + '\n')
+                                continue
+
+                    pcktdicts.append(processor(unpack_pus(pckt), pckt))
+                    pcktcount += 1
+                    if pcktcount % bulk_insert_size == 0:
+                        new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
+                        # new_session.bulk_insert_mappings(DbTelemetry, pcktdicts)
+                        pcktdicts = []
+
+                new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
+
+            elif protocol == 'SPW':
+                headers, pckts, remainder = extract_spw(buf)
+
+                pcktdicts_rmap = []
+                pcktdicts_feedata = []
+
+                for head, pckt in zip(headers, pckts):
+
+                    if SPW_PROTOCOL_IDS_R[head.bits.PROTOCOL_ID] == 'RMAP':
+                        pcktdicts_rmap.append(processor(head, pckt))
+                    elif SPW_PROTOCOL_IDS_R[head.bits.PROTOCOL_ID] == 'FEEDATA':
+                        pcktdicts_feedata.append(processor(head, pckt))
+
+                    pcktcount += 1
+                    if pcktcount % bulk_insert_size == 0:
+                        if len(pcktdicts_rmap) > 0:
+                            new_session.execute(RMapTelemetry.__table__.insert(), pcktdicts_rmap)
+                            pcktdicts_rmap = []
+                        if len(pcktdicts_feedata) > 0:
+                            new_session.execute(FEEDataTelemetry.__table__.insert(), pcktdicts_feedata)
+                            pcktdicts_feedata = []
+
+                if len(pcktdicts_rmap) > 0:
+                    new_session.execute(RMapTelemetry.__table__.insert(), pcktdicts_rmap)
+                if len(pcktdicts_feedata) > 0:
+                    new_session.execute(FEEDataTelemetry.__table__.insert(), pcktdicts_feedata)
+
+            new_session.execute('set unique_checks=1, foreign_key_checks=1')
+            new_session.commit()
+            new_session.close()
+
+
+class LoadInfo(Gtk.Window):
+    def __init__(self, parent=None, title="DB Loader"):
+        Gtk.Window.__init__(self)
+
+        if title is None:
+            self.set_title('Loading data to pool...')
+        else:
+            self.set_title(title)
+
+        self.pmgr = parent
+
+        grid = Gtk.VBox()
+        # pixbuf = Gtk.gdk.pixbuf_new_from_file('pixmap/Icon_Space_weiß_en.png')
+        # pixbuf = pixbuf.scale_simple(100, 100, Gtk.gdk.INTERP_BILINEAR)
+        # logo = Gtk.image_new_from_pixbuf(pixbuf)
+        logo = Gtk.Image.new_from_file('pixmap/ccs_logo_2.svg')
+
+        self.spinner = Gtk.Spinner()
+        self.spinner.set_size_request(48, 48)
+        # self.spinner.start()
+        self.log = Gtk.Label()
+        self.ok_button = Gtk.Button.new_with_label('OK')
+        self.ok_button.connect('clicked', self.destroy_window)
+
+        grid.pack_start(logo, 1, 1, 0)
+        grid.pack_start(self.spinner, 1, 1, 0)
+        grid.pack_start(self.log, 1, 1, 0)
+        grid.pack_start(self.ok_button, 1, 1, 0)
+        grid.set_spacing(2)
+
+        self.add(grid)
+
+        self.show_all()
+
+    def destroy_window(self, widget, *args):
+        # if is_open('poolviewer', communication['poolviewer']):
+        #     pv = dbus_connection('poolviewer', communication['poolviewer'])
+        #     pv.Functions('small_refresh_function')
+        try:
+            self.destroy()
+        except Exception as err:
+            print(err)
 
 
 class TestReport:
