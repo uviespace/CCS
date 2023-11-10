@@ -1960,7 +1960,7 @@ class TMPoolView(Gtk.Window):
         for pool in model:
             if pool[3] == filename:
                 self.logger.info('Pool {} already loaded'.format(filename))
-                return True
+                return pool
         return False
 
     def update_columns(self):
@@ -2795,13 +2795,48 @@ class TMPoolView(Gtk.Window):
             dialog.destroy()
 
         if no_duplicates and (not force_db_import):
-            if self._check_pool_is_loaded(filename):
+            loadeditem = self._check_pool_is_loaded(filename)
+            if loadeditem:
+                self.pool_selector.set_active_iter(loadeditem.iter)
                 return
 
-        new_pool = cfl.DbTools.sql_insert_binary_dump(filename, brute=brute, force_db_import=force_db_import,
-                                                      protocol=protocol, pecmode='warn', parent=self)
+        new_pool, loader_thread = cfl.DbTools.sql_insert_binary_dump(filename, brute=brute, force_db_import=force_db_import,
+                                                                     protocol=protocol, pecmode='warn', parent=self)
 
         self._set_pool_list_and_display(new_pool)
+
+        if loader_thread is not None:
+            checkloader_thread = threading.Thread(target=self._db_loading_checker, args=[new_pool, loader_thread])
+            checkloader_thread.daemon = True
+            checkloader_thread.start()
+
+    def _db_loading_checker(self, pool_info, thread):
+
+        try:
+            model = self.pool_selector.get_model()
+            for pool in model:
+                if pool[3] == pool_info.filename:
+                    pool[1] = '[LOAD]'
+
+            while thread.is_alive():
+                time.sleep(1)
+
+            model = self.pool_selector.get_model()
+
+            for pool in model:
+                if pool[3] == pool_info.filename:
+                    pool[1] = None
+                    break
+
+            if self.pool_selector.get_active_iter() == pool.iter:
+                self.select_pool(self.pool_selector, pool_info)
+
+        except Exception as err:
+            self.logger.error(err)
+            model = self.pool_selector.get_model()
+            for pool in model:
+                if pool[3] == pool_info.filename:
+                    pool[1] = 'ERR'
 
     def pool_loader_dialog_buttons(self):
         '''
@@ -3081,10 +3116,10 @@ class TMPoolView(Gtk.Window):
         if poolmgr:
             poolmgr.Functions('disconnect', pool_name)
 
-        iter = self.pool_selector.get_active_iter()
+        itr = self.pool_selector.get_active_iter()
         mod = self.pool_selector.get_model()
         if mod is not None:
-            mod[iter][1] = self.live_signal[self.active_pool_info.live]
+            mod[itr][1] = self.live_signal[self.active_pool_info.live]
             self.stop_butt.set_sensitive(False)
 
         return

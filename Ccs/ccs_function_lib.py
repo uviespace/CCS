@@ -5911,14 +5911,12 @@ class DbTools:
             False)
 
         new_session = scoped_session_storage
-        pool_exists_in_db_already = new_session.query(
-            DbTelemetryPool
-        ).filter(
-            DbTelemetryPool.pool_name == active_pool_info.filename,
-            DbTelemetryPool.modification_time == active_pool_info.modification_time
-        ).count() > 0
+        filename_in_pool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == active_pool_info.filename)
+
+        pool_exists_in_db_already = filename_in_pool.filter(DbTelemetryPool.modification_time == active_pool_info.modification_time).count() > 0
+
         if (not pool_exists_in_db_already) or force_db_import:
-            if force_db_import:
+            if force_db_import or filename_in_pool.count():
                 del_time = time.strftime('%s')
                 new_session.execute(
                     'UPDATE tm_pool SET pool_name="---TO-BE-DELETED{}" WHERE tm_pool.pool_name="{}"'.format(
@@ -5940,13 +5938,16 @@ class DbTools:
             _loader_thread.daemon = True
             _loader_thread.start()
 
-            logger.info('Loaded Pool:' + str(filename))
+            logger.info('Loading Pool:' + str(filename))
+
+        else:
+            _loader_thread = None
 
         new_session.close()
 
-        logger.info('Loaded Pool:' + str(filename))
+        # logger.info('Loaded Pool:' + str(filename))
 
-        return active_pool_info
+        return active_pool_info, _loader_thread
 
     @staticmethod
     def import_dump_in_db(pool_info, loadinfo, brute=False, protocol='PUS', pecmode='warn'):
@@ -6052,6 +6053,7 @@ class DbTools:
         # pv.Functions('_set_list_and_display_Glib_idle_add', self.active_pool_info, int(self.my_bus_name[-1]), ignore_reply=True)
         # GLib.idle_add(self._set_pool_list_and_display)
         new_session.close()
+        logger.info('Loaded Pool:' + str(pool_info.filename))
 
     @staticmethod
     def db_bulk_insert(filename, processor, bulk_insert_size=1000, brute=False, checkcrc=True, protocol='PUS', pecmode='warn'):
@@ -6134,20 +6136,12 @@ class DbTools:
 
 class LoadInfo(Gtk.Window):
     def __init__(self, parent=None, title="DB Loader"):
-        Gtk.Window.__init__(self)
+        Gtk.Window.__init__(self, transient_for=parent, destroy_with_parent=True)
 
-        if title is None:
-            self.set_title('Loading data to pool...')
-        else:
-            self.set_title(title)
-
-        self.pmgr = parent
+        self.set_title(title)
 
         grid = Gtk.VBox()
-        # pixbuf = Gtk.gdk.pixbuf_new_from_file('pixmap/Icon_Space_weiß_en.png')
-        # pixbuf = pixbuf.scale_simple(100, 100, Gtk.gdk.INTERP_BILINEAR)
-        # logo = Gtk.image_new_from_pixbuf(pixbuf)
-        logo = Gtk.Image.new_from_file('pixmap/ccs_logo_2.svg')
+        logo = Gtk.Image.new_from_file(os.path.join(cfg.get('paths', 'ccs'), 'pixmap/ccs_logo_2.svg'))
 
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(48, 48)
@@ -6167,9 +6161,6 @@ class LoadInfo(Gtk.Window):
         self.show_all()
 
     def destroy_window(self, widget, *args):
-        # if is_open('poolviewer', communication['poolviewer']):
-        #     pv = dbus_connection('poolviewer', communication['poolviewer'])
-        #     pv.Functions('small_refresh_function')
         try:
             self.destroy()
         except Exception as err:
