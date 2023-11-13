@@ -4,6 +4,7 @@
 General purpose socket communication utilities
 
 """
+import io
 import queue
 import select
 import socket
@@ -191,6 +192,20 @@ class Connector:
         self.receiver.stop()
         self.receiver = None
 
+    @property
+    def recvd_data(self):
+        if self.receiver is None:
+            return
+
+        return self.receiver.recvd_data_buf.queue
+
+    @property
+    def proc_data(self):
+        if self.receiver is None:
+            return
+
+        return self.receiver.proc_data
+
 
 class Receiver:
     """
@@ -287,6 +302,9 @@ class Receiver:
                             self.proc_data_fd.write(procdata)
                         else:
                             self.proc_data_fd.write(str(procdata))
+                    except io.UnsupportedOperation as err:
+                        print(err)
+                        break
                     except Exception as err:
                         self.proc_data_fd.write('# {} #\n'.format(err))
                         continue
@@ -300,7 +318,8 @@ class Receiver:
                 self._isrunning = False
 
         print('Processing stopped')
-        self.proc_data_fd.close()
+        if self.proc_data_fd is not None:
+            self.proc_data_fd.close()
 
 
 def _msgdecoder(msg, fmt, sep=''):
