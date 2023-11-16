@@ -5524,6 +5524,7 @@ def add_tst_import_paths():
     sys.path.append(cfg.get('paths', 'tst') + '/sketch_desk')
     sys.path.append(cfg.get('paths', 'tst') + '/test_specs')
     sys.path.append(cfg.get('paths', 'tst') + '/testing_library')
+    sys.path.append(cfg.get('paths', 'tst') + '/testing_library/testlib')
     # insert this to import the tst view.py, not the one in .local folder
     sys.path.insert(0, cfg.get('paths', 'tst') + '/tst')
 
