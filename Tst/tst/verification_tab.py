@@ -10,7 +10,7 @@ import confignator
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
 sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
-sys.path.append('/home/sebastian/CCS/Tst/testing_library/testlib')  # notwendig damit tm als Modul erkannt wird
+# sys.path.append('/home/sebastian/CCS/Tst/testing_library/testlib')  # notwendig damit tm als Modul erkannt wird
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 

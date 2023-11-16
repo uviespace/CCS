@@ -8,6 +8,8 @@ from gi.repository import Gtk, Gdk, Gio, GLib
 import sys
 import confignator
 
+sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
+
 cfg = confignator.get_config()
 sys.path.append(cfg.get('paths', 'ccs'))
 
@@ -1299,7 +1301,7 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None):
         super(Save_to_File_Dialog, self).__init__(title='Please choose a Folder to save the Test Run',
                                        parent=parent,
-                                       action=Gtk.FileChooserAction.OPEN_FOLDER)
+                                       action=Gtk.FileChooserAction.SELECT_FOLDER)
 
         self.win = parent
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)

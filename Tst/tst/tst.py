@@ -1065,10 +1065,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
             path_test_specs = cfg.get(section='tst-paths', option='tst_products')
             path_test_runs = cfg.get(section='tst-logging', option='test_run')
 
-            json_file_path = os.path.join(path_test_specs, current_file_name)
+            json_file_path = current_instance.filename
             paths['json_file_path'] = json_file_path
 
-            name = generator.strip_file_extension(current_file_name)
+            name = current_instance.test_meta_data_name.get_text()
+            name = generator.create_file_name(name)
+
             cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
             paths['cmd_log_file_path'] = cmd_log_file_path
 
