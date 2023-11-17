@@ -55,7 +55,7 @@ def connect_to_editor(logger=module_logger):
 def connect_to_tst(logger=module_logger):
     try:
         bus_name = confignator.get_option('dbus_names', 'tst')
-        obj_path = '/smile/egse/tst/editor/window/1'
+        obj_path = '/' + bus_name.replace('.', '/') + '/window/1'
 
         bus = dbus.SessionBus()
         obj = bus.get_object(bus_name=bus_name, object_path=obj_path)
@@ -66,6 +66,7 @@ def connect_to_tst(logger=module_logger):
             print(item)
         print('closing the current page in Tst')
         interface_actions.Activate(actions[0], [], [])
+        return interface_actions
     except dbus.exceptions.DBusException as dbe:
         logger.exception(dbe)
 

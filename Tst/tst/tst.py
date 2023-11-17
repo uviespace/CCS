@@ -53,7 +53,7 @@ file_hdlr = toolbox.create_file_handler(file=log_file)
 logger.addHandler(hdlr=file_hdlr)
 
 
-VERSION = '0.10'
+VERSION = '0.11'
 
 
 class TstApp(Gtk.Application):
@@ -114,13 +114,13 @@ class TstApp(Gtk.Application):
         action.connect("activate", self._on_start_poolmanager)
         self.add_action(action)
 
-        action = Gio.SimpleAction.new('start_plotter', None)
-        action.connect("activate", self._on_start_plotter)
-        self.add_action(action)
-
-        action = Gio.SimpleAction.new('start_monitor', None)
-        action.connect("activate", self._on_start_monitor)
-        self.add_action(action)
+        # action = Gio.SimpleAction.new('start_plotter', None)
+        # action.connect("activate", self._on_start_plotter)
+        # self.add_action(action)
+        #
+        # action = Gio.SimpleAction.new('start_monitor', None)
+        # action.connect("activate", self._on_start_monitor)
+        # self.add_action(action)
 
         action = Gio.SimpleAction.new('start_config_editor', None)
         action.connect("activate", self._on_start_config_editor)
@@ -237,6 +237,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
         action = Gio.SimpleAction.new('about_us', None)
         action.connect('activate', self.on_about)
+        self.add_action(action)
+
+        action = Gio.SimpleAction.new('open-test-spec', GLib.VariantType('s'))
+        action.connect('activate', self.load_test_spec)
         self.add_action(action)
 
         self.create_make_menu()
@@ -616,23 +620,25 @@ class TstAppWindow(Gtk.ApplicationWindow):
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
             cfg.save_option_to_file('tst-history', 'last-folder', os.path.dirname(file_selected))
-            try:
-                json_type = True
-                data_from_file = file_management.open_file(file_name=file_selected)
-                filename = file_selected
-            except json.decoder.JSONDecodeError:
-                # data_from_file = file_management.from_json(spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False))
-                data_from_file = spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False)
-                filename = file_selected.replace('.' + file_selected.split('.')[-1], '.json')
-                json_type = False
-                if os.path.exists(filename):
-                    self.existing_json_warn_dialog(filename)
 
-            if data_from_file is not None:
-                self.on_open_create_tab(data_from_file, filename, json_type)
+            self.load_test_spec(file_selected)
 
         dialog.destroy()
-        return
+
+    def load_test_spec(self, json_path):
+        try:
+            json_type = True
+            data_from_file = file_management.open_file(file_name=json_path)
+            filename = json_path
+        except json.decoder.JSONDecodeError:
+            data_from_file = spec_to_json.run(specfile=json_path, gen_cmd=True, save_json=False)
+            filename = json_path.replace('.' + json_path.split('.')[-1], '.json')
+            json_type = False
+            if os.path.exists(filename):
+                self.existing_json_warn_dialog(filename)
+
+        if data_from_file is not None:
+            self.on_open_create_tab(data_from_file, filename, json_type)
 
     def on_open_create_tab(self, data_from_file, filename, json_type):
         # make a new test instance and notebook page
@@ -648,7 +654,6 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.update_model_viewer()
         new_test.view.update_widget_data()
         self.notebook.set_current_page(new_page_index)
-        return
 
     def on_save(self, *args):
         # get the  data model of the current notebook page
@@ -1061,15 +1066,14 @@ class TstAppWindow(Gtk.ApplicationWindow):
             self.logger.warning('Progress Viewer started without running Test')
             return ''
         try:
-            current_file_name = os.path.basename(current_instance.filename)
-            path_test_specs = cfg.get(section='tst-paths', option='tst_products')
+            # current_file_name = os.path.basename(current_instance.filename)
+            # path_test_specs = cfg.get(section='tst-paths', option='tst_products')
             path_test_runs = cfg.get(section='tst-logging', option='test_run')
 
-            json_file_path = current_instance.filename
-            paths['json_file_path'] = json_file_path
+            # json_file_path = current_instance.filename
+            paths['json_file_path'] = current_instance.filename
 
-            name = current_instance.test_meta_data_name.get_text()
-            name = generator.create_file_name(name)
+            name = generator.create_file_name(current_instance.test_meta_data_name.get_text().strip())
 
             cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
             paths['cmd_log_file_path'] = cmd_log_file_path

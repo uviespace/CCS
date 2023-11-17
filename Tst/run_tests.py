@@ -76,7 +76,7 @@ def run_test_set(ccs, pool_name, test_set=None):
                 if len(test.step_results) == 0:
                     if test.precond_ok is False:
                         logger.info('Precondition not fulfilled!')
-                    logger.info('No steps were ran successfully.')
+                    logger.info('No steps were run successfully.')
                 for item in test.step_results:
                     if item['result'] is not True:
                         if 'exception' in item:
