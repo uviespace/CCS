@@ -153,8 +153,8 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.open_json_btn = Gtk.Button()
         self.open_json_btn.set_label('Open JSON in TST')
         self.open_json_btn.set_size_request(185, -1)
-        # self.open_json_btn.connect('clicked', self.on_open_json_tst)
-        # self.box_file_path_1.pack_start(self.open_json_btn, False, True, 5)
+        self.open_json_btn.connect('clicked', self.on_open_json_tst)
+        self.box_file_path_1.pack_start(self.open_json_btn, False, True, 5)
         self.path_box.pack_start(self.box_file_path_1, True, True, 0)
 
         # select file - command log
@@ -196,7 +196,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         self.title_box = Gtk.HBox()
         self.test_label = Gtk.Label()
-        self.test_label.set_markup('<big>Test:</big>')
+        # self.test_label.set_markup('<big>Test:</big>')
         self.test_title = Gtk.Label()
         self.set_test_title()
 

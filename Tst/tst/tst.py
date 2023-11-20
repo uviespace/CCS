@@ -621,14 +621,19 @@ class TstAppWindow(Gtk.ApplicationWindow):
             file_selected = dialog.get_filename()
             cfg.save_option_to_file('tst-history', 'last-folder', os.path.dirname(file_selected))
 
-            self.load_test_spec(file_selected)
+            self.load_test_spec(None, file_selected)
 
         dialog.destroy()
 
-    def load_test_spec(self, json_path):
+    def load_test_spec(self, simple_action, json_path, *args):
+
+        # cast to string if called from open-test-spec action via DBus
+        if isinstance(json_path, GLib.Variant):
+            json_path = json_path.get_string()
+
         try:
             json_type = True
-            data_from_file = file_management.open_file(file_name=json_path)
+            data_from_file = file_management.open_file(json_path)
             filename = json_path
         except json.decoder.JSONDecodeError:
             data_from_file = spec_to_json.run(specfile=json_path, gen_cmd=True, save_json=False)

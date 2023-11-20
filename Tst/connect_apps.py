@@ -61,14 +61,13 @@ def connect_to_tst(logger=module_logger):
         obj = bus.get_object(bus_name=bus_name, object_path=obj_path)
         interface_actions = dbus.Interface(obj, 'org.gtk.Actions')
         actions = interface_actions.List()
-        print('Available Actions:')
+        logger.debug('Available Actions for {}:'.format(bus_name))
         for item in actions:
-            print(item)
-        print('closing the current page in Tst')
-        interface_actions.Activate(actions[0], [], [])
+            logger.debug('{}'.format(item))
         return interface_actions
     except dbus.exceptions.DBusException as dbe:
         logger.exception(dbe)
+        raise dbe
 
 
 def connect_to_progress_viewer(logger=module_logger):
