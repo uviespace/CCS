@@ -7,8 +7,8 @@
    viewBox="0 0 26.510681 28.219215"
    version="1.1"
    id="svg5"
-   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
-   sodipodi:docname="collapse.svg"
+   inkscape:version="1.3 (0e150ed6c4, 2023-07-21)"
+   sodipodi:docname="expand.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -26,7 +26,7 @@
      showgrid="false"
      inkscape:zoom="2.3786088"
      inkscape:cx="183.09022"
-     inkscape:cy="531.82348"
+     inkscape:cy="61.17021"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
      inkscape:window-x="0"
@@ -34,66 +34,43 @@
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1" />
   <defs
-     id="defs2">
-    <marker
-       style="overflow:visible"
-       id="Arrow3-7-9"
-       refX="0"
-       refY="0"
-       orient="auto-start-reverse"
-       inkscape:stockid="Arrow3"
-       markerWidth="11"
-       markerHeight="11"
-       viewBox="0 0 4.2071068 7"
-       inkscape:isstock="true"
-       inkscape:collect="always"
-       preserveAspectRatio="xMidYMid"
-       markerUnits="userSpaceOnUse">
-      <path
-         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
-         d="M 3,-3 0,0 3,3"
-         id="arrow3-5-1"
-         transform="rotate(180,0.125,0)"
-         sodipodi:nodetypes="ccc" />
-    </marker>
-    <marker
-       style="overflow:visible"
-       id="Arrow3-7-5-2"
-       refX="0"
-       refY="0"
-       orient="auto-start-reverse"
-       inkscape:stockid="Arrow3"
-       markerWidth="11"
-       markerHeight="11"
-       viewBox="0 0 4.2071068 7"
-       inkscape:isstock="true"
-       inkscape:collect="always"
-       preserveAspectRatio="xMidYMid"
-       markerUnits="userSpaceOnUse">
-      <path
-         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
-         d="M 3,-3 0,0 3,3"
-         id="arrow3-5-6-7"
-         transform="rotate(180,0.125,0)"
-         sodipodi:nodetypes="ccc" />
-    </marker>
-  </defs>
+     id="defs2" />
   <g
      inkscape:label="Ebene 1"
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-109.32506,-110.6955)">
     <path
-       style="fill:none;stroke:#000000;stroke-width:1.375;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
-       d="m 110.01256,124.8051 h 25.13569"
+       style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+       d="m 110.01172,124.11719 a 0.6875,0.6875 0 0 0 -0.6875,0.6875 0.6875,0.6875 0 0 0 0.6875,0.6875 h 25.13672 a 0.6875,0.6875 0 0 0 0.6875,-0.6875 0.6875,0.6875 0 0 0 -0.6875,-0.6875 z"
        id="path2600-0" />
-    <path
-       style="fill:none;stroke:#000000;stroke-width:1.744;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#Arrow3-7-9)"
-       d="m 122.58041,137.41068 v -9.7876"
-       id="path2600-3-3-9" />
-    <path
-       style="fill:none;stroke:#000000;stroke-width:1.744;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#Arrow3-7-5-2)"
-       d="m 122.58041,112.19952 v 9.7876"
-       id="path2600-3-3-2-3" />
+    <g
+       id="path2600-3-3-9">
+      <path
+         style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+         d="m 122.58008,126.75195 a 0.87199998,0.87199998 0 0 0 -0.8711,0.8711 v 9.78711 a 0.87199998,0.87199998 0 0 0 0.8711,0.87304 0.87199998,0.87199998 0 0 0 0.87305,-0.87304 v -9.78711 a 0.87199998,0.87199998 0 0 0 -0.87305,-0.8711 z"
+         id="path3" />
+      <g
+         id="g2">
+        <path
+           style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+           d="m 117.31055,132.5332 a 0.78571498,0.78571498 0 0 0 0,1.11133 l 5.26953,5.26953 5.26953,-5.26953 a 0.78571498,0.78571498 0 0 0 0,-1.11133 0.78571498,0.78571498 0 0 0 -1.11133,0 l -4.1582,4.15821 -4.1582,-4.15821 a 0.78571498,0.78571498 0 0 0 -1.11133,0 z"
+           id="path2" />
+      </g>
+    </g>
+    <g
+       id="path2600-3-3-2-3">
+      <path
+         style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+         d="m 122.58008,111.32813 a 0.87199998,0.87199998 0 0 0 -0.8711,0.87109 v 9.78711 a 0.87199998,0.87199998 0 0 0 0.8711,0.87305 0.87199998,0.87199998 0 0 0 0.87305,-0.87305 v -9.78711 a 0.87199998,0.87199998 0 0 0 -0.87305,-0.87109 z"
+         id="path5" />
+      <g
+         id="g4">
+        <path
+           style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+           d="m 122.58008,110.69531 -5.26953,5.26953 a 0.78571498,0.78571498 0 0 0 0,1.11133 0.78571498,0.78571498 0 0 0 1.11133,0 l 4.1582,-4.1582 4.1582,4.1582 a 0.78571498,0.78571498 0 0 0 1.11133,0 0.78571498,0.78571498 0 0 0 0,-1.11133 z"
+           id="path4" />
+      </g>
+    </g>
   </g>
 </svg>

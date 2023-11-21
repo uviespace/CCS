@@ -350,7 +350,7 @@ def make_verification_script(model, model_spec):
 
 
 def make_documentation(model, model_spec):
-    return None
+    return
 
 
 def make_all(model):
@@ -362,11 +362,6 @@ def make_all(model):
         vf_path = make_verification_script(sequence, model)
         dc_path = make_documentation(sequence, model)
         break
-
-    #cs_path = make_command_script(model)
-    #cms_path = make_command_manually_steps_script(model)
-    #vf_path = make_verification_script(model)
-    #dc_path = make_documentation(model)
 
     if cs_path is not None:
         paths.append(cs_path)
