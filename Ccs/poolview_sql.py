@@ -1581,9 +1581,16 @@ class TMPoolView(Gtk.Window):
         self.pool_selector.connect('changed', self.select_pool)
 
         icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/func.png')
-        plot_butt = Gtk.Button(image=Gtk.Image.new_from_file(icon_path), tooltip_text='Parameter Plotter')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 32, 32)
+        plot_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Plotter')
         plot_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
         plot_butt.connect('clicked', self.plot_parameters)
+
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/monitor.png')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 32, 32)
+        mon_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Monitor')
+        mon_butt.connect('clicked', self.monitor_parameters)
+
         dump_butt = Gtk.Button.new_from_icon_name('gtk-save', Gtk.IconSize.LARGE_TOOLBAR)
         dump_butt.set_tooltip_text('Save pool')
         dump_butt.connect('clicked', self.save_pool)
@@ -1615,14 +1622,15 @@ class TMPoolView(Gtk.Window):
 
         self.pool_managebar.pack_start(self.pool_selector, 1, 1, 0)
         self.pool_managebar.pack_start(plot_butt, 0, 0, 0)
+        self.pool_managebar.pack_start(mon_butt, 0, 0, 0)
         self.pool_managebar.pack_end(self.univie_box, 0, 0, 0)
         self.pool_managebar.pack_end(clear_butt, 0, 0, 0)
         self.pool_managebar.pack_end(bigd, 0, 0, 0)
         self.pool_managebar.pack_end(self.stop_butt, 0, 0, 0)
         self.pool_managebar.pack_end(self.rec_butt, 0, 0, 0)
+        self.pool_managebar.pack_end(extract_butt, 0, 0, 0)
         self.pool_managebar.pack_end(dump_butt, 0, 0, 0)
         self.pool_managebar.pack_end(load_butt, 0, 0, 0)
-        self.pool_managebar.pack_end(extract_butt, 0, 0, 0)
 
     def create_filterbar(self):
         filterbar = Gtk.HBox()
@@ -3059,7 +3067,15 @@ class TMPoolView(Gtk.Window):
             self.logger.warning('No pool selected')
             return
 
-        cfl.start_plotter(pool_name=self.active_pool_info.filename)
+        cfl.start_plotter(self.active_pool_info.filename)
+
+    def monitor_parameters(self, widget=None, **kwargs):
+
+        if not self.active_pool_info.filename:
+            self.logger.warning('No pool selected')
+            return
+
+        cfl.start_monitor(self.active_pool_info.filename)
 
     def start_recording(self, widget=None):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
