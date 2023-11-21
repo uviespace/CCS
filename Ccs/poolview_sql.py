@@ -1568,6 +1568,9 @@ class TMPoolView(Gtk.Window):
 
         self.pool_selector.set_model(pool_names)
 
+        cell = self.pool_selector.get_cells()[0]
+        cell.set_property('ellipsize', Pango.EllipsizeMode.MIDDLE)
+
         type_cell = Gtk.CellRendererText(foreground='gray', style=Pango.Style.ITALIC)
         self.pool_selector.pack_start(type_cell, 0)
         self.pool_selector.add_attribute(type_cell, 'text', 2)

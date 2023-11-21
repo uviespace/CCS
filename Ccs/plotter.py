@@ -43,7 +43,7 @@ TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_con
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('Notify', '0.7')
-from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify  # NOQA
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Notify, Pango  # NOQA
 
 # from event_storm_squasher import delayed
 
@@ -148,7 +148,7 @@ class PlotViewer(Gtk.Window):
     def create_toolbar(self):
         toolbar = Gtk.HBox()
 
-        self.pool_label = Gtk.Label(tooltip_text=self.loaded_pool.filename)
+        self.pool_label = Gtk.Label(tooltip_text=self.loaded_pool.filename, ellipsize=Pango.EllipsizeMode.MIDDLE)
         self.pool_label.set_markup('<span foreground=\"#656565\">{}</span>'.format(self.loaded_pool.pool_name))
 
         toolbar.pack_start(self.pool_label, 0, 0, 10)
@@ -232,7 +232,7 @@ class PlotViewer(Gtk.Window):
         fig = Figure()
         self.subplot = fig.add_subplot(111)
         self.subplot.grid()
-        self.subplot.set_xlabel('CUC Time [s]')
+        self.subplot.set_xlabel('CUC time [s]')
         self.subplot.callbacks.connect('xlim_changed', self._update_plot_xlimit_values)
         self.subplot.callbacks.connect('ylim_changed', self._update_plot_ylimit_values)
 
