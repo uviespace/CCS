@@ -76,9 +76,9 @@ def convert_fullframe_to_cheopssim(fname):
     hdulist.writeto(fname[:-5] + '_CHEOPSSIM.fits')
 
 
-def ce_decompress(outdir, pool_name=None, sdu=None, starttime=None, endtime=None, startidx=None, endidx=None,
+def ce_decompress(pool_name, outdir, sdu=None, starttime=None, endtime=None, startidx=None, endidx=None,
                   ce_exec=None):
-    decomp = CeDecompress(outdir, pool_name=pool_name, sdu=sdu, starttime=starttime, endtime=endtime, startidx=startidx,
+    decomp = CeDecompress(pool_name, outdir, sdu=sdu, starttime=starttime, endtime=endtime, startidx=startidx,
                           endidx=endidx, ce_exec=ce_exec)
     decomp.start()
 
@@ -94,7 +94,7 @@ def ce_decompress_stop(name=None):
 
 class CeDecompress:
 
-    def __init__(self, outdir, pool_name=None, sdu=None, starttime=None, endtime=None, startidx=None, endidx=None,
+    def __init__(self, pool_name, outdir, sdu=None, starttime=None, endtime=None, startidx=None, endidx=None,
                  ce_exec=None):
         self.outdir = outdir
         self.pool_name = pool_name
@@ -156,7 +156,8 @@ class CeDecompress:
             fitspath = cefile[:-2] + 'fits'
             if os.path.isfile(fitspath):
                 subprocess.run(["rm", fitspath])
-            subprocess.run([self.ce_exec, cefile, fitspath], stdout=open(cefile[:-2] + 'log', 'w'))
+            with open(cefile[:-2] + 'log', 'w') as logfd:
+                subprocess.run([self.ce_exec, cefile, fitspath], stdout=logfd, stderr=logfd)
 
         # first, get all TM13s already complete in pool
         try:
@@ -164,8 +165,11 @@ class CeDecompress:
                                            outdir=self.outdir, dump_all=True, sdu=self.sdu, startidx=self.startidx,
                                            endidx=self.endidx)
             for ce in filedict:
-                self.last_ce_time = ce
                 decompress(filedict[ce])
+                self.last_ce_time = ce
+
+            self.last_ce_time += self.ldt_minimum_ce_gap
+
         except (ValueError, TypeError, AttributeError) as err:
             ce_decompressors.pop(self.init_time)
             raise err

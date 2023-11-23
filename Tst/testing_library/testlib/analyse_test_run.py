@@ -8,10 +8,9 @@ import csv
 import datetime
 import os
 from os import listdir
-from os.path import isfile, join
-import os, os.path
 import errno
 import logging
+import json
 
 import sys
 sys.path.append(confignator.get_option('paths', 'ccs'))
@@ -22,8 +21,8 @@ import toolbox
 from testlib import analyse_verification_log
 from testlib import analyse_command_log
 
-test_name = 'test'  # Name of the test that should be analysed
-run_id = '20210722123605'  # Run ID that should be analysed or NONE for whole file
+# test_name = 'test'  # Name of the test that should be analysed
+# run_id = '20210722123605'  # Run ID that should be analysed or NONE for whole file
 
 cmd_log_file_end = '_command.log'
 vrc_log_file_end = '_verification.log'
@@ -32,13 +31,15 @@ basic_output_file_path = confignator.get_option('tst-logging', 'output-file-path
 basic_json_file_path = confignator.get_option('tst-paths', 'tst_products')
 output_file_header = ['Item', 'Description', 'Verification', 'TestResult']
 
-def save_result_to_file(test_name, log_file_path=None, output_file_path=None, json_file_path=None, run_id=None, test_report=None, logger=False):
+
+def save_result_to_file(json_file_path=None, log_file_cmd=None, log_file_vrc=None, output_file_path=None, run_id=None,
+                        test_report=None, logger=False):
     """
     Analyses the command and verification log file and creates a txt output table
-    :param str test_name: the name of the test and of its log files
-    :param str log_file_path: Path to the log files, None if basic one should be used
+    :param str json_file_path: Path to the json file
+    :param str log_file_cmd: Path to the command log file
+    :param str log_file_vrc: Path to the verification log file
     :param str output_file_path: Path were the output file should be saved
-    :param str json_file_path: Path to the json file, None if basic one should be used
     :param str run_id: Output only for specific Run defined by Run ID, None use whole file
     :param str test_report: The Test Report number as a string, end of the output file name
     :param str logger: A logger
@@ -52,15 +53,15 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
         logger.addHandler(hdlr=console_hdlr)
 
     # Get the given file paths or use the basic ones specified in the tst.cfg file
-    if not log_file_path:
-        log_file_path = basic_log_file_path
-    if not output_file_path:
-        output_file_path = basic_output_file_path
-    if not json_file_path:
-        json_file_path = basic_json_file_path + '/' + test_name + '.json'
+    # if not log_file_path:
+    #     log_file_path = basic_log_file_path
+    # if not output_file_path:
+    #     output_file_path = basic_output_file_path
+    # if not json_file_path:
+    #     json_file_path = basic_json_file_path + '/' + test_name + '.json'
 
-    cmd_log_file = log_file_path + '/' + test_name + cmd_log_file_end
-    vrc_log_file = log_file_path + '/' + test_name + vrc_log_file_end
+    cmd_log_file = log_file_cmd  # log_file_path + '/' + test_name + cmd_log_file_end
+    vrc_log_file = log_file_vrc  # log_file_path + '/' + test_name + vrc_log_file_end
 
     # Get all the steps and verification steps from the respective log files
     cmd_steps = analyse_command_log.get_steps_and_commands(cmd_log_file)
@@ -87,7 +88,8 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
     general_run_infos, precon_info, postcon_info = analyse_command_log.get_general_run_info(cmd_log_file, run_id=run_id)
 
     # Give the output file its name, consits of test name, the specification nbr (version)
-    name_start = '{}-TS-{}-TR-'.format(test_name, cmd_steps[0]['spec_version'])
+    spec = json.load(open(json_file_path, 'r'))
+    name_start = '{}-TS-{}-TR-'.format(spec['_name'], cmd_steps[0]['spec_version'])
 
     # Check if output folder exists otherwise make it
     if not os.path.isdir(output_file_path):
@@ -106,7 +108,7 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
         test_report = int(test_report)
 
     # Output file name, with the path
-    output_file_name_path = output_file_path + '/' + name_start + f'{test_report:03d}' + '.txt'
+    output_file_name_path = os.path.join(output_file_path, '{}{:03d}.csv'.format(name_start, test_report))
 
     with open(output_file_name_path, 'w', encoding='UTF8', newline='') as file:
         writer = csv.writer(file, delimiter='|')
@@ -117,7 +119,7 @@ def save_result_to_file(test_name, log_file_path=None, output_file_path=None, js
         # write the general info line, if multiple descriptions/versions are found all are written to the output file
         spec_version, iasw_version = get_version(cmd_steps, logger)
         description = get_general_run_info_info(general_run_infos, 'descr', logger)
-        writer.writerow([test_name, description, 'Test Spec. Version: ' + 'IASW-{}TS-{}'.format(iasw_version, spec_version), 'Test Rep. Version: ' + f'{test_report:03d}'])
+        writer.writerow([spec['_name'], description, 'Test Spec. Version: {} (IASW_v{})'.format(spec_version, iasw_version), 'Test Rep. Version: {:03d}'.format(test_report)])
 
         # write date line, first Date (Specification Date) is the last time the json file was changed or None if no json file was given
         # second Date (Execution Date), Is the execution Date of the first step
@@ -249,6 +251,7 @@ def show_basic_results(test_name, log_file_path=None):
     print('\n--------------------------------------------------')
     return
 
+
 if __name__ == '__main__':
-    #save_result_to_file(test_name, run_id=run_id)
-    show_basic_results(test_name)
+    # save_result_to_file(test_name, run_id=run_id)
+    show_basic_results(sys.argv[1])

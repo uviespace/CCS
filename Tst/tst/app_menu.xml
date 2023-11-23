@@ -56,14 +56,14 @@
                     <attribute name="label" translatable="yes">Poolmanager</attribute>
                     <attribute name="action">app.start_poolmanager</attribute>
                 </item>
-                <item>
-                    <attribute name="label" translatable="yes">Plotter</attribute>
-                    <attribute name="action">app.start_plotter</attribute>
-                </item>
-                <item>
-                    <attribute name="label" translatable="yes">Monitor</attribute>
-                    <attribute name="action">app.start_monitor</attribute>
-                </item>
+<!--                <item>-->
+<!--                    <attribute name="label" translatable="yes">Plotter</attribute>-->
+<!--                    <attribute name="action">app.start_plotter</attribute>-->
+<!--                </item>-->
+<!--                <item>-->
+<!--                    <attribute name="label" translatable="yes">Monitor</attribute>-->
+<!--                    <attribute name="action">app.start_monitor</attribute>-->
+<!--                </item>-->
                 <item>
                     <attribute name="label" translatable="yes">Configuration Editor</attribute>
                     <attribute name="action">app.start_config_editor</attribute>

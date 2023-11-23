@@ -36,22 +36,13 @@ from event_storm_squasher import delayed
 from sqlalchemy.orm import load_only
 from database.tm_db import DbTelemetryPool, DbTelemetry, RMapTelemetry, FEEDataTelemetry, scoped_session_maker
 
+ActivePoolInfo = cfl.ActivePoolInfo
 
 cfg = confignator.get_config(check_interpolation=False)
 
 project = 'packet_config_{}'.format(cfg.get('ccs-database', 'project'))
 packet_config = importlib.import_module(project)
 TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_config.TC_HEADER_LEN, packet_config.PEC_LEN]
-
-ActivePoolInfo = NamedTuple(
-    'ActivePoolInfo', [
-        ('filename', str),
-        ('modification_time', int),
-        ('pool_name', str),
-        ('live', bool)])
-
-# fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
-#            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
@@ -94,7 +85,7 @@ class TMPoolView(Gtk.Window):
     colour_filters = {}
     # active_pool_info = None  # type: Union[None, ActivePoolInfo]
     decoding_type = 'PUS'
-    live_signal = {True: '[LIVE]', False: None}
+    live_signal = {True: '[REC]', False: None}
     currently_selected = set()
     shift_range = [1, 1]
     active_row = None
@@ -297,7 +288,8 @@ class TMPoolView(Gtk.Window):
                 return
 
             for pool in pools:
-                self.set_pool(pool[0])
+                if not pool[0].count('/'):
+                    self.set_pool(pool[0])
 
         except Exception as err:
             self.logger.exception(err)
@@ -453,16 +445,9 @@ class TMPoolView(Gtk.Window):
                     editor.Functions('_to_console_via_socket', "pv" +str(Count)+ " = dbus.SessionBus().get_object('" +
                                      str(My_Bus_Name) + "', '/MessageListener')")
 
-        #####
         # Check if pool from poolmanagers should be loaded, default is True
-        check_for_pools = True
-        if '--not_load' in sys.argv:
-            check_for_pools = False
-
-        if check_for_pools:
+        if '--noload' not in sys.argv:
             self.set_pool_from_pmgr()
-
-        return
 
     def add_colour_filter(self, colour_filter):
         seq = len(self.colour_filters.keys())
@@ -878,7 +863,7 @@ class TMPoolView(Gtk.Window):
         self.treeview.thaw_child_notify()
 
     def _filter_rows(self, rows):
-        
+
         def f_rule(x):
             if x[1] == '==':
                 return x[0] == x[2]
@@ -1575,13 +1560,16 @@ class TMPoolView(Gtk.Window):
     def create_pool_managebar(self):
         self.pool_managebar = Gtk.HBox()
 
-        self.pool_selector = Gtk.ComboBoxText(tooltip_text='Pool to view')
-        pool_names = Gtk.ListStore(str, str, str)
+        self.pool_selector = Gtk.ComboBoxText(tooltip_text='Pool path')
+        pool_names = Gtk.ListStore(str, str, str, str)
 
         #        if self.pool != None:
         #            [self.pool_names.append([name]) for name in self.pool.datapool.keys()]
 
         self.pool_selector.set_model(pool_names)
+
+        cell = self.pool_selector.get_cells()[0]
+        cell.set_property('ellipsize', Pango.EllipsizeMode.MIDDLE)
 
         type_cell = Gtk.CellRendererText(foreground='gray', style=Pango.Style.ITALIC)
         self.pool_selector.pack_start(type_cell, 0)
@@ -1593,9 +1581,16 @@ class TMPoolView(Gtk.Window):
         self.pool_selector.connect('changed', self.select_pool)
 
         icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/func.png')
-        plot_butt = Gtk.Button(image=Gtk.Image.new_from_file(icon_path), tooltip_text='Parameter Plotter')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 32, 32)
+        plot_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Plotter')
         plot_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
         plot_butt.connect('clicked', self.plot_parameters)
+
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/monitor.png')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 32, 32)
+        mon_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Monitor')
+        mon_butt.connect('clicked', self.monitor_parameters)
+
         dump_butt = Gtk.Button.new_from_icon_name('gtk-save', Gtk.IconSize.LARGE_TOOLBAR)
         dump_butt.set_tooltip_text('Save pool')
         dump_butt.connect('clicked', self.save_pool)
@@ -1627,14 +1622,15 @@ class TMPoolView(Gtk.Window):
 
         self.pool_managebar.pack_start(self.pool_selector, 1, 1, 0)
         self.pool_managebar.pack_start(plot_butt, 0, 0, 0)
+        self.pool_managebar.pack_start(mon_butt, 0, 0, 0)
         self.pool_managebar.pack_end(self.univie_box, 0, 0, 0)
         self.pool_managebar.pack_end(clear_butt, 0, 0, 0)
         self.pool_managebar.pack_end(bigd, 0, 0, 0)
         self.pool_managebar.pack_end(self.stop_butt, 0, 0, 0)
         self.pool_managebar.pack_end(self.rec_butt, 0, 0, 0)
+        self.pool_managebar.pack_end(extract_butt, 0, 0, 0)
         self.pool_managebar.pack_end(dump_butt, 0, 0, 0)
         self.pool_managebar.pack_end(load_butt, 0, 0, 0)
-        self.pool_managebar.pack_end(extract_butt, 0, 0, 0)
 
     def create_filterbar(self):
         filterbar = Gtk.HBox()
@@ -1938,9 +1934,8 @@ class TMPoolView(Gtk.Window):
         )
         pool = pool.all()
         # new_session.commit()
-        time.sleep(0.5)  # with no wait query might return empty. WHY???##############################################
+        # time.sleep(0.5)  # with no wait query might return empty. WHY?
         # Still sometimes empty, if not pool abfrage should stopp this behaviour
-        #print(pool.all())
 
         if not pool:
             self.decoding_type = 'PUS'
@@ -1959,14 +1954,25 @@ class TMPoolView(Gtk.Window):
     #     [self.pool_names.append([name]) for name in self.pool.datapool.keys()]
     #     self.pool_selector.set_model(self.pool_names)
 
-    #This function fills the Active pool info variable with data form pus_datapool
+    # This function fills the Active pool info variable with data form pus_datapool
     def Active_Pool_Info_append(self, pool_info=None):
         if pool_info is not None:
             self.active_pool_info = ActivePoolInfo(str(pool_info[0]), int(pool_info[1]),
                                                    str(pool_info[2]), bool(pool_info[3]))
-        #self.decoding_type = 'PUS'
         self.check_structure_type()
+        self._set_pool_selector_tooltip()
         return self.active_pool_info
+
+    def _set_pool_selector_tooltip(self):
+        self.pool_selector.set_tooltip_text(self.active_pool_info.filename)
+
+    def _check_pool_is_loaded(self, filename):
+        model = self.pool_selector.get_model()
+        for pool in model:
+            if pool[3] == filename:
+                self.logger.info('Pool {} already loaded'.format(filename))
+                return pool
+        return False
 
     def update_columns(self):
         columns = self.treeview.get_columns()
@@ -1983,29 +1989,20 @@ class TMPoolView(Gtk.Window):
 
     def select_pool(self, selector, new_pool=None):
         if not new_pool:
-            pool_name = selector.get_active_text()
+            pool_name = selector.get_model()[selector.get_active_iter()][3]
         else:
             pool_name = new_pool
-        #self.active_pool_info = self.pool.loaded_pools[pool_name]
-        # self.active_pool_info = poolmgr.Dictionaries('loaded_pools', pool_name)
 
+        new_session = self.session_factory_storage
         try:
-            poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-            if not poolmgr:
-                raise TypeError
-            self.Active_Pool_Info_append(cfl.Dictionaries(poolmgr, 'loaded_pools', pool_name))
+            if self.active_pool_info.filename != pool_name:
+                dbpool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
+                self.Active_Pool_Info_append([pool_name, dbpool.modification_time, dbpool.pool_name, False])
 
-        except:
-            new_session = self.session_factory_storage
-
-            if self.active_pool_info.pool_name == pool_name:
-                #type = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == self.active_pool_info.filename).first()
-                #self.Active_Pool_Info_append([pool_name, type.modification_time, pool_name, False])
-                pass
-            else:
-                type = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name)
-                self.Active_Pool_Info_append([pool_name, type.modification_time, pool_name, False])
-
+        except Exception as err:
+            self.logger.warning(err)
+            return
+        finally:
             new_session.close()
 
         self.update_columns()
@@ -2033,6 +2030,11 @@ class TMPoolView(Gtk.Window):
 
     def clear_pool(self, widget):
         poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+
+        # don't clear static pools
+        if self.active_pool_info.filename.count('/'):
+            return
+
         widget.set_sensitive(False)
         pool_name = self.get_active_pool_name()
 
@@ -2070,6 +2072,8 @@ class TMPoolView(Gtk.Window):
         # Add the different Starting Options
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
+            if name in ['plotter', 'monitor']:
+                continue
             start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, False, True, 0)
@@ -2669,67 +2673,108 @@ class TMPoolView(Gtk.Window):
         return
 
     # Whole function is now done in Poolmgr
-    def load_pool(self, widget=None, filename=None, brute=False, force_db_import=False, protocol='PUS'):
-        if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
-            poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        else:
-            cfl.start_pmgr(True, '--nogui')
-            #path_pm = os.path.join(confignator.get_option('paths', 'ccs'), 'pus_datapool.py')
-            #subprocess.Popen(['python3', path_pm, '--nogui'])
-            self.logger.info('Poolmanager was started in the background')
+    # def load_pool2(self, widget=None, filename=None, brute=False, force_db_import=False, protocol='PUS'):
+    #     if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
+    #         poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+    #     else:
+    #         cfl.start_pmgr(gui=False)
+    #         #path_pm = os.path.join(confignator.get_option('paths', 'ccs'), 'pus_datapool.py')
+    #         #subprocess.Popen(['python3', path_pm, '--nogui'])
+    #         self.logger.info('Poolmanager was started in the background')
+    #
+    #         # Here we have a little bit of a tricky situation since when we start the Poolmanager it wants to tell the
+    #         # Manager to which number it can talk to but it can only do this when PoolViewer is not busy...
+    #         # Therefore it is first found out which number the new Poolmanager will get and it will be called by that
+    #         our_con = []
+    #         # Look for all connections starting with com.poolmanager.communication,
+    #         # therefore only one loop over all connections is necessary
+    #         for service in dbus.SessionBus().list_names():
+    #             if service.startswith(self.cfg['ccs-dbus_names']['poolmanager']):
+    #                 our_con.append(service)
+    #
+    #         new_pmgr_nbr = 0
+    #         if len(our_con) != 0:   # If an active PoolManager is found they have to belong to another prject
+    #             for k in range(1, 10):  # Loop over all possible numbers
+    #                 for j in our_con:   # Check every number with every PoolManager
+    #                     if str(k) == str(j[-1]):    # If the number is not found set variable found to True
+    #                         found = True
+    #                     else:   # If number is found set variable found to False
+    #                         found = False
+    #                         break
+    #
+    #                 if found:   # If number could not be found save the number and try connecting
+    #                     new_pmgr_nbr = k
+    #                     break
+    #
+    #         else:
+    #             new_pmgr_nbr = 1
+    #
+    #         if new_pmgr_nbr == 0:
+    #             self.logger.warning('The maximum amount of Poolviewers has been reached')
+    #             return
+    #
+    #         # Wait a maximum of 10 seconds to connect to the poolmanager
+    #         i = 0
+    #         while i < 100:
+    #             if cfl.is_open('poolmanager', new_pmgr_nbr):
+    #                 poolmgr = cfl.dbus_connection('poolmanager', new_pmgr_nbr)
+    #                 break
+    #             else:
+    #                 i += 1
+    #                 time.sleep(0.1)
+    #
+    #     if filename is not None and filename:
+    #         pool_name = filename.split('/')[-1]
+    #         try:
+    #             new_pool = cfl.Functions(poolmgr, 'load_pool_poolviewer', pool_name, filename, brute, force_db_import,
+    #                                          self.count_current_pool_rows(), self.my_bus_name[-1], protocol)
+    #
+    #         except:
+    #             self.logger.warning('Pool could not be loaded, File: ' + str(filename) + 'does probably not exist')
+    #             # print('Pool could not be loaded, File' +str(filename)+ 'does probably not exist')
+    #             return
+    #     else:
+    #         dialog = Gtk.FileChooserDialog(title="Load File to pool", parent=self, action=Gtk.FileChooserAction.OPEN)
+    #         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+    #
+    #         area = dialog.get_content_area()
+    #         hbox, force_button, brute_extract, type_buttons = self.pool_loader_dialog_buttons()
+    #
+    #         area.add(hbox)
+    #         area.show_all()
+    #
+    #         dialog.set_transient_for(self)
+    #
+    #         response = dialog.run()
+    #
+    #         if response == Gtk.ResponseType.OK:
+    #             filename = dialog.get_filename()
+    #             pool_name = filename.split('/')[-1]
+    #             isbrute = brute_extract.get_active()
+    #             force_db_import = force_button.get_active()
+    #             for button in type_buttons:
+    #                 if button.get_active():
+    #                     package_type = button.get_label()
+    #         else:
+    #             dialog.destroy()
+    #             return
+    #
+    #         if package_type:
+    #             if package_type not in ['PUS', 'PLMSIM']:
+    #                 package_type == 'SPW'
+    #
+    #         # package_type defines which type was selected by the user, if any was selected
+    #         new_pool = cfl.Functions(poolmgr, 'load_pool_poolviewer', pool_name, filename, isbrute, force_db_import,
+    #                                  self.count_current_pool_rows(), self.my_bus_name[-1], package_type)
+    #
+    #         dialog.destroy()
+    #
+    #     if new_pool:
+    #         self._set_pool_list_and_display(new_pool)
 
-            # Here we have a little bit of a tricky situation since when we start the Poolmanager it wants to tell the
-            # Manager to which number it can talk to but it can only do this when PoolViewer is not busy...
-            # Therefore it is first found out which number the new Poolmanager will get and it will be called by that
-            our_con = []
-            # Look for all connections starting with com.poolmanager.communication,
-            # therefore only one loop over all connections is necessary
-            for service in dbus.SessionBus().list_names():
-                if service.startswith(self.cfg['ccs-dbus_names']['poolmanager']):
-                    our_con.append(service)
+    def load_pool(self, widget=None, filename=None, brute=False, force_db_import=False, protocol='PUS', no_duplicates=True):
 
-            new_pmgr_nbr = 0
-            if len(our_con) != 0:   # If an active PoolManager is found they have to belong to another prject
-                for k in range(1, 10):  # Loop over all possible numbers
-                    for j in our_con:   # Check every number with every PoolManager
-                        if str(k) == str(j[-1]):    # If the number is not found set variable found to True
-                            found = True
-                        else:   # If number is found set variable found to False
-                            found = False
-                            break
-
-                    if found:   # If number could not be found save the number and try connecting
-                        new_pmgr_nbr = k
-                        break
-
-            else:
-                new_pmgr_nbr = 1
-
-            if new_pmgr_nbr == 0:
-                self.logger.warning('The maximum amount of Poolviewers has been reached')
-                return
-
-            # Wait a maximum of 10 seconds to connect to the poolmanager
-            i = 0
-            while i < 100:
-                if cfl.is_open('poolmanager', new_pmgr_nbr):
-                    poolmgr = cfl.dbus_connection('poolmanager', new_pmgr_nbr)
-                    break
-                else:
-                    i += 1
-                    time.sleep(0.1)
-
-        if filename is not None and filename:
-            pool_name = filename.split('/')[-1]
-            try:
-                new_pool = cfl.Functions(poolmgr, 'load_pool_poolviewer', pool_name, filename, brute, force_db_import,
-                                             self.count_current_pool_rows(), self.my_bus_name[-1], protocol)
-
-            except:
-                self.logger.warning('Pool could not be loaded, File: ' + str(filename) + 'does probably not exist')
-                # print('Pool could not be loaded, File' +str(filename)+ 'does probably not exist')
-                return
-        else:
+        if filename is None:
             dialog = Gtk.FileChooserDialog(title="Load File to pool", parent=self, action=Gtk.FileChooserAction.OPEN)
             dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
 
@@ -2745,47 +2790,64 @@ class TMPoolView(Gtk.Window):
 
             if response == Gtk.ResponseType.OK:
                 filename = dialog.get_filename()
-                pool_name = filename.split('/')[-1]
-                isbrute = brute_extract.get_active()
+                brute = brute_extract.get_active()
                 force_db_import = force_button.get_active()
                 for button in type_buttons:
                     if button.get_active():
-                        package_type = button.get_label()
+                        protocol = button.get_label()
             else:
                 dialog.destroy()
                 return
 
-            if package_type:
-                if package_type not in ['PUS', 'PLMSIM']:
-                    package_type == 'SPW'
-
-            # package_type defines which type was selected by the user, if any was selected
-            new_pool = cfl.Functions(poolmgr, 'load_pool_poolviewer', pool_name, filename, isbrute, force_db_import,
-                                     self.count_current_pool_rows(), self.my_bus_name[-1], package_type)
+            if protocol:
+                if protocol not in ['PUS', 'PLMSIM']:
+                    protocol = 'SPW'
 
             dialog.destroy()
 
-        if new_pool:
-            self._set_pool_list_and_display(new_pool)
+        if no_duplicates and (not force_db_import):
+            loadeditem = self._check_pool_is_loaded(filename)
+            if loadeditem:
+                self.pool_selector.set_active_iter(loadeditem.iter)
+                return
 
-        # If a new Pool is loaded show it
-        #if new_pool:
+        new_pool, loader_thread = cfl.DbTools.sql_insert_binary_dump(filename, brute=brute, force_db_import=force_db_import,
+                                                                     protocol=protocol, pecmode='warn', parent=self)
 
-        #else: # If not just switch the page to the previously loaded pool
-        #    #Check if pool is loaded in Poolviewer or if it is a loaded pool in the poolmanager which is not
-        #    # live and therefore not loaded to the viewer in the booting process
-        #    try:
-        #        model = self.pool_selector.get_model()
-        #        self.pool_selector.set_active([row[0] == self.active_pool_info.pool_name for row in model].index(True))
-        #    except:
-                # Pool is still importing do nothing
-                #all_pmgr_pools = poolmgr.Functions('loaded_pools_export_func')
-                #for pool in all_pmgr_pools:
-                #    if pool[2] == pool_name:
-                #        self._set_pool_list_and_display(pool)
-                #        break
-                #pass
-        return
+        self._set_pool_list_and_display(new_pool)
+
+        if loader_thread is not None:
+            checkloader_thread = threading.Thread(target=self._db_loading_checker, args=[new_pool, loader_thread])
+            checkloader_thread.daemon = True
+            checkloader_thread.start()
+
+    def _db_loading_checker(self, pool_info, thread):
+
+        try:
+            model = self.pool_selector.get_model()
+            for pool in model:
+                if pool[3] == pool_info.filename:
+                    pool[1] = '[LOAD]'
+
+            while thread.is_alive():
+                time.sleep(1)
+
+            model = self.pool_selector.get_model()
+
+            for pool in model:
+                if pool[3] == pool_info.filename:
+                    pool[1] = None
+                    break
+
+            if self.pool_selector.get_active_iter() == pool.iter:
+                self.select_pool(self.pool_selector, pool_info)
+
+        except Exception as err:
+            self.logger.error(err)
+            model = self.pool_selector.get_model()
+            for pool in model:
+                if pool[3] == pool_info.filename:
+                    pool[1] = 'ERR'
 
     def pool_loader_dialog_buttons(self):
         '''
@@ -2857,34 +2919,25 @@ class TMPoolView(Gtk.Window):
 
         self.update_columns()
 
-        # self.pool.create(pool_name)
         self.adj.set_upper(self.count_current_pool_rows())
         self.offset = 0
         self.limit = self.adj.get_page_size()
         self._on_scrollbar_changed(adj=self.adj, force=True)
-        # self.pool.load_pckts(pool_name, filename)
-        # pvqueue2 = self.pool.register_queue(pool_name)
-        # self.set_queue(*pvqueue2)
         # Check the decoding type to show a pool
         if self.decoding_type == 'PUS':
             model = self.pool_selector.get_model()
-            iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], self.decoding_type])
+            iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], self.decoding_type, self.active_pool_info.filename])
             self.pool_selector.set_active_iter(iter)
         else:
             # If not PUS open all other possible types but show RMAP
             for packet_type in Telemetry:
                 if packet_type == 'RMAP':
                     model = self.pool_selector.get_model()
-                    iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], packet_type])
+                    iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], packet_type, self.active_pool_info.filename])
                     self.pool_selector.set_active_iter(iter)   # Always show the RMAP pool when created
                 else:
                     model = self.pool_selector.get_model()
-                    iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], packet_type])
-        #try:
-        #    poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-        #    poolmgr.Functions('loaded_pools_func', self.active_pool_info.pool_name, self.active_pool_info)
-        #except:
-        #    pass
+                    iter = model.append([self.active_pool_info.pool_name, self.live_signal[self.active_pool_info.live], packet_type, self.active_pool_info.filename])
 
         if self.active_pool_info.live:
             self.stop_butt.set_sensitive(True)
@@ -3010,7 +3063,19 @@ class TMPoolView(Gtk.Window):
 
     def plot_parameters(self, widget=None, parameters=None, start_live=False):
 
-        cfl.start_plotter(pool_name=self.active_pool_info.pool_name)
+        if not self.active_pool_info.filename:
+            self.logger.warning('No pool selected')
+            return
+
+        cfl.start_plotter(self.active_pool_info.filename)
+
+    def monitor_parameters(self, widget=None, **kwargs):
+
+        if not self.active_pool_info.filename:
+            self.logger.warning('No pool selected')
+            return
+
+        cfl.start_monitor(self.active_pool_info.filename)
 
     def start_recording(self, widget=None):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
@@ -3070,10 +3135,10 @@ class TMPoolView(Gtk.Window):
         if poolmgr:
             poolmgr.Functions('disconnect', pool_name)
 
-        iter = self.pool_selector.get_active_iter()
+        itr = self.pool_selector.get_active_iter()
         mod = self.pool_selector.get_model()
         if mod is not None:
-            mod[iter][1] = self.live_signal[self.active_pool_info.live]
+            mod[itr][1] = self.live_signal[self.active_pool_info.live]
             self.stop_butt.set_sensitive(False)
 
         return
@@ -3438,6 +3503,10 @@ class BigDataViewer(Gtk.Window):
 
     def on_draw(self, widget, cr):
         poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
+
+        if not poolmgr:
+            return
+
         check = poolmgr.Functions('_return_colour_list', 'try')
         if check is False:
             return

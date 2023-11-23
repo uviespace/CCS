@@ -4,6 +4,7 @@
 General purpose socket communication utilities
 
 """
+import io
 import queue
 import select
 import socket
@@ -32,6 +33,7 @@ class Connector:
         self.conn = None
         self.log = []
         self._storagefd = None
+        self._storage_hexsep = ''
 
         self.receiver = None
 
@@ -43,8 +45,9 @@ class Connector:
         if save_to is not None:
             self.setup_storage(save_to)
 
-    def setup_storage(self, fname):
+    def setup_storage(self, fname, hexsep=''):
         self._storagefd = open(fname, 'w')
+        self._storage_hexsep = hexsep
 
     def setup_port(self):
 
@@ -121,11 +124,14 @@ class Connector:
             self.log.append((t, msg, resp))
 
             if self._storagefd is not None:
-                self._storagefd.write('{:.3f}\t{}\t{}\n'.format(t, _msgdecoder(msg, self.msgdecoding), _msgdecoder(resp, self.msgdecoding)))
+                self._storagefd.write('{:.3f}\t{}\t{}\n'.format(t, _msgdecoder(msg, self.msgdecoding, sep=self._storage_hexsep), _msgdecoder(resp, self.msgdecoding, sep=self._storage_hexsep)))
                 self._storagefd.flush()
 
             if output:
                 print('{:.3f}: SENT {} | RECV: {}'.format(t, _msgdecoder(msg, self.msgdecoding), _msgdecoder(resp, self.msgdecoding)))
+
+            if not rx:
+                return None
 
             return resp if self.resp_decoder is None else self.resp_decoder(resp)
 
@@ -185,6 +191,20 @@ class Connector:
 
         self.receiver.stop()
         self.receiver = None
+
+    @property
+    def recvd_data(self):
+        if self.receiver is None:
+            return
+
+        return self.receiver.recvd_data_buf.queue
+
+    @property
+    def proc_data(self):
+        if self.receiver is None:
+            return
+
+        return self.receiver.proc_data
 
 
 class Receiver:
@@ -255,7 +275,8 @@ class Receiver:
             except socket.timeout:
                 continue
 
-            except (ValueError, OSError):
+            except (ValueError, OSError) as err:
+                print(err)
                 self.stop()
                 break
 
@@ -277,7 +298,13 @@ class Receiver:
 
                 if self.proc_data_fd is not None:
                     try:
-                        self.proc_data_fd.write(str(procdata))
+                        if self.proc_data_fd.mode.count('b'):
+                            self.proc_data_fd.write(procdata)
+                        else:
+                            self.proc_data_fd.write(str(procdata))
+                    except io.UnsupportedOperation as err:
+                        print(err)
+                        break
                     except Exception as err:
                         self.proc_data_fd.write('# {} #\n'.format(err))
                         continue
@@ -291,7 +318,8 @@ class Receiver:
                 self._isrunning = False
 
         print('Processing stopped')
-        self.proc_data_fd.close()
+        if self.proc_data_fd is not None:
+            self.proc_data_fd.close()
 
 
 def _msgdecoder(msg, fmt, sep=''):
@@ -304,9 +332,16 @@ def _msgdecoder(msg, fmt, sep=''):
 
 
 def hexify(bs, sep=''):
+
     if bs is None:
         bs = b''
-    return bs.hex().upper() if sep == '' else bs.hex(sep).upper()
+
+    if isinstance(sep, tuple):
+        sep, grp = sep
+    else:
+        grp = 0
+
+    return bs.hex().upper() if sep == '' else bs.hex(sep, grp).upper()
 
 
 def toascii(bs, errors='replace'):

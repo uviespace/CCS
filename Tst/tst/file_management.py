@@ -48,7 +48,6 @@ def open_file(file_name, *args):
     data_from_file = None
     with open(file_name, 'r') as file:
         data_from_file = _from_json(file)
-    file.close()
     return data_from_file
 
 

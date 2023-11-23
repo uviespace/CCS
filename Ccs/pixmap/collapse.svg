@@ -7,7 +7,7 @@
    viewBox="0 0 26.510696 28.219185"
    version="1.1"
    id="svg5"
-   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   inkscape:version="1.3 (0e150ed6c4, 2023-07-21)"
    sodipodi:docname="collapse.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -26,7 +26,7 @@
      showgrid="false"
      inkscape:zoom="2.3786088"
      inkscape:cx="183.09022"
-     inkscape:cy="531.82348"
+     inkscape:cy="61.17021"
      inkscape:window-width="2560"
      inkscape:window-height="1385"
      inkscape:window-x="0"
@@ -34,66 +34,43 @@
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1" />
   <defs
-     id="defs2">
-    <marker
-       style="overflow:visible"
-       id="Arrow3-7"
-       refX="0"
-       refY="0"
-       orient="auto-start-reverse"
-       inkscape:stockid="Arrow3"
-       markerWidth="11"
-       markerHeight="11"
-       viewBox="0 0 4.2071068 7"
-       inkscape:isstock="true"
-       inkscape:collect="always"
-       preserveAspectRatio="xMidYMid"
-       markerUnits="userSpaceOnUse">
-      <path
-         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
-         d="M 3,-3 0,0 3,3"
-         id="arrow3-5"
-         transform="rotate(180,0.125,0)"
-         sodipodi:nodetypes="ccc" />
-    </marker>
-    <marker
-       style="overflow:visible"
-       id="Arrow3-7-5"
-       refX="0"
-       refY="0"
-       orient="auto-start-reverse"
-       inkscape:stockid="Arrow3"
-       markerWidth="11"
-       markerHeight="11"
-       viewBox="0 0 4.2071068 7"
-       inkscape:isstock="true"
-       inkscape:collect="always"
-       preserveAspectRatio="xMidYMid"
-       markerUnits="userSpaceOnUse">
-      <path
-         style="fill:none;stroke:context-stroke;stroke-width:1;stroke-linecap:round"
-         d="M 3,-3 0,0 3,3"
-         id="arrow3-5-6"
-         transform="rotate(180,0.125,0)"
-         sodipodi:nodetypes="ccc" />
-    </marker>
-  </defs>
+     id="defs2" />
   <g
      inkscape:label="Ebene 1"
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(-54.299432,-112.5212)">
     <path
-       style="fill:none;stroke:#000000;stroke-width:1.375;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
-       d="M 54.986932,126.6308 H 80.122625"
+       style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+       d="m 54.986328,125.94336 a 0.6875,0.6875 0 0 0 -0.6875,0.6875 0.6875,0.6875 0 0 0 0.6875,0.6875 h 25.136719 a 0.6875,0.6875 0 0 0 0.6875,-0.6875 0.6875,0.6875 0 0 0 -0.6875,-0.6875 z"
        id="path2600" />
-    <path
-       style="fill:none;stroke:#000000;stroke-width:1.744;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#Arrow3-7)"
-       d="m 67.554779,130.0808 v 9.7876"
-       id="path2600-3-3" />
-    <path
-       style="fill:none;stroke:#000000;stroke-width:1.744;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;marker-start:url(#Arrow3-7-5)"
-       d="m 67.554779,123.1808 v -9.7876"
-       id="path2600-3-3-2" />
+    <g
+       id="path2600-3-3">
+      <path
+         style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+         d="m 67.554687,129.20898 a 0.87199998,0.87199998 0 0 0 -0.871093,0.8711 v 9.78906 a 0.87199998,0.87199998 0 0 0 0.871093,0.87109 0.87199998,0.87199998 0 0 0 0.873047,-0.87109 v -9.78906 a 0.87199998,0.87199998 0 0 0 -0.873047,-0.8711 z"
+         id="path6" />
+      <g
+         id="g5">
+        <path
+           style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+           d="m 67.554687,128.57617 -5.269531,5.26953 a 0.78571498,0.78571498 0 0 0 0,1.11133 0.78571498,0.78571498 0 0 0 1.111328,0 l 4.158203,-4.1582 4.158204,4.1582 a 0.78571498,0.78571498 0 0 0 1.111328,0 0.78571498,0.78571498 0 0 0 0,-1.11133 z"
+           id="path5" />
+      </g>
+    </g>
+    <g
+       id="path2600-3-3-2">
+      <path
+         style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+         d="m 67.554687,112.52148 a 0.87199998,0.87199998 0 0 0 -0.871093,0.8711 v 9.78906 a 0.87199998,0.87199998 0 0 0 0.871093,0.87109 0.87199998,0.87199998 0 0 0 0.873047,-0.87109 v -9.78906 a 0.87199998,0.87199998 0 0 0 -0.873047,-0.8711 z"
+         id="path3" />
+      <g
+         id="g2">
+        <path
+           style="color:#000000;fill:#000000;stroke-linecap:round;-inkscape-stroke:none"
+           d="m 62.839844,118.07422 a 0.78571498,0.78571498 0 0 0 -0.554688,0.23047 0.78571498,0.78571498 0 0 0 0,1.10937 l 5.269531,5.27149 5.269532,-5.27149 a 0.78571498,0.78571498 0 0 0 0,-1.10937 0.78571498,0.78571498 0 0 0 -1.111328,0 l -4.158204,4.1582 -4.158203,-4.1582 a 0.78571498,0.78571498 0 0 0 -0.55664,-0.23047 z"
+           id="path2" />
+      </g>
+    </g>
   </g>
 </svg>

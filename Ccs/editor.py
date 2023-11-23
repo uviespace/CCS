@@ -23,6 +23,9 @@ import DBus_Basic
 # import config_dialog
 import ccs_function_lib as cfl
 
+sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
+import tm
+
 cfg = confignator.get_config()
 
 pixmap_folder = cfg.get('ccs-paths', 'pixmap')
@@ -1449,6 +1452,8 @@ class CcsEditor(Gtk.Window):
         # Add the different Starting Options
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5, margin=4)
         for name in self.cfg['ccs-dbus_names']:
+            if name in ['plotter', 'monitor']:
+                continue
             start_button = Gtk.Button.new_with_label("Start " + name.capitalize())
             start_button.connect("clicked", cfl.on_open_univie_clicked)
             vbox.pack_start(start_button, True, True, 0)

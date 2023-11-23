@@ -8,6 +8,8 @@ from gi.repository import Gtk, Gdk, Gio, GLib
 import sys
 import confignator
 
+sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
+
 cfg = confignator.get_config()
 sys.path.append(cfg.get('paths', 'ccs'))
 
@@ -24,6 +26,7 @@ import data_model
 import json
 import toolbox
 import generator
+import connect_apps
 
 # create a logger
 log_file_path = cfg.get(section='progress-viewer-logging', option='log-file-path')
@@ -133,49 +136,59 @@ class TestProgressView(Gtk.ApplicationWindow):
         #self.set_position(self.get_default_size()[1] * 0.2)
 
         self.path_frame = Gtk.Frame()
-        self.path_box = Gtk.Box()
+        self.path_box = Gtk.Box(spacing=0)
         self.path_box.set_orientation(Gtk.Orientation.VERTICAL)
 
         # select file - JSON test model
         self.box_file_path_1 = Gtk.Box()
         self.box_file_path_1.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.label_path_json = Gtk.Label()
-        self.label_path_json.set_text('Path to JSON test spec:')
+        self.label_path_json = Gtk.Label(xalign=0)
+        self.label_path_json.set_size_request(125, -1)
+        self.label_path_json.set_text('Test spec JSON:')
         self.box_file_path_1.pack_start(self.label_path_json, False, False, 0)
         self.text_path_json_btn = Gtk.FileChooserButton()
         self.text_path_json_btn.set_title('Choose a test specification JSON file')
         self.text_path_json_btn.connect('file-set', self.set_path_json_file)
         self.box_file_path_1.pack_start(self.text_path_json_btn, False, False, 0)
+        self.open_json_btn = Gtk.Button()
+        self.open_json_btn.set_label('Open JSON in TST')
+        self.open_json_btn.set_size_request(185, -1)
+        self.open_json_btn.connect('clicked', self.on_open_json_tst)
+        self.box_file_path_1.pack_start(self.open_json_btn, False, True, 5)
         self.path_box.pack_start(self.box_file_path_1, True, True, 0)
 
         # select file - command log
         self.box_file_path_2 = Gtk.Box()
         self.box_file_path_2.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.label_path_cmd = Gtk.Label()
-        self.label_path_cmd.set_text('Path to Command log:')
+        self.label_path_cmd = Gtk.Label(xalign=0)
+        self.label_path_cmd.set_size_request(125, -1)
+        self.label_path_cmd.set_text('Command log:')
         self.box_file_path_2.pack_start(self.label_path_cmd, False, False, 0)
         self.text_path_cmd_btn = Gtk.FileChooserButton()
         self.text_path_cmd_btn.connect('file-set', self.set_path_cmd_file)
         self.box_file_path_2.pack_start(self.text_path_cmd_btn, False, False, 0)
         self.del_btn_cmd = Gtk.Button()
         self.del_btn_cmd.set_label('Clear command log')
+        self.del_btn_cmd.set_size_request(185, -1)
         self.del_btn_cmd.connect('clicked', self.on_clear_cmd_log)
-        self.box_file_path_2.pack_start(self.del_btn_cmd, False, True, 0)
+        self.box_file_path_2.pack_start(self.del_btn_cmd, False, True, 5)
         self.path_box.pack_start(self.box_file_path_2, True, True, 0)
 
         # select file - verification log
         self.box_file_path_3 = Gtk.Box()
         self.box_file_path_3.set_orientation(Gtk.Orientation.HORIZONTAL)
-        self.label_path_vrc = Gtk.Label()
-        self.label_path_vrc.set_text('Path to Verification log:')
+        self.label_path_vrc = Gtk.Label(xalign=0)
+        self.label_path_vrc.set_size_request(125, -1)
+        self.label_path_vrc.set_text('Verification log:')
         self.box_file_path_3.pack_start(self.label_path_vrc, False, False, 0)
         self.text_path_vrc_btn = Gtk.FileChooserButton()
         self.text_path_vrc_btn.connect('file-set', self.set_path_vrc_file)
         self.box_file_path_3.pack_start(self.text_path_vrc_btn, False, False, 0)
         self.del_btn_vrc = Gtk.Button()
         self.del_btn_vrc.set_label('Clear verification log')
+        self.del_btn_vrc.set_size_request(185, -1)
         self.del_btn_vrc.connect('clicked', self.on_clear_vrc_log)
-        self.box_file_path_3.pack_start(self.del_btn_vrc, False, True, 0)
+        self.box_file_path_3.pack_start(self.del_btn_vrc, False, True, 5)
         self.path_box.pack_start(self.box_file_path_3, True, True, 0)
 
         self.path_frame.add(self.path_box)
@@ -183,7 +196,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         self.title_box = Gtk.HBox()
         self.test_label = Gtk.Label()
-        self.test_label.set_markup('<big>Test Title: </big>')
+        # self.test_label.set_markup('<big>Test:</big>')
         self.test_title = Gtk.Label()
         self.set_test_title()
 
@@ -287,12 +300,12 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.btn_rld_all.connect('clicked', self.on_reload_all)
         self.box_buttons.pack_start(self.btn_rld_all, False, False, 0)
         self.btn_output = Gtk.Button()
-        self.btn_output.set_label('Generate Output File')
+        self.btn_output.set_label('Generate Report File')
         self.btn_output.connect('clicked', self.on_save_as)
         self.box_buttons.pack_start(self.btn_output, False, False, 0)
 
         self.sort_label = Gtk.Label()
-        self.sort_label.set_text('Sort by Execution')
+        self.sort_label.set_text('Sort by run')
         self.box_buttons.pack_end(self.sort_label, False, True, 0)
 
         self.sort_button = Gtk.Switch()
@@ -300,7 +313,7 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.box_buttons.pack_end(self.sort_button, False, True, 0)
 
         self.sort_label2 = Gtk.Label()
-        self.sort_label2.set_text('Sort by Steps')
+        self.sort_label2.set_text('Sort by steps')
         self.box_buttons.pack_end(self.sort_label2, False, True, 0)
 
     def make_treeview(self):
@@ -361,7 +374,7 @@ class TestProgressView(Gtk.ApplicationWindow):
 
         # column 6
         renderer_tcs = Gtk.CellRendererText()
-        column_tcs = Gtk.TreeViewColumn('TC\'s sent', renderer_tcs, text=5, background=7)
+        column_tcs = Gtk.TreeViewColumn('Sent TCs', renderer_tcs, text=5, background=7)
         column_tcs.set_sizing(Gtk.TreeViewColumnSizing.AUTOSIZE)
         column_tcs.set_resizable(True)
         column_tcs.set_min_width(50)
@@ -389,25 +402,28 @@ class TestProgressView(Gtk.ApplicationWindow):
         return
 
     def get_log_file_paths_from_json_file_name(self, filename):
-        from testlib import testing_logger
+
         paths = {}
+
         try:
-            current_file_name = os.path.basename(filename)
-            path_test_specs = cfg.get(section='tst-paths', option='tst_products')
             path_test_runs = cfg.get(section='tst-logging', option='test_run')
 
-            json_file_path = os.path.join(path_test_specs, current_file_name)
+            json_file_path = os.path.abspath(filename)
             paths['json_file_path'] = json_file_path
 
-            name = generator.strip_file_extension(current_file_name)
+            spec = json.load(open(json_file_path, 'r'))
+            name = generator.create_file_name(spec['_name'].strip())
+
             cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
             paths['cmd_log_file_path'] = cmd_log_file_path
 
             vrc_log_file_path = os.path.join(path_test_runs, name + testing_logger.vrc_log_auxiliary)
             paths['vrc_log_file_path'] = vrc_log_file_path
+
         except Exception as e:
-            self.logger.info('Json or Log Files could not be found')
+            self.logger.info('Json or log files could not be found')
             return ''
+
         return paths
 
     def open_test_files(self, simple_action, paths, *args):
@@ -416,7 +432,7 @@ class TestProgressView(Gtk.ApplicationWindow):
             self.path_json = paths['json_file_path']
             self.text_path_json_btn.set_file(Gio.File.new_for_path(self.path_json))
         except:
-            logger.debug('JSon File could not be opened')
+            logger.debug('Json file could not be opened')
 
         try:
             self.path_cmd = paths['cmd_log_file_path']
@@ -569,7 +585,6 @@ class TestProgressView(Gtk.ApplicationWindow):
         self.make_treeview()
         self.on_reload_all()
 
-
     def on_reload_all(self, *args):
         if self.path_json:
             self.load_json(self.path_json)
@@ -578,48 +593,88 @@ class TestProgressView(Gtk.ApplicationWindow):
         if self.path_vrc:
             self.load_vrc(self.path_vrc)
 
-
     def on_clear_cmd_log(self, *args):
+
+        if self.text_path_cmd_btn.get_filename() is None:
+            return
+
+        if not self._confirm_log_clear(self.text_path_cmd_btn):
+            return
+
         with open(self.path_cmd, 'w') as cmd_log:
             cmd_log.write('')
             cmd_log.close()
 
     def on_clear_vrc_log(self, *args):
+
+        if self.text_path_vrc_btn.get_filename() is None:
+            return
+
+        if not self._confirm_log_clear(self.text_path_vrc_btn):
+            return
+
         with open(self.path_vrc, 'w') as vrc_log:
             vrc_log.write('')
             vrc_log.close()
 
+    def _confirm_log_clear(self, pathbtn):
+        logpath = os.path.basename(pathbtn.get_filename())
+        msg = '\nClear log file <i>{}</i>?\n\nAll results for this test will be deleted!'.format(logpath)
+        dialog = ConfirmClearLogDialog(msg=msg, parent=self)
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            confirmed = True
+        else:
+            confirmed = False
+
+        dialog.destroy()
+        return confirmed
+
+    def on_open_json_tst(self, *args):
+
+        json_path = self.text_path_json_btn.get_filename()
+
+        if json_path is None:
+            return
+
+        json_path = os.path.abspath(json_path)
+        tst_app = self.connect_tst()
+        try:
+            tst_app.Activate('open-test-spec', [json_path], [])
+        except Exception as e:
+            message = 'Could not open JSON in TST'
+            self.logger.error(message)
+            self.logger.exception(e)
+            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message=message)
 
     def on_save_as(self, *args):
         self.save_as_file_dialog()
-        return
 
     def save_as_file_dialog(self):
-        # If one log file is loaded use it as Log file path, otherwise ask for it in separate dialog
-        test_name = None
-        if self.path_cmd:
-            file_name = self.path_cmd.split('/')[-1]
-            log_file_path = self.path_cmd[:-len(file_name)]
-            test_name = file_name.split('_')[0]
-        elif self.path_vrc:
-            file_name = self.path_vrc.split('/')[-1]
-            log_file_path = self.path_vrc[:-len(file_name)]
-            test_name = file_name.split('_')[0]
+
+        if self.path_json:
+            test_spec = os.path.abspath(self.path_json)
         else:
-            log_file_path=None
+            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message='No Test Spec JSON selected.')
+            return
 
-        if not test_name and self.path_json:
-            test_name = self.path_json.split('/')[-1].split('.')[0]
+        if self.path_cmd:
+            log_file_path_cmd = os.path.abspath(self.path_cmd)
+        else:
+            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message='No command log selected.')
+            return
 
-        dialog = Save_to_File_Dialog(parent=self)  # Look were the output file should be saved and which files (log, json) should be used
+        if self.path_vrc:
+            log_file_path_vrc = os.path.abspath(self.path_vrc)
+        else:
+            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message='No verification log selected.')
+            return
+
+        # Look were the output file should be saved and which files (log, json) should be used
+        dialog = Save_to_File_Dialog(parent=self)
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            if not test_name:
-                test_name = dialog.test_name.get_text()
-                if not test_name:
-                    dialog.destroy()
-                    self.logger.info('Can not create Output file without test name')
-                    return
 
             folder = dialog.get_current_folder()
             run_count = dialog.run_id_selection.get_active()
@@ -629,48 +684,16 @@ class TestProgressView(Gtk.ApplicationWindow):
                 for run_id in self.run_count.keys():
                     if self.run_count[run_id] == str(run_count):
                         sent_run_id = run_id
-            if not log_file_path:
-                if not dialog.log_file_path_check.get_active():
-                    log_file_path = 'FIND'
-            if not self.path_json:
-                if dialog.log_file_path_check.get_active():
-                    json_file_path = None
-                else:
-                    json_file_path = 'FIND'
-            else:
-                json_file_path = self.path_json
 
-        elif response == Gtk.ResponseType.CANCEL:
+        else:  # response == Gtk.ResponseType.CANCEL:
             dialog.destroy()
             return
 
         dialog.destroy()
-        if log_file_path == 'FIND':  # Get the log file path if they are not already given
-            dialog = File_Path_Dialog(parent=self, file='Command or Verification Log File', is_json=False)
-            response = dialog.run()
-            if response == Gtk.ResponseType.OK:
-                log_file_path = dialog.get_current_folder()
-            elif response == Gtk.ResponseType.CANCEL:
-                dialog.destroy()
-                return
-        dialog.destroy()
 
-        if json_file_path == 'FIND':  # Get the json file if it is not already given
-            dialog = File_Path_Dialog(parent=self, file='the Json File', is_json=True)
-            response = dialog.run()
-            if response == Gtk.ResponseType.OK:
-                json_file_path = dialog.get_filename()
-            elif response == Gtk.ResponseType.CANCEL:
-                dialog.destroy()
-                return
-
-        dialog.destroy()
-
-        analyse_test_run.save_result_to_file(test_name=test_name, log_file_path=log_file_path, output_file_path=folder,
-                                             json_file_path=json_file_path, run_id=sent_run_id, test_report=test_report,
-                                             logger=self.logger)
-
-        return
+        analyse_test_run.save_result_to_file(json_file_path=test_spec, log_file_cmd=log_file_path_cmd,
+                                             log_file_vrc=log_file_path_vrc, output_file_path=folder,
+                                             run_id=sent_run_id, test_report=test_report, logger=self.logger)
 
     def on_destroy(self, *args):
         self.logger.info('Self-Destruct of the ProgressView Window initiated.\n')
@@ -1294,12 +1317,31 @@ class TestProgressView(Gtk.ApplicationWindow):
                         #self.add_detailed_row(new_row_iter, tree_store)
             self.restore_expanded_states(tree_store)
 
+    def connect_tst(self):
+        try:
+            connect_apps.connect_to_tst(logger=self.logger)
+        except dbus.exceptions.DBusException:
+            self.logger.warning('could not connect to TST, starting it')
+            cfl.start_tst()
+        k = 0
+        while k < 10:
+            self.logger.debug('trying to connect to the TST via DBus.')
+            time.sleep(0.2)
+            try:
+                prog = connect_apps.connect_to_tst(logger=self.logger)
+                if prog is not None:
+                    self.logger.info('Successfully connected to TST via DBus.')
+                    return prog
+            except dbus.exceptions.DBusException:
+                self.logger.warning('Failed to connect to TST')
+            k += 1
+
 
 class Save_to_File_Dialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None):
         super(Save_to_File_Dialog, self).__init__(title='Please choose a Folder to save the Test Run',
                                        parent=parent,
-                                       action=Gtk.FileChooserAction.OPEN_FOLDER)
+                                       action=Gtk.FileChooserAction.SELECT_FOLDER)
 
         self.win = parent
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
@@ -1335,12 +1377,12 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
         # Select the Run ID which should be printed to the File
         self.run_id_selection = Gtk.ComboBoxText.new()  # Make the Combobox
         if not self.win.sort_button.get_active():  # If sorted by steps, run id is not defined
-            self.run_id_selection.append_text('Whole Log File')  # Only possible selection is to save whole file
+            self.run_id_selection.append_text('All runs')  # Only possible selection is to save whole file
             self.run_id_selection.set_button_sensitivity(False)
             self.run_id_selection.set_active(0)
-            self.run_id_selection.set_tooltip_text('If Sorted by Executions, it is possible to limit the Output File to just one Run')
+            self.run_id_selection.set_tooltip_text('If Sorted by runs, it is possible to limit the output file to a specific run')
         else:  # If sorted by executions add all available run ids
-            self.run_id_selection.append('0', 'Whole Log File')  # Give also the possibility to save whole file
+            self.run_id_selection.append('0', 'All runs')  # Give also the possibility to save whole file
             for run_id in self.win.run_count:
                 self.run_id_selection.append(run_id, 'Run ' + self.win.run_count[run_id])  # Add all Run ids
 
@@ -1359,12 +1401,12 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
                     self.run_id_selection.set_active(1)
                 except:
                     self.run_id_selection.set_active(0)
-            self.run_id_selection.set_tooltip_text('Define which Run should be saved or the whole Log File')
+            self.run_id_selection.set_tooltip_text('Select which run should be saved')
 
         test_report_label = Gtk.Label(label='Test Report: ')
 
         self.test_report_int = Gtk.Entry()
-        self.test_report_int.set_tooltip_text('Select the Test Report Number (1-999) NOTE: Prior Versions could be overwritten, If emtpy it will be automatically generated')
+        self.test_report_int.set_tooltip_text('Specify the Test Report version (1-999)\nNOTE: Prior versions could be overwritten. Will be automatically generated if empty')
 
         self.savedetailes.pack_end(self.run_id_selection, False, True, 10)
         self.savedetailes.pack_end(run_id_label, False, True, 10)
@@ -1392,8 +1434,8 @@ class Save_to_File_Dialog(Gtk.FileChooserDialog):
 class File_Path_Dialog(Gtk.FileChooserDialog):
     def __init__(self, parent=None, file=None, is_json=None):
         super(File_Path_Dialog, self).__init__(title='Please choose {}'.format(file),
-                                                  parent=parent,
-                                                  action=Gtk.FileChooserAction.OPEN)
+                                               parent=parent,
+                                               action=Gtk.FileChooserAction.OPEN)
 
         self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
 
@@ -1406,9 +1448,22 @@ class File_Path_Dialog(Gtk.FileChooserDialog):
         if not is_json:
             area = self.get_content_area()
             #main_box = Gtk.HBox()
-            label = Gtk.Label(label='It does not matter if Command or Verification Log File is choosen, both are in the same Folder')
+            label = Gtk.Label(label='It does not matter whether Command or Verification Log File is choosen, both are in the same folder')
             #main_box.pack_end(label, False, True, 10)
             area.pack_start(label, False, True, 0)
+        self.show_all()
+
+
+class ConfirmClearLogDialog(Gtk.MessageDialog):
+
+    def __init__(self, msg='', parent=None):
+        super().__init__(title='Clear log', parent=parent)
+
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        self.set_transient_for(parent)
+
+        self.set_markup(msg)
+
         self.show_all()
 
 

@@ -184,8 +184,10 @@ class Board(Gtk.Box):
         self.label_comment.set_text(_('Test comment:'))
         # Make the area where the real command is entered
         self.comment_scrolled_window = Gtk.ScrolledWindow()
+        self.comment_scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         # self.comment_scrolled_window.set_size_request(200, 100)
         self.test_meta_data_comment = Gtk.TextView.new()
+        self.test_meta_data_comment.set_wrap_mode(Gtk.WrapMode.WORD)
         Gtk.StyleContext.add_class(self.test_meta_data_comment.get_style_context(), 'text-view')
         self.comment_scrolled_window.add(self.test_meta_data_comment)
 
@@ -775,7 +777,7 @@ class StepWidget(Gtk.EventBox):
         # self.lbl_box_verification.pack_start(self.btn_exec_verification, False, False, 0)
         # self.detail_box.pack_start(self.lbl_box_verification, True, True, 0)
         self.verification_scrolled_window = Gtk.ScrolledWindow()
-        # self.verification_scrolled_window.set_size_request(50, 100)
+        #self.verification_scrolled_window.set_size_request(50, 100)
         self.verification_view = GtkSource.View()
         self.verification_view.set_auto_indent(True)
         self.verification_view.set_show_line_numbers(True)

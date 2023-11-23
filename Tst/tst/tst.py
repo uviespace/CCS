@@ -26,6 +26,7 @@ import toolbox
 import tc_management as tcm
 import tm_management as tmm
 import data_pool_tab as dpt
+import verification_tab as vt
 
 import json_to_barescript
 import json_to_csv
@@ -52,7 +53,7 @@ file_hdlr = toolbox.create_file_handler(file=log_file)
 logger.addHandler(hdlr=file_hdlr)
 
 
-VERSION = '0.10'
+VERSION = '0.11'
 
 
 class TstApp(Gtk.Application):
@@ -113,13 +114,13 @@ class TstApp(Gtk.Application):
         action.connect("activate", self._on_start_poolmanager)
         self.add_action(action)
 
-        action = Gio.SimpleAction.new('start_plotter', None)
-        action.connect("activate", self._on_start_plotter)
-        self.add_action(action)
-
-        action = Gio.SimpleAction.new('start_monitor', None)
-        action.connect("activate", self._on_start_monitor)
-        self.add_action(action)
+        # action = Gio.SimpleAction.new('start_plotter', None)
+        # action.connect("activate", self._on_start_plotter)
+        # self.add_action(action)
+        #
+        # action = Gio.SimpleAction.new('start_monitor', None)
+        # action.connect("activate", self._on_start_monitor)
+        # self.add_action(action)
 
         action = Gio.SimpleAction.new('start_config_editor', None)
         action.connect("activate", self._on_start_config_editor)
@@ -238,6 +239,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
         action.connect('activate', self.on_about)
         self.add_action(action)
 
+        action = Gio.SimpleAction.new('open-test-spec', GLib.VariantType('s'))
+        action.connect('activate', self.load_test_spec)
+        self.add_action(action)
+
         self.create_make_menu()
 
         self.set_icon_from_file(path_icon)
@@ -277,25 +282,26 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.btn_export_csv.set_icon_name('text-csv')
         self.btn_export_csv.set_tooltip_text('Export current spec to CSV')
         self.btn_export_csv.connect('clicked', self.on_generate_csv)
-        # self.btn_generate_products = Gtk.ToolButton()
-        # self.btn_generate_products.set_label('Generate scripts')
-        # self.btn_generate_products.set_icon_name('text-x-python')
-        # self.btn_generate_products.set_tooltip_text('Generate command.py, verification.py and manually.py')
-        # self.btn_generate_products.connect('clicked', self.on_generate_products)
+        self.btn_generate_products = Gtk.ToolButton()
+        self.btn_generate_products.set_label('Automated test scripts')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(cfg.get('paths', 'ccs'), 'pixmap/pythons.png'), 28, 28)
+        icon = Gtk.Image.new_from_pixbuf(pixbuf)
+        self.btn_generate_products.set_icon_widget(icon)
+        self.btn_generate_products.set_tooltip_text('Generate set of Python scripts for automated testing')
+        self.btn_generate_products.connect('clicked', self.on_generate_products)
         self.btn_generate_script = Gtk.ToolButton()
-        self.btn_generate_script.set_label('Generate scripts')
+        self.btn_generate_script.set_label('Generate script')
         self.btn_generate_script.set_icon_name('text-x-python')
-        self.btn_generate_script.set_tooltip_text('Generate Python script of the current test')
+        self.btn_generate_script.set_tooltip_text('Generate compact Python script of the current test')
         self.btn_generate_script.connect('clicked', self.on_generate_barescript)
 
         self.btn_start_ccs_editor = Gtk.ToolButton()
         self.btn_start_ccs_editor.set_label('Start CCS')
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(
-            cfg.get('paths', 'ccs') + '/pixmap/ccs_logo_2.svg', 28, 28)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(os.path.join(cfg.get('paths', 'ccs'), 'pixmap/ccs_logo_2.svg'), 28, 28)
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.btn_start_ccs_editor.set_icon_widget(icon)
         self.btn_start_ccs_editor.set_tooltip_text('Start CCS-Editor')
-        self.btn_start_ccs_editor.connect('clicked', self.on_start_ccs_editor)
+        self.btn_start_ccs_editor.connect('clicked', self.connect_to_ccs_editor)
 
         self.btn_open_progress_view = Gtk.ToolButton()
         self.btn_open_progress_view.set_label('Start ProgressView')
@@ -310,10 +316,10 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.toolbar.insert(self.btn_save_as, 3)
         # self.toolbar.insert(self.btn_show_model_viewer, 2)
         self.toolbar.insert(self.btn_export_csv, 4)
-        # self.toolbar.insert(self.btn_generate_products, 5)
         self.toolbar.insert(self.btn_generate_script, 5)
-        self.toolbar.insert(self.btn_start_ccs_editor, 6)
-        self.toolbar.insert(self.btn_open_progress_view, 7)
+        self.toolbar.insert(self.btn_generate_products, 6)
+        self.toolbar.insert(self.btn_start_ccs_editor, 7)
+        self.toolbar.insert(self.btn_open_progress_view, 8)
         
         # IDB chooser
         self.idb_chooser = Gtk.ToolButton()
@@ -323,12 +329,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.idb_chooser.set_label_widget(label)
         self.idb_chooser.set_tooltip_text('Select IDB')
         self.idb_chooser.connect('clicked', self.on_set_idb_version)
-        self.toolbar.insert(self.idb_chooser, 8)
+        self.toolbar.insert(self.idb_chooser, 9)
 
         # separator
         sepa = Gtk.SeparatorToolItem()
         sepa.set_expand(True)
-        self.toolbar.insert(sepa, 9)
+        self.toolbar.insert(sepa, 10)
 
         # logo
         self.unilogo = Gtk.ToolButton()
@@ -337,7 +343,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         icon = Gtk.Image.new_from_pixbuf(pixbuf)
         self.unilogo.set_icon_widget(icon)
         self.unilogo.connect('clicked', self.on_about)
-        self.toolbar.insert(self.unilogo, 10)
+        self.toolbar.insert(self.unilogo, 11)
         self.box.pack_start(self.toolbar, False, True, 0)
         
         self.info_bar = None
@@ -390,6 +396,12 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.label_widget_data_pool = Gtk.Label()
         self.label_widget_data_pool.set_text('Data Pool')
         self.feature_area.insert_page(child=self.data_pool_tab, tab_label=self.label_widget_data_pool, position=3)
+
+        # verification tab
+        self.verification_tab = vt.VerificationTable()
+        self.label_widget_verification = Gtk.Label()
+        self.label_widget_verification.set_text("Verification")
+        self.feature_area.insert_page(child=self.verification_tab, tab_label=self.label_widget_verification, position=4)
 
         self.box.pack_start(self.work_desk, True, True, 0)
 
@@ -609,23 +621,30 @@ class TstAppWindow(Gtk.ApplicationWindow):
         if response == Gtk.ResponseType.OK:
             file_selected = dialog.get_filename()
             cfg.save_option_to_file('tst-history', 'last-folder', os.path.dirname(file_selected))
-            try:
-                json_type = True
-                data_from_file = file_management.open_file(file_name=file_selected)
-                filename = file_selected
-            except json.decoder.JSONDecodeError:
-                # data_from_file = file_management.from_json(spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False))
-                data_from_file = spec_to_json.run(specfile=file_selected, gen_cmd=True, save_json=False)
-                filename = file_selected.replace('.' + file_selected.split('.')[-1], '.json')
-                json_type = False
-                if os.path.exists(filename):
-                    self.existing_json_warn_dialog(filename)
 
-            if data_from_file is not None:
-                self.on_open_create_tab(data_from_file, filename, json_type)
+            self.load_test_spec(None, file_selected)
 
         dialog.destroy()
-        return
+
+    def load_test_spec(self, simple_action, json_path, *args):
+
+        # cast to string if called from open-test-spec action via DBus
+        if isinstance(json_path, GLib.Variant):
+            json_path = json_path.get_string()
+
+        try:
+            json_type = True
+            data_from_file = file_management.open_file(json_path)
+            filename = json_path
+        except json.decoder.JSONDecodeError:
+            data_from_file = spec_to_json.run(specfile=json_path, gen_cmd=True, save_json=False)
+            filename = json_path.replace('.' + json_path.split('.')[-1], '.json')
+            json_type = False
+            if os.path.exists(filename):
+                self.existing_json_warn_dialog(filename)
+
+        if data_from_file is not None:
+            self.on_open_create_tab(data_from_file, filename, json_type)
 
     def on_open_create_tab(self, data_from_file, filename, json_type):
         # make a new test instance and notebook page
@@ -641,7 +660,6 @@ class TstAppWindow(Gtk.ApplicationWindow):
         self.update_model_viewer()
         new_test.view.update_widget_data()
         self.notebook.set_current_page(new_page_index)
-        return
 
     def on_save(self, *args):
         # get the  data model of the current notebook page
@@ -872,9 +890,6 @@ class TstAppWindow(Gtk.ApplicationWindow):
         This function generates out of the current test script model the command script, the verification script and
         the documentation file. If it succeeded, a dialog box will be triggered.
         """
-        # ToDo: remove the reloading, when developing is finished
-        # import importlib
-        # importlib.reload(generator)
         model = self.current_model()
         if not model:
             logger.info('Test Files can not be generated without Steps')
@@ -884,21 +899,38 @@ class TstAppWindow(Gtk.ApplicationWindow):
             logger.info('Test Files can not be generated if Test has no name!')
             logger.error('Please give the test a name')
             return
-        self.product_paths = generator.make_all(model=model)
+
+        existfns = self.check_for_existing_files(model)
+        if existfns:
+
+            dialog = FilesExistDialog(existfns[0])
+            dialog.set_transient_for(self)
+
+            response = dialog.run()
+            if response != Gtk.ResponseType.OK:
+                dialog.destroy()
+                return
+
+            dialog.destroy()
+
+        self.product_paths = generator.make_all(model)
         # triggering the dialog after generation
         self.on_generate_products_message_dialog(paths=self.product_paths)
+
+    def check_for_existing_files(self, model):
+        cmdfn = generator.create_script_path(model.name, generator.cmd_scrpt_auxiliary)
+        runfn = generator.create_script_path(model.name, generator.run_scrpt_auxiliary)
+        vrcfn = generator.create_script_path(model.name, generator.vrc_scrpt_auxiliary)
+
+        if os.path.isfile(cmdfn) or os.path.isfile(runfn) or os.path.isfile(vrcfn):
+            return cmdfn, runfn, vrcfn
+        else:
+            return False
 
     def on_generate_barescript(self, *args):
         """
         Generates a compact python test file without all the additional stuff from on_generate_scripts
         """
-        # dialog = Gtk.FileChooserDialog(
-        #     title="Save script as", parent=self, action=Gtk.FileChooserAction.SAVE)
-        # dialog.add_buttons(
-        #     Gtk.STOCK_CANCEL,
-        #     Gtk.ResponseType.CANCEL,
-        #     Gtk.STOCK_SAVE,
-        #     Gtk.ResponseType.OK, )
 
         if self.current_test_instance():
             # current_json_filename = self.current_test_instance().filename
@@ -962,7 +994,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
         dialog.destroy()
         return
 
-    def connect_to_ccs_editor(self):
+    def connect_to_ccs_editor(self, *args):
         # get the DBus connection to the CCS-Editor
         editor = connect_apps.connect_to_editor()
         if editor is None:
@@ -970,6 +1002,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             self.on_start_ccs_editor(False)
 
         editor = connect_apps.connect_to_app('editor')
+        editor.Functions('present')
         '''     
         k = 0
         while k < 3:
@@ -1029,11 +1062,11 @@ class TstAppWindow(Gtk.ApplicationWindow):
                                    Gtk.MessageType.QUESTION,
                                    Gtk.ButtonsType.YES_NO,
                                    'Scripts were generated')
-        message = 'Generated files:\n'
+        message = 'Generated files in {}:\n\n'.format(os.path.dirname(paths[0]))
         for entry in paths:
             message += os.path.basename(entry) + '\n'
         paths.append(os.path.join(os.path.realpath(os.path.join(os.path.dirname(__file__), '..')), 'prep_test_env.py'))
-        message += 'Do you want to open them in CCS?'
+        message += '\nDo you want to open them in CCS?'
         dialog.format_secondary_text(message)
         response = dialog.run()
         if response == Gtk.ResponseType.YES:
@@ -1054,14 +1087,15 @@ class TstAppWindow(Gtk.ApplicationWindow):
             self.logger.warning('Progress Viewer started without running Test')
             return ''
         try:
-            current_file_name = os.path.basename(current_instance.filename)
-            path_test_specs = cfg.get(section='tst-paths', option='tst_products')
+            # current_file_name = os.path.basename(current_instance.filename)
+            # path_test_specs = cfg.get(section='tst-paths', option='tst_products')
             path_test_runs = cfg.get(section='tst-logging', option='test_run')
 
-            json_file_path = os.path.join(path_test_specs, current_file_name)
-            paths['json_file_path'] = json_file_path
+            # json_file_path = current_instance.filename
+            paths['json_file_path'] = current_instance.filename
 
-            name = generator.strip_file_extension(current_file_name)
+            name = generator.create_file_name(current_instance.test_meta_data_name.get_text().strip())
+
             cmd_log_file_path = os.path.join(path_test_runs, name + testing_logger.cmd_log_auxiliary)
             paths['cmd_log_file_path'] = cmd_log_file_path
 
@@ -1083,13 +1117,14 @@ class TstAppWindow(Gtk.ApplicationWindow):
         progress_viewer = self.connect_progress_viewer()
         file_names = self.get_log_file_paths_from_json_file_name()
         try:
-            progress_viewer.Activate('open-test-files', [file_names], [])
+            if file_names:
+                progress_viewer.Activate('open-test-files', [file_names], [])
         except Exception as e:
-            message = 'Could not start ProgressViewer application.'
+            message = 'Could not load test files for {} in Progress Viewer.'.format(file_names['json_file_path'])
             self.logger.error(message)
             self.logger.exception(e)
             # add a info bar message that the starting of the CCS-Editor failed.
-            self.add_info_bar(message_type=Gtk.MessageType.ERROR, message=message)
+            self.add_info_bar(message_type=Gtk.MessageType.WARNING, message=message)
 
     def on_start_ccs_editor(self, *args):
         try:
@@ -1308,6 +1343,16 @@ class ScriptExportDialog(Gtk.FileChooserDialog):
             self.csvspec.set_sensitive(True)
         else:
             self.csvspec.set_sensitive(False)
+
+
+class FilesExistDialog(Gtk.MessageDialog):
+
+    def __init__(self, existpath):
+        super().__init__(title='Files exist', message_type=Gtk.MessageType.INFO)
+
+        existdir, existfn = os.path.split(existpath)
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        self.set_markup('\n<i>{}*</i> scripts already exist in\n{}\nand will be overwritten!'.format(existfn.replace(generator.cmd_scrpt_auxiliary, ''), existdir))
 
 
 if __name__ == '__main__':
