@@ -979,15 +979,78 @@ def extract_apid_from_packetid(packet_id):
     return apid
 
 
+def get_tc_ack(pool_name="LIVE", ack_types=None, tc_apid=321):
 
-def get_tc_acknow(pool_name="LIVE", tc_apid=321, tc_ssc=1, tm_st=1, tm_sst=None):
+    if ack_types is None:
+        remaining = [1, 7]
+    else:
+        remaining = list(ack_types)
+
+    tc_data = get_data_of_last_tc(pool_name, apid=tc_apid)
+
+    if tc_data is None:
+        return False, []
+
+    t_tc_sent = tc_data[0]
+    tc_idx = tc_data[1]
+    tc_head_bytes = tc_data[2]
+
+    assert isinstance(pool_name, str)
+    assert isinstance(tc_apid, (int, str))
+    assert isinstance(t_tc_sent, (float, int))
+    assert isinstance(tc_idx, int)
+    assert isinstance(tc_head_bytes, (int, str, bytes))
+
+    acks = cfl.get_pool_rows(pool_name)
+    acks = acks.filter(cfl.DbTelemetry.stc == 1, cfl.DbTelemetry.idx > tc_idx).order_by(cfl.DbTelemetry.idx)
+
+    ack_pkts = []
+    result = False
+
+    for ack in acks:
+        if ack.data[:4] == tc_head_bytes:
+
+            if ack.sst in [1, 3, 7]:
+                logger.info('TM({},{}) @ {}'.format(ack.stc, ack.sst, ack.timestamp))
+            elif ack.sst in [2, 4, 8]:
+                if ack.sst == 2:
+                    logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of acceptance check for a command.'
+                                .format(ack.stc, ack.sst, ack.timestamp))
+                    logger.debug('Data of the TM packet: {}'.format(ack.raw.hex()))
+                if ack.sst == 4:
+                    logger.info('TM({},{}) @ {} FAILURE: Acknowledge failure of start check for a command.'
+                                .format(ack.stc, ack.sst, ack.timestamp))
+                    logger.debug('Data of the TM packet: {}'.format(ack.raw.hex()))
+                if ack.sst == 8:
+                    logger.info(
+                        'TM({},{}) @ {} FAILURE: Acknowledge failure of termination check for a command.'
+                        .format(ack.stc, ack.sst, ack.timestamp))
+                    logger.debug('Data of the TM packet: {}'.format(ack.raw.hex()))
+            else:
+                logger.info('No TM found with matching pattern {}'.format(tc_head_bytes))
+
+            try:
+                remaining.remove(ack.sst)
+            except ValueError:
+                pass
+
+            ack_pkts.append(ack.raw)
+
+    if not remaining:
+        result = True
+
+    if not ack_pkts:
+        logger.info('No ACKs found with matching pattern {}'.format(tc_head_bytes.hex().upper()))
+
+    return result, ack_pkts
+
+
+def get_tc_acknow(pool_name="LIVE", tc_apid=321, tc_ssc=None, tm_st=1, tm_sst=None):
     """
     Check if for the TC acknowledgement packets can be found in the database.
     This function makes a single database query.
     :param pool_name: str
         Name of the TM pool in the database
-    :param t_tc_sent: float
-        CUC timestamp from which search for telecommand should start
     :param tc_apid: int or str
         Application process ID of the sent TC. Can be provided as integer or hexadecimal string
     :param tc_ssc: int
@@ -1017,7 +1080,7 @@ def get_tc_acknow(pool_name="LIVE", tc_apid=321, tc_ssc=1, tm_st=1, tm_sst=None)
     tc_apid = tools.convert_apid_to_int(apid=tc_apid)
 
     # make database query
-    packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent - 1)
+    packets = fetch_packets(pool_name=pool_name, st=tm_st, sst=tm_sst, t_from=t_tc_sent)
     # print(packets[1][0][0].CTIME + (packets[1][0][0].FTIME/1000000))
     # filter for TM packets with the correct APID and source sequence counter (SSC) in the data field
     ack_tms = []
@@ -1848,7 +1911,7 @@ def get_acquisition(pool_name, tm_21_3):
     return result
 
 
-def get_data_of_last_tc(pool_name="LIVE"):
+def get_data_of_last_tc(pool_name="LIVE", apid=None):
     """
     Finds the newest Telecommand in database with the Telemetry just before.
     :param pool_name: str
@@ -1857,21 +1920,25 @@ def get_data_of_last_tc(pool_name="LIVE"):
         timestamp of packet, IID of packet, First four bytes of packet data
     """
 
-
     tm_pool = cfl.get_pool_rows(pool_name)
-    # last_telecommand = None
-    tm_before_tc = None
-    for i in range(-1, -100, -1):
-        if tm_pool[i].timestamp == "":
-            # last_telecommand = tm_pool[i]
-            tm_before_tc = tm_pool[i-1]
-            tc_id = tm_pool[i].iid
-            tc_bytes = tm_pool[i].raw.hex()[:4]
 
-            break
+    tcpkt = tm_pool.filter(cfl.DbTelemetry.is_tm == 1).order_by(cfl.DbTelemetry.idx.desc())
+
+    if apid is not None:
+        tcpkt = tcpkt.filter(cfl.DbTelemetry.apid == apid)
+
+    tcpkt = tcpkt.first()
+
+    if tcpkt is None:
+        return
+
+    tc_id = tcpkt.idx
+    tc_bytes = tcpkt.raw[:4]  # fist 4 bytes of TC used for identification in ACK service
+
+    tm_before_tc = tm_pool.filter(cfl.DbTelemetry.is_tm == 0, cfl.DbTelemetry.idx < tc_id).order_by(cfl.DbTelemetry.idx.desc()).first()
+
     timestamp = tm_before_tc.timestamp
-    timestamp_length = len(timestamp)
-    timestamp = float(timestamp[:timestamp_length -1])
+    timestamp = float(timestamp[:-1])
     return timestamp, tc_id, tc_bytes
 
 
