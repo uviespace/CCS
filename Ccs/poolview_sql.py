@@ -1589,6 +1589,9 @@ class TMPoolView(Gtk.Window):
         self.Active_Pool_Info_append(poolmgr.Dictionaries('loaded_pools', pool_name))
         self.offset = 0
 
+        self.autoscroll = True
+        self.autoselect = True
+
         self.adj.set_upper(self.count_current_pool_rows())
         self._on_scrollbar_changed()
         widget.set_sensitive(True)
