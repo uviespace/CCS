@@ -96,11 +96,6 @@ class TMPoolView(Gtk.Window):
     row_buffer_n = 100
     main_instance = None
     first_run = True
-    shown_all_rows = []
-    shown_lock = threading.Lock()
-    shown_thread = {}
-    shown_loaded = False
-    shown_limit = 0
     only_scroll = False
 
     CELLPAD_MAGIC = float(cfg['ccs-misc']['viewer_cell_pad'])
@@ -721,90 +716,9 @@ class TMPoolView(Gtk.Window):
 
         if self.active_pool_info is None:
             return
+
         limit = self.adj.get_page_size() if not limit else limit  # Check if a limit is given
 
-        sort = False
-        # Check if the rows should be shown in any specific order
-        for col in self.tm_columns[self.decoding_type]:
-            if self.tm_columns[self.decoding_type][col][1] in [1,2]:
-                sort = True
-
-        position = int(len(self.shown_all_rows) - self.adj.get_page_size())
-        if position < 0:
-            position = 0
-        #offset = 0 if offset < 0 else offset
-        self.shown_lock.acquire()   # Thread lock to changes shared variables between threads
-
-        # If the offset is still in buffer range get new packages from buffer and reload the buffer in a thread, if autoscroll dont use buffer (makes no sense)
-        #if self.shown_loaded and offset in range(self.shown_upper_limit, self.shown_offset+buffer) and not force_import:
-        if self.shown_loaded and offset in range(self.shown_all_rows[0][0], self.shown_all_rows[position][0]+1) and not force_import and not sort and not self.autoscroll:
-            if self.filter_rules_active and scrolled:
-                for x, row in enumerate(self.shown_all_rows, start=0):
-                    if row[0] >= self.shown_offset:
-                        position_shown_offset = x
-                        break
-                for x, row in enumerate(self.shown_all_rows, start=0):
-                    if row[0] >= self.offset:
-                        position_offset = x
-                        break
-
-                shown_diff = position_offset - position_shown_offset
-            else:
-                shown_diff = offset - self.shown_offset     # How far has been scrolled
-
-            if isinstance(self.shown_diff, int):
-                self.shown_diff += shown_diff   # Thread is already loading, load additional ones
-            else:
-                self.shown_diff = shown_diff    # New thread knows how much should be loaded
-        elif self.shown_loaded and self.shown_offset and abs(self.shown_offset-self.offset) < buffer and sort and not force_import and not self.autoscroll: # If sorted and inside buffer
-            shown_diff = offset - self.shown_offset
-
-            if isinstance(self.shown_diff, int):
-                self.shown_diff += shown_diff   # Thread is already loading, load additional ones
-            else:
-                self.shown_diff = shown_diff    # New thread knows how much should be loaded
-
-        else:   # Scrolled outside of loaded buffer, reload all shown packages
-            self.shown_offset = offset  # Index of the first package shown, does not update if buffer does not update
-            self.shown_diff = None  # How far hs been scrolled
-            shown_diff = None
-            self.shown_upper_limit = 0 if (offset - buffer) < 0 else offset - buffer  # Upper limit of buffer
-
-        local_offset = 0 if offset - buffer < 0 else offset - buffer
-        # If the limit changes reload all packages, important for end of pool and if pool is loaded during starting process
-        if self.shown_limit != (limit + 2*buffer):
-            self.shown_limit_changed = True
-        else:
-            self.shown_limit_changed = False
-
-        self.shown_limit = int(limit + 2*buffer)     # Length of all loaded packages including buffer
-        self.shown_buffer = buffer  # Buffer length
-        self.shown_lock.release()
-        if shown_diff == 0 and not rows and not self.shown_limit_changed:   # If nothing changed do nothing
-            return  # Necessary, sometimes function is called from different plays, but should not be executed multiple times
-        elif shown_diff and not rows and not self.shown_limit_changed:  # Update buffer and scroll within buffer
-            # If no thread is running start one to update the buffer
-            self.shown_lock.acquire()
-            if not self.shown_thread:
-                t_shown_rows = threading.Thread(target=self.update_shown_buffer)
-                t_shown_rows.daemon = True
-                t_shown_rows.start()
-                self.shown_thread.update({t_shown_rows.name: True})
-            self.shown_lock.release()
-                # self.shown_thread_running = True
-            # Start the updating from buffer
-
-            self.feed_lines_to_view(shown_diff)
-            return
-        ####### Reload all packages
-        # If a thread is still loading, tell it to not add them to the buffer
-        self.shown_lock.acquire()
-        if self.shown_thread:
-            self.shown_thread = {}
-
-        self.shown_lock.release()
-
-        # Set up the query
         if rows is None:
             # Combine the Storage Tables and filter only the packages for the given pool
             new_session = self.session_factory_storage
@@ -832,35 +746,11 @@ class TMPoolView(Gtk.Window):
         if self.filter_rules_active:
             rows = self._filter_rows(rows)
 
-            # if self.tm_columns[col][2] is not None:
-            #     try:
-            #         rows = rows.filter(self.tm_columns[col][0] == self.tm_columns[col][2])
-            #     except:
-            #         print("filtering error")
-        # self.adj.set_upper(rows.count())
-        # If sorted use different query, this is slower but there is no other possibility
         if sorted:
-            # rows = rows[offset:offset+limit]
-            #rows = rows.options(load_only()).yield_per(1000).offset(offset).limit(limit)
-            if local_offset < 1:    # No buffer needed on the upper side if index is 1
-                rows = rows.options(load_only()).yield_per(1000).offset(local_offset).limit(self.shown_limit - self.shown_buffer + offset)
-            else:
-                rows = rows.options(load_only()).yield_per(1000).offset(local_offset).limit(self.shown_limit)
-            #rows = rows.offset(local_offset).limit(self.shown_limit)
-        else:   # Query is faster this way, only possible if not sorted
-            #rows = rows.filter(DbTelemetry.idx > offset).limit(limit)  # .all
-            if local_offset < 1:    # No buffer needed on the upper side if index is 1
-                rows = rows.filter(Telemetry[self.decoding_type].idx > local_offset).limit(self.shown_limit - self.shown_buffer + offset) # .all()
-            else:
-                rows = rows.filter(Telemetry[self.decoding_type].idx > local_offset).limit(self.shown_limit) # .all()
-            #rows = rows.offset(local_offset).limit(self.shown_limit)
-
-
-        self.treeview.freeze_child_notify()
-        #starttime = time.time()
-        self.reload_all_shown_rows(rows)    # Load all rows
-        #print('TIME:::', time.time()-starttime)
-        self.treeview.thaw_child_notify()
+            rows = rows.options(load_only()).yield_per(1000).offset(offset).limit(limit)
+        else:
+            rows = rows.filter(Telemetry[self.decoding_type].idx > offset).limit(limit)
+        return rows
 
     def _filter_rows(self, rows):
 
@@ -901,344 +791,25 @@ class TMPoolView(Gtk.Window):
 
         return rows
 
-    def feed_lines_to_view(self, shown_diff):
+    def feed_lines_to_view(self, rows):
         """
         Updates the shown packages from the buffer
         @param shown_diff: how many lines has been scrolled
         @return: -
         """
 
-        self.treeview.freeze_child_notify()
-        #self.pool_liststore.clear()
-        #something = []
-        #for i in self.shown_all_rows:
-        #    something.append(i[0])
-        sorted = False
-        for col in self.tm_columns[self.decoding_type]:
-            if self.tm_columns[self.decoding_type][col][1] in [1,2]:
-                sorted = True
-
-        # Empty the liststore and refill it from buffer
-        #x = 0
-        #for tm_row in self.shown_all_rows:  # Loop over all loaded packages and only use the once in the view area
-        #    if x in range(self.shown_offset + shown_diff - self.shown_upper_limit,
-        #                  self.shown_offset + shown_diff + int(self.adj.get_page_size()) - self.shown_upper_limit):
-        #        liststore_rows.append(tm_row)
-        #    x += 1
-        if sorted:
-            liststore_rows = []
-            #print(self.shown_all_rows)
-            first_row_idx = self.pool_liststore[0][0]
-            position = False
-            # Check at which position should be started to fill in
-            for x, row in enumerate(self.shown_all_rows, start=0):
-                if row[0] == first_row_idx:
-                    position = x
-                    break
-            if not position:
-                self.fetch_lines_from_db(force_import=True)
-
-            # Only load the packages that should be shown
-            for count, tm_row in enumerate(self.shown_all_rows):
-                if count in range(position+shown_diff, position+shown_diff+int(self.adj.get_page_size())):
-                    liststore_rows.append(tm_row)
-
-
-            if len(liststore_rows) < self.adj.get_page_size():
-                liststore_rows = self.shown_all_rows[-int(self.adj.get_page_size()):]
-            self.pool_liststore.clear()
-
-
-        else:
-            self.pool_liststore.clear()
-            liststore_rows = []
-            #Check at which position should be started to fill in
-            for x, row in enumerate(self.shown_all_rows, start=0):
-                if row[0] >= self.offset:
-                    position = x
-                    break
-
-            # Only load the packages that should be shown
-            for count, tm_row in enumerate(self.shown_all_rows):
-                if tm_row[0] >= self.offset and count <= self.adj.get_page_size()+position:
-                    liststore_rows.append(tm_row)
-
-
-            if len(liststore_rows) < self.adj.get_page_size():
-                liststore_rows = self.shown_all_rows[-int(self.adj.get_page_size()):]
-        #something = []
-        for row in liststore_rows:
-            #something.append(row[0])
-            self.pool_liststore.append(row)
-        #print(something)
-            #print(something, self.shown_offset, self.shown_upper_limit)
-        self.treeview.thaw_child_notify()   # Tell GTk to reload
-
-    def reload_all_shown_rows(self, dbrows):
-        """
-        Reload all Packages (shown and in buffer) from the Database
-        @param dbrows: The query to get the packages from the Database
-        @return: -
-        """
-        self.filter_spinner.start()
-        #self.shown_all_rows = []    # Empty buffer
-        self.shown_all_rows = self.format_loaded_rows(dbrows)
-        liststore_rows = []    # Empty liststore
-
-        #for tm in dbrows:   # Get all rows from the query, (this step can take some time if filter is active)
-        #    tm_row = [tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst, tm.destID,
-        #              str(tm.timestamp), tm.data.hex()]     # Get needed information
-        x = 0
-        for tm_row in self.shown_all_rows:
-            # Check if package should be added to buffer or if it should be shown
-            if x in range(self.shown_offset - self.shown_upper_limit,
-                          self.shown_offset + (self.shown_limit - 2*self.shown_buffer) - self.shown_upper_limit):
-                # tm_row = [tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst, tm.destID,
-                #          str(tm.timestamp), tm.data.hex()]
-                liststore_rows.append(tm_row)
-            #self.shown_all_rows.append(tm_row)
-            x += 1
         self.pool_liststore.clear()
 
-        #something = []
-        #for i in liststore_rows:
-        #    something.append(i[0])
-        #print(something)
+        # new_rows = [[tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst, tm.destID, str(tm.timestamp),
+        #              tm.data.hex()] for tm in rows]
 
-        #if len(liststore_rows) < int(self.adj.get_page_size()):
-        #    print(1)
-        #    liststore_rows = self.shown_all_rows[-int(self.adj.get_page_size()):]
+        # self.treeview.freeze_child_notify()
 
-        for tm in liststore_rows:
-            self.pool_liststore.append(tm)
-        if liststore_rows:
-            self.shown_loaded = True
-        else:
-            self.shown_loaded = False
-        self.filter_spinner.stop()
-        return
+        for tm in rows:
+            self.pool_liststore.append([tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst,
+                                        tm.destID, str(tm.timestamp), tm.data.hex()])
 
-
-    def update_shown_buffer(self):
-        """
-        Update the buffer for the shown packages in a seperate thread
-        @return:
-        """
-        # Run until told otherwise
-        while True:
-            # Get all needed global variables to local variabels so that there is no confilct
-            self.shown_lock.acquire()
-            shown_offset = self.shown_offset
-            shown_diff = self.shown_diff
-            shown_upper_limit = self.shown_upper_limit - 2
-            shown_limit = self.shown_limit
-            shown_buffer = self.shown_buffer
-            offset = self.offset
-
-            if not shown_diff:  # If there has been no change since the last update close the thread
-                try:
-                    self.shown_thread = {}
-                except:
-                    pass
-                self.shown_lock.release()
-                break
-            self.shown_lock.release()
-
-            # Make the query to load packages from the Database
-            new_session = self.session_factory_storage
-            # Join both storage table from the database and filter all package that belong to the given pool
-            rows = new_session.query(
-                Telemetry[self.decoding_type]
-            ).join(
-                DbTelemetryPool,
-                Telemetry[self.decoding_type].pool_id == DbTelemetryPool.iid
-            ).filter(
-                DbTelemetryPool.pool_name == self.active_pool_info.filename
-            )
-
-            sorted = False
-            # Check if the packages should be shown in a specific order
-            for col in self.tm_columns[self.decoding_type]:
-                if self.tm_columns[self.decoding_type][col][1] == 1:
-                    rows = rows.order_by(self.tm_columns[self.decoding_type][col][0], Telemetry[self.decoding_type].idx)
-                    sorted = True
-                elif self.tm_columns[self.decoding_type][col][1] == 2:
-                    rows = rows.order_by(self.tm_columns[self.decoding_type][col][0].desc(), Telemetry[self.decoding_type].idx.desc())
-                    sorted = True
-
-            # Check if a filter has applied
-            if self.filter_rules_active:
-                rows = self._filter_rows(rows)
-                #filtered = True
-            if shown_diff < 0:  # Scrolled up
-                reverse = True
-                # Complete the query to only get the few packages which are actually needed to update the buffer
-                if sorted:
-                    if shown_upper_limit > abs(shown_diff):
-                        dbrows = rows.offset(shown_upper_limit + shown_diff).limit(shown_diff * -1)
-                    else:
-                        dbrows = rows.offset(0).limit(shown_diff * -1)
-                else:
-                    #if shown_upper_limit > abs(shown_diff):
-                    #dbrows = rows.filter(Telemetry[self.decoding_type].idx > (shown_upper_limit + shown_diff + 1)).limit(shown_diff * -1)
-                    reverse = False
-                    dbrows = rows.filter(Telemetry[self.decoding_type].idx < self.shown_all_rows[0][0]).order_by(Telemetry[self.decoding_type].idx.desc()).limit(shown_diff * -1)
-
-                    #else:
-                        #dbrows = rows.filter(Telemetry[self.decoding_type].idx > 0).limit(shown_diff * -1)
-
-                #tm_rows = []
-                tm_rows = self.format_loaded_rows(dbrows)
-                #print(tm_rows)
-                # Get the information from the DB, do this before lock is aquired it can take a bit
-                store_rows = []
-                if reverse:
-                    for tm in reversed(tm_rows):
-                        store_rows.append(tm)
-                else:
-                    for tm in tm_rows:
-                        store_rows.append(tm)
-                # Get the information of the packages
-                #for tm in dbrows:
-                #    tm_row = [tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst, tm.destID,
-                #              str(tm.timestamp), tm.data.hex()]
-                #    tm_rows.append(tm_row)
-                self.shown_lock.acquire()
-                # Check if the thread should still run, or if it is not longer necessary
-                try:
-                    a = self.shown_thread[threading.current_thread().name]
-                except:
-                    self.shown_lock.release()
-                    break
-
-                # Insert the rows at the very beginning of the buffer (scrolled up)
-                for tm in store_rows:
-                    self.shown_all_rows.insert(0, tm)
-
-                # Delete the same amount of rows at the very end of the buffer
-                #if shown_offset > shown_buffer:
-                #if len(self.shown_all_rows) > shown_limit + abs(shown_diff):
-                #    self.shown_all_rows = self.shown_all_rows[:shown_diff]
-                if len(store_rows) > 0:
-                    self.shown_all_rows = self.shown_all_rows[:-len(store_rows)]
-                else:
-                    if len(self.shown_all_rows) > shown_limit-shown_buffer:
-                        self.shown_all_rows = self.shown_all_rows[:-min(abs(len(self.shown_all_rows) - shown_limit + shown_buffer), abs(shown_diff))]
-                # Tell how many packages have been done
-                self.shown_diff -= shown_diff
-
-            elif shown_diff > 0:    # Scroled down
-                # Complete the query to only get the few packages which are actually needed to update the buffer
-                if sorted:
-                    dbrows = rows.offset(shown_offset + shown_limit - shown_buffer).limit(shown_diff)
-                    # dbrows = rows.offset(int(self.shown_all_rows[-1][0])).limit(shown_diff)
-                else:
-                    # dbrows = rows.filter(Telemetry[self.decoding_type].idx > (shown_offset + shown_limit - shown_buffer)).limit(shown_diff)
-                    dbrows = rows.filter(Telemetry[self.decoding_type].idx > int(self.shown_all_rows[-1][0])).limit(shown_diff)
-
-                #tm_rows = []
-                tm_rows = self.format_loaded_rows(dbrows)
-
-                # Get the information from the DB, do this before lock is aquired it can take a bit
-                store_rows = []
-                for tm in tm_rows:
-                    store_rows.append(tm)
-                # Get the information of the packages
-                #for tm in dbrows:
-                #    tm_row = [tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst, tm.destID,
-                #              str(tm.timestamp), tm.data.hex()]
-                #    tm_rows.append(tm_row)
-                self.shown_lock.acquire()
-                # Check if the thread should still run, or if it is not longer necessary
-                try:
-                    a = self.shown_thread[threading.current_thread().name]
-                except:
-                    self.shown_lock.release()
-                    break
-
-                # Insert the rows at the very end of the buffer (scrolled down)
-                for tm in store_rows:
-                    self.shown_all_rows.append(tm)
-
-                # Tell how many packages have been done
-                self.shown_diff -= shown_diff
-
-                # Delete the same amount of rows at the very beginning of the buffer
-                if len(self.shown_all_rows) > shown_limit+shown_diff:
-                    del self.shown_all_rows[0:len(tm_rows)]
-            else:
-                break
-
-            # Update all global variables
-            new_session.close()
-            #self.shown_offset = 0 if self.shown_offset < 0 else self.shown_offset + shown_diff
-            #self.shown_upper_limit = 0 if (self.shown_offset - self.shown_buffer) < 0 else self.shown_offset -self.shown_buffer
-            #x = 0
-            #for cnt in self.shown_all_rows:
-            #    if int(self.shown_offset) <= int(cnt[0]):
-            #        break
-            #    x += 1
-
-            if sorted:
-                self.shown_offset = 0 if self.shown_offset + shown_diff < 0 else self.shown_offset + shown_diff
-            else:
-                if len(self.shown_all_rows) < shown_limit:
-                    self.shown_offset = self.shown_all_rows[shown_buffer - (shown_limit-len(self.shown_all_rows) - 1)][0]
-                #if x < shown_buffer:
-                #    self.shown_offset = self.shown_all_rows[x+shown_diff][0] if (x+shown_diff) >= 0 else self.shown_all_rows[0][0]
-                else:
-                    self.shown_offset = self.shown_all_rows[shown_buffer][0]
-            #if self.shown_offset <= 0:
-            #    self.shown_offset = self.shown_all_rows[shown_diff-1][0]
-            #    print(2)
-            #else:
-            #    self.shown_offset = self.shown_all_rows[x + shown_diff][0] if (x+shown_diff) >= 0 else self.shown_all_rows[0][0]
-            #    print(3)
-            #self.shown_upper_limit = 0 if (self.shown_offset - self.shown_buffer) < 0 else self.shown_all_rows[0][0]
-            if sorted:
-                self.shown_upper_limit = 0 if self.shown_offset - shown_buffer < 0 else self.shown_offset - shown_buffer
-            else:
-                self.shown_upper_limit = self.shown_all_rows[0][0]
-            #self.shown_thread = {}
-            #self.session_factory_storage.remove()
-            #new_session.close()
-            self.shown_lock.release()
-
-        '''
-        running = True
-        self.shown_lock.acquire()
-        first_time = True
-        for xx in self.dbrows_list:
-            dbrows = xx[0]
-            count = xx[1]
-            if not running:
-                self.shown_lock.release()
-                break
-            if first_time:
-                self.shown_lock.release()
-                first_time = False
-
-            try:
-                for tm in dbrows:
-                    tm_row = [tm.idx, self.tmtc[tm.is_tm], tm.apid, tm.seq, tm.len_7, tm.stc, tm.sst, tm.destID,
-                              str(tm.timestamp), tm.data.hex()]
-                    self.shown_lock.acquire()
-                    if self.dbrows_list:
-                        if count < 0:
-                            self.shown_all_rows.insert(0, tm_row)
-                        elif count > 0:
-                            self.shown_all_rows.append(tm_row)
-                    else:
-                        running = False
-                    self.shown_lock.release()
-            except:
-                self.shown_lock.acquire()
-                self.loaded = 0
-                self.shown_lock.release()
-                print(traceback.format_exc())
-                print(2)
-        self.dbrows_list = []
-        '''
+        # self.treeview.thaw_child_notify()
 
     def format_loaded_rows(self, dbrows):
         '''
@@ -1356,7 +927,7 @@ class TMPoolView(Gtk.Window):
             scroll_lines = 3 * max(-1, event.delta_y)
             if scroll_lines < 0:
                 self.autoscroll = 0
-            elif scroll_lines > 3:
+            elif scroll_lines > 6:
                 self.autoscroll = 1
         # needed for remote desktop
         elif event.direction.value_name == 'GDK_SCROLL_UP':
@@ -1368,7 +939,6 @@ class TMPoolView(Gtk.Window):
             return
 
         self._scroll_treeview(scroll_lines)
-        self.offset = self.offset - 1 if self.offset > 0 else 0
         self.reselect_rows()
         # Only_scroll is necessary to not launch a second event after the scrollbar is reset to new value
         self.only_scroll = False
@@ -1378,44 +948,16 @@ class TMPoolView(Gtk.Window):
         #     self.autoscroll = 0
 
     def _scroll_treeview(self, scroll_lines=0, sort=None, order='asc', rows=None, force_db_import=False):
-        sorted = False
-        for col in self.tm_columns[self.decoding_type]:
-            if self.tm_columns[self.decoding_type][col][1] in [1, 2]:
-                sorted = True
-
-        if sorted:
-            upper_limit = self.adj.get_upper() - self.adj.get_page_size()
-            self.offset = int(min(upper_limit, self.adj.get_value() + scroll_lines))
-        else:
-            position = 0
-            for x, row in enumerate(self.shown_all_rows, start=0):
-                if row[0] >= self.offset:
-                    position = x
-                    break
-
-            try:
-                if scroll_lines < 0:
-                    if scroll_lines == -int(self.adj.get_page_size()):
-                        self.offset -= int(self.adj.get_page_size())
-                    else:
-                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) >= 0 else 0
-                else:
-                    if len(self.shown_all_rows) < (self.shown_limit):
-                        self.offset = self.shown_all_rows[-int(self.adj.get_page_size())][0]
-                    else:
-                        self.offset = self.shown_all_rows[int(position + scroll_lines)][0] if (position + scroll_lines) >= 0 else 0
-            except IndexError:
-                upper_limit = max(0, self.adj.get_upper() - self.adj.get_page_size())
-                self.offset = int(min(upper_limit, self.adj.get_value() + scroll_lines))
-
-        if self.offset < 0:
-            return
-
+        upper_limit = self.adj.get_upper() - self.adj.get_page_size()
+        self.offset = int(min(upper_limit, self.adj.get_value() + scroll_lines))
+        self.offset = max(0, self.offset)
         self.limit = int(self.adj.get_page_size())
-        self.fetch_lines_from_db(self.offset, self.limit, sort=sort, order=order, rows=rows, scrolled=True, force_import=force_db_import)
+        self.feed_lines_to_view(
+            self.fetch_lines_from_db(self.offset, self.limit, sort=sort, order=order, rows=rows))
         self.adj.set_value(self.offset)
 
     def key_pressed(self, widget=None, event=None):
+
         def unselect_rows(clear=False):
             # selection = widget.get_selection()
             # self.selection.disconnect_by_func(self.tree_selection_changed)
@@ -1488,30 +1030,32 @@ class TMPoolView(Gtk.Window):
     def set_currently_selected(self, widget=None, event=None):
         state = event.get_state()
         # print(state, state & Gdk.ModifierType.CONTROL_MASK == Gdk.ModifierType.CONTROL_MASK)
-        if state & Gdk.ModifierType.CONTROL_MASK == Gdk.ModifierType.CONTROL_MASK:
-            # selection = widget.get_selection()
-            # model, paths = selection.get_selected_rows()
-            idx = self.shift_range[1]
-            if idx in self.currently_selected:
-                self.currently_selected.remove(idx)
-            else:
-                self.currently_selected.add(idx)
-                # for path in paths:
-                #    self.currently_selected.add(model[path][0])
-        elif state & Gdk.ModifierType.SHIFT_MASK == Gdk.ModifierType.SHIFT_MASK:
-            # selection = widget.get_selection()
-            # model, paths = selection.get_selected_rows()
-            # for path in paths:
-            #     self.currently_selected.add(model[path][0])
-            if len(self.currently_selected) > 1:
-                for idx in range(min(self.shift_range), max(self.shift_range) + 1):
-                    self.currently_selected.add(idx)
-            else:
-                self.currently_selected = set(range(min(self.shift_range), max(self.shift_range) + 1))
-        else:
-            # selection = widget.get_selection()
-            model, paths = self.selection.get_selected_rows()
-            self.currently_selected = {model[path][0] for path in paths}
+        # if state & Gdk.ModifierType.CONTROL_MASK == Gdk.ModifierType.CONTROL_MASK:
+        #     # selection = widget.get_selection()
+        #     # model, paths = selection.get_selected_rows()
+        #     idx = self.shift_range[1]
+        #     if idx in self.currently_selected:
+        #         self.currently_selected.remove(idx)
+        #     else:
+        #         self.currently_selected.add(idx)
+        #         # for path in paths:
+        #         #    self.currently_selected.add(model[path][0])
+        # elif state & Gdk.ModifierType.SHIFT_MASK == Gdk.ModifierType.SHIFT_MASK:
+        #     # selection = widget.get_selection()
+        #     # model, paths = selection.get_selected_rows()
+        #     # for path in paths:
+        #     #     self.currently_selected.add(model[path][0])
+        #     if len(self.currently_selected) > 1:
+        #         for idx in range(min(self.shift_range), max(self.shift_range) + 1):
+        #             self.currently_selected.add(idx)
+        #     else:
+        #         self.currently_selected = set(range(min(self.shift_range), max(self.shift_range) + 1))
+        # else:
+        #     # selection = widget.get_selection()
+        #     model, paths = self.selection.get_selected_rows()
+        #     self.currently_selected = {model[path][0] for path in paths}
+        model, paths = self.selection.get_selected_rows()
+        self.currently_selected = {model[path][0] for path in paths}
         self.reselect_rows()
 
     def select_all_rows(self, widget=None, *args):
@@ -1553,8 +1097,8 @@ class TMPoolView(Gtk.Window):
                       0, self.quit_func)
         accel.connect(Gdk.keyval_from_name('q'), Gdk.ModifierType.CONTROL_MASK,
                       0, self.quit_func)
-        accel.connect(Gdk.keyval_from_name('a'), Gdk.ModifierType.CONTROL_MASK,
-                      0, self.select_all_rows)
+        # accel.connect(Gdk.keyval_from_name('a'), Gdk.ModifierType.CONTROL_MASK,
+        #               0, self.select_all_rows)
         self.add_accel_group(accel)
 
     def create_pool_managebar(self):
@@ -1851,9 +1395,9 @@ class TMPoolView(Gtk.Window):
         upper_limit = self.adj.get_upper() - self.adj.get_page_size()
         self.offset = abs(int(min(upper_limit, goto)))
         self.limit = int(self.adj.get_page_size())
-        #self.feed_lines_to_view(
-        #    self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc'))
-        self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc', force_import=True)
+        self.feed_lines_to_view(self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc', force_import=True))
+
+        self.autoscroll = False
         self.adj.set_value(self.offset)
 
     def _goto_timestamp(self, widget):
@@ -1876,9 +1420,8 @@ class TMPoolView(Gtk.Window):
             widget.set_sensitive(True)
         self.offset = abs(int(min(upper_limit, idx)))
         self.limit = int(self.adj.get_page_size())
-        #self.feed_lines_to_view(
-        #    self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc'))
-        self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc', force_import=True)
+        self.feed_lines_to_view(self.fetch_lines_from_db(self.offset, self.limit, sort=None, order='asc', force_import=True))
+        self.autoscroll = False
 
         self.adj.set_value(self.offset)
 

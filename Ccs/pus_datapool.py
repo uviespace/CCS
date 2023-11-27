@@ -626,6 +626,12 @@ class DatapoolManager:
 
         return
 
+    def clear_from_loaded_pools(self, pool_name):
+        try:
+            cleared = self.loaded_pools.pop(pool_name)
+        except KeyError:
+            self.logger.error('Could not remove {} from loaded pools'.format(pool_name))
+
     def get_time(self):
         return datetime.datetime.utcnow().strftime("%Y-%m-%d %T UTC: ")
 
