@@ -1526,21 +1526,27 @@ class TMPoolView(Gtk.Window):
         self.pool_liststore = self.create_liststore()
         self.treeview.set_model(self.pool_liststore)
 
-        #self.scrolled_treelist.add(self.treeview)
+        # self.scrolled_treelist.add(self.treeview)
 
         self.show_all()
 
     def select_pool(self, selector, new_pool=None):
+
+        active_info = selector.get_model()[selector.get_active_iter()]
+
         if not new_pool:
-            pool_name = selector.get_model()[selector.get_active_iter()][3]
+            pool_name = active_info[3]
         else:
             pool_name = new_pool
 
         new_session = self.session_factory_storage
         try:
-            if self.active_pool_info.filename != pool_name:
-                dbpool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
-                self.Active_Pool_Info_append([pool_name, dbpool.modification_time, dbpool.pool_name, False])
+            live = False
+            dbpool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
+            if active_info[0] == active_info[3]:  # check if pool is loaded from a file
+                live = True
+
+            self.Active_Pool_Info_append([pool_name, dbpool.modification_time, dbpool.pool_name, live])
 
         except Exception as err:
             self.logger.warning(err)
@@ -1549,7 +1555,7 @@ class TMPoolView(Gtk.Window):
             new_session.close()
 
         self.update_columns()
-        #self._set_pool_list_and_display()
+        # self._set_pool_list_and_display()
 
         if not self.active_pool_info.live:
             self.stop_butt.set_sensitive(False)
