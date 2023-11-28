@@ -94,24 +94,6 @@ class ParameterMonitor(Gtk.Window):
         self.reset_evt_cnt()
         return
 
-    # def check_for_pools(self):
-    #     try:
-    #         # poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
-    #         poolmgr = cfl.get_module_handle('poolmanager')
-    #         pools = poolmgr.Functions('loaded_pools_export_func')
-    #         if len(pools) == 1:
-    #             pool_name = pools[0][0]
-    #             if '/' in pools[0][0]:
-    #                 pool_name = pools[0][0].split('/')[-1]
-    #             self.set_pool(pool_name)
-    #             return 1
-    #         else:
-    #             self.logger.error('Failed to open a pool.')
-    #             return 0
-    #     except Exception as err:
-    #         self.logger.error(err)
-    #         return 0
-
     def set_pool(self, pool_name):
         self.pool_name = pool_name
 

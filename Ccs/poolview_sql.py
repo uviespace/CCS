@@ -121,6 +121,8 @@ class TMPoolView(Gtk.Window):
         self.autoscroll = 1
         self.autoselect = 1
 
+        self._selected_mon_par_set = None
+
         self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL, wide_handle=True, position=400)
 
         self.statusbar = Gtk.Statusbar()
@@ -638,9 +640,8 @@ class TMPoolView(Gtk.Window):
             return
         self.offset = int(self.adj.get_value())
         self.limit = int(self.adj.get_page_size())
-        #self.feed_lines_to_view(
-        #    self.fetch_lines_from_db(offset=self.offset, limit=self.limit))
-        self.fetch_lines_from_db(offset=self.offset, limit=self.limit, force_import=True)
+
+        self.feed_lines_to_view(self.fetch_lines_from_db(offset=self.offset, limit=self.limit, force_import=True))
         self.reselect_rows()
 
     def count_current_pool_rows(self, pool_info=None):
@@ -1127,13 +1128,14 @@ class TMPoolView(Gtk.Window):
         icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/func.png')
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 32, 32)
         plot_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Plotter')
-        plot_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
+        # plot_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
         plot_butt.connect('clicked', self.plot_parameters)
 
         icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/monitor.png')
         pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 32, 32)
-        mon_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Monitor')
-        mon_butt.connect('clicked', self.monitor_parameters)
+        self.mon_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf), tooltip_text='Parameter Monitor')
+        self.mon_butt.connect('clicked', self.monitor_parameters)
+        self.mon_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
 
         dump_butt = Gtk.Button.new_from_icon_name('gtk-save', Gtk.IconSize.LARGE_TOOLBAR)
         dump_butt.set_tooltip_text('Save pool')
@@ -1166,7 +1168,7 @@ class TMPoolView(Gtk.Window):
 
         self.pool_managebar.pack_start(self.pool_selector, 1, 1, 0)
         self.pool_managebar.pack_start(plot_butt, 0, 0, 0)
-        self.pool_managebar.pack_start(mon_butt, 0, 0, 0)
+        self.pool_managebar.pack_start(self.mon_butt, 0, 0, 0)
         self.pool_managebar.pack_end(self.univie_box, 0, 0, 0)
         self.pool_managebar.pack_end(clear_butt, 0, 0, 0)
         self.pool_managebar.pack_end(bigd, 0, 0, 0)
@@ -1425,23 +1427,31 @@ class TMPoolView(Gtk.Window):
 
         self.adj.set_value(self.offset)
 
-        return
     def context_menu(self):
+
         menu = Gtk.Menu()
 
-        item = Gtk.MenuItem(label='TEST')
-        item.connect('activate', self.menu_test)
-        menu.append(item)
+        par_sets = cfg['ccs-monitor_parameter_sets']
+        for parset in par_sets:
+            item = Gtk.MenuItem(label=str(parset))
+            item.connect('activate', self.mon_menu, parset)
+            menu.append(item)
+
         return menu
 
     def show_context_menu(self, widget, event, menu):
+
         if event.button != 3:
             return
-        menu.show_all()
-        menu.popup(None, None, None, None, 3, event.time)
 
-    def menu_test(self, widget=None):
-        pass
+        menu.show_all()
+        menu.popup_at_pointer()
+
+    def mon_menu(self, widget=None, parset=None):
+
+        if parset is not None:
+            self._selected_mon_par_set = parset
+            self.mon_butt.set_tooltip_text('Parameter Monitor [{}]'.format(parset))
 
     def check_structure_type(self):
 
@@ -2627,7 +2637,7 @@ class TMPoolView(Gtk.Window):
             self.logger.warning('No pool selected')
             return
 
-        cfl.start_monitor(self.active_pool_info.filename)
+        cfl.start_monitor(self.active_pool_info.filename, parameter_set=self._selected_mon_par_set)
 
     def start_recording(self, widget=None):
         if cfl.is_open('poolmanager', cfl.communication['poolmanager']):
