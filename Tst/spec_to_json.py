@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import json
+import os
 import sys
 
 sys.path.append('../Ccs')
@@ -8,18 +9,26 @@ import ccs_function_lib as cfl
 
 
 def run(specfile, gen_cmd, save_json):
-    tmp = json.load(open('tst_template_empty.json', 'r'))
+    tmp = json.load(open(os.path.join(cfl.cfg.get('paths', 'tst'), 'tst_template_empty.json'), 'r'))
     jspec = tmp.copy()
     specs = open(specfile, 'r').read().split('\n')
 
-    name, descr, spec_version_entry, _ = specs[1].split('|')
-    spec_version = spec_version_entry.split(': ')[-1]
-    sw_version = spec_version_entry.split('-')[1]
+    name, descr, spec_version_entry, sw_version_entry = specs[1].split('|')
+
+    try:
+        spec_version = spec_version_entry.split(': ')[-1]
+    except IndexError:
+        spec_version = ''
+
+    try:
+        sw_version = sw_version_entry.split('-')[1]
+    except IndexError:
+        sw_version = ''
 
     jspec['_name'] = name
     jspec['_description'] = descr.replace('\\_', '_')
-    jspec['_spec_version'] = spec_version
-    jspec['_iasw_version'] = sw_version
+    jspec['_spec_version'] = spec_version.strip()
+    jspec['_iasw_version'] = sw_version.strip()
     jspec['_primary_counter_locked'] = False
 
     steps = jspec['sequences'][0]['steps']
