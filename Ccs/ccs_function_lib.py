@@ -2016,6 +2016,20 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
     return rows
 
 
+def filter_by_discr(rows, pi1_off, pi1_wid, pi1_val):
+    """
+
+    :param rows:
+    :param pi1_off:
+    :param pi1_wid:
+    :param pi1_val:
+    :return:
+    """
+
+    rows = rows.filter(func.mid(DbTelemetry.raw, pi1_off + 1, pi1_wid) == pi1_val.to_bytes(pi1_wid, 'big'))
+    return rows
+
+
 ##
 #  CRC check
 #
@@ -2098,6 +2112,27 @@ def get_pool_rows(pool_name, check_existence=False):
     dbcon.close()
 
     return rows
+
+
+def get_hk_val(pool_name, sid, par_id, apid=None):
+
+    assert isinstance(sid, int)
+
+    dbcon = scoped_session_idb()
+    apid_filt = '' if apid is None else ' AND pid_apid={:d}'.format(apid)
+    res = dbcon.execute('SELECT pid_descr FROM pid WHERE pid_type=3 and pid_stype=25 and pid_pi1_val={:d}{}'.format(sid, apid_filt)).fetchall()
+    dbcon.close()
+
+    if not res:
+        return
+
+    hk, = res[0]
+    # TODO: user defined HKs
+
+    if isinstance(par_id, int):
+        pass  # TODO
+
+    return get_param_values(pool_name=pool_name, hk=hk, param=par_id, last=1, mk_array=False)
 
 
 # get values of parameter from HK packets
@@ -2186,7 +2221,11 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         descr, unit, name = param, None, None
 
     bylen = csize(ufmt)
-    tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+    if isinstance(tmlist, list):
+        tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+    else:
+        tmlist_filt = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        tmlist_filt = [x.raw for x in tmlist_filt]
 
     if name is not None:
         que = 'SELECT pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % name
@@ -2198,9 +2237,16 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
             return
 
         categ, curtx = fetch[0]
-        xy = [(get_cuctime(tm),
-               get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
-                              properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
+
+        if mk_array:
+            xy = [(get_cuctime(tm),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                                  properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
+        else:
+            xy = [(get_cuctime(tm),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                                  properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=nocal)) for tm in
+                  tmlist_filt]
 
     else:
         xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]

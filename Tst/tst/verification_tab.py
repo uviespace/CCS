@@ -41,6 +41,10 @@ Verification_6 = "tm." + tm.get_packet_length.__name__ + str(inspect.signature((
 Verification_7 = "tm." + tm.get_version_number.__name__ + str(inspect.signature((tm.get_version_number)))
 Verification_8 = "tm." + tm.get_data_of_last_tc.__name__ + str(inspect.signature((tm.get_data_of_last_tc)))
 Verification_9 = "tm." + tm.verify_no_more_hk.__name__ + str(inspect.signature((tm.verify_no_more_hk)))
+Verification_10 = "tm." + tm.verify_tc_ack.__name__ + str(inspect.signature((tm.verify_tc_ack)))
+Verification_11 = "tm." + tm.confirm_pkt.__name__ + str(inspect.signature((tm.confirm_pkt)))
+Verification_12 = "tm." + tm.get_hk_val.__name__ + str(inspect.signature((tm.get_hk_val)))
+
 
 
 
@@ -51,6 +55,9 @@ Verification_9 = "tm." + tm.verify_no_more_hk.__name__ + str(inspect.signature((
 
 descr_8 = "Get Timestamp of TM before last TC, get IID of last TC, get first 4 bytes of TC raw data."
 descr_9 = "Check if there are no more HK packets"
+descr_10 = "Verify acknowledgement of TC"
+descr_11 = "Confirm that packet ST, SST has been received"
+descr_12 = "Get parameter value from HK packet"
 
 
 
@@ -63,7 +70,10 @@ verification_list = [
     ("Get Packet Length", None, None, "descr", Verification_6),
     ("Get Version Number", None, None, "descr", Verification_7),
     ("Get Data of last TC", None, None, descr_8, Verification_8),
-    ("Test if there are no more HK packets", None, None, descr_9, Verification_9)
+    ("Test if there are no more HK packets", None, None, descr_9, Verification_9),
+    ("Verify TC ACK", None, None, descr_10, Verification_10),
+    ("Confirm pkt", None, None, descr_11, Verification_11),
+    ("HK val", None, None, descr_12, Verification_12)
 ]
 
 

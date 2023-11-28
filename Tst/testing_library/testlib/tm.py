@@ -979,7 +979,56 @@ def extract_apid_from_packetid(packet_id):
     return apid
 
 
-def get_tc_ack(pool_name="LIVE", ack_types=None, tc_apid=321):
+def confirm_pkt(pool_name, st, sst, apid=None, pi1_off=None, pi1_wid=None, pi1_val=None, wait=0):
+    """
+    Confirm reception of TM packet with service type st and sub-tpye sst after last TC.
+    By using the pi1_* parameters, an additional constraint using a discriminant can be applied.
+
+    :param pool_name:
+    :param st:
+    :param sst:
+    :param apid:
+    :param pi1_off: byte offset of discriminant parameter in the entire packet (i.e., incl. PUS header)
+    :param pi1_wid: size of discriminant parameter in bytes
+    :param pi1_val: discriminant value
+    :param wait: seconds to wait before running the check
+    :return:
+    """
+
+    time.sleep(wait)
+
+    tc_data = get_data_of_last_tc(pool_name, apid=apid)
+
+    if tc_data is None:
+        return False, []
+
+    t_tc_sent = tc_data[0]
+    tc_idx = tc_data[1]
+    tc_head_bytes = tc_data[2]
+
+    tms = cfl.get_pool_rows(pool_name)
+    tms = tms.filter(cfl.DbTelemetry.stc == st, cfl.DbTelemetry.sst == sst, cfl.DbTelemetry.idx > tc_idx).order_by(cfl.DbTelemetry.idx)
+
+    if pi1_off and pi1_wid and pi1_val:
+        tms = cfl.filter_by_discr(tms, pi1_off, pi1_wid, pi1_val)
+
+    pkt = tms.first()
+
+    if pkt is None:
+        return False, []
+    else:
+        return True, pkt.raw
+
+
+def verify_tc_ack(pool_name, ack_types=None, tc_apid=321):
+    """
+    Confirm acknowledgement of last TC packet.
+
+    :param pool_name:
+    :param ack_types: list of ACK types (i.e., service 1 sub-types) to check for
+    :param tc_apid:
+    :return:
+    """
 
     if ack_types is None:
         remaining = [1, 7]
@@ -1043,6 +1092,11 @@ def get_tc_ack(pool_name="LIVE", ack_types=None, tc_apid=321):
         logger.info('No ACKs found with matching pattern {}'.format(tc_head_bytes.hex().upper()))
 
     return result, ack_pkts
+
+
+def get_hk_val(pool_name, sid, par_id, apid=None):
+
+    return cfl.get_hk_val(pool_name, sid, par_id, apid=apid)
 
 
 def get_tc_acknow(pool_name="LIVE", tc_apid=321, tc_ssc=None, tm_st=1, tm_sst=None):
