@@ -182,6 +182,10 @@ class RawGetterSetter:
     def raw(self, rawdata):
         self.bin[:] = rawdata
 
+    @property
+    def hex(self):
+        return bytes(self.bin).hex(' ').upper()
+
 
 class PHeaderBits(ctypes.BigEndianStructure):
     _pack_ = 1
