@@ -10,10 +10,19 @@ decon = com.Connector('', 12345, msgdecoding='hex')
 decon.connect()
 
 # example commands
-decon.send(b'\x20\xDE\xAD')  # test echo interface (0x20)
-decon.send(de.HkCmdRecv(0x1000))  # get PCM MODE register
-decon.send(de.CmdSend(0x3C00, 1))  # write sequencer register
-decon.send(de.CmdSend(0x3C00, 1), rx=False)  # write sequencer register, but don't fetch cmd response from socket
+# test echo interface (0x20)
+decon.send(b'\x20\xDE\xAD')
+
+# HK interface 0x33
+decon.send(de.HkCmdRead(0x1000))  # get PCM MODE register
+decon.send(de.HkCmdWrite(0x1000, 0x0001))  # set PCM MODE register
+
+# CMD interface 0x34
+decon.send(de.CmdWrite(0x3C00, 0x0001))  # write sequencer register
+decon.send(de.CmdWrite(0x3C00, 1), rx=False)  # write sequencer register, but don't fetch cmd response from socket
+decon.send(de.CmdRead(0x3C00))  # read sequencer register
+
+# SCI interface 0x35
 decon.send(de.SciCmd(100))  # set science data output rate
 
 # dump cmd log (decon.log)

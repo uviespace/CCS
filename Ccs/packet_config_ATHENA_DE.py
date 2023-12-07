@@ -85,44 +85,51 @@ class CommandBase(ctypes.Union, RawGetterSetter):
     ]
 
 
-class HkCmdSend(CommandBase):
+class HkCmdWrite(CommandBase):
 
     def __init__(self, addr, data):
-        super(HkCmdSend).__init__()
+        super(HkCmdWrite).__init__()
         self.items.ifaddr = IfAddr.HK
         self.items.addr = addr
         self.items.txrx = CmdDir.SEND
         self.items.cmddata = data
 
 
-class HkCmdRecv(CommandBase):
+class HkCmdRead(CommandBase):
 
     def __init__(self, addr):
-        super(HkCmdRecv).__init__()
+        super(HkCmdRead).__init__()
         self.items.ifaddr = IfAddr.HK
         self.items.addr = addr
         self.items.txrx = CmdDir.RECV
         self.items.cmddata = 0
 
 
-class CmdSend(CommandBase):
+class CmdWrite(CommandBase):
 
     def __init__(self, addr, data):
-        super(CmdSend).__init__()
+        super(CmdWrite).__init__()
         self.items.ifaddr = IfAddr.CMD
         self.items.addr = addr
         self.items.txrx = CmdDir.SEND
         self.items.cmddata = data
 
 
-class CmdRecv(CommandBase):
+class CmdRead(CommandBase):
 
     def __init__(self, addr):
-        super(CmdRecv).__init__()
+        super(CmdRead).__init__()
         self.items.ifaddr = IfAddr.CMD
         self.items.addr = addr
         self.items.txrx = CmdDir.RECV
         self.items.cmddata = 0
+
+
+# aliases for script backwards-compatibility
+CmdSend = CmdWrite
+CmdRecv = CmdRead
+HkCmdSend = HkCmdWrite
+HkCmdRecv = HkCmdRead
 
 
 class Ack:
@@ -387,6 +394,10 @@ class SciCmd:
     @raw.setter
     def raw(self, rawdata):
         self._raw = rawdata
+
+    @property
+    def hex(self):
+        return self._raw.hex(' ').upper()
 
     @property
     def ifaddr(self):

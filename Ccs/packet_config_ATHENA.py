@@ -174,6 +174,8 @@ def calc_timestamp(time, sync=None, return_bytes=False):
 
 class RawGetterSetter:
 
+    bin = 0
+
     @property
     def raw(self):
         return bytes(self.bin)
