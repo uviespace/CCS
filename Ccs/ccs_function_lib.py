@@ -6015,7 +6015,7 @@ class DbTools:
             os.path.basename(filename),
             False)
 
-        new_session = scoped_session_storage
+        new_session = scoped_session_storage()
         filename_in_pool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == active_pool_info.filename)
 
         pool_exists_in_db_already = filename_in_pool.filter(DbTelemetryPool.modification_time == active_pool_info.modification_time).count() > 0
@@ -6037,18 +6037,19 @@ class DbTools:
             loadinfo = LoadInfo(parent=parent)
             # loadinfo.spinner.start()
             # loadinfo.show_all()
+            new_session.close()
+
             _loader_thread = threading.Thread(target=DbTools.import_dump_in_db,
                                               args=[active_pool_info, loadinfo],
                                               kwargs={'brute': brute, 'protocol': protocol, 'pecmode': pecmode})
             _loader_thread.daemon = True
             _loader_thread.start()
 
-            logger.info('Loading Pool:' + str(filename))
+            logger.info('Loading Pool: ' + str(filename))
 
         else:
             _loader_thread = None
-
-        new_session.close()
+            new_session.close()
 
         # logger.info('Loaded Pool:' + str(filename))
 
@@ -6158,7 +6159,7 @@ class DbTools:
         # pv.Functions('_set_list_and_display_Glib_idle_add', self.active_pool_info, int(self.my_bus_name[-1]), ignore_reply=True)
         # GLib.idle_add(self._set_pool_list_and_display)
         new_session.close()
-        logger.info('Loaded Pool:' + str(pool_info.filename))
+        logger.info('Loaded Pool: ' + str(pool_info.filename))
 
     @staticmethod
     def db_bulk_insert(filename, processor, bulk_insert_size=1000, brute=False, checkcrc=True, protocol='PUS', pecmode='warn'):
@@ -6167,7 +6168,7 @@ class DbTools:
 
             pcktcount = 0
 
-            new_session = scoped_session_storage
+            new_session = scoped_session_storage()
             new_session.execute('set unique_checks=0,foreign_key_checks=0')
 
             if protocol == 'PUS':

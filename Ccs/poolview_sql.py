@@ -650,6 +650,7 @@ class TMPoolView(Gtk.Window):
 
         if self.active_pool_info is None:
             return 0
+
         new_session = self.session_factory_storage
         rows = new_session.query(
             Telemetry[self.decoding_type]
@@ -660,6 +661,7 @@ class TMPoolView(Gtk.Window):
             DbTelemetryPool.pool_name == self.active_pool_info.filename
         )
         if rows.first() is None:
+            self.logger.warning('Could not find rows for pool {}'.format(self.active_pool_info.filename))
             cnt = 0
         else:
             cnt = rows.order_by(Telemetry[self.decoding_type].idx.desc()).first().idx
@@ -1544,19 +1546,23 @@ class TMPoolView(Gtk.Window):
 
         active_info = selector.get_model()[selector.get_active_iter()]
 
-        if not new_pool:
+        if new_pool is None:
             pool_name = active_info[3]
         else:
             pool_name = new_pool
 
-        new_session = self.session_factory_storage
+        new_session = self.session_factory_storage()
         try:
             live = False
             dbpool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == pool_name).first()
+
             if active_info[0] == active_info[3]:  # check if pool is loaded from a file
                 live = True
 
-            self.Active_Pool_Info_append([pool_name, dbpool.modification_time, dbpool.pool_name, live])
+            if dbpool is not None:
+                self.Active_Pool_Info_append(pool_info=[pool_name, dbpool.modification_time, os.path.basename(pool_name), live])
+            else:
+                self.Active_Pool_Info_append(pool_info=None)
 
         except Exception as err:
             self.logger.warning(err)
@@ -2401,8 +2407,12 @@ class TMPoolView(Gtk.Window):
                     pool[1] = None
                     break
 
-            if self.pool_selector.get_active_iter() == pool.iter:
-                self.select_pool(self.pool_selector, pool_info)
+            # check via filename if loaded pool is currently viewed
+            if model[self.pool_selector.get_active_iter()][3] == pool_info.filename:
+                # self.select_pool(self.pool_selector, pool_info.filename)
+                self.adj.set_upper(self.count_current_pool_rows(pool_info=pool_info))
+                self.adj.set_value(0)
+                self._on_scrollbar_changed(adj=self.adj)
 
         except Exception as err:
             self.logger.error(err)
