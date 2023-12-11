@@ -1055,7 +1055,12 @@ class MonitorSetupDialog(Gtk.Dialog):
 
                 for par in pnames:
                     try:
-                        self.slots[i][3].append([par.split(':')[1], pnames[par]])
+                        if par.split(':')[0] == 'MIB':
+                            descr = cfl.pcf_name_to_descr(par.split(':')[1])
+                        else:
+                            descr = par.split(':')[1]
+
+                        self.slots[i][3].append([descr, pnames[par]])
                     except Exception as err:
                         self.logger.error('Incompatible parameter {} in set {}'.format(par, entry))
                         continue

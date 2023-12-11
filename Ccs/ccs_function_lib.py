@@ -4438,6 +4438,17 @@ def get_tm_parameter_info(pname):
     return res
 
 
+def pcf_name_to_descr(pcfname):
+    """
+    Look up PCF_DESCR for PCF_NAME in MIB
+    """
+    que = 'SELECT pcf_descr FROM pcf WHERE pcf_name="{}"'.format(pcfname)
+    res = scoped_session_idb.execute(que).fetchall()
+
+    if res:
+        return res[0][0]
+
+
 def get_tm_id(pcf_descr=None):
     """
 
