@@ -118,12 +118,22 @@ def _mk_bin_entry(data, timestamp):
     return timestamp, fc, ccdnr, col, row, node, evts
 
 
-def _assemble_ft_frames_to_fp_view(arr3d):
+def _assemble_ft_frames_to_fp_view(arrnd):
 
-    n00 = arr3d[0, :, :]  # CCD2 F-side (lower left in FP view)
-    n01 = arr3d[1, :, ::-1]  # CCD2 E-side (lower right in FP view)
-    n10 = arr3d[2, ::-1, ::-1]  # CCD4 F-side (upper right in FP view)
-    n11 = arr3d[3, ::-1, :]  # CCD4 E-side (upper left in FP view)
+    # FT
+    if arrnd.ndim == 3:
+        n00 = arrnd[0, :, :]  # CCD2 F-side (lower left in FP view)
+        n01 = arrnd[1, :, ::-1]  # CCD2 E-side (lower right in FP view)
+        n10 = arrnd[2, ::-1, ::-1]  # CCD4 F-side (upper right in FP view)
+        n11 = arrnd[3, ::-1, :]  # CCD4 E-side (upper left in FP view)
+    # ED
+    elif arrnd.ndim == 4:
+        n00 = arrnd[0, 0, :, :]  # CCD2 F-side
+        n01 = arrnd[0, 1, :, :][:, ::-1]  # CCD2 E-side
+        n10 = arrnd[1, 0, :, :][::-1, ::-1]  # CCD4 F-side
+        n11 = arrnd[1, 1, :, :][::-1, :]  # CCD4 E-side
+    else:
+        return
 
     n0 = np.concatenate((n00, n01), axis=1)  # CCD2
     n1 = np.concatenate((n11, n10), axis=1)  # CCD4
