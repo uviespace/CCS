@@ -99,7 +99,7 @@ def mk_ed(data):
         except:
             print(col, row, 'FAILED')
 
-    nodes[:] = np.nan
+    nodes[nodes == 0] = np.nan
 
     ed_img = _assemble_ft_frames_to_fp_view(nodes)
 
