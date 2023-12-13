@@ -92,13 +92,14 @@ def mk_ed(data):
 
     # also add an HDU with event map
     nodes = np.zeros((2, 2, NROWS_FT, NCOLS_FT))
-    nodes[:] = np.nan
 
     for _, _, ccd, col, row, node, fx in bindata:
         try:
-            nodes[ccd, node, row - 2:row + 3, col - 2:col + 3] = fx.reshape(5, 5)
+            nodes[ccd, node, row - 2:row + 3, col - 2:col + 3] += fx.reshape(5, 5)
         except:
             print(col, row, 'FAILED')
+
+    nodes[:] = np.nan
 
     ed_img = _assemble_ft_frames_to_fp_view(nodes)
 
