@@ -5892,6 +5892,28 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     return filedict
 
 
+def get_hk_def_tcs(filename, sid=None, sidoff=TC_HEADER_LEN, sidbs=2):
+    """
+    Search binary pool dump for HK definitions (TC(3,1))
+
+    @param filename:
+    @param sid: Only return HK definitions with this SID if not None
+    @param sidoff:
+    @param sidbs:
+    @return:
+    """
+
+    with open(filename, 'rb') as fd:
+        pkts = extract_pus(fd)
+
+    if sid is None:
+        pkts = [pkt for pkt in pkts if (pkt[7] == 3) and (pkt[8] == 1)]
+    else:
+        pkts = [pkt for pkt in pkts if (pkt[7] == 3) and (pkt[8] == 1) and (int.from_bytes(pkt[sidoff:sidoff+sidbs], 'big') == sid)]
+
+    return pkts
+
+
 class DbTools:
     """
     SQL database management tools
