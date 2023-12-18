@@ -1003,12 +1003,11 @@ class MonitorSetupDialog(Gtk.Dialog):
                 name = 'UDEF:{}:{}'.format(userpar[1], userpar[0])
                 parameter_model.append(pktiter, [userpar[1], str([name, None, st, sst, apid, sid, sid_off, sid_bitlen])])
 
-        # user-defined stand-alone ("plot") parameters
-        self.useriter = parameter_model.append(None, ['User defined', None])
-        for userpar in self.monitor.cfg['ccs-plot_parameters']:
-            name = 'user_defined:{}'.format(userpar)
-            parameter_model.append(self.useriter, [userpar, str([name,
-                                                                 self.monitor.cfg['ccs-plot_parameters'][userpar]])])
+        # user-defined stand-alone ("plot") parameters TODO
+        # self.useriter = parameter_model.append(None, ['User defined', None])
+        # for userpar in self.monitor.cfg['ccs-plot_parameters']:
+        #     name = 'user_defined:{}'.format(userpar)
+        #     parameter_model.append(self.useriter, [userpar, str([name, self.monitor.cfg['ccs-plot_parameters'][userpar]])])
 
         return parameter_model
 

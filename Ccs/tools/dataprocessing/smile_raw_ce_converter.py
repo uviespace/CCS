@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from astropy.io import fits
 
-# expected CE sizes in bytes
+# expected CE sizes in bytes TODO: 24x24 binned FT
 NROWS_FF = 4511
 NCOLS_FF = 4608
 NROWS_FT = 639
