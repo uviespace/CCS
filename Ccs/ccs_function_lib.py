@@ -65,6 +65,7 @@ except SQLOperationalError as err:
 _pcf_cache = {}
 _cap_cache = {}
 _txp_cache = {}
+_pcf_descr_cache = {}
 
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
@@ -87,6 +88,12 @@ try:
 except AttributeError as err:
     logger.critical(err)
     raise err
+
+try:
+    cal = importlib.import_module('calibrations_' + str(project).upper())
+except Exception as err:
+    logger.warning(err)
+    cal = None
 
 SREC_MAX_BYTES_PER_LINE = 250
 SEG_HEADER_FMT = '>III'
@@ -1770,6 +1777,9 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     elif type_par.startswith('oct'):
         return rawval.hex().upper()
     elif curtx is None:
+        if not nocal and cal is not None:
+            calval = cal.calibrate_ext(rawval, pcf_name_to_descr(pcf_name))
+            return calval if floatfmt is None else format(calval, floatfmt)
         try:
             return rawval if isinstance(rawval, (int, float)) else rawval[0]
         except IndexError:
@@ -2202,9 +2212,10 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         apid = int(pktkey[2]) if pktkey[2] != 'None' else None
         sid = int(pktkey[3]) if pktkey[3] != 'None' else None
         # name, descr, _, offbi, ptc, pfc, unit, _, bitlen = parinfo
-        _, descr, ptc, pfc, curtx, bitlen, _, _, _, _, _ = parinfo
-        unit = None
-        name = None
+        name, descr, ptc, pfc, curtx, bitlen, unit, _, _, _, _ = parinfo
+        if name in ['user_defined', 'user_defined_nopos', 'dp_item']:
+            unit = None
+            name = None
         offbi = 0
 
         offby = sum([x[5] for x in pktinfo[:pktinfo.index(parinfo)]]) // 8 + TM_HEADER_LEN  # +TM_HEADER_LEN for header
@@ -2259,13 +2270,20 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
 
     try:
         arr = np.array(np.array(xy).T, dtype='float')
+
         # calibrate y values
         if not nocal and name is not None:
             get_cap_yval(name, arr[1, 0])  # calibrate one value to get name into _cap_cache
+
             if _cap_cache[name] is None:
+                # try custom calibration if not in MIB
+                if cal is not None:
+                    arr[1, :] = cal.calibrate_ext(arr[1, :], pcf_name_to_descr(name))
                 return arr, (descr, unit)
+
             xvals, yvals = _cap_cache[name]
             arr[1, :] = np.interp(arr[1, :], xvals, yvals, left=np.nan, right=np.nan)
+
         return arr, (descr, unit)
 
     except (ValueError, IndexError):
@@ -4442,10 +4460,15 @@ def pcf_name_to_descr(pcfname):
     """
     Look up PCF_DESCR for PCF_NAME in MIB
     """
+
+    if pcfname in _pcf_descr_cache:
+        return _pcf_descr_cache[pcfname]
+
     que = 'SELECT pcf_descr FROM pcf WHERE pcf_name="{}"'.format(pcfname)
     res = scoped_session_idb.execute(que).fetchall()
 
     if res:
+        _pcf_descr_cache[pcfname] = res[0][0]
         return res[0][0]
 
 

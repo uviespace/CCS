@@ -635,7 +635,7 @@ class PlotViewer(Gtk.Window):
                     bufidx = rows.order_by(DbTelemetry.idx.desc()).first().idx
                     self._pkt_buffer[hk] = (bufidx, pkts)
 
-            xy, (descr, unit) = cfl.get_param_values(pkts, hk=hk, param=parameter,
+            xy, (descr, unit) = cfl.get_param_values(tmlist=pkts, hk=hk, param=parameter,
                                                      numerical=True, tmfilter=False, nocal=nocal)
 
             if len(xy) == 0:
@@ -838,7 +838,7 @@ class PlotViewer(Gtk.Window):
 
                 try:
                     # xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True)[0]
-                    xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True, tmfilter=False, nocal=nocal)[0]
+                    xnew, ynew = cfl.get_param_values(tmlist=[row.raw for row in new_rows], hk=hk, param=parameter, numerical=True, tmfilter=False, nocal=nocal)[0]
                     idx_new = new_rows.order_by(DbTelemetry.idx.desc()).first().idx
                 except ValueError:
                     continue
@@ -985,7 +985,7 @@ class PlotViewer(Gtk.Window):
             params = list(d[n].keys())
             head = '# {}\n# CUC_Time\t\t'.format(n) + '\t\t'.join(params) + '\n'
             datablock = '\n'.join(['{:.6F}\t\t'.format(d[n][params[0]][i, 0]) + '\t\t'.join(
-                ['{:.12G}'.format(d[n][param][i, 1]) for param in params]) for i in range(len(d[n][params[0]][:, 1]))])
+                ['{:.15G}'.format(d[n][param][i, 1]) for param in params]) for i in range(len(d[n][params[0]][:, 1]))])
             hkblocks.append(head + datablock)
             text = '\n\n'.join(hkblocks)
 

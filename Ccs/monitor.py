@@ -535,6 +535,9 @@ class ParameterMonitor(Gtk.Window):
         elif curtx is not None:  # numerically calibrated
             return '.7G'
         else:
+            # check if externally calibrated
+            if cfl.cal is not None and cfl.cal.calibrate_ext(0, name, exception=True) is not None:
+                return '.7G'
             return 'd'
 
     def pckt_counter(self, rows, st, sst, pidx=0):

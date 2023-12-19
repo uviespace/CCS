@@ -696,6 +696,26 @@ def cal_fee_hk(adu, signal):
     return val
 
 
+def calibrate_ext(adu, signal, exception=False):
+    """
+    Provide unified access to customised calibrations outside MIB.
+    This function shall expose all calibrations in this module that should be accessible by other CCS modules.
+
+    :param adu:
+    :param signal:
+    :param exception:
+    :return:
+    """
+
+    try:
+        return cal_fee_hk(adu, signal)
+    except ValueError:
+        return adu if not exception else None
+
+    # to disable calibration
+    # return adu if not exception else None
+
+
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
