@@ -63,16 +63,17 @@ class ParameterMonitor(Gtk.Window):
         hbox = Gtk.HBox()
         self.add(hbox)
 
-        self._res_evt_cnt_callback = None
-        self.evt_cnt = self.create_event_counter()
-        self.evt_check_enabled = True
-        self.evt_check_tocnt = 0
-
         self.pool_id = None  # used to track "clear pool" events
         self.pool_name = pool_name
         self.parameter_set = parameter_set
         self.parameters = {}
         self.monitored_pkts = None
+        self._cal_active = 1
+
+        self._res_evt_cnt_callback = None
+        self.evt_cnt = self.create_event_counter()
+        self.evt_check_enabled = True
+        self.evt_check_tocnt = 0
 
         hbox.pack_start(self.evt_cnt, 0, 0, 0)
         hbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), 0, 1, 0)
@@ -142,8 +143,15 @@ class ParameterMonitor(Gtk.Window):
         set_button.set_tooltip_text('Select/create set of monitored parameters')
         set_button.connect('clicked', self.add_evt_cnt)
 
+        cal_button = Gtk.ToggleButton(label='Calibrated')
+        cal_button.set_tooltip_text('Display calibrated parameter values')
+        cal_button.set_active(self._cal_active)
+        cal_button.connect('clicked', self._on_calibrated)
+
         evt_cnt.pack_start(reset_button, 0, 0, 0)
         evt_cnt.pack_start(set_button, 0, 0, 0)
+        evt_cnt.pack_start(cal_button, 0, 0, 0)
+
         evt_cnt.set_spacing(7)
 
         return evt_cnt
@@ -204,10 +212,10 @@ class ParameterMonitor(Gtk.Window):
 
     def _on_select_about_dialog(self, action):
         cfl.about_dialog(self)
-        return
 
-    def get_active_pool_name(self):
-        return self.pool_selector.get_active_text()
+    def _on_calibrated(self, widget, *args):
+        self._cal_active = int(widget.get_active())
+        GLib.idle_add(self.updt_buf)
 
     def set_parameter_view(self, parameter_set):
         # update user_limit dict
@@ -391,11 +399,11 @@ class ParameterMonitor(Gtk.Window):
                     pname = self.pname_from_pktid[pktid]
                     xy, par = cfl.get_param_values(tmlist=[pkt], hk='User defined', param=pname, last=1, tmfilter=False, mk_array=False)
                     udtype = 'user_defined'
-                    self.monitored_pkts[pktid]['data'] = {'{}:{}'.format(udtype, par[0]): xy[0][1]}
+                    self.monitored_pkts[pktid]['data'] = {'{}:{}'.format(udtype, par[0]): (xy[0][1], xy[0][1])}
                 else:
                     try:
                         tm = cfl.Tmdata(pkt)[0]
-                        self.monitored_pkts[pktid]['data'] = {self.get_param_id(par): par[0] for par in tm}
+                        self.monitored_pkts[pktid]['data'] = {self.get_param_id(par): (par[4][0], par[0]) for par in tm}
                     except Exception as err:
                         self.logger.info('{} {}'.format(err, pktid))
                         continue
@@ -411,7 +419,7 @@ class ParameterMonitor(Gtk.Window):
                 continue
             else:
                 try:
-                    value = self.monitored_pkts[pktid]['data'][pname]
+                    rawval, calval = self.monitored_pkts[pktid]['data'][pname]
                 except Exception as err:
                     self.logger.warning('Could not update value of {} [{}]!'.format(pname, str(err)))
                     continue
@@ -423,31 +431,12 @@ class ParameterMonitor(Gtk.Window):
                     user_limit = self.user_limits[self.pdescr[pname]]
                 else:
                     user_limit = None
-                limit_color = self.limit_colors[cfl.Tm_limits_check(pname, value, user_limit)]
+                limit_color = self.limit_colors[cfl.Tm_limits_check(pname, calval, user_limit)]
 
-            self.parameters[pname]['value'] = value
+            self.parameters[pname]['value'] = rawval, calval
             self.parameters[pname]['alarm'] = limit_color
 
-        def updt_buf():
-            for par in self.parameters:
-                buf = self.parameters[par]['field'].get_buffer()
-                buf.delete(*buf.get_bounds())
-                if self.parameters[par]['value'] is None:
-                    buf.insert_markup(buf.get_start_iter(),
-                                      '<span size="large" foreground="{}" weight="bold">{}</span>'.format(
-                                          self.parameters[par]['alarm'], '--'), -1)
-                else:
-                    val = self.parameters[par]['value']
-                    if isinstance(val, bytes):
-                        txt = '<span size="large" foreground="{}" weight="bold">0x{}</span>'.format(
-                            self.parameters[par]['alarm'], val.hex().upper())
-                    else:
-                        txt = '<span size="large" foreground="{}" weight="bold">{:{fstr}}</span>'.format(
-                            self.parameters[par]['alarm'], val, fstr=self.parameters[par]['format'])
-
-                    buf.insert_markup(buf.get_start_iter(), txt, -1)
-
-        GLib.idle_add(updt_buf)
+        GLib.idle_add(self.updt_buf)
 
         if self.evt_check_enabled:
             ctime = time.time()
@@ -486,15 +475,33 @@ class ParameterMonitor(Gtk.Window):
         # GLib.idle_add(updt_bg_color)
         # return
 
-    def get_last_pkt_with_id(self, rows, pktid, pidx=0):
+    def updt_buf(self):
+        for par in self.parameters:
+            buf = self.parameters[par]['field'].get_buffer()
+            buf.delete(*buf.get_bounds())
+            if self.parameters[par]['value'] is None:
+                buf.insert_markup(buf.get_start_iter(),
+                                  '<span size="large" foreground="{}" weight="bold">{}</span>'.format(
+                                      self.parameters[par]['alarm'], '--'), -1)
+            else:
+                rawcal = self.parameters[par]['value']
+                if isinstance(rawcal[self._cal_active], bytes):
+                    txt = '<span size="large" foreground="{}" weight="bold">0x{}</span>'.format(
+                        self.parameters[par]['alarm'], rawcal[[self._cal_active]].hex().upper())
+                else:
+                    val = rawcal[self._cal_active]
+                    fmt = self.parameters[par]['format'][self._cal_active]
+                    txt = '<span size="large" foreground="{}" weight="bold">{:{fstr}}</span>'.format(
+                        self.parameters[par]['alarm'], val, fstr=fmt)
+
+                buf.insert_markup(buf.get_start_iter(), txt, -1)
+
+    @staticmethod
+    def get_last_pkt_with_id(rows, pktid, pidx=0):
         spid, st, sst, apid, pi1, pi1off, pi1wid = pktid
         if pi1off != -1:  # and (pi1off is not None):
-            # rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid,
-            #                    func.mid(DbTelemetry.data, pi1off - cfl.TM_HEADER_LEN + 1, pi1wid // 8) == pi1.to_bytes(
-            #                     pi1wid // 8, 'big'), DbTelemetry.idx>=pidx).order_by(DbTelemetry.idx.desc()).first()
             rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=pi1, idx_from=pidx).order_by(DbTelemetry.idx.desc()).first()
         else:
-            # rows = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.apid == apid, DbTelemetry.idx>=pidx).order_by(DbTelemetry.idx.desc()).first()
             rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, idx_from=pidx).order_by(DbTelemetry.idx.desc()).first()
         if rows is None:
             return
@@ -515,10 +522,19 @@ class ParameterMonitor(Gtk.Window):
         else:
             return par[0]
 
-    def get_fstr(self, param_id, name, categ=None):
+    @staticmethod
+    def get_fstr(param_id, name, categ=None):
+        """
+        Return fmt string pair for display of raw and calibrated value
+
+        :param param_id:
+        :param name:
+        :param categ:
+        :return:
+        """
 
         if categ == 'S':
-            return 's'
+            return 'd', 's'
 
         udtype = param_id.split(':')[0]
         pinfo = cfl._parameter_decoding_info((name, udtype), check_curtx=True)
@@ -527,18 +543,18 @@ class ParameterMonitor(Gtk.Window):
         curtx = pinfo[4]
 
         if ptc in [7]:
-            return ''
+            return '', ''
         elif ptc in [5, 9]:
-            return '.13G'
+            return '.13G', '.13G'
         elif ptc in [8]:
-            return 's'
+            return '', 's'
         elif curtx is not None:  # numerically calibrated
-            return '.7G'
+            return 'd', '.7G'
         else:
             # check if externally calibrated
             if cfl.cal is not None and cfl.cal.calibrate_ext(0, name, exception=True) is not None:
-                return '.7G'
-            return 'd'
+                return 'd', '.7G'
+            return 'd', 'd'
 
     def pckt_counter(self, rows, st, sst, pidx=0):
         npckts = rows.filter(DbTelemetry.stc == st, DbTelemetry.sst == sst, DbTelemetry.idx > pidx).count()
@@ -552,7 +568,7 @@ class ParameterMonitor(Gtk.Window):
                                   'red' if self.events[evt][1] > self.evt_reset_values[evt] else 'black',
                                   self.events[evt][1]), -1)
 
-        for event in self.evt_cnt.get_children()[:-2]:
+        for event in self.evt_cnt.get_children()[:3]:
             evt = event.get_children()[0].get_text()
 
             if incremental:
@@ -576,7 +592,7 @@ class ParameterMonitor(Gtk.Window):
         # GLib.idle_add(updt_bg_color)
 
     def reset_evt_cnt(self, widget=None):
-        panels = [x.get_children() for x in self.evt_cnt.get_children()[:-2]]
+        panels = [x.get_children() for x in self.evt_cnt.get_children()[:3]]
         for panel in panels:
             buf = panel[1].get_buffer()
             value = int(buf.get_text(*buf.get_bounds(), True))
@@ -592,13 +608,13 @@ class ParameterMonitor(Gtk.Window):
             cbuf.insert_markup(cbuf.get_start_iter(), '<span size="large" foreground="{}" weight="bold">{}</span>'.format(
                 'grey', self.events[cevt][1]), -1)
 
-        for evt in self.evt_cnt.get_children()[:-2]:
+        for evt in self.evt_cnt.get_children()[:3]:
             evt.set_sensitive(False)
             buf = evt.get_children()[1]
 
             GLib.idle_add(updt_buf, buf.get_buffer(), evt.get_children()[0].get_text())
 
-        rbutton = self.evt_cnt.get_children()[-2]
+        rbutton = self.evt_cnt.get_children()[3]
         rbutton.set_label('Count EVTs')
         rbutton.set_tooltip_text('Event counting has been disabled because of heavy load, probably because of a too large pool. Click to force count update.')
         rbutton.disconnect(self._res_evt_cnt_callback)
@@ -614,7 +630,7 @@ class ParameterMonitor(Gtk.Window):
             cbuf.insert_markup(cbuf.get_start_iter(), '<span size="large" foreground="{}" weight="bold">{}</span>'.format(
                 'black', self.events[cevt][1]), -1)
 
-        for evt in self.evt_cnt.get_children()[:-2]:
+        for evt in self.evt_cnt.get_children()[:3]:
             evt.set_sensitive(True)
             buf = evt.get_children()[1]
 
@@ -632,11 +648,9 @@ class ParameterMonitor(Gtk.Window):
 
     def set_update_interval(self, widget=None, interval=1.0):
         self.interval = interval
-        return
 
     def set_max_age(self, widget=None, max_age=20):
         self.max_age = max_age
-        return
 
     def monitor_setup(self, parameter_set=None, nslots=3):
         if parameter_set is not None:
