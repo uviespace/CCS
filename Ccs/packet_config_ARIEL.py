@@ -298,6 +298,158 @@ RMAP_REPLY_READ_HEADER = [
 ]
 
 
+class RMapCommandHeaderBits(ctypes.BigEndianStructure):
+    _pack_ = 1
+    _fields_ = [(label, ctype, bits) for label, ctype, bits in RMAP_COMMAND_HEADER]
+
+
+RMAP_COMMAND_HEADER_LEN = ctypes.sizeof(RMapCommandHeaderBits)  # sum([x[2] for x in RMAP_COMMAND_HEADER]) // 8
+
+
+class RMapCommandHeader(ctypes.Union, RawGetterSetter):
+    _pack_ = 1
+    _fields_ = [
+        ('bits', RMapCommandHeaderBits),
+        ('bin', ctypes.c_ubyte * RMAP_COMMAND_HEADER_LEN)
+    ]
+
+    def __init__(self, *args, **kw):
+        super(RMapCommandHeader, self).__init__(*args, **kw)
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS["RMAP"]
+        self.bits.PKT_TYPE = 1
+
+
+class RMapReplyWriteHeaderBits(ctypes.BigEndianStructure):
+    _pack_ = 1
+    _fields_ = [(label, ctype, bits) for label, ctype, bits in RMAP_REPLY_WRITE_HEADER]
+
+
+RMAP_REPLY_WRITE_HEADER_LEN = ctypes.sizeof(
+    RMapReplyWriteHeaderBits)  # sum([x[2] for x in RMAP_REPLY_WRITE_HEADER]) // 8
+
+
+class RMapReplyWriteHeader(ctypes.Union, RawGetterSetter):
+    _pack_ = 1
+    _fields_ = [
+        ('bits', RMapReplyWriteHeaderBits),
+        ('bin', ctypes.c_ubyte * RMAP_REPLY_WRITE_HEADER_LEN)
+    ]
+
+    def __init__(self, *args, **kw):
+        super(RMapReplyWriteHeader, self).__init__(*args, **kw)
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS["RMAP"]
+        self.bits.PKT_TYPE = 0
+        self.bits.WRITE = 1
+        self.bits.REPLY = 1
+
+
+class RMapReplyReadHeaderBits(ctypes.BigEndianStructure):
+    _pack_ = 1
+    _fields_ = [(label, ctype, bits) for label, ctype, bits in RMAP_REPLY_READ_HEADER]
+
+
+RMAP_REPLY_READ_HEADER_LEN = ctypes.sizeof(RMapReplyReadHeaderBits)  # sum([x[2] for x in RMAP_REPLY_READ_HEADER]) // 8
+
+
+class RMapReplyReadHeader(ctypes.Union, RawGetterSetter):
+    _pack_ = 1
+    _fields_ = [
+        ('bits', RMapReplyReadHeaderBits),
+        ('bin', ctypes.c_ubyte * RMAP_REPLY_READ_HEADER_LEN)
+    ]
+
+    def __init__(self, *args, **kw):
+        super(RMapReplyReadHeader, self).__init__(*args, **kw)
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS["RMAP"]
+        self.bits.PKT_TYPE = 0
+        self.bits.WRITE = 0
+        self.bits.VERIFY = 0
+        self.bits.REPLY = 1
+
+
+class RMapCommandWrite(RMapCommandHeader):
+    """This is intended for building an RMap Write Command"""
+
+    def __init__(self, addr, data, verify=True, reply=True, incr=True, key=SPW_FEE_KEY,
+                 initiator=SPW_DPU_LOGICAL_ADDRESS, tid=1, *args, **kwargs):
+        super(RMapCommandWrite, self).__init__(*args, **kwargs)
+
+        self.header = self.bits
+        self.data = data
+        self.data_crc = rmapcrc(self.data).to_bytes(RMAP_PEC_LEN, 'big')
+
+        self.bits.TARGET_LOGICAL_ADDR = SPW_FEE_LOGICAL_ADDRESS
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS['RMAP']
+
+        self.bits.PKT_TYPE = 1
+        self.bits.WRITE = 1
+        self.bits.VERIFY = verify
+        self.bits.REPLY = reply
+        self.bits.INCREMENT = incr
+        self.bits.REPLY_ADDR_LEN = 0
+        self.bits.KEY = key
+
+        self.bits.INIT_LOGICAL_ADDR = initiator
+        self.bits.TRANSACTION_ID = tid
+        self.bits.EXT_ADDR = addr >> 32
+        self.bits.ADDR = addr & 0xFFFFFFFF
+        self.bits.DATA_LEN = len(self.data)
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+
+    @property
+    def raw(self):
+        return bytes(self.bin) + self.data + self.data_crc
+
+    @raw.setter
+    def raw(self, rawdata):
+        self.bin[:] = rawdata[:RMAP_COMMAND_HEADER_LEN]
+        self.data = rawdata[RMAP_COMMAND_HEADER_LEN:-RMAP_PEC_LEN]
+        self.data_crc = rawdata[-RMAP_PEC_LEN:]
+
+    def crc_updt(self):
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+        self.data_crc = rmapcrc(self.data).to_bytes(RMAP_PEC_LEN, 'big')
+
+
+class RMapCommandRead(RMapCommandHeader):
+    """This is intended for building an RMap Read Command"""
+
+    def __init__(self, addr, datalen, incr=True, key=SPW_FEE_KEY, initiator=SPW_DPU_LOGICAL_ADDRESS, tid=1,
+                 *args, **kwargs):
+        super(RMapCommandRead, self).__init__(*args, **kwargs)
+
+        self.header = self.bits
+
+        self.bits.TARGET_LOGICAL_ADDR = SPW_FEE_LOGICAL_ADDRESS
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS['RMAP']
+
+        self.bits.PKT_TYPE = 1
+        self.bits.WRITE = 0
+        self.bits.VERIFY = 0
+        self.bits.REPLY = 1
+        self.bits.INCREMENT = incr
+        self.bits.REPLY_ADDR_LEN = 0
+        self.bits.KEY = key
+
+        self.bits.INIT_LOGICAL_ADDR = initiator
+        self.bits.TRANSACTION_ID = tid
+        self.bits.EXT_ADDR = addr >> 32
+        self.bits.ADDR = addr & 0xFFFFFFFF
+        self.bits.DATA_LEN = datalen
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+
+    @property
+    def raw(self):
+        return bytes(self.bin)
+
+    @raw.setter
+    def raw(self, rawdata):
+        self.bin[:] = rawdata[:RMAP_COMMAND_HEADER_LEN]
+
+    def crc_updt(self):
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+
+
 # S13 data header format, using python struct conventions
 S13_FMT_OBSID = 'I'
 S13_FMT_TIME = 'I'
