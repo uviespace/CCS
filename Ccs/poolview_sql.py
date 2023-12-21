@@ -1594,16 +1594,21 @@ class TMPoolView(Gtk.Window):
         #         # self.change_cursor(self.scrolled_treelist.get_window(),'progress')
 
     def clear_pool(self, widget):
-        poolmgr = cfl.dbus_connection('poolmanager', cfl.communication['poolmanager'])
 
         # don't clear static pools
         if self.active_pool_info.filename.count('/'):
             return
 
-        widget.set_sensitive(False)
         pool_name = self.get_active_pool_name()
 
         if pool_name is None:
+            return
+
+        widget.set_sensitive(False)
+        poolmgr = cfl.get_module_handle('poolmanager', timeout=2)
+
+        if not poolmgr:
+            widget.set_sensitive(True)
             return
 
         poolmgr.Functions('_clear_pool', pool_name)

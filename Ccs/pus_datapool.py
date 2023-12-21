@@ -60,6 +60,8 @@ PLM_PKT_SUFFIX = packet_config.PLM_PKT_SUFFIX
 
 SOCK_TO_LIMIT = 900  # number of tm_recv socket timeouts before SQL session reconnect
 
+PROTOCOLS = ['PUS', 'PLMSIM', 'SPW']
+
 communication = {}
 for name in cfg['ccs-dbus_names']:
     communication[name] = 0
@@ -369,6 +371,9 @@ class DatapoolManager:
             # options = override.get('options', options)
 
         protocol = protocol.upper()
+        if protocol not in PROTOCOLS:
+            self.logger.error('"{}" is not a supported protocol, aborting.'.format(protocol))
+            return
 
         # check if recording connection with pool_name already exists and return if it does
         if pool_name in self.connections:
@@ -476,6 +481,11 @@ class DatapoolManager:
             is_server = override.get('is_server', is_server)
             use_socket = override.get('use_socket', use_socket)
             # options = override.get('options', options)
+
+        protocol = protocol.upper()
+        if protocol not in PROTOCOLS:
+            self.logger.error('"{}" is not a supported protocol, aborting.'.format(protocol))
+            return
 
         if use_socket is not None:
             if isinstance(use_socket, socket.socket):

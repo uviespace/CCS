@@ -416,7 +416,7 @@ def dbus_connection(name, instance=1):
         return dbuscon
     except:
         # print('Please start ' + str(name) + ' if it is not running')
-        logger.info('Connection to ' + str(name) + ' is not possible.')
+        logger.warning('Connection to ' + str(name) + ' is not possible.')
         return False
 
 
@@ -2364,8 +2364,15 @@ def get_module_handle(module_name, instance=1, timeout=5):
     if module:
         return module
     else:
-        logger.error('No running {} instance found'.format(module_name.upper()))
-        return False
+        try:
+            # try one last time with fixed instance
+            module = dbus_connection(module_name, instance=1)
+            if not module:
+                raise ValueError
+            return module
+        except Exception as err:
+            logger.error('No running {} instance found'.format(module_name.upper()))
+            return False
 
 
 def _get_ccs_dbus_names(exclude=None):
