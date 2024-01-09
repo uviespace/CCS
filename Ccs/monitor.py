@@ -487,7 +487,7 @@ class ParameterMonitor(Gtk.Window):
                 rawcal = self.parameters[par]['value']
                 if isinstance(rawcal[self._cal_active], bytes):
                     txt = '<span size="large" foreground="{}" weight="bold">0x{}</span>'.format(
-                        self.parameters[par]['alarm'], rawcal[[self._cal_active]].hex().upper())
+                        self.parameters[par]['alarm'], rawcal[self._cal_active].hex().upper())
                 else:
                     val = rawcal[self._cal_active]
                     fmt = self.parameters[par]['format'][self._cal_active]
