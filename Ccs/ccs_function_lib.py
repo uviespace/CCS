@@ -5743,8 +5743,11 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
     # remove incomplete transfers
     clean_bounds = _check_s13_downlinks(tm_bounds, tm_132)
 
+    if len(clean_bounds) == 0:
+        return {None: None}
+
     if not collect_all:
-        clean_bounds = clean_bounds[0]
+        clean_bounds = [clean_bounds[0]]
 
     ces = _assemble_s13(clean_bounds, tm_132, join=join, consistency_check=consistency_check, verbose=verbose)
 
@@ -5780,7 +5783,7 @@ def _check_s13_downlinks(s13_bounds, s13_intermediate):
                 sidx = pkt.idx
             else:
                 clean_transfers.append((valid_start, None))
-                logger.info('single packet downlink at {}'.format(sidx))
+                logger.debug('single packet downlink at {}'.format(valid_start.idx))
             valid_start = pkt
             tx = True
 
@@ -5791,7 +5794,7 @@ def _check_s13_downlinks(s13_bounds, s13_intermediate):
 
         elif not tx and pkt.sst == 3:
             tx = False
-            logger.warning('unexpected end-of-transmission packet at {}'.format(pkt.idx))
+            logger.debug('unexpected end-of-transmission packet at {}'.format(pkt.idx))
 
         elif tx and pkt.sst == 4:
             tx = False
@@ -5892,7 +5895,7 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
                           startidx=startidx, endidx=endidx, sdu=sdu, verbose=verbose, consistency_check=consistency_check)
 
     ldt_cnt = 0
-    for i, buf in enumerate(ldt_dict, 1):
+    for buf in ldt_dict:
         if ldt_dict[buf] is None:
             continue
 
