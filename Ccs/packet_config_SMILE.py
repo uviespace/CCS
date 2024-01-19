@@ -620,9 +620,6 @@ class RMapCommandWrite(RMapCommandHeader):
 
     @property
     def raw(self):
-        """Return raw packet with updated CRCs"""
-        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
-        self.data_crc = rmapcrc(self.data).to_bytes(RMAP_PEC_LEN, 'big')
         return bytes(self.bin) + self.data + self.data_crc
 
     @raw.setter
@@ -630,6 +627,10 @@ class RMapCommandWrite(RMapCommandHeader):
         self.bin[:] = rawdata[:RMAP_COMMAND_HEADER_LEN]
         self.data = rawdata[RMAP_COMMAND_HEADER_LEN:-RMAP_PEC_LEN]
         self.data_crc = rawdata[-RMAP_PEC_LEN:]
+
+    def crc_updt(self):
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+        self.data_crc = rmapcrc(self.data).to_bytes(RMAP_PEC_LEN, 'big')
 
 
 class RMapCommandRead(RMapCommandHeader):
@@ -661,13 +662,14 @@ class RMapCommandRead(RMapCommandHeader):
 
     @property
     def raw(self):
-        """Return raw packet with updated CRCs"""
-        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
         return bytes(self.bin)
 
     @raw.setter
     def raw(self, rawdata):
         self.bin[:] = rawdata[:RMAP_COMMAND_HEADER_LEN]
+
+    def crc_updt(self):
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
 
 
 class FeeDataTransfer(FeeDataTransferHeader):

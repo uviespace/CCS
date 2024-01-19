@@ -77,9 +77,9 @@ def convert_fullframe_to_cheopssim(fname):
 
 
 def ce_decompress(pool_name, outdir, sdu=None, starttime=None, endtime=None, startidx=None, endidx=None,
-                  ce_exec=None):
+                  ce_exec=None, check_s13_consistency=True):
     decomp = CeDecompress(pool_name, outdir, sdu=sdu, starttime=starttime, endtime=endtime, startidx=startidx,
-                          endidx=endidx, ce_exec=ce_exec)
+                          endidx=endidx, ce_exec=ce_exec, check_s13_consistency=check_s13_consistency)
     decomp.start()
 
 
@@ -95,7 +95,7 @@ def ce_decompress_stop(name=None):
 class CeDecompress:
 
     def __init__(self, pool_name, outdir, sdu=None, starttime=None, endtime=None, startidx=None, endidx=None,
-                 ce_exec=None):
+                 ce_exec=None, check_s13_consistency=True, verbose=True):
         self.outdir = outdir
         self.pool_name = pool_name
         self.sdu = sdu
@@ -103,6 +103,8 @@ class CeDecompress:
         self.endtime = endtime
         self.startidx = startidx
         self.endidx = endidx
+        self.check_s13_consistency = check_s13_consistency
+        self.verbose = verbose
 
         self.init_time = int(time.time())
 
@@ -124,30 +126,25 @@ class CeDecompress:
         self.ce_collect_timeout = CE_COLLECT_TIMEOUT
         self.ldt_minimum_ce_gap = LDT_MINIMUM_CE_GAP
 
-        global ce_decompressors
-        ce_decompressors[self.init_time] = self
-
     def _ce_decompress(self):
-        checkdir = os.path.dirname(self.outdir)
-        if not os.path.exists(checkdir) and checkdir != "":
-            os.mkdir(checkdir)
+        checkdir = os.path.abspath(self.outdir)
+        if not os.path.isdir(checkdir):  # and checkdir != "":
+            # os.mkdir(checkdir)
+            raise NotADirectoryError('{} is not a directory/does not exist.'.format(checkdir))
 
-        thread = threading.Thread(target=self._ce_decompress_worker, name="CeDecompression")
-        thread.daemon = True
-        self.ce_thread = thread
+        self.ce_thread = threading.Thread(target=self._ce_decompress_worker, name="CeDecompression_{}".format(self.init_time))
+        self.ce_thread.daemon = True
         if self.starttime is not None:
             self.last_ce_time = self.starttime
         self.ce_decompression_on = True
 
         try:
-            thread.start()
+            self.ce_thread.start()
             logger.info('Started CeDecompress [{}]...'.format(self.init_time))
         except Exception as err:
             logger.error(err)
             self.ce_decompression_on = False
             raise err
-
-        return thread
 
     def _ce_decompress_worker(self):
 
@@ -163,7 +160,8 @@ class CeDecompress:
         try:
             filedict = cfl.dump_large_data(pool_name=self.pool_name, starttime=self.last_ce_time, endtime=self.endtime,
                                            outdir=self.outdir, dump_all=True, sdu=self.sdu, startidx=self.startidx,
-                                           endidx=self.endidx)
+                                           endidx=self.endidx, consistency_check=self.check_s13_consistency,
+                                           verbose=self.verbose)
             for ce in filedict:
                 decompress(filedict[ce])
                 self.last_ce_time = ce
@@ -176,13 +174,19 @@ class CeDecompress:
 
         while self.ce_decompression_on:
             filedict = cfl.dump_large_data(pool_name=self.pool_name, starttime=self.last_ce_time, endtime=self.endtime,
-                                           outdir=self.outdir, dump_all=False, sdu=self.sdu, startidx=self.startidx,
-                                           endidx=self.endidx)
+                                           outdir=self.outdir, dump_all=True, sdu=self.sdu, startidx=self.startidx,
+                                           endidx=self.endidx, consistency_check=self.check_s13_consistency,
+                                           verbose=self.verbose)
             if len(filedict) == 0:
                 time.sleep(self.ce_collect_timeout)
                 continue
-            self.last_ce_time, cefile = list(filedict.items())[0]
-            decompress(cefile)
+
+            for ce in filedict:
+                self.last_ce_time, cefile = ce, filedict[ce]
+                decompress(cefile)
+
+            # self.last_ce_time, cefile = list(filedict.items())[0]
+            # decompress(cefile)
             self.last_ce_time += self.ldt_minimum_ce_gap
             time.sleep(self.ce_collect_timeout)
         logger.info('CeDecompress stopped [{}].'.format(self.init_time))
@@ -190,6 +194,9 @@ class CeDecompress:
 
     def start(self):
         self._ce_decompress()
+
+        global ce_decompressors
+        ce_decompressors[self.init_time] = self
 
     def stop(self):
         self.ce_decompression_on = False

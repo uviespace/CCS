@@ -15,13 +15,6 @@ T_ZERO = 273.15
 ADC_INPRNG = 7.34783  # V
 ADC_OFFSET = -1.69565  # V
 
-# FEE HK gains/offsets
-# EQM
-FEE_CCD2TsA_gain = 0.048589971
-FEE_CCD2TsA_offset = 326.709604
-FEE_CCD4TsB_gain = 0.048346072
-FEE_CCD4TsB_offset = 317.546000
-
 
 class Dpu:
 
@@ -589,6 +582,138 @@ def t_ccd_fee_deg_to_adu(t, ccd):
         return np.rint((cal_pt1000(t) - FEE_CCD4TsB_offset) / FEE_CCD4TsB_gain).astype(int)
     else:
         raise ValueError("CCD must be either 2 or 4!")
+
+
+class Fee:
+
+    CCD2_TS_A = "FRMHKccd2TsA"
+    CCD4_TS_B = "FRMHKccd4TsB"
+    PRT1 = "FRMHKprt1"
+    PRT2 = "FRMHKprt2"
+    PRT3 = "FRMHKprt3"
+    PRT4 = "FRMHKprt4"
+    PRT5 = "FRMHKprt5"
+    CCD4_VOD_MON_E = "FRMHKccd4VodMonE"
+    CCD4_VOG_MON = "FRMHKccd4VogMon"
+    CCD4_VRD_MON_E = "FRMHKccd4VrdMonE"
+    CCD2_VOD_MON_E = "FRMHKccd2VodMonE"
+    CCD2_VOG_MON = "FRMHKccd2VogMon"
+    CCD2_VRD_MON_E = "FRMHKccd2VrdMonE"
+    CCD4_VRD_MON_F = "FRMHKccd4VrdMonF"
+    CCD4_VDD_MON = "FRMHKccd4VddMon"
+    CCD4_VGD_MON = "FRMHKccd4VgdMon"
+    CCD2_VRD_MON_F = "FRMHKccd2VrdMonF"
+    CCD2_VDD_MON = "FRMHKccd2VddMon"
+    CCD2_VGD_MON = "FRMHKccd2VgdMon"
+    VCCD = "FRMHKvccd"
+    VRCLK_MON = "FRMHKvrclkMon"
+    VICLK = "FRMHKviclk"
+    CCD4_VOD_MON_F = "FRMHKccd4VodMonF"
+    P5VB_POS_MON = "FRMHK5vbPosMon"
+    P5VB_NEG_MON = "FRMHK5vbNegMon"
+    P3V3B_MON = "FRMHK3v3bMon"
+    P2V5A_MON = "FRMHK2v5aMon"
+    P3V3D_MON = "FRMHK3v3dMon"
+    P2V5D_MON = "FRMHK2v5dMon"
+    P1V2D_MON = "FRMHK1v2dMon"
+    P5VREF_MON = "FRMHK5vrefMon"
+    VCCD_POS_RAW = "FRMHKvccdPosRaw"
+    VCLK_POS_RAW = "FRMHKvclkPosRaw"
+    VAN1_POS_RAW = "FRMHKvan1PosRaw"
+    VAN3_NEG_MON = "FRMHKvan3NegMon"
+    VAN2_POS_RAW = "FRMHKvan2PosRaw"
+    VDIG_RAW = "FRMHKvdigRaw"
+    IG_HI_MON = "FRMHKigHiMon"
+    CCD2_VOD_MON_F = "FRMHKccd2VodMonF"
+
+
+# FEE HK gains/offsets
+# EQM
+FEE_GAIN_OFFSET = {
+    Fee.CCD2_TS_A: (0.048589970854, 326.709603726099),
+    Fee.CCD4_TS_B: (0.048346071846, 317.545999899085),
+    Fee.PRT1: (0.049337666752, 310.304954966437),
+    Fee.PRT2: (0.048871723231, 322.563832689621),
+    Fee.PRT3: (0.048882740559, 322.418053560869),
+    Fee.PRT4: (0.048777132761, 322.321990156487),
+    Fee.PRT5: (0.048683458078, 323.746239172483),
+    Fee.CCD4_VOD_MON_E: (0.000563088127, -0.00209746042908421),
+    Fee.CCD4_VOG_MON: (0.000135181804, -0.166559933290103),
+    Fee.CCD4_VRD_MON_E: (0.000563174116, 0.0193461050916852),
+    Fee.CCD2_VOD_MON_E: (0.000563015464, -0.0097318620270066),
+    Fee.CCD2_VOG_MON: (0.000135565734, -0.164272515606305),
+    Fee.CCD2_VRD_MON_E: (0.000562914749, 0.0221158942564337),
+    Fee.CCD4_VRD_MON_F: (0.000563425754, 0.00833790912991361),
+    Fee.CCD4_VDD_MON: (0.000816121249, 0),
+    Fee.CCD4_VGD_MON: (0.000562165835, 0.0483795532258782),
+    Fee.CCD2_VRD_MON_F: (0.000563631207, -0.00437775179765865),
+    Fee.CCD2_VDD_MON: (0.000815982604, 0),
+    Fee.CCD2_VGD_MON: (0.000556683023, 0.225687270717021),
+    Fee.VCCD: (0.000756606970, 0),
+    Fee.VRCLK_MON: (0.000360316440, 0),
+    Fee.VICLK: (0.000360364766, 0),
+    Fee.CCD4_VOD_MON_F: (0.000562995879, 0.00807772719949895),
+    Fee.P5VB_POS_MON: (0.000092728181, 0),
+    Fee.P5VB_NEG_MON: (-0.000125745208, 0),
+    Fee.P3V3B_MON: (0.000062672872, 0),
+    Fee.P2V5A_MON: (0.000062623239, 0),
+    Fee.P3V3D_MON: (0.000062667814, 0),
+    Fee.P2V5D_MON: (0.000062623117, 0),
+    Fee.P1V2D_MON: (0.000031361075, 0),
+    Fee.P5VREF_MON: (0.000097218804, 0),
+    Fee.VCCD_POS_RAW: (0.000756449617, 0),
+    Fee.VCLK_POS_RAW: (0.000360291117, 0),
+    Fee.VAN1_POS_RAW: (0.000163267788, 0),
+    Fee.VAN3_NEG_MON: (-0.000208630551, 0),
+    Fee.VAN2_POS_RAW: (0.000163196727, 0),
+    Fee.VDIG_RAW: (0.000097250522, 0),
+    Fee.IG_HI_MON: (0.000186900810, 0),
+    Fee.CCD2_VOD_MON_F: (0.000562860544, -0.00642286504851342)
+}
+
+FEE_CCD2TsA_gain, FEE_CCD2TsA_offset = FEE_GAIN_OFFSET[Fee.CCD2_TS_A]
+FEE_CCD4TsB_gain, FEE_CCD4TsB_offset = FEE_GAIN_OFFSET[Fee.CCD4_TS_B]
+
+
+def cal_fee_hk(adu, signal):
+    """
+    Calibrate raw FEE HK reading to engineering value
+
+    @param signal:
+    @param adu:
+    @return:
+    """
+
+    if signal not in FEE_GAIN_OFFSET:
+        raise ValueError('Unknown signal "{}"'.format(signal))
+
+    gain, offset = FEE_GAIN_OFFSET[signal]
+    val = adu * gain + offset
+
+    if signal in [Fee.CCD2_TS_A, Fee.CCD4_TS_B, Fee.PRT1, Fee.PRT2, Fee.PRT3, Fee.PRT4, Fee.PRT5]:
+        val = _pt1000_curve_inv(val)
+
+    return val
+
+
+def calibrate_ext(adu, signal, exception=False):
+    """
+    Provide unified access to customised calibrations outside MIB.
+    This function shall expose all calibrations in this module that should be accessible by other CCS modules.
+
+    :param adu:
+    :param signal:
+    :param exception:
+    :return:
+    """
+
+    try:
+        return cal_fee_hk(adu, signal)
+    except ValueError:
+        return adu if not exception else None
+
+    # to disable calibration
+    # return adu if not exception else None
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ sys.path.append(ccs_path)
 sys.path.append(confignator.get_option('tst-paths', 'testing_library'))
 
 import ccs_function_lib as cfl
+from  Tst.testing_library.testlib import tm
 
 from datetime import datetime
 from testlib import report

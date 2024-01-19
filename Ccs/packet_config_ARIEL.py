@@ -1,11 +1,10 @@
 """
 PUS & SpW packet header structure definitions and utility functions
 
-PUS-C for ATHENA
+PUS-C for ARIEL
 
 Author: Marko Mecina (MM)
 """
-
 ### TBD ###
 import ctypes
 import datetime
@@ -15,9 +14,8 @@ import numpy as np
 import crcmod
 from s2k_partypes import ptt
 
-
 # ID of the parameter format type defining parameter
-FMT_TYPE_PARAM = ''
+FMT_TYPE_PARAM = 'DPPXXXXX'
 
 # pre/suffixes for TM/TC packets from/to PLMSIM
 # PLM_PKT_PREFIX = b'tc PUS_TC '
@@ -33,9 +31,10 @@ PEC_LEN = 2  # in bytes
 RMAP_PEC_LEN = 1
 
 # PUS packet structure definition
+
 PUS_PKT_VERS_NUM = 0  # 0 for space packets
-PUS_VERSION = 2  # PUS-C = 2
-MAX_PKT_LEN = 1024  # TBD
+PUS_VERSION = 2
+MAX_PKT_LEN = 1024  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
 
 TMTC = {0: 'TM', 1: 'TC'}
 TSYNC_FLAG = {0: 'U', 1: 'S'}
@@ -52,14 +51,13 @@ PRIMARY_HEADER = [
 
 TM_SECONDARY_HEADER = [
     ("PUS_VERSION", ctypes.c_uint8, 4),
-    ("SC_REFTIME", ctypes.c_uint8, 4),
+    ("SCTRS", ctypes.c_uint8, 4),
     ("SERV_TYPE", ctypes.c_uint8, 8),
     ("SERV_SUB_TYPE", ctypes.c_uint8, 8),
-    ("MSG_TYPE_CNT", ctypes.c_uint16, 16),
+    ("MTC", ctypes.c_uint16, 16),
     ("DEST_ID", ctypes.c_uint16, 16),
     ("CTIME", ctypes.c_uint32, 32),
-    ("FTIME", ctypes.c_uint16, 16),
-    ("TIMESYNC", ctypes.c_uint8, 8)
+    ("FTIME", ctypes.c_uint16, 16)
 ]
 
 TC_SECONDARY_HEADER = [
@@ -71,19 +69,11 @@ TC_SECONDARY_HEADER = [
 ]
 
 # [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of extra sync flag in bytes]
-timepack = [ptt(9, 17), 7, 2**16, 1]
-CUC_EPOCH = datetime.datetime(2022, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
+timepack = [ptt(9, 17), 6, 2**16, 0]
+CUC_EPOCH = datetime.datetime(2020, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 
 def timecal(data, string=False, checkft=False):
-    """
-    This function takes a CUC time bytestring and must return the time as a *str* if *string* is True, or as a float otherwise.
-
-    :param data: CUC time bytestring
-    :param string:
-    :param checkft:
-    :return:
-    """
     if not isinstance(data, bytes):
         try:
             return data[0]
@@ -112,7 +102,7 @@ def timecal(data, string=False, checkft=False):
 
     if string:
         if sync_byte:
-            sync = 'S' if (data & 0xff) == 1 else 'U'
+            sync = 'S' if (data & 0xff) == 0b101 else 'U'
         else:
             sync = ''
         return '{:.6f}{}'.format(coarse + fine, sync)
@@ -122,14 +112,6 @@ def timecal(data, string=False, checkft=False):
 
 
 def calc_timestamp(time, sync=None, return_bytes=False):
-    """
-    This function must return the CUC time as a bytestring if *return_bytes* is *True*, or a tuple of integers for ctime, ftime, and sync otherwise.
-
-    :param time: CUC time as float or str
-    :param sync:
-    :param return_bytes:
-    :return:
-    """
     if isinstance(time, (float, int)):
         ctime = int(time)
         ftime = round(time % 1 * timepack[2])
@@ -147,16 +129,17 @@ def calc_timestamp(time, sync=None, return_bytes=False):
         if ftime == timepack[2]:
             ctime += 1
             ftime = 0
-        sync = 1 if time[-1].upper() == 'S' else 0
+        sync = 0b101 if time[-1].upper() == 'S' else 0
 
     elif isinstance(time, bytes):
         if len(time) not in [timepack[1], timepack[1] - timepack[3]]:
             raise ValueError(
                 'Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
         ctime = int.from_bytes(time[:4], 'big')
-        ftime = int.from_bytes(time[4:7], 'big')
+        ftime = int.from_bytes(time[4:6], 'big')
         if len(time) == timepack[1]:
-            sync = time[-1]
+            sync = None
+            # sync = time[-1]
         else:
             sync = None
 
@@ -165,16 +148,20 @@ def calc_timestamp(time, sync=None, return_bytes=False):
 
     if return_bytes:
         if sync is None or sync is False:
-            return ctime.to_bytes(4, 'big') + ftime.to_bytes(3, 'big')
+            return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big')
         else:
-            return ctime.to_bytes(4, 'big') + ftime.to_bytes(3, 'big') + sync.to_bytes(1, 'big')
+            pass
+            # no sync byte in ARIEL?
+            # return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big') + sync.to_bytes(1, 'big')
     else:
         return ctime, ftime, sync
 
 
-class RawGetterSetter:
+# P_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER]) // 8
+# TM_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TM_SECONDARY_HEADER]) // 8
+# TC_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TC_SECONDARY_HEADER]) // 8
 
-    bin = 0
+class RawGetterSetter:
 
     @property
     def raw(self):
@@ -183,10 +170,6 @@ class RawGetterSetter:
     @raw.setter
     def raw(self, rawdata):
         self.bin[:] = rawdata
-
-    @property
-    def hex(self):
-        return bytes(self.bin).hex(' ').upper()
 
 
 class PHeaderBits(ctypes.BigEndianStructure):
@@ -253,6 +236,7 @@ CUC_OFFSET = TMHeaderBits.CTIME.offset
 
 SPW_PROTOCOL_IDS = {
     "RMAP": 0x01,
+    "FEEDATA": 0xF0,
     "CCSDS": 0x02
 }
 
@@ -381,6 +365,89 @@ class RMapReplyReadHeader(ctypes.Union, RawGetterSetter):
         self.bits.WRITE = 0
         self.bits.VERIFY = 0
         self.bits.REPLY = 1
+
+
+class RMapCommandWrite(RMapCommandHeader):
+    """This is intended for building an RMap Write Command"""
+
+    def __init__(self, addr, data, verify=True, reply=True, incr=True, key=SPW_FEE_KEY,
+                 initiator=SPW_DPU_LOGICAL_ADDRESS, tid=1, *args, **kwargs):
+        super(RMapCommandWrite, self).__init__(*args, **kwargs)
+
+        self.header = self.bits
+        self.data = data
+        self.data_crc = rmapcrc(self.data).to_bytes(RMAP_PEC_LEN, 'big')
+
+        self.bits.TARGET_LOGICAL_ADDR = SPW_FEE_LOGICAL_ADDRESS
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS['RMAP']
+
+        self.bits.PKT_TYPE = 1
+        self.bits.WRITE = 1
+        self.bits.VERIFY = verify
+        self.bits.REPLY = reply
+        self.bits.INCREMENT = incr
+        self.bits.REPLY_ADDR_LEN = 0
+        self.bits.KEY = key
+
+        self.bits.INIT_LOGICAL_ADDR = initiator
+        self.bits.TRANSACTION_ID = tid
+        self.bits.EXT_ADDR = addr >> 32
+        self.bits.ADDR = addr & 0xFFFFFFFF
+        self.bits.DATA_LEN = len(self.data)
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+
+    @property
+    def raw(self):
+        return bytes(self.bin) + self.data + self.data_crc
+
+    @raw.setter
+    def raw(self, rawdata):
+        self.bin[:] = rawdata[:RMAP_COMMAND_HEADER_LEN]
+        self.data = rawdata[RMAP_COMMAND_HEADER_LEN:-RMAP_PEC_LEN]
+        self.data_crc = rawdata[-RMAP_PEC_LEN:]
+
+    def crc_updt(self):
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+        self.data_crc = rmapcrc(self.data).to_bytes(RMAP_PEC_LEN, 'big')
+
+
+class RMapCommandRead(RMapCommandHeader):
+    """This is intended for building an RMap Read Command"""
+
+    def __init__(self, addr, datalen, incr=True, key=SPW_FEE_KEY, initiator=SPW_DPU_LOGICAL_ADDRESS, tid=1,
+                 *args, **kwargs):
+        super(RMapCommandRead, self).__init__(*args, **kwargs)
+
+        self.header = self.bits
+
+        self.bits.TARGET_LOGICAL_ADDR = SPW_FEE_LOGICAL_ADDRESS
+        self.bits.PROTOCOL_ID = SPW_PROTOCOL_IDS['RMAP']
+
+        self.bits.PKT_TYPE = 1
+        self.bits.WRITE = 0
+        self.bits.VERIFY = 0
+        self.bits.REPLY = 1
+        self.bits.INCREMENT = incr
+        self.bits.REPLY_ADDR_LEN = 0
+        self.bits.KEY = key
+
+        self.bits.INIT_LOGICAL_ADDR = initiator
+        self.bits.TRANSACTION_ID = tid
+        self.bits.EXT_ADDR = addr >> 32
+        self.bits.ADDR = addr & 0xFFFFFFFF
+        self.bits.DATA_LEN = datalen
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
+
+    @property
+    def raw(self):
+        return bytes(self.bin)
+
+    @raw.setter
+    def raw(self, rawdata):
+        self.bin[:] = rawdata[:RMAP_COMMAND_HEADER_LEN]
+
+    def crc_updt(self):
+        self.bits.HEADER_CRC = rmapcrc(bytes(self.bin[:-1]))
 
 
 # S13 data header format, using python struct conventions

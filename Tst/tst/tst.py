@@ -752,7 +752,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
             # self.on_open_create_tab(data_from_file, filename, json_type=False)
             dialog.destroy()
 
-            self.save_as_file_dialog()
+            # self.save_as_file_dialog()
         else:
             dialog.destroy()
 

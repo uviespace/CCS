@@ -24,7 +24,7 @@ import DBus_Basic
 import ccs_function_lib as cfl
 
 sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
-import tm
+# import tm
 
 cfg = confignator.get_config()
 
@@ -32,6 +32,7 @@ pixmap_folder = cfg.get('ccs-paths', 'pixmap')
 action_folder = cfg.get('ccs-paths', 'actions')
 
 scripts = glob.glob(os.path.join(cfg.get('paths', 'ccs'), "scripts/*.py"))
+scripts.sort()
 script_actions = '\n'.join(["<menuitem action='{}' />".format(os.path.split(script)[-1][:-3]) for script in scripts])
 
 LOG_UPDT_PER = 2000  # ms

@@ -27,6 +27,7 @@ import logging.handlers
 from database.tm_db import scoped_session_maker, DbTelemetry, DbTelemetryPool, RMapTelemetry, FEEDataTelemetry
 from sqlalchemy.exc import OperationalError as SQLOperationalError
 from sqlalchemy.sql.expression import func
+import threading
 
 from typing import NamedTuple
 from s2k_partypes import ptt, ptt_reverse, ptype_parameters, ptype_values
@@ -64,6 +65,7 @@ except SQLOperationalError as err:
 _pcf_cache = {}
 _cap_cache = {}
 _txp_cache = {}
+_pcf_descr_cache = {}
 
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
@@ -86,6 +88,12 @@ try:
 except AttributeError as err:
     logger.critical(err)
     raise err
+
+try:
+    cal = importlib.import_module('calibrations_' + str(project).upper())
+except Exception as err:
+    logger.warning(err)
+    cal = None
 
 SREC_MAX_BYTES_PER_LINE = 250
 SEG_HEADER_FMT = '>III'
@@ -408,7 +416,7 @@ def dbus_connection(name, instance=1):
         return dbuscon
     except:
         # print('Please start ' + str(name) + ' if it is not running')
-        logger.info('Connection to ' + str(name) + ' is not possible.')
+        logger.warning('Connection to ' + str(name) + ' is not possible.')
         return False
 
 
@@ -1769,6 +1777,9 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     elif type_par.startswith('oct'):
         return rawval.hex().upper()
     elif curtx is None:
+        if not nocal and cal is not None:
+            calval = cal.calibrate_ext(rawval, pcf_name_to_descr(pcf_name))
+            return calval if floatfmt is None else format(calval, floatfmt)
         try:
             return rawval if isinstance(rawval, (int, float)) else rawval[0]
         except IndexError:
@@ -2016,6 +2027,20 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
     return rows
 
 
+def filter_by_discr(rows, pi1_off, pi1_wid, pi1_val):
+    """
+
+    :param rows:
+    :param pi1_off:
+    :param pi1_wid:
+    :param pi1_val:
+    :return:
+    """
+
+    rows = rows.filter(func.mid(DbTelemetry.raw, pi1_off + 1, pi1_wid) == pi1_val.to_bytes(pi1_wid, 'big'))
+    return rows
+
+
 ##
 #  CRC check
 #
@@ -2100,6 +2125,27 @@ def get_pool_rows(pool_name, check_existence=False):
     return rows
 
 
+def get_hk_val(pool_name, sid, par_id, apid=None):
+
+    assert isinstance(sid, int)
+
+    dbcon = scoped_session_idb()
+    apid_filt = '' if apid is None else ' AND pid_apid={:d}'.format(apid)
+    res = dbcon.execute('SELECT pid_descr FROM pid WHERE pid_type=3 and pid_stype=25 and pid_pi1_val={:d}{}'.format(sid, apid_filt)).fetchall()
+    dbcon.close()
+
+    if not res:
+        return
+
+    hk, = res[0]
+    # TODO: user defined HKs
+
+    if isinstance(par_id, int):
+        pass  # TODO
+
+    return get_param_values(pool_name=pool_name, hk=hk, param=par_id, last=1, mk_array=False)
+
+
 # get values of parameter from HK packets
 def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True, nocal=False):
     """
@@ -2166,9 +2212,10 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         apid = int(pktkey[2]) if pktkey[2] != 'None' else None
         sid = int(pktkey[3]) if pktkey[3] != 'None' else None
         # name, descr, _, offbi, ptc, pfc, unit, _, bitlen = parinfo
-        _, descr, ptc, pfc, curtx, bitlen, _, _, _, _, _ = parinfo
-        unit = None
-        name = None
+        name, descr, ptc, pfc, curtx, bitlen, unit, _, _, _, _ = parinfo
+        if name in ['user_defined', 'user_defined_nopos', 'dp_item']:
+            unit = None
+            name = None
         offbi = 0
 
         offby = sum([x[5] for x in pktinfo[:pktinfo.index(parinfo)]]) // 8 + TM_HEADER_LEN  # +TM_HEADER_LEN for header
@@ -2186,7 +2233,11 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         descr, unit, name = param, None, None
 
     bylen = csize(ufmt)
-    tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+    if isinstance(tmlist, list):
+        tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+    else:
+        tmlist_filt = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        tmlist_filt = [x.raw for x in tmlist_filt]
 
     if name is not None:
         que = 'SELECT pcf.pcf_categ,pcf.pcf_curtx from pcf where pcf_name="%s"' % name
@@ -2198,9 +2249,16 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
             return
 
         categ, curtx = fetch[0]
-        xy = [(get_cuctime(tm),
-               get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
-                              properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
+
+        if mk_array:
+            xy = [(get_cuctime(tm),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                                  properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
+        else:
+            xy = [(get_cuctime(tm),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                                  properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=nocal)) for tm in
+                  tmlist_filt]
 
     else:
         xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]
@@ -2212,13 +2270,20 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
 
     try:
         arr = np.array(np.array(xy).T, dtype='float')
+
         # calibrate y values
         if not nocal and name is not None:
             get_cap_yval(name, arr[1, 0])  # calibrate one value to get name into _cap_cache
+
             if _cap_cache[name] is None:
+                # try custom calibration if not in MIB
+                if cal is not None:
+                    arr[1, :] = cal.calibrate_ext(arr[1, :], pcf_name_to_descr(name))
                 return arr, (descr, unit)
+
             xvals, yvals = _cap_cache[name]
             arr[1, :] = np.interp(arr[1, :], xvals, yvals, left=np.nan, right=np.nan)
+
         return arr, (descr, unit)
 
     except (ValueError, IndexError):
@@ -2299,8 +2364,15 @@ def get_module_handle(module_name, instance=1, timeout=5):
     if module:
         return module
     else:
-        logger.error('No running {} instance found'.format(module_name.upper()))
-        return False
+        try:
+            # try one last time with fixed instance
+            module = dbus_connection(module_name, instance=1)
+            if not module:
+                raise ValueError
+            return module
+        except Exception as err:
+            logger.error('No running {} instance found'.format(module_name.upper()))
+            return False
 
 
 def _get_ccs_dbus_names(exclude=None):
@@ -4391,6 +4463,22 @@ def get_tm_parameter_info(pname):
     return res
 
 
+def pcf_name_to_descr(pcfname):
+    """
+    Look up PCF_DESCR for PCF_NAME in MIB
+    """
+
+    if pcfname in _pcf_descr_cache:
+        return _pcf_descr_cache[pcfname]
+
+    que = 'SELECT pcf_descr FROM pcf WHERE pcf_name="{}"'.format(pcfname)
+    res = scoped_session_idb.execute(que).fetchall()
+
+    if res:
+        _pcf_descr_cache[pcfname] = res[0][0]
+        return res[0][0]
+
+
 def get_tm_id(pcf_descr=None):
     """
 
@@ -5587,7 +5675,7 @@ def _get_displayed_pool_path(pool_name=None):
 
 
 def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=None, join=True, collect_all=False,
-               sdu=None, verbose=True):
+               sdu=None, verbose=True, consistency_check=True):
     """
     Collect and group S13 down transfer packet trains
 
@@ -5600,8 +5688,10 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
     :param collect_all:
     :param sdu:
     :param verbose:
+    :param consistency_check:
     :return:
     """
+
     if not os.path.isfile(pool_name):
         logger.debug('{} is not a file, looking it up in DB'.format(pool_name))
         # try fetching pool info from pools opened in viewer
@@ -5611,9 +5701,8 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
 
     rows = get_pool_rows(pool_name, check_existence=True)
 
-    ces = {}
     # faster method to collect already completed TM13 transfers
-    tm_bounds = rows.filter(DbTelemetry.stc == 13, DbTelemetry.sst.in_([1, 3])).order_by(DbTelemetry.idx)
+    tm_bounds = rows.filter(DbTelemetry.stc == 13, DbTelemetry.sst.in_([1, 3, 4])).order_by(DbTelemetry.idx)
 
     if starttime is not None:
         tm_bounds = tm_bounds.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) >= starttime)
@@ -5630,8 +5719,8 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
     if sdu:
         tm_bounds = tm_bounds.filter(func.left(DbTelemetry.data, 1) == sdu.to_bytes(SDU_PAR_LENGTH, 'big'))
 
-    # quit if no start and end packet are found
-    if tm_bounds.count() < 2:
+    # quit if no start packet is found
+    if tm_bounds.filter(DbTelemetry.sst == 1).count() == 0:
         return {None: None}
 
     tm_132 = rows.filter(DbTelemetry.stc == 13, DbTelemetry.sst == 2).order_by(DbTelemetry.idx)
@@ -5651,78 +5740,138 @@ def collect_13(pool_name, starttime=None, endtime=None, startidx=None, endidx=No
     if sdu:
         tm_132 = tm_132.filter(func.left(DbTelemetry.data, 1) == sdu.to_bytes(SDU_PAR_LENGTH, 'big'))
 
-    # make sure to start with a 13,1
-    while tm_bounds[0].sst != 1:
-        tm_bounds = tm_bounds[1:]
-        if len(tm_bounds) < 2:
-            return {None: None}
-    # and end with a 13,3
-    while tm_bounds[-1].sst != 3:
-        tm_bounds = tm_bounds[:-1]
-        if len(tm_bounds) < 2:
-            return {None: None}
+    # remove incomplete transfers
+    clean_bounds = _check_s13_downlinks(tm_bounds, tm_132)
 
-    if not collect_all:
-        tm_bounds = tm_bounds[:2]
-    else:
-        tm_bounds = tm_bounds[:]  # cast Query to list if not list already
-
-    # check for out of order 1s and 3s TODO: there can be short transfers with only TM13,1 and no TM13,3
-    idcs = [i.sst for i in tm_bounds]
-    outoforder = []
-    for i in range(len(idcs) - 1):
-        if idcs[i + 1] == idcs[i]:
-            if idcs[i] == 1:
-                outoforder.append(i)
-            elif idcs[i] == 3:
-                outoforder.append(i + 1)
-    dels = 0
-    for i in outoforder:
-        del tm_bounds[i - dels]
-        dels += 1
-    # check if start/end (1/3) strictly alternating
-    if not np.diff([i.sst for i in tm_bounds]).all():
-        print('Detected inconsistent transfers')
+    if len(clean_bounds) == 0:
         return {None: None}
 
-    k = 0
-    n = len(tm_bounds)
-    cnt = 0
-    while k < n - 1:
-        i, j = tm_bounds[k:k + 2]
-        if i.sst == j.sst:
-            k += 1
-            logger.warning('Identical consecutive SSTs found (idx={})'.format(i.idx))
-            continue
-        else:
-            pkts = [a.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] for a in tm_132.filter(DbTelemetry.idx > i.idx, DbTelemetry.idx < j.idx)]
+    if not collect_all:
+        clean_bounds = [clean_bounds[0]]
 
-            # check for padding bytes in last packet
-            datalen = int.from_bytes(j.raw[S13_DATALEN_PAR_OFFSET:S13_DATALEN_PAR_OFFSET + S13_DATALEN_PAR_SIZE], 'big')
-            lastpktdata = j.raw[S13_HEADER_LEN_TOTAL:S13_HEADER_LEN_TOTAL + datalen]
+    ces = _assemble_s13(clean_bounds, tm_132, join=join, consistency_check=consistency_check, verbose=verbose)
+
+    return ces
+
+
+def _check_s13_downlinks(s13_bounds, s13_intermediate):
+    """
+    Filter out TM13 1 & 3/4 packets from incomplete transfers
+
+    :param s13_bounds:
+    :param s13_intermediate:
+    :return:
+    """
+
+    tx = False
+    sidx = 0
+
+    valid_start = None
+
+    clean_transfers = []
+
+    for pkt in s13_bounds:
+
+        if not tx and pkt.sst == 1:
+            tx = True
+            sidx = pkt.idx
+            valid_start = pkt
+
+        elif pkt.sst == 1:
+            if s13_intermediate.filter(DbTelemetry.idx > sidx, DbTelemetry.idx < pkt.idx).count():
+                logger.warning('incomplete downlink at {}'.format(sidx))
+                sidx = pkt.idx
+            else:
+                clean_transfers.append((valid_start, None))
+                logger.debug('single packet downlink at {}'.format(valid_start.idx))
+            valid_start = pkt
+            tx = True
+
+        elif tx and pkt.sst == 3:
+            clean_transfers.append((valid_start, pkt))
+            valid_start = None
+            tx = False
+
+        elif not tx and pkt.sst == 3:
+            tx = False
+            logger.debug('unexpected end-of-transmission packet at {}'.format(pkt.idx))
+
+        elif tx and pkt.sst == 4:
+            tx = False
+            logger.warning('aborted downlink at {}'.format(pkt.idx))
+
+        elif not tx and pkt.sst == 4:
+            tx = False
+            logger.warning('unexpected abort-of-transmission packet at {}'.format(pkt.idx))
+
+        else:
+            logger.error("I shouldn't be here! ({})".format(pkt.idx))
+
+    return clean_transfers
+
+
+def _assemble_s13(bounds, tm_132, join=True, consistency_check=False, verbose=True):
+    """
+    Assemble payload data from S13 transfers.
+
+    :param bounds:
+    :param tm_132:
+    :param join:
+    :param consistency_check:
+    :param verbose:
+    :return:
+    """
+
+    ces = {}
+    errs = []
+
+    scnt_offset = TM_HEADER_LEN + _s13_info[0][1]
+    scnt_size = _s13_info[1][1]
+
+    for i, j in bounds:
+
+        try:
+            # single packet transfer
+            if j is None:
+                firstpktdata = b''
+                pkts = []
+                datalen = int.from_bytes(i.raw[S13_DATALEN_PAR_OFFSET:S13_DATALEN_PAR_OFFSET + S13_DATALEN_PAR_SIZE], 'big')
+                lastpktdata = i.raw[S13_HEADER_LEN_TOTAL:S13_HEADER_LEN_TOTAL + datalen]
+
+            else:
+                firstpktdata = i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]
+                pkts = [a.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] for a in tm_132.filter(DbTelemetry.idx > i.idx, DbTelemetry.idx < j.idx)]
+
+                # check for padding bytes in last packet
+                datalen = int.from_bytes(j.raw[S13_DATALEN_PAR_OFFSET:S13_DATALEN_PAR_OFFSET + S13_DATALEN_PAR_SIZE], 'big')
+                lastpktdata = j.raw[S13_HEADER_LEN_TOTAL:S13_HEADER_LEN_TOTAL + datalen]
+
+                if consistency_check:
+                    # check if number of collected packets matches the sequence counter of TM13,3
+                    cnt = int.from_bytes(j.raw[scnt_offset:scnt_offset + scnt_size], 'big')
+                    npkts = len(pkts) + 2
+                    if cnt != npkts:
+                        logger.warning('Inconsistent number of packets in transfer starting at {}'.format(i.timestamp))
+                        errs.append(i.timestamp)
 
             if join:
-                ces[float(i.timestamp[:-1])] = i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN] + b''.join(pkts) + lastpktdata
+                ces[float(i.timestamp[:-1])] = firstpktdata + b''.join(pkts) + lastpktdata
             else:
-                ces[float(i.timestamp[:-1])] = [i.raw[S13_HEADER_LEN_TOTAL:-PEC_LEN]] + pkts + [lastpktdata]
-            k += 2
+                ces[float(i.timestamp[:-1])] = [firstpktdata] + pkts + [lastpktdata]
 
-        cnt += 1
-        if verbose:
-            print('Collected {} of {} S13 transfers.'.format(cnt, n // 2), end='\r')
+        except Exception as err:
+            logger.error(err)
 
-    # for (i, j) in zip(tm_bounds[::2], tm_bounds[1::2]):
-    #     pkts = [a.raw[21:-2] for a in tm_132.filter(DbTelemetry.idx > i.idx, DbTelemetry.idx < j.idx)]
-    #     if join:
-    #         ces[float(i.timestamp[:-1])] = i.raw[21:-2] + b''.join(pkts) + j.raw[21:-2]
-    #     else:
-    #         ces[float(i.timestamp[:-1])] = [i.raw[21:-2]] + [b''.join(pkts)] + [j.raw[21:-2]]
+    if verbose:
+        print('Collected {} S13 transfers.'.format(len(ces)))
+        if len(errs) != 0:
+            print('There are inconsistencies in {} transfer(s)!\n{}'.format(len(errs), '\n'.join(errs)))
 
     return ces
 
 
 def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=False, sdu=None, startidx=None,
-                    endidx=None, verbose=True):
+                    endidx=None, verbose=True, consistency_check=True):
     """
     Dump S13 down transfer data to disk. For pools loaded from a file, pool_name must be the absolute path of that file.
 
@@ -5735,6 +5884,7 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     :param startidx:
     :param endidx:
     :param verbose:
+    :param consistency_check:
     """
 
     if not os.path.exists(outdir):
@@ -5742,10 +5892,10 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
 
     filedict = {}
     ldt_dict = collect_13(pool_name, starttime=starttime, endtime=endtime, join=True, collect_all=dump_all,
-                          startidx=startidx, endidx=endidx, sdu=sdu, verbose=verbose)
+                          startidx=startidx, endidx=endidx, sdu=sdu, verbose=verbose, consistency_check=consistency_check)
 
     ldt_cnt = 0
-    for i, buf in enumerate(ldt_dict, 1):
+    for buf in ldt_dict:
         if ldt_dict[buf] is None:
             continue
 
@@ -5775,7 +5925,28 @@ def dump_large_data(pool_name, starttime=0, endtime=None, outdir="", dump_all=Fa
     return filedict
 
 
-import threading
+def get_hk_def_tcs(filename, sid=None, sidoff=TC_HEADER_LEN, sidbs=2):
+    """
+    Search binary pool dump for HK definitions (TC(3,1))
+
+    @param filename:
+    @param sid: Only return HK definitions with this SID if not None
+    @param sidoff:
+    @param sidbs:
+    @return:
+    """
+
+    with open(filename, 'rb') as fd:
+        pkts = extract_pus(fd)
+
+    if sid is None:
+        pkts = [pkt for pkt in pkts if (pkt[7] == 3) and (pkt[8] == 1)]
+    else:
+        pkts = [pkt for pkt in pkts if (pkt[7] == 3) and (pkt[8] == 1) and (int.from_bytes(pkt[sidoff:sidoff+sidbs], 'big') == sid)]
+
+    return pkts
+
+
 class DbTools:
     """
     SQL database management tools
@@ -5910,7 +6081,7 @@ class DbTools:
             os.path.basename(filename),
             False)
 
-        new_session = scoped_session_storage
+        new_session = scoped_session_storage()
         filename_in_pool = new_session.query(DbTelemetryPool).filter(DbTelemetryPool.pool_name == active_pool_info.filename)
 
         pool_exists_in_db_already = filename_in_pool.filter(DbTelemetryPool.modification_time == active_pool_info.modification_time).count() > 0
@@ -5932,18 +6103,19 @@ class DbTools:
             loadinfo = LoadInfo(parent=parent)
             # loadinfo.spinner.start()
             # loadinfo.show_all()
+            new_session.close()
+
             _loader_thread = threading.Thread(target=DbTools.import_dump_in_db,
                                               args=[active_pool_info, loadinfo],
                                               kwargs={'brute': brute, 'protocol': protocol, 'pecmode': pecmode})
             _loader_thread.daemon = True
             _loader_thread.start()
 
-            logger.info('Loading Pool:' + str(filename))
+            logger.info('Loading Pool: ' + str(filename))
 
         else:
             _loader_thread = None
-
-        new_session.close()
+            new_session.close()
 
         # logger.info('Loaded Pool:' + str(filename))
 
@@ -6053,7 +6225,7 @@ class DbTools:
         # pv.Functions('_set_list_and_display_Glib_idle_add', self.active_pool_info, int(self.my_bus_name[-1]), ignore_reply=True)
         # GLib.idle_add(self._set_pool_list_and_display)
         new_session.close()
-        logger.info('Loaded Pool:' + str(pool_info.filename))
+        logger.info('Loaded Pool: ' + str(pool_info.filename))
 
     @staticmethod
     def db_bulk_insert(filename, processor, bulk_insert_size=1000, brute=False, checkcrc=True, protocol='PUS', pecmode='warn'):
@@ -6062,7 +6234,7 @@ class DbTools:
 
             pcktcount = 0
 
-            new_session = scoped_session_storage
+            new_session = scoped_session_storage()
             new_session.execute('set unique_checks=0,foreign_key_checks=0')
 
             if protocol == 'PUS':
@@ -7211,7 +7383,7 @@ try:
 except (FileNotFoundError, ValueError, confignator.config.configparser.NoOptionError):
     if 'DP_ITEMS_SRC_FILE' not in locals():
         DP_ITEMS_SRC_FILE = None
-    logger.warning('Could not load data pool from file: {}. Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
+    logger.warning('Could not load data pool from file: {} Using MIB instead.'.format(DP_ITEMS_SRC_FILE))
     _dp_items = get_data_pool_items(as_dict=True)
 finally:
     # DP_IDS_TO_ITEMS = {int(k[0]): k[1] for k in _dp_items}
