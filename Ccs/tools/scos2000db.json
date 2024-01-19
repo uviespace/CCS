@@ -152,7 +152,9 @@
         "CPC_INTER": " CHAR(1) NULL DEFAULT 'R' ",
         "CPC_DEFVAL": " VARCHAR(17) NULL DEFAULT NULL ",
         "CPC_CORR": " CHAR(1) NULL DEFAULT 'Y' ",
-        "CPC_OBTID": " INT(5) NULL DEFAULT '0' "
+        "CPC_OBTID": " INT(5) NULL DEFAULT '0' ",
+        "CPC_ENDIAN": " CHAR(1) NULL DEFAULT 'B' ",
+        "CPC_DESCR2": " VARCHAR(256) NULL DEFAULT '' "
       },
       "options": [
         "  PRIMARY KEY (`CPC_PNAME`) "
@@ -299,7 +301,8 @@
         "PCF_CORR": " CHAR(1) NULL DEFAULT 'Y' ",
         "PCF_OBTID": " INT(5) NULL DEFAULT '0' ",
         "PCF_DARC": " CHAR(1) NULL DEFAULT '0' ",
-        "PCF_ENDIAN": " CHAR(1) NULL DEFAULT 'B' "
+        "PCF_ENDIAN": " CHAR(1) NULL DEFAULT 'B' ",
+        "PCF_DESCR2": " VARCHAR(256) NULL DEFAULT '' "
       },
       "options": [
         "  PRIMARY KEY (`PCF_NAME`) "
@@ -414,17 +417,6 @@
         "    REFERENCES `$SCHEMA`.`dpf` (`DPF_NUMBE` )",
         "    ON DELETE CASCADE",
         "    ON UPDATE CASCADE"
-      ],
-      "engine": "InnoDB",
-      "default_character_set": "latin1"
-    },
-    "dst": {
-      "columns": {
-        "DST_APID": " INT(5) NOT NULL ",
-        "DST_ROUTE": " VARCHAR(30) NOT NULL "
-      },
-      "options": [
-        "  PRIMARY KEY (`DST_APID`) "
       ],
       "engine": "InnoDB",
       "default_character_set": "latin1"
