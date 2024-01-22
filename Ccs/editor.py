@@ -20,20 +20,85 @@ import dbus.service
 from dbus.mainloop.glib import DBusGMainLoop
 import DBus_Basic
 
-# import config_dialog
 import ccs_function_lib as cfl
 
 sys.path.append(os.path.join(confignator.get_option("paths", "Tst"), "testing_library/testlib"))
-# import tm
 
 cfg = confignator.get_config()
 
 pixmap_folder = cfg.get('ccs-paths', 'pixmap')
 action_folder = cfg.get('ccs-paths', 'actions')
 
-scripts = glob.glob(os.path.join(cfg.get('paths', 'ccs'), "scripts/*.py"))
-scripts.sort()
-script_actions = '\n'.join(["<menuitem action='{}' />".format(os.path.split(script)[-1][:-3]) for script in scripts])
+
+def group_scripts(fname, scrptdict):
+    """
+    arrange scripts hierarchically
+
+    :param fname:
+    :param scrptdict:
+    :return:
+    """
+    p, b = os.path.split(fname)
+    if not p:
+        if p in scrptdict:
+            scrptdict[p].append(fname)
+        else:
+            scrptdict[p] = [fname]
+        return scrptdict
+    else:
+        pre, *post = p.strip(os.path.sep).split(os.path.sep)
+        post = os.path.join(*post, b)
+        if pre not in scrptdict:
+            scrptdict[pre] = {}
+        return group_scripts(post, scrptdict[pre])
+
+
+def mk_xml(k, xmldict, name, lvl):
+    """
+    generate UI XML snippet
+
+    :param k:
+    :param xmldict:
+    :param name:
+    :param lvl:
+    :return:
+    """
+    if k == '':
+        lis = xmldict[k]
+        lis.sort(key=lambda x: (x == '', x.lower()))
+        name = name.replace(os.path.sep, '|')
+        pfx = lvl * _idt + "<menuitem action='{}' />"
+        for x in lis:
+            _stxt.append(pfx.format(name + x[:-3]))
+            # _smitems.append(name + x[:-3])
+    else:
+        _stxt.append((lvl) * _idt + "<menu action='ScriptsMenu{}'>".format(name))
+        _scr_groups.append(("ScriptsMenu" + name, k))
+        sl = list(xmldict[k].keys())
+        sl.sort(key=lambda x: (x == '', x.lower()))
+        for j in sl:
+            mk_xml(j, xmldict[k], name+'|'+j, lvl+1)
+        _stxt.append(lvl * _idt + "</menu>")
+
+
+# generate scripts menu from directory content
+scrpath = os.path.join(cfg.get('paths', 'ccs'), "scripts")
+scripts = glob.glob(os.path.join(scrpath, "**/*.py"), recursive=True)
+scripts = [os.path.relpath(x, scrpath) for x in scripts]
+
+_idt = '  '
+_sdata = {}
+_stxt = []
+_scr_groups = []
+for fn in scripts:
+    group_scripts(fn, _sdata)
+
+_sl = list(_sdata.keys())
+_sl.sort(key=lambda x: (x == '', x.lower()))
+for sd in _sl:
+    mk_xml(sd, _sdata, sd, 0)
+    
+script_actions = '\n        '.join(_stxt)
 
 LOG_UPDT_PER = 2000  # ms
 
@@ -59,6 +124,7 @@ UI_INFO = """
       <separator />
       <menuitem action='EditFind' />
       <menuitem action='EditComment' />
+      <menuitem action='EditAddBp' />
       <separator />
       <menuitem action='EditPreferences' />
       <menuitem action='EditStyle' />
@@ -667,6 +733,10 @@ class CcsEditor(Gtk.Window):
         action.connect("activate", self._on_comment_lines)
         action_group.add_action_with_accel(action, "<control>T")
 
+        action = Gtk.Action(name="EditAddBp", label="Add Breakpoint", tooltip=None)
+        action.connect("activate", self._on_add_breakpoint)
+        action_group.add_action_with_accel(action, "<control>B")
+
         action = Gtk.Action(name="EditPreferences", label="Preferences", tooltip=None, stock_id=Gtk.STOCK_PREFERENCES)
         action.connect("activate", cfl.start_config_editor)
         action_group.add_action(action)
@@ -724,10 +794,15 @@ class CcsEditor(Gtk.Window):
         action = Gtk.Action(name="ScriptsMenu", label="_Scripts", tooltip=None, stock_id=None)
         action_group.add_action(action)
 
+        for grp in _scr_groups:
+            action = Gtk.Action(name=grp[0], label="_{}".format(grp[1]), tooltip=None, stock_id=None)
+            action_group.add_action(action)
+
         for script in scripts:
-            name = os.path.split(script)[-1]
-            action = Gtk.Action(name=name[:-3], label="_{}".format(name.replace('_', '__')), tooltip=None, stock_id=None)
-            action.connect("activate", self._on_open_script, script)
+            handle = script.replace(os.path.sep, '|')[:-3]
+            name = os.path.basename(script)
+            action = Gtk.Action(name=handle, label="_{}".format(name.replace('_', '__')), tooltip=None, stock_id=None)
+            action.connect("activate", self._on_open_script, os.path.join(scrpath, script))
             action_group.add_action(action)
 
     def create_help_menu(self, action_group):
@@ -810,6 +885,24 @@ class CcsEditor(Gtk.Window):
             x = textbuffer.get_iter_at_offset(ix)
             y = textbuffer.get_iter_at_line_offset(iyl, iyo)
             textbuffer.select_range(x, y)
+
+    def _on_add_breakpoint(self, widget=None):
+        view = self._get_active_view()
+        textbuffer = view.get_buffer()
+
+        x = textbuffer.get_iter_at_mark(textbuffer.get_insert())
+        x.set_line_offset(0)
+        y = x.copy()
+        y.forward_to_line_end()
+        tt = x.get_text(y)
+
+        bpcode = '#! CCS.BREAKPOINT'
+        if not tt.startswith('\n'):
+            bpcode += '\n'
+
+        linenr = x.get_line()
+        textbuffer.insert(x, bpcode, len(bpcode))
+        textbuffer.create_source_mark(str(linenr), 'break', textbuffer.get_iter_at_line(linenr))
 
     def _on_start_poolviewer(self, action):
         cfl.start_pv()
