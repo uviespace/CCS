@@ -28,7 +28,7 @@ Following you can find the steps used to install CCS on **Ubuntu**.
   * line 14: user = ccs
   * line 16: password = Aik4eeya
   * also have a look into the paths, especially line 5 obsw
-  * change line 11: CoCa
+  * change line 11: COMETINTERCEPTOR
 - make confignator
 - make databases
 - setup database with following steps:
