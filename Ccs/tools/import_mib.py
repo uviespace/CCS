@@ -81,6 +81,7 @@ def import_mib():
     print('...populating schema {} with data from {}'.format(DBNAME, MIBDIR))
 
     for fn in fs:
+        print('  importing ' + fn)
         mfile = open(os.path.join(MIBDIR, fn)).readlines()
 
         # replace empty strings with DEFAULT
