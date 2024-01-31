@@ -29,6 +29,8 @@ cfg = confignator.get_config()
 pixmap_folder = cfg.get('ccs-paths', 'pixmap')
 action_folder = cfg.get('ccs-paths', 'actions')
 
+VERIFY_EXEC_NO_BP = True
+
 
 def group_scripts(fname, scrptdict):
     """
@@ -1690,6 +1692,18 @@ class CcsEditor(Gtk.Window):
         self._set_play_mark(view, stop)
 
     def on_button_run_all_nobreak(self, widget):
+
+        if VERIFY_EXEC_NO_BP:
+            confirm_run_all = Gtk.MessageDialog(title='Confirm execution')
+            confirm_run_all.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+            confirm_run_all.set_markup('\nExecute ignoring breakpoints?')
+            confirm = confirm_run_all.run()
+
+            if confirm != Gtk.ResponseType.OK:
+                confirm_run_all.destroy()
+                return
+
+            confirm_run_all.destroy()
 
         view = self._get_active_view()
         textbuffer = view.get_buffer()
