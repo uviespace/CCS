@@ -1,0 +1,56 @@
+1	1	512	0	0	542600000	TmSuccAcceptVerifRep		-1	0				1		
+1	2	512	0	0	542600001	TmFailedAcceptVerifRep		-1	0				1		
+1	3	512	0	0	542600002	TmSuccStartOfExecVerifRep		-1	0				1		
+1	4	512	0	0	542600003	TmFailedStartOfExecVerifRep		-1	0				1		
+1	7	512	0	0	542600004	TmSuccCompletionOfExecVerifRep		-1	0				1		
+1	8	512	0	0	542600005	TmFailedCompletionOfExecVerifRep		-1	0				1		
+3	25	512	7001	0	542600006	TmHkParamRep_Sid_7001		-1	0				1		
+3	25	512	7002	0	542600007	TmHkParamRep_Sid_7002		-1	0				1		
+3	25	512	7003	0	542600008	TmHkParamRep_Sid_7003		-1	0				1		
+3	10	512	0	0	542600009	TmHkParamRepStructRep		9	7				1		
+3	35	512	0	0	542600010	TmHkParamRepPeriodicGenPropsRep		10	0				1		
+5	1	512	22000	0	542600011	TmInformativeEventRep_Eid_22000		-1	0	Y			1		
+5	1	512	22005	0	542600012	TmInformativeEventRep_Eid_22005		-1	0	Y			1		
+5	1	512	22020	0	542600013	TmInformativeEventRep_Eid_22020		-1	0	Y			1		
+5	1	512	22060	0	542600014	TmInformativeEventRep_Eid_22060		-1	0	Y			1		
+5	1	512	22100	0	542600015	TmInformativeEventRep_Eid_22100		-1	0	Y			1		
+5	1	512	22160	0	542600016	TmInformativeEventRep_Eid_22160		-1	0	Y			1		
+5	1	512	22170	0	542600017	TmInformativeEventRep_Eid_22170		-1	0	Y			1		
+5	1	512	22180	0	542600018	TmInformativeEventRep_Eid_22180		-1	0	Y			1		
+5	2	512	22140	0	542600019	TmLowSevAnomRep_Eid_22140		-1	0	Y			1		
+5	3	512	22010	0	542600020	TmMediumSevAnomRep_Eid_22010		-1	0	Y			1		
+5	3	512	22030	0	542600021	TmMediumSevAnomRep_Eid_22030		-1	0	Y			1		
+5	3	512	22032	0	542600022	TmMediumSevAnomRep_Eid_22032		-1	0	Y			1		
+5	3	512	22035	0	542600023	TmMediumSevAnomRep_Eid_22035		-1	0	Y			1		
+5	3	512	22040	0	542600024	TmMediumSevAnomRep_Eid_22040		-1	0	Y			1		
+5	3	512	22050	0	542600025	TmMediumSevAnomRep_Eid_22050		-1	0	Y			1		
+5	3	512	22080	0	542600026	TmMediumSevAnomRep_Eid_22080		-1	0	Y			1		
+5	3	512	22090	0	542600027	TmMediumSevAnomRep_Eid_22090		-1	0	Y			1		
+5	3	512	22110	0	542600028	TmMediumSevAnomRep_Eid_22110		-1	0	Y			1		
+5	3	512	22130	0	542600029	TmMediumSevAnomRep_Eid_22130		-1	0	Y			1		
+5	3	512	22150	0	542600030	TmMediumSevAnomRep_Eid_22150		-1	0	Y			1		
+5	4	512	22070	0	542600031	TmHighSevAnomRep_Eid_22070		-1	0	Y			1		
+5	4	512	22120	0	542600032	TmHighSevAnomRep_Eid_22120		-1	0	Y			1		
+5	4	512	23900	0	542600033	TmHighSevAnomRep_Eid_23900		-1	0	Y			1		
+5	4	512	23910	0	542600034	TmHighSevAnomRep_Eid_23910		-1	0	Y			1		
+5	4	512	22190	0	542600035	TmHighSevAnomRep_Eid_22190		-1	0	Y			1		
+5	8	512	0	0	542600036	TmDisdEventDefsListRep		36	0				1		
+6	6	512	0	0	542600037	TmDumpedRawMemDataRep		37	1				1		
+6	10	512	0	0	542600038	TmCheckedRawMemDataRep		38	1				1		
+17	2	512	0	0	542600039	TmAre-you-aliveConnTestRep		-1	0				1		
+20	2	512	0	0	542600040	TmParamValueRep		40	0				1		
+20	7	512	0	0	542600041	TmParamDefRep		41	0				1		
+160	10	512	0	0	542600042	TmSwUpdStatusRep		-1	0				1		
+166	12	512	0	0	542600043	TmMissionPhaseFlagRep		-1	0				1		
+166	25	512	0	0	542600044	TmCfgParamsCrcRep		-1	0				1		
+166	27	512	0	0	542600045	TmCfgParamValuesRep		45	0				1		
+166	22	512	0	0	542600046	TmCtxRep		46	0				1		
+167	3	512	0	0	542600047	TmSdfDirContentRep		47	0				1		
+167	7	512	0	0	542600048	TmSdfAbortedNotifRep		-1	0				1		
+167	10	512	0	0	542600049	TmFirstSdfDwnRep		49	4				1		
+167	11	512	0	0	542600050	TmIntermediateSdfDwnRep		50	4				1		
+167	12	512	0	0	542600051	TmLastSdfDwnRep		51	4				1		
+195	1	512	0	0	542600052	TmHeartbeatRep		-1	0				1		
+156	22	512	0	0	542600053	TmOscAcqRep		53	0				1		
+170	2	512	0	0	542600054	TmEventLogRecordRep		54	0				1		
+170	11	512	0	0	542600055	TmBootRep		-1	0				1		
