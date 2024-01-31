@@ -185,6 +185,9 @@ class CeDecompress:
                 self.last_ce_time, cefile = ce, filedict[ce]
                 decompress(cefile)
 
+                if not self.ce_decompression_on:
+                    break
+
             # self.last_ce_time, cefile = list(filedict.items())[0]
             # decompress(cefile)
             self.last_ce_time += self.ldt_minimum_ce_gap
