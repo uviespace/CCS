@@ -121,25 +121,28 @@ def _mk_bin_entry(data, timestamp):
 
 def _assemble_ft_frames_to_fp_view(arrnd):
 
+    # interpreting TVAC results, CCD0/2 is at the "top" and CCD1/4 at the "bottom" in the detector plane layout
+
     # FT
+    # according to MSSL-IF-122 the nodes arrive in the following order: E2, F2, E4, F4
     if arrnd.ndim == 3:
-        n00 = arrnd[0, :, :]  # CCD2 F-side (lower left in FP view)
-        n01 = arrnd[1, :, ::-1]  # CCD2 E-side (lower right in FP view)
-        n10 = arrnd[2, ::-1, ::-1]  # CCD4 F-side (upper right in FP view)
-        n11 = arrnd[3, ::-1, :]  # CCD4 E-side (upper left in FP view)
+        n00 = arrnd[1, ::-1, ::-1]  # CCD2 F-side (upper right in FP view)
+        n01 = arrnd[0, ::-1, :]  # CCD2 E-side (upper left in FP view)
+        n10 = arrnd[3, :, :]  # CCD4 F-side (lower left in FP view)
+        n11 = arrnd[2, :, ::-1]  # CCD4 E-side (lower right in FP view)
     # ED
     elif arrnd.ndim == 4:
-        n00 = arrnd[0, 0, :, :]  # CCD2 F-side
-        n01 = arrnd[0, 1, :, :][:, ::-1]  # CCD2 E-side
-        n10 = arrnd[1, 0, :, :][::-1, ::-1]  # CCD4 F-side
-        n11 = arrnd[1, 1, :, :][::-1, :]  # CCD4 E-side
+        n00 = arrnd[0, 0, :, :][::-1, ::-1]  # CCD2 F-side
+        n01 = arrnd[0, 1, :, :][::-1, :]  # CCD2 E-side
+        n10 = arrnd[1, 0, :, :]  # CCD4 F-side
+        n11 = arrnd[1, 1, :, :][:, ::-1]  # CCD4 E-side
     else:
         return
 
-    n0 = np.concatenate((n00, n01), axis=1)  # CCD2
-    n1 = np.concatenate((n11, n10), axis=1)  # CCD4
+    n0 = np.concatenate((n01, n00), axis=1)  # CCD2
+    n1 = np.concatenate((n10, n11), axis=1)  # CCD4
 
-    return np.concatenate((n0, n1), axis=0)
+    return np.concatenate((n1, n0), axis=0)
 
 
 def _mk_hdl(dmode):
