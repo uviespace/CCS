@@ -22,7 +22,7 @@ class Connector:
     def __init__(self, host, port, is_server=False, response_to=2, recv_nbytes_min=0, save_to_file=None, msgdecoding='hex', resp_decoder=None):
 
         self.sock_timeout = 10
-        self.response_to = response_to
+        self._response_to = response_to
         self.host = host
         self.port = port
         self.isserver = is_server
@@ -34,6 +34,7 @@ class Connector:
         self.log = []
         self._storagefd = None
         self._storage_hexsep = ''
+        self._storage_fmt = '{:.3f}\t{}\t{}\n'
 
         self.receiver = None
 
@@ -45,9 +46,12 @@ class Connector:
         if save_to is not None:
             self.setup_storage(save_to)
 
-    def setup_storage(self, fname, hexsep=''):
+    def setup_storage(self, fname, hexsep=None, fmt=None):
         self._storagefd = open(fname, 'w')
-        self._storage_hexsep = hexsep
+        if hexsep is not None:
+            self._storage_hexsep = hexsep
+        if fmt is not None:
+            self._storage_fmt = fmt
 
     def setup_port(self):
 
@@ -70,7 +74,7 @@ class Connector:
             self.conn = self.sockfd
             print('Connected to {}:{}'.format(self.host, self.port))
 
-        self.conn.settimeout(self.response_to)
+        self.conn.settimeout(self._response_to)
 
     def _close(self, servershtdwn):
         if self.conn.fileno() != -1:
@@ -103,10 +107,9 @@ class Connector:
         self._storagefd.close()
         self._storagefd = None
 
-    def dump_log(self, fname, hexsep=''):
-        log = '\n'.join(['{:.3f}\t{}\t{}'.format(t, _msgdecoder(msg, self.msgdecoding, sep=hexsep), _msgdecoder(resp, self.msgdecoding, sep=hexsep)) for (t, msg, resp) in self.log])
+    def dump_log(self, fname, hexsep='', fmt='{:.3f}\t{}\t{}'):
         with open(fname, 'w') as fd:
-            fd.write(log)
+            fd.write('\n'.join([fmt.format(t, _msgdecoder(msg, self.msgdecoding, sep=hexsep), _msgdecoder(resp, self.msgdecoding, sep=hexsep)) for (t, msg, resp) in self.log]))
 
     def send(self, msg, rx=True, output=False):
 
@@ -124,11 +127,11 @@ class Connector:
             self.log.append((t, msg, resp))
 
             if self._storagefd is not None:
-                self._storagefd.write('{:.3f}\t{}\t{}\n'.format(t, _msgdecoder(msg, self.msgdecoding, sep=self._storage_hexsep), _msgdecoder(resp, self.msgdecoding, sep=self._storage_hexsep)))
+                self._storagefd.write(self._storage_fmt.format(t, _msgdecoder(msg, self.msgdecoding, sep=self._storage_hexsep), _msgdecoder(resp, self.msgdecoding, sep=self._storage_hexsep)))
                 self._storagefd.flush()
 
             if output:
-                print('{:.3f}: SENT {} | RECV: {}'.format(t, _msgdecoder(msg, self.msgdecoding), _msgdecoder(resp, self.msgdecoding)))
+                print('{:.3f}: SENT {} | RECV {}'.format(t, _msgdecoder(msg, self.msgdecoding), _msgdecoder(resp, self.msgdecoding)))
 
             if not rx:
                 return None
@@ -164,7 +167,7 @@ class Connector:
 
     def set_response_to(self, seconds):
         self.conn.settimeout(seconds)
-        self.response_to = seconds
+        self._response_to = seconds
 
     def start_receiver(self, procfunc=None, outfile=None, ofmode='w'):
         """
