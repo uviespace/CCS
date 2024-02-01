@@ -58,7 +58,8 @@ TM_SECONDARY_HEADER = [
     ("MTC", ctypes.c_uint16, 16),
     ("DEST_ID", ctypes.c_uint16, 16),
     ("CTIME", ctypes.c_uint32, 32),
-    ("FTIME", ctypes.c_uint32, 24)
+    ("FTIME", ctypes.c_uint16, 16),
+    ("FTIMEX", ctypes.c_uint8, 8)
 ]
 
 TC_SECONDARY_HEADER = [
