@@ -38,7 +38,11 @@ PUS_VERSION = 2
 MAX_PKT_LEN = 2048  # 2048 for TMs, 248 for TCs
 
 TMTC = {0: 'TM', 1: 'TC'}
-TSYNC_FLAG = {0: 'U', 1: 'S'}
+
+# This flag determines how the TIMESYNC field is interpreted. This setting
+# means that a value of TIMESYNC equal to 0 is interepreted as 'unsynchronized
+# time' whereas a value of 8 is interpreted as 'synchronized time'.
+TSYNC_FLAG = {0: 'U', 8: 'S'}
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
@@ -52,7 +56,7 @@ PRIMARY_HEADER = [
 
 TM_SECONDARY_HEADER = [
     ("PUS_VERSION", ctypes.c_uint8, 4),
-    ("SCTRS", ctypes.c_uint8, 4),
+    ("TIMESYNC", ctypes.c_uint8, 4),
     ("SERV_TYPE", ctypes.c_uint8, 8),
     ("SERV_SUB_TYPE", ctypes.c_uint8, 8),
     ("MTC", ctypes.c_uint16, 16),
@@ -71,44 +75,32 @@ TC_SECONDARY_HEADER = [
 ]
 
 # [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of extra sync flag in bytes]
-timepack = [ptt(9, 18), 7, 2**24, 0]
+# Note that the time-stamp actually has 7 bytes (4 coarse + 3 fine) but the least significant byte is cut out of FTIME in 
+# TM_SECONDARY_HEADER for alignment reasons. This means that the CCS assumes the time-stamp to have only 6 bytes (4 coarse + 2 fine) and
+# we accept that we lose some resolution in the fine time.
+timepack = [ptt(9, 17), 6, 2**16, 0]
 CUC_EPOCH = datetime.datetime(1980, 1, 6, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
 
 def timecal(data, string=False, checkft=False):
+    " Return the time-stamp as an integer or as a string """
     if not isinstance(data, bytes):
         try:
             return data[0]
         except (IndexError, TypeError):
             return data
 
-    if len(data) == timepack[1]:
-        sync_byte = True
-    elif len(data) == timepack[1] - timepack[3]:
-        sync_byte = False
-    else:
-        raise ValueError('Wrong length of time stamp data ({} bytes)'.format(len(data)))
-
     data = int.from_bytes(data, 'big')
-
-    if sync_byte:
-        coarse = data >> 24
-        fine = ((data >> 8) & 0xffff) / timepack[2]
-    else:
-        coarse = data >> 16
-        fine = (data & 0xffff) / timepack[2]
+    coarse = data >> 16
+    fine = (data & 0xffff) / timepack[2]
 
     # check for fine time overflow
     if checkft and (fine > timepack[2]):
         raise ValueError('Fine time is greater than resolution {} > {}!'.format(fine, timepack[2]))
 
     if string:
-        if sync_byte:
-            sync = 'S' if (data & 0xff) == 0b101 else 'U'
-        else:
-            sync = ''
+        sync=' '
         return '{:.6f}{}'.format(coarse + fine, sync)
-
     else:
         return coarse + fine
 
