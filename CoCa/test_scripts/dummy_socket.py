@@ -37,16 +37,16 @@ def send_hello_world():
     while True:
         for client in clients_tm:
             try:
-                # simple TM
-                #data = b'\x0b\xf4\xc0\x00\x00\x0f \xc3\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+                # simple TM(195,1) with time synch
+                #data = b'\x0b\xf4\xc0\x00\x00\x12\x28\xc3\x01\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x11\x12\x13\x14\x15'
                 # SCTRS as 0x8
                 #data = b'\n\n\xc0\x01\x00\x1b(\x05\x01\x00\x01\x00\x00\x00\x00\x00\x01E\x17\x1cV\x9a\x00\x00\x00\x01=i\xe0\x05\x00\x00*<'
                 # SCTRS as 0x1
-                data = b'\n\n\xc0\x01\x00\x1b!\x05\x01\x00\x01\x00\x00\x00\x00\x00\x01E\x17\x1cV\x9a\x00\x00\x00\x01=i\xe0\x05\x00\x00*<'
+                data = b'\n\n\xc0\x01\x00\x1a!\x05\x01\x00\x01\x00\x00\x00\x00\x00\x01E\x17\x1cV\x9a\x00\x00\x00\x01=i\xe0\x05\x00*<'
                 client.send(data)
             except Exception as e:
                 print(e)
-        time.sleep(10)  # Wait for 10 seconds before sending again
+        time.sleep(2)  # Wait for 10 seconds before sending again
 
 # Create two sockets
 socket_tm = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
