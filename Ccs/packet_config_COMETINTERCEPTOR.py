@@ -42,7 +42,7 @@ TMTC = {0: 'TM', 1: 'TC'}
 # This flag determines how the TIMESYNC field is interpreted. This setting
 # means that a value of TIMESYNC equal to 0 is interepreted as 'unsynchronized
 # time' whereas a value of 8 is interpreted as 'synchronized time'.
-TSYNC_FLAG = {0: 'U', 8: 'S'}
+TSYNC_FLAG = {8: 'U', 1: 'S'}
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
