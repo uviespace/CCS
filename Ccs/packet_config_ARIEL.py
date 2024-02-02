@@ -9,13 +9,9 @@ Author: Marko Mecina (MM)
 import ctypes
 import datetime
 import struct
-import numpy as np
 
 import crcmod
 from s2k_partypes import ptt
-
-# ID of the parameter format type defining parameter
-FMT_TYPE_PARAM = 'DPPXXXXX'
 
 # pre/suffixes for TM/TC packets from/to PLMSIM
 # PLM_PKT_PREFIX = b'tc PUS_TC '
@@ -37,7 +33,7 @@ PUS_VERSION = 2
 MAX_PKT_LEN = 1024  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
 
 TMTC = {0: 'TM', 1: 'TC'}
-TSYNC_FLAG = {0: 'U', 1: 'S'}
+TSYNC_FLAG = {0: 'U', 8: 'S'}
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
@@ -51,13 +47,14 @@ PRIMARY_HEADER = [
 
 TM_SECONDARY_HEADER = [
     ("PUS_VERSION", ctypes.c_uint8, 4),
-    ("SCTRS", ctypes.c_uint8, 4),
+    # ("SCTRS", ctypes.c_uint8, 4), SCTRS takes the role of sync flag in PUS-C, rename to TIMESYNC for compatibility
+    ("TIMESYNC", ctypes.c_uint8, 4),
     ("SERV_TYPE", ctypes.c_uint8, 8),
     ("SERV_SUB_TYPE", ctypes.c_uint8, 8),
     ("MTC", ctypes.c_uint16, 16),
     ("DEST_ID", ctypes.c_uint16, 16),
     ("CTIME", ctypes.c_uint32, 32),
-    ("FTIME", ctypes.c_uint16, 16)
+    ("FTIME", ctypes.c_uint32, 16)
 ]
 
 TC_SECONDARY_HEADER = [
@@ -80,33 +77,20 @@ def timecal(data, string=False, checkft=False):
         except (IndexError, TypeError):
             return data
 
-    if len(data) == timepack[1]:
-        sync_byte = True
-    elif len(data) == timepack[1] - timepack[3]:
-        sync_byte = False
-    else:
+    if len(data) != timepack[1]:
         raise ValueError('Wrong length of time stamp data ({} bytes)'.format(len(data)))
 
     data = int.from_bytes(data, 'big')
 
-    if sync_byte:
-        coarse = data >> 24
-        fine = ((data >> 8) & 0xffff) / timepack[2]
-    else:
-        coarse = data >> 16
-        fine = (data & 0xffff) / timepack[2]
+    coarse = data >> 16
+    fine = (data & 0XFFFF) / timepack[2]
 
     # check for fine time overflow
     if checkft and (fine > timepack[2]):
         raise ValueError('Fine time is greater than resolution {} > {}!'.format(fine, timepack[2]))
 
     if string:
-        if sync_byte:
-            sync = 'S' if (data & 0xff) == 0b101 else 'U'
-        else:
-            sync = ''
-        return '{:.6f}{}'.format(coarse + fine, sync)
-
+        return '{:.6f}'.format(coarse + fine)
     else:
         return coarse + fine
 
@@ -129,37 +113,25 @@ def calc_timestamp(time, sync=None, return_bytes=False):
         if ftime == timepack[2]:
             ctime += 1
             ftime = 0
-        sync = 0b101 if time[-1].upper() == 'S' else 0
+        sync = 8 if time[-1].upper() == 'S' else 0
 
     elif isinstance(time, bytes):
-        if len(time) not in [timepack[1], timepack[1] - timepack[3]]:
-            raise ValueError(
-                'Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
+        if len(time) != timepack[1]:
+            raise ValueError('Bytestring size ({}) does not match length specified in format ({})'.format(len(time), timepack[1]))
         ctime = int.from_bytes(time[:4], 'big')
         ftime = int.from_bytes(time[4:6], 'big')
-        if len(time) == timepack[1]:
-            sync = None
-            # sync = time[-1]
-        else:
-            sync = None
+        sync = None  # PUS-C: sync flag not part of CUC time
 
     else:
         raise TypeError('Unsupported input for time ({})'.format(type(time)))
 
     if return_bytes:
-        if sync is None or sync is False:
-            return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big')
-        else:
-            pass
-            # no sync byte in ARIEL?
-            # return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big') + sync.to_bytes(1, 'big')
+        if sync is not None:
+            print('PUS-C: sync flag is not part of CUC time!')
+        return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big')
     else:
         return ctime, ftime, sync
 
-
-# P_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER]) // 8
-# TM_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TM_SECONDARY_HEADER]) // 8
-# TC_HEADER_LEN = sum([x[2] for x in PRIMARY_HEADER + TC_SECONDARY_HEADER]) // 8
 
 class RawGetterSetter:
 
@@ -195,6 +167,13 @@ class TMHeaderBits(ctypes.BigEndianStructure):
 
 TM_HEADER_LEN = ctypes.sizeof(TMHeaderBits)
 
+# check whether size of TM header struct is what it should be
+_blen_tmh = sum(x[2] for x in (PRIMARY_HEADER + TM_SECONDARY_HEADER))
+if _blen_tmh % 8:
+    raise ValueError('TM header struct size is not byte aligned ({})!'.format(_blen_tmh))
+if _blen_tmh // 8 != TM_HEADER_LEN:
+    raise ValueError('Misaligned TM header struct: {} vs {} bytes!'.format(TM_HEADER_LEN, _blen_tmh // 8))
+
 
 class TMHeader(ctypes.Union, RawGetterSetter):
     _pack_ = 1
@@ -216,6 +195,13 @@ class TCHeaderBits(ctypes.BigEndianStructure):
 
 
 TC_HEADER_LEN = ctypes.sizeof(TCHeaderBits)
+
+# check whether size of TC header struct is what it should be
+_blen_tch = sum(x[2] for x in (PRIMARY_HEADER + TC_SECONDARY_HEADER))
+if _blen_tch % 8:
+    raise ValueError('TC header struct size is not byte aligned ({})!'.format(_blen_tch))
+if _blen_tch // 8 != TC_HEADER_LEN:
+    raise ValueError('Misaligned TC header struct: {} vs {} bytes!'.format(TC_HEADER_LEN, _blen_tch // 8))
 
 
 class TCHeader(ctypes.Union, RawGetterSetter):

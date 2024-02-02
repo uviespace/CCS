@@ -1318,8 +1318,8 @@ def cuc_time_str(head, logger=logger):
         else:
             return ''
     except Exception as err:
-        logger.info(err)
-        return ''
+        logger.warning(err)
+        return '#######'
 
 
 ##
