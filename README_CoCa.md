@@ -33,7 +33,7 @@ Following you can find the steps used to install CCS on **Ubuntu**.
 - make databases
 - setup database with following steps:
   * change line 17 in egse.cfs to real mib-schema (e.g. mib_schema_coca)
-  * import a set of SCOS2000 MIB files (e.g. ./Ccs/tools/import_mib.py '/home/pstump/Downloads/COCA MIB x.y' 'mib_schema_coca' 'ccs')
+  * import a set of SCOS2000 MIB files (e.g. ./Ccs/tools/import_mib.py './CoCa/mib_tables/mib_dat_exports/' 'mib_schema_coca' 'ccs')
   * ./Ccs/tools/import_mib.py 'path_to_MIB_file_directory' 'mib-schema-from-line-17-egse.cfs' 'db_user'
   * script will then ask for db password
 - start CCS: ./start_ccs
@@ -82,3 +82,31 @@ It will do:
 For tests, you can find a dummy socket client under
 [CoCa/test_scripts/dummy_socket.py](CoCa/test_scripts/dummy_socket.py)
 it will just print out all binary commands sent to it.
+
+## Logs
+
+### Add Additional Logs to CCS Log Window
+
+CCS runs in different processes, to add additional logs to the CCS log
+window (tab in the CCS Editor). Add following lines:
+
+```python
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(level=logging.DEBUG)
+logging.warning('...')
+```
+
+### Change Default Log Level
+
+To enable more extensive logging, set the `level` option in
+[Ccs/ccs_main_config.cfg](Ccs/ccs_main_config.cfg)
+
+[comment]: # (discussion on github https://github.com/mmecina/CCS/issues/4#issuecomment-1922284468)
+
+```ini
+[ccs-logging]
+log-dir = ${paths:base}/logs
+level = DEBUG
+max_logs = 30
+```
