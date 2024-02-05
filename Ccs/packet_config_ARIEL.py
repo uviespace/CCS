@@ -33,7 +33,7 @@ PUS_VERSION = 2
 MAX_PKT_LEN = 1024  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
 
 TMTC = {0: 'TM', 1: 'TC'}
-TSYNC_FLAG = {0: 'U', 8: 'S'}
+TSYNC_FLAG = {1: 'U', 8: 'S'}
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),
@@ -54,7 +54,7 @@ TM_SECONDARY_HEADER = [
     ("MTC", ctypes.c_uint16, 16),
     ("DEST_ID", ctypes.c_uint16, 16),
     ("CTIME", ctypes.c_uint32, 32),
-    ("FTIME", ctypes.c_uint32, 16)
+    ("FTIME", ctypes.c_uint16, 16)
 ]
 
 TC_SECONDARY_HEADER = [
