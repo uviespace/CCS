@@ -13,6 +13,9 @@ Following you can find the steps used to install CCS on **Ubuntu**.
 - sudo apt install libgtk-3-dev
 - sudo apt install libgtksourceview-3.0-1
 - install pip https://pip.pypa.io/en/stable/installation/
+- sudo apt install python3.10-venv
+- sudo apt-get install python3-dev
+- sudo apt-get install libmysqlclient-dev
 - sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-gtksource-3.0
 - sudo apt install python-dbus-dev
 - in contrast to the readme, I use my already installed mysql version (instead of using mariadb)

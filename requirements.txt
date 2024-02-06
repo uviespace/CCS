@@ -5,6 +5,7 @@ numpy
 scipy
 matplotlib
 cairocffi
+pymysql
 mysqlclient
 sqlalchemy < 2
 sphinx
