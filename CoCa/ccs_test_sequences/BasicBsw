@@ -1,7 +1,9 @@
 #--------------------------------------------
-# Name: BasicBsw
-# Title: Basic Operation Under BSW Control
+# BasicBsw
+# Basic Operation Under BSW Control
+# Specification Version: 1.0
 # Author: PnP
+# Date: 2024-02-05
 #--------------------------------------------
 
 # Description: Switch on instrument to remain under BSW control, perform basic 
@@ -18,7 +20,7 @@
 # Node N1: Send TC(131,4) to platform to set instrument in 'CheckOut' state
 # Node N3: Send TC(131,1) to platform to switch on instrument
 
-# WAIT FcpPwrOnChkOutT2 sec (see sect. 6 of [FcpDef] for value of FcpPwrOnChkOutT2)
+# WAIT FcpPwrOnChkOutT2 seconds 
 # VERIFY that instrument TM is generated
 
 #--------------------------------------------
@@ -55,8 +57,7 @@ cfl.Tcsend_DB('L166021RepCtx', pool_name='LIVE')
 #            that the instrument is synchronized and the time-stamp is consistent
 #            with the platform time
 #        (b2)Event EVT_SYNCH_ACQ was generated within 1 second from start-up
-#        (c) Telemetry packet HkBswBasicRep is generated with period 
-#            as given in configuration parameter HkRdlPer
+#        (c) Telemetry packet HkBswBasicRep is generated with the period 5 sec
 #        (e) The watchdog is disabled (LowWdEnabled is DISABLED in HkBswBasicRep)
 #        (f) All error counters in HkBswBasicRep are set to zero (FdScrubDbeNmb,
 #            FdScrubSbeNmb, Ver*Fail*, Mon*Err
@@ -79,6 +80,7 @@ cfl.Tcsend_DB('L170010GenBootRep', pool_name='LIVE')
 # VERIFY that the reset type information in the boot report is consistent 
 #        with the instrument having been powered up (i.e. RstTypeRtIn is equal
 #        to PLTFRM_PW_OFF
+# VERIFY that the context information is all zero (instrument was powered up) 
 
 #--------------------------------------------
 # STEP 700 - Telemetry Jitter and Sequence Counters
