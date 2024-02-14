@@ -1,7 +1,0 @@
-UCAXX001	CcaCcsdsApid	U
-UCAXX002	CcaCcsdsSeqCount	U
-UCAXX003	CcaCcsdsPktLength	U
-UCAXX004	CcaPusServType	U
-UCAXX005	CcaPusServSubtyp	U
-UCAXX006	CcaPusAckFlag	U
-UCAXX007	CcaPusSourceId	U

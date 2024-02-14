@@ -2093,6 +2093,7 @@ def get_cuctime(tml):
 
         cuc_timestamp = ct + ft / resolution
 
+    logger.debug("cuc_timestamp:"+str(cuc_timestamp))
     return cuc_timestamp
 
 
@@ -3369,6 +3370,7 @@ def get_last_pckt_time(pool_name='LIVE', string=True):
                     'This TM packet does not have valid CUC timestamp fields:\n\t\tHeader: {}\n\t\tData: {}'
                     .format(Tmread(packet), Tmdata(packet)))
                 cuc = None
+    logger.debug("cuc: "+str(cuc))
     return cuc
 
 
@@ -6192,7 +6194,7 @@ class DbTools:
                             timestamp=cuc_time_str(tm),
                             data=tmd[1][:MAX_PKT_LEN],
                             raw=tm_raw[:MAX_PKT_LEN])
-
+            logger.debug("timestamp="+str(timestamp))
             state[0] += 1
             if state[0] % bulk_insert_size == 0:
                 GLib.idle_add(loadinfo.log.set_text, "Loaded {:d} rows.".format(state[0], ))
