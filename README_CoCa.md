@@ -86,7 +86,7 @@ For tests, you can find a dummy socket client under
 [CoCa/test_scripts/dummy_socket.py](CoCa/test_scripts/dummy_socket.py)
 it will just print out all binary commands sent to it.
 
-## Logs
+## Troubleshooting
 
 ### Add Additional Logs to CCS Log Window
 
@@ -113,3 +113,12 @@ log-dir = ${paths:base}/logs
 level = DEBUG
 max_logs = 30
 ```
+
+### Make Exceptions Visible
+If there is an exception in a process running in the background, the process fails but the user does not notice it. In order to investigate such problems, one can run the process not as a stand-alone process, but in the CCS Editor terminal. For instance, if one suspects an error in the Poolviewer, one can start it from the CCS Editor by executing
+
+```python
+cfl.start_pv(console=True)
+```
+
+In this way, unhandled exceptions will be seen in the CCS console
