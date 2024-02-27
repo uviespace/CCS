@@ -79,7 +79,7 @@ def import_mib():
     fs = [k + '.dat' for k in ssd['tables']]
 
     print('...populating schema {} with data from {}'.format(DBNAME, MIBDIR))
-
+    
     for fn in fs:
         print('  importing ' + fn)
         mfile = open(os.path.join(MIBDIR, fn)).readlines()
@@ -91,8 +91,9 @@ def import_mib():
                 s.execute(text('INSERT IGNORE INTO {} VALUES ({})'.format(fn[:-4], row)))  # IGNORE truncates too long strings
         except Exception as err:
             s.rollback()
-            s.close()
-            raise err
+            print('Fatal error when importing MIB table ' + fn)
+            print('  Error description: ' + str(err))
+            print('  Continuing with other tables ...')
 
     s.commit()
     s.close()
@@ -101,7 +102,7 @@ def import_mib():
 if __name__ == '__main__':
 
     do_import = True
-
+    
     if '-c' in sys.argv:
         MIBDIR = '/home/user/space/mib'  # directory containing the SCOS2000 *.dat files
         DBNAME = 'mib_schema_test'  # SQL schema name to be created
