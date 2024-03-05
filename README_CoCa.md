@@ -121,4 +121,7 @@ If there is an exception in a process running in the background, the process fai
 cfl.start_pv(console=True)
 ```
 
-In this way, unhandled exceptions will be seen in the CCS console
+In this way, unhandled exceptions will be seen in the CCS console. 
+
+### Use of the Python Debugger
+If there is a need to run the python debugger, most modules can also be run by executing the respective Python files directly (e.g. `poolview_sql.py` for the Poolviewer in the Ccs subfolder) and then the debugger should be accessible normally.
