@@ -1104,12 +1104,6 @@ def read_stream(stream, fmt, pos=None, offbi=0):
             x = x.decode('utf-8', errors='replace')
     elif fmt == timepack[0]:
         x = timecal(data)
-    elif fmt.startswith('CUC'):
-        logger.error('Undefined time format {}, project time format is {}'.format(fmt, timepack[0]))
-        # x = int.from_bytes(data, 'big')
-        # only interpret 4 MSBs as coarse time
-        # x = x >> ((len(data) - 4) * 8)
-        x = 0xFFFFFFFF
     else:
         x = struct.unpack('>' + fmt, data)[0]
 
@@ -1144,7 +1138,7 @@ def csize(fmt, offbi=0, bitsize=False):
         try:
             return struct.calcsize(fmt)
         except struct.error:
-            raise NotImplementedError(fmt)
+            raise NotImplementedError('Unknown format {}'.format(fmt))
 
 
 ##
