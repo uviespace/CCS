@@ -54,13 +54,12 @@ ActivePoolInfo = NamedTuple(
         ('pool_name', str),
         ('live', bool)])
 
-# fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
-#            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
+REFRESH_RATE = 1
 
 
 class PlotViewer(Gtk.Window):
 
-    def __init__(self, loaded_pool, refresh_rate=1, parameters=None, start_live=False, **kwargs):
+    def __init__(self, loaded_pool, refresh_rate=REFRESH_RATE, parameters=None, start_live=False, **kwargs):
         Gtk.Window.__init__(self)
 
         assert isinstance(loaded_pool, str)

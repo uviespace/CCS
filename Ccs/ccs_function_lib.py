@@ -1104,6 +1104,12 @@ def read_stream(stream, fmt, pos=None, offbi=0):
             x = x.decode('utf-8', errors='replace')
     elif fmt == timepack[0]:
         x = timecal(data)
+    elif fmt.startswith('CUC'):
+        logger.error('Undefined time format {}, project time format is {}'.format(fmt, timepack[0]))
+        # x = int.from_bytes(data, 'big')
+        # only interpret 4 MSBs as coarse time
+        # x = x >> ((len(data) - 4) * 8)
+        x = 0xFFFFFFFF
     else:
         x = struct.unpack('>' + fmt, data)[0]
 
@@ -2037,7 +2043,10 @@ def filter_by_discr(rows, pi1_off, pi1_wid, pi1_val):
     :return:
     """
 
-    rows = rows.filter(func.mid(DbTelemetry.raw, pi1_off + 1, pi1_wid) == pi1_val.to_bytes(pi1_wid, 'big'))
+    if not isinstance(pi1_val, bytes):
+        pi1_val = pi1_val.to_bytes(pi1_wid, 'big')
+
+    rows = rows.filter(func.mid(DbTelemetry.raw, pi1_off + 1, pi1_wid) == pi1_val)
     return rows
 
 
@@ -3206,7 +3215,7 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 
         elif typ == 0 and dhead == 1:
             header.bits.PUS_VERSION = tmv
-            header.bits.SC_REFTIME = tref_stat
+            # header.bits.SC_REFTIME = tref_stat  # replaced with TIMESYNC to be backwards-compatible with PUS-A
             header.bits.SERV_TYPE = st
             header.bits.SERV_SUB_TYPE = sst
             header.bits.MSG_TYPE_CNT = msg_type_cnt
