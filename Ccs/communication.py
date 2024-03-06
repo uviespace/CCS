@@ -18,6 +18,7 @@ class Connector:
     """
 
     RECV_NBYTES = 4096
+    _decoding_types = ('hex', 'ascii')
 
     def __init__(self, host, port, is_server=False, response_to=2, recv_nbytes_min=0, save_to_file=None, msgdecoding='hex', resp_decoder=None):
 
@@ -39,6 +40,17 @@ class Connector:
         self.receiver = None
 
         self._startup(save_to_file)
+
+    @property
+    def msgdecoding(self):
+        return self._msgdecoding
+
+    @msgdecoding.setter
+    def msgdecoding(self, typ):
+        if typ not in self._decoding_types:
+            print('WARNING: Invalid decoding format {}. Using hex. {}'.format(typ, self._decoding_types))
+            typ = 'hex'
+        self._msgdecoding = typ
 
     def _startup(self, save_to):
 
@@ -133,10 +145,8 @@ class Connector:
             if output:
                 print('{:.3f}: SENT {} | RECV {}'.format(t, _msgdecoder(msg, self.msgdecoding), _msgdecoder(resp, self.msgdecoding)))
 
-            if not rx:
-                return None
-
-            return resp if self.resp_decoder is None else self.resp_decoder(resp)
+            if rx:
+                return resp if self.resp_decoder is None else self.resp_decoder(resp)
 
         else:
             print('Not connected!')
@@ -169,7 +179,7 @@ class Connector:
         self.conn.settimeout(seconds)
         self._response_to = seconds
 
-    def start_receiver(self, procfunc=None, outfile=None, ofmode='w'):
+    def start_receiver(self, procfunc=None, outfile=None, ofmode='w', pkt_parser_func=None):
         """
 
         :param procfunc:
@@ -182,32 +192,30 @@ class Connector:
             return
 
         if self.receiver is None:
-            self.receiver = Receiver([self.conn], procfunc=procfunc, outfile=outfile, ofmode=ofmode)
+            self.receiver = Receiver([self.conn], procfunc=procfunc, outfile=outfile, ofmode=ofmode, pkt_parser_func=pkt_parser_func)
             self.receiver.start()
         else:
             print('Receiver already initialised')
 
-    def stop_receiver(self):
+    def stop_receiver(self, clear=False):
         if self.receiver is None:
             print('No receiver to stop')
             return
 
         self.receiver.stop()
-        self.receiver = None
+
+        if clear:
+            self.receiver = None
 
     @property
     def recvd_data(self):
-        if self.receiver is None:
-            return
-
-        return self.receiver.recvd_data_buf.queue
+        if self.receiver is not None:
+            return self.receiver.recvd_data_buf.queue
 
     @property
     def proc_data(self):
-        if self.receiver is None:
-            return
-
-        return self.receiver.proc_data
+        if self.receiver is not None:
+            return self.receiver.proc_data
 
 
 class Receiver:
@@ -219,7 +227,7 @@ class Receiver:
     SEL_TIMEOUT = 2
     RECV_BUF_SIZE = 1024**3
 
-    def __init__(self, sockfds, procfunc=None, recv_buf_size=RECV_BUF_SIZE, outfile=None, ofmode='w'):
+    def __init__(self, sockfds, procfunc=None, recv_buf_size=RECV_BUF_SIZE, outfile=None, ofmode='w', pkt_parser_func=None):
 
         self.sockfds = sockfds
         self.recvd_data_buf = queue.Queue(recv_buf_size)
@@ -227,6 +235,7 @@ class Receiver:
         self._recv_thread = None
         self._proc_thread = None
         self.proc_data = []
+        self._pkt_parser_func = pkt_parser_func
 
         if outfile is not None:
             self.proc_data_fd = open(outfile, ofmode)
@@ -266,8 +275,10 @@ class Receiver:
             try:
                 rd, wr, er = select.select(self.sockfds, [], self.sockfds, self.SEL_TIMEOUT)
                 for sock in rd:
-                    self.recvd_data_buf.put((time.time(), sock.recv(self.RECV_BYTES)))
-                    # print(self.recvd_data.get())
+                    if self._pkt_parser_func is not None:
+                        self.recvd_data_buf.put((time.time(), self._pkt_parser_func(sock)))
+                    else:
+                        self.recvd_data_buf.put((time.time(), sock.recv(self.RECV_BYTES)))
 
                 for sock in er:
                     print('Error in {}'.format(sock.getpeername()))
@@ -342,7 +353,7 @@ def hexify(bs, sep=''):
     if isinstance(sep, tuple):
         sep, grp = sep
     else:
-        grp = 0
+        grp = 1
 
     return bs.hex().upper() if sep == '' else bs.hex(sep, grp).upper()
 
@@ -366,3 +377,15 @@ def proc_func_generic(data, ts=None):
         ts = '{:.6f}'.format(ts)
 
     return [ts, str(data)]
+
+
+def pkt_parser(sock, default_len=7):
+    headlen = 1
+    pkt = sock.recv(headlen)
+    if pkt == b'\x35':
+        plen = 40
+        while len(pkt) < plen:
+            pkt += sock.recv(plen - len(pkt))
+        return pkt
+    else:
+        return pkt + sock.recv(default_len - headlen)
