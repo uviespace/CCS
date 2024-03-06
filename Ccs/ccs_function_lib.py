@@ -3318,29 +3318,33 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
 #   @param pool_name: name of the pool
 #   @param string: <boolean> if true the CUC timestamp is returned as a string, otherwise as a float
 #   @return: <CUC> timestamp or None if failing
-def get_last_pckt_time(pool_name='LIVE', string=True):
+def get_last_pckt_time(pool_name='LIVE', string=True, use_pmgr=False):
     """
 
     :param pool_name:
     :param string:
     :return:
     """
-    pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
-    if not pmgr:
-        logger.warning('Accessing PMGR failed!')
-        return
+    if use_pmgr:
+        pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
-    packet = None
-    # fetch the pool_name
-    try:
-        poolname = pmgr.Dictionaries('loaded_pools', pool_name)
-    except (dbus.DBusException, KeyError):
-        logger.error('Pool {} is not connected/accessible!'.format(pool_name))
-        return
+        if not pmgr:
+            logger.warning('Accessing PMGR failed!')
+            return
 
-    filename = poolname[2]  # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
-    if not filename:
+        packet = None
+        # fetch the pool_name
+        try:
+            poolname = pmgr.Dictionaries('loaded_pools', pool_name)
+        except (dbus.DBusException, KeyError):
+            logger.error('Pool {} is not connected/accessible!'.format(pool_name))
+            return
+
+        filename = poolname[2]  # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
+        if not filename:
+            filename = pool_name
+    else:
         filename = pool_name
 
     # get the first packet from the pool
@@ -3379,6 +3383,26 @@ def get_last_pckt_time(pool_name='LIVE', string=True):
                     .format(Tmread(packet), Tmdata(packet)))
                 cuc = None
     return cuc
+
+
+def get_last_tc(pool_name, idbytes=False):
+    dbcon = scoped_session_storage
+    row = dbcon.query(
+        DbTelemetry
+    ).join(
+        DbTelemetryPool,
+        DbTelemetry.pool_id == DbTelemetryPool.iid
+    ).filter(
+        DbTelemetryPool.pool_name == pool_name, DbTelemetry.is_tm == 1
+    ).order_by(
+        DbTelemetry.idx.desc()
+    ).first()
+    dbcon.close()
+
+    if idbytes:
+        return row.raw[:4]  # return first 4 header bytes used for identification in PUS Ack service
+    else:
+        return row
 
 
 def _has_tc_connection(pool_name, pmgr_handle):
@@ -6313,6 +6337,76 @@ class DbTools:
             new_session.execute('set unique_checks=1, foreign_key_checks=1')
             new_session.commit()
             new_session.close()
+
+
+class Verification:
+    """
+    Packet verification tools
+    """
+
+    PKTIDLEN = 4
+
+    @classmethod
+    def await_tc_ack(cls, pool_name, pktid=None, idx_from=None, time_from=None, acktypes=(1, 7), timeout=3.):
+
+        t1 = time.time()
+
+        acks_remain = list(acktypes)
+
+        if pktid is None:
+            pkt = get_last_tc(pool_name)
+            pktid = pkt.raw[:cls.PKTIDLEN]
+
+            if idx_from is None:
+                idx_from = pkt.idx
+
+        elif isinstance(pktid, (tuple, list)):
+            pktid = cls.mk_pktid(*pktid)
+
+        elif isinstance(pktid, DbTelemetry):
+            pktid = pktid.raw[:cls.PKTIDLEN]
+
+            if idx_from is None:
+                idx_from = pktid.idx
+
+        else:
+            if len(pktid) != cls.PKTIDLEN or not isinstance(pktid, (bytes, bytearray)):
+                raise ValueError
+
+        while time.time() - t1 < timeout:
+
+            acks = cls.get_acks(pool_name, idx_from=idx_from, time_from=time_from)
+            # filter by pktid
+            acks_found = filter_by_discr(acks, TM_HEADER_LEN, cls.PKTIDLEN, pktid)
+
+            for ack in acks_found:
+                if ack.sst in acks_remain:
+                    acks_remain.remove(ack.sst)
+
+            if len(acks_remain) == 0:
+                return True, acks_found.all()
+
+            time.sleep(.1)
+
+        return False, acks_found.all() if len(acks_found) != 0 else False, []
+
+    @staticmethod
+    def get_acks(pool_name, idx_from=None, time_from=None):
+
+        rows = get_pool_rows(pool_name)
+        acks = filter_rows(rows, st=1, idx_from=idx_from, time_from=time_from)
+
+        return acks
+
+    @classmethod
+    def mk_pktid(cls, apid, sc):
+        pktid = TCHeader()
+        pktid.bits.SEC_HEAD_FLAG = 1
+        pktid.bits.APID = apid
+        pktid.bits.SEQ_FLAGS = 3
+        pktid.bits.PKT_SEQ_CNT = sc
+
+        return pktid.raw[:cls.PKTIDLEN]
 
 
 class LoadInfo(Gtk.Window):
