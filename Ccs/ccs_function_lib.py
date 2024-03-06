@@ -6156,21 +6156,28 @@ class DbTools:
 
     @staticmethod
     def import_dump_in_db(pool_info, loadinfo, brute=False, protocol='PUS', pecmode='warn'):
+
         loadinfo.ok_button.set_sensitive(False)
         loadinfo.spinner.start()
         new_session = scoped_session_storage
-        new_session.query(
-            DbTelemetryPool
-        ).filter(
-            DbTelemetryPool.pool_name == pool_info.filename
-        ).delete()
-        new_session.flush()
-        newPoolRow = DbTelemetryPool(
-            pool_name=pool_info.filename,
-            modification_time=pool_info.modification_time,
-            protocol=protocol)
-        new_session.add(newPoolRow)
-        new_session.flush()  # DB assigns auto-increment field (primary key iid) used below
+
+        try:
+            new_session.query(
+                DbTelemetryPool
+            ).filter(
+                DbTelemetryPool.pool_name == pool_info.filename
+            ).delete()
+            new_session.flush()
+            newPoolRow = DbTelemetryPool(
+                pool_name=pool_info.filename,
+                modification_time=pool_info.modification_time,
+                protocol=protocol)
+            new_session.add(newPoolRow)
+            new_session.flush()  # DB assigns auto-increment field (primary key iid) used below
+        except Exception as err:
+            new_session.rollback()
+            new_session.close()
+            raise err
 
         bulk_insert_size = 1000  # number of rows to transfer in one transaction
         state = [1]
@@ -6301,9 +6308,15 @@ class DbTools:
                     pcktdicts.append(processor(unpack_pus(pckt), pckt))
                     pcktcount += 1
                     if pcktcount % bulk_insert_size == 0:
-                        new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
-                        # new_session.bulk_insert_mappings(DbTelemetry, pcktdicts)
-                        pcktdicts = []
+                        try:
+                            new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
+                            # new_session.bulk_insert_mappings(DbTelemetry, pcktdicts)
+                            pcktdicts = []
+                        except Exception as err:
+                            new_session.rollback()
+                            new_session.close()
+                            logger.error(err)
+                            raise err
 
                 new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
 
