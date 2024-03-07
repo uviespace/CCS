@@ -54,6 +54,11 @@ PRIMARY_HEADER = [
     ("PKT_LEN", ctypes.c_uint16, 16)
 ]
 
+# Note that the time-stamp in the TM header actually has 7 bytes (4 coarse + 3 fine) 
+# but the least significant byte is cut out of FTIME in TM_SECONDARY_HEADER for alignment reasons. 
+# This means that the CCS assumes the time-stamp to have only 6 bytes (4 coarse + 2 fine) and
+# we accept that we lose some resolution in the fine time.
+# Field FTIMEX is thus treated as a spare.
 TM_SECONDARY_HEADER = [
     ("PUS_VERSION", ctypes.c_uint8, 4),
     ("TIMESYNC", ctypes.c_uint8, 4),
@@ -74,13 +79,10 @@ TC_SECONDARY_HEADER = [
     ("SOURCE_ID", ctypes.c_uint16, 16)
 ]
 
-# [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, length of extra sync flag in bytes]
-# Note that the time-stamp actually has 7 bytes (4 coarse + 3 fine) but the least significant byte is cut out of FTIME in 
-# TM_SECONDARY_HEADER for alignment reasons. This means that the CCS assumes the time-stamp to have only 6 bytes (4 coarse + 2 fine) and
-# we accept that we lose some resolution in the fine time.
-timepack = [ptt(9, 17), 6, 2**16, 0]
+# [format of time stamp, amount of bytes of time stamp including sync byte(s), fine time resolution, 
+# length of extra sync flag in bytes]
+timepack = [ptt(9, 18), 7, 2**16, 0]
 CUC_EPOCH = datetime.datetime(1980, 1, 6, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
-
 
 def timecal(data, string=False, checkft=False):
     " Return the time-stamp as an integer or as a string """
@@ -90,9 +92,10 @@ def timecal(data, string=False, checkft=False):
         except (IndexError, TypeError):
             return data
 
+    # This must be adapted to the 'timepack' defined above
     data = int.from_bytes(data, 'big')
-    coarse = data >> 16
-    fine = (data & 0xffff) / timepack[2]
+    coarse = data >> 24
+    fine = ((data >> 8) & 0xffff) / timepack[2]
 
     # check for fine time overflow
     if checkft and (fine > timepack[2]):
@@ -142,10 +145,12 @@ def calc_timestamp(time, sync=None, return_bytes=False):
 
     if return_bytes:
         if sync is None or sync is False:
-            return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big')
+            # This covers 4 coarse time byte, 2 fine time byte and the last padding byte
+            # (see comment to TM_SECONDARY_HEADER)
+            return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big') + b'\x00'
         else:
             pass
-            # no sync byte in ARIEL?
+            # no sync byte in CometInterceptor
             # return ctime.to_bytes(4, 'big') + ftime.to_bytes(2, 'big') + sync.to_bytes(1, 'big')
     else:
         return ctime, ftime, sync
