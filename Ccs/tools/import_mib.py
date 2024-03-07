@@ -71,7 +71,7 @@ def create_schema():
     s.close()
 
 
-def import_mib():
+def import_mib(skip_over_errors=False):
     eng = create_engine(DBURL + '/' + DBNAME)
     sf = sessionmaker(bind=eng)
     s = sf()
@@ -85,13 +85,21 @@ def import_mib():
 
         # replace empty strings with DEFAULT
         rows = [('"' + i.replace('\t', '","').strip() + '"').replace('""', 'DEFAULT') for i in mfile]
+
         try:
             for row in rows:
                 s.execute(text('INSERT IGNORE INTO {} VALUES ({})'.format(fn[:-4], row)))  # IGNORE truncates too long strings
+
         except Exception as err:
             s.rollback()
-            s.close()
-            raise err
+
+            if skip_over_errors:
+                print('Fatal error when importing MIB table ' + fn)
+                print('  Error description: ' + str(err))
+                print('  Continuing with other tables ...')
+            else:
+                s.close()
+                raise err
 
     s.commit()
     s.close()
@@ -100,6 +108,11 @@ def import_mib():
 if __name__ == '__main__':
 
     do_import = True
+    ignore_errors = False
+
+    if '--ignore' in sys.argv:
+        sys.argv.remove('--ignore')
+        ignore_errors = True
 
     if '-c' in sys.argv:
         MIBDIR = '/home/user/space/mib'  # directory containing the SCOS2000 *.dat files
@@ -120,8 +133,9 @@ if __name__ == '__main__':
 
     else:
         print('USAGE: ./import_mib.py <MIBDIR> <DBSCHEMA> <DBUSERNAME> [-c]\n'
-              'Options:\n\t-c\tUse configuration in script, any command line arguments will be ignored.\n'
-              '\t--dummy\tCreate empty MIB structure only. Omit <MIBDIR> argument.')
+              'Options:\n\t-c\t\tUse configuration in script, any command line arguments will be ignored.\n'
+              '\t--dummy\t\tCreate empty MIB structure only. Omit <MIBDIR> argument.\n'
+              '\t--ignore\tContinue if a table import fails.')
 
         sys.exit()
 
@@ -129,6 +143,6 @@ if __name__ == '__main__':
     create_schema()
 
     if do_import:
-        import_mib()
+        import_mib(skip_over_errors=ignore_errors)
 
     print('...DONE!')
