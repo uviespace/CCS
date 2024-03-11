@@ -2689,11 +2689,14 @@ def encode_pus(params, *values, params_as_fmt_string=False):
         raise ValueError('Wrong number of parameters: Expected {}, but got {}.\n{}'.format(len(ed_pars), len(values), ', '.join(x[10] for x in ed_pars)))
 
     params_nospares = [param for param in params if param[5] not in ['A']]
-
+    
     # insert fixed parameter values, cdf_value=param[7]
     for i, par in enumerate(params_nospares):
         if par[5] == 'F':
-            values.insert(i, tc_param_alias(par[-1], par[7]))
+            if par[8] in (3, 4):    # The fixed-value parameter is of integer type (see GitHub 9)
+                values.insert(i, tc_param_alias(par[-1], int(par[7])))  
+            else: 
+                values.insert(i, tc_param_alias(par[-1], par[7]))
 
     fmts = [parameter_ptt_type_tc(par) for par in params]
 
