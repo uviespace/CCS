@@ -34,6 +34,7 @@ from s2k_partypes import ptt, ptt_reverse, ptype_parameters, ptype_values
 import confignator
 import importlib
 
+import timeformats
 
 cfg = confignator.get_config(check_interpolation=False)
 
@@ -1104,6 +1105,8 @@ def read_stream(stream, fmt, pos=None, offbi=0):
             x = x.decode('utf-8', errors='replace')
     elif fmt == timepack[0]:
         x = timecal(data)
+    elif fmt.startswith('CUC'):
+        x = timeformats.cuctime.get(fmt).calc_time(data)
     else:
         x = struct.unpack('>' + fmt, data)[0]
 
@@ -1130,6 +1133,11 @@ def csize(fmt, offbi=0, bitsize=False):
         return (int(fmt[4:]) + offbi - 1) // 8 + 1
     elif fmt == timepack[0]:
         return timepack[1] - timepack[3]
+    elif fmt.startswith('CUC'):
+        try:
+            return timeformats.cuctime.get(fmt).cize
+        except AttributeError:
+            raise NotImplementedError('Unknown format {}'.format(fmt))
     elif fmt.startswith('oct'):
         return int(fmt[3:])
     elif fmt.startswith('ascii'):
