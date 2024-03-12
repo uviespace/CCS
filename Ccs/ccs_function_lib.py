@@ -2696,11 +2696,12 @@ def encode_pus(params, *values, params_as_fmt_string=False):
     # insert fixed parameter values, cdf_value=param[7]
     for i, par in enumerate(params_nospares):
         if par[5] == 'F':
-            values.insert(i, tc_param_alias(par[-1], par[7]))
+            fixed_val = cast_str_value_ptc(par[7], par[8])
+            values.insert(i, tc_param_alias(par[-1], fixed_val))
 
     fmts = [parameter_ptt_type_tc(par) for par in params]
 
-    # deduced parameter types are not supported for TCs
+    # deduced parameter types are not supported for TCs TODO
     if 'deduced' in fmts:
         raise NotImplementedError("Deduced parameter types in TCs are not supported! ({})".format(', '.join([p[-2] for p in params if p[8] == 11])))
 
@@ -2713,6 +2714,36 @@ def encode_pus(params, *values, params_as_fmt_string=False):
         # proper insertion of spares
         vals_iter = iter(values)
         return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+
+
+def cast_str_value_ptc(val, ptc):
+    """
+    Cast string type value to type given by PTC
+
+    :param val:
+    :param ptc:
+    :return:
+    """
+
+    if ptc == 1:
+        return int(bool(int(val)))
+    elif ptc == 2:
+        try:
+            v = int(val)  # test if val is text-calibrated
+            logger.warning("Numerical fixed value ({}) defined for enumerated type parameter (PTC=2).".format(val))
+            return v
+        except ValueError:
+            return str(val)
+    elif ptc in [3, 4]:
+        return int(val)
+    elif ptc in [5, 9, 10]:
+        return float(val)
+    elif ptc == 7:
+        return bytes.fromhex(val)
+    elif ptc == 8:
+        return str(val)
+    else:
+        raise NotImplementedError("TC fixed parameter values not supported for PTC={}".format(ptc))
 
 
 def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
