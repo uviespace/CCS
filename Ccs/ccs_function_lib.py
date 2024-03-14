@@ -6438,7 +6438,7 @@ class Verification:
 
             time.sleep(.1)
 
-        return False, acks_found.all() if len(acks_found) != 0 else False, []
+        return False, acks_found.all()
 
     @staticmethod
     def get_acks(pool_name, idx_from=None, time_from=None):
