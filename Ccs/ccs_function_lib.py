@@ -2738,12 +2738,16 @@ def cast_str_value_ptc(val, ptc):
     elif ptc == 2:
         try:
             v = int(val)  # test if val is text-calibrated
-            logger.warning("Numerical fixed value ({}) defined for enumerated type parameter (PTC=2).".format(val))
+            logger.info("Numerical fixed value ({}) defined for enumerated type parameter (PTC=2).".format(val))
             return v
         except ValueError:
             return str(val)
     elif ptc in [3, 4]:
-        return int(val)
+        try:
+            return int(val)  # test if val is text-calibrated
+        except ValueError:
+            logger.info("String fixed value ({}) defined for integer type parameter (PTC=3).".format(val))
+            return val
     elif ptc in [5, 9, 10]:
         return float(val)
     elif ptc == 7:
