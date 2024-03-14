@@ -3340,7 +3340,7 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
         return
 
     # get the SSC of the sent packet
-    ssc = counters[int(str(apid), 0)]
+    ssc = counters.setdefault(int(str(apid), 0), 1)
     # increase the SSC counter
     counters[int(str(apid), 0)] += 1
     # More specific Logging format that is compatible with the TST
