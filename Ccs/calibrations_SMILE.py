@@ -716,6 +716,33 @@ def calibrate_ext(adu, signal, exception=False):
     # return adu if not exception else None
 
 
+class BadPixelMask:
+    """
+    Convenience functions for handling the SMILE SXI bad pixel mask stored in MRAM
+    """
+
+    NROWS = 639
+    NCOLS = 384
+
+    @classmethod
+    def from_bytes(cls, buffer):
+        return np.unpackbits(bytearray(buffer)).reshape((cls.NROWS, cls.NCOLS))
+
+    @classmethod
+    def to_bytes(cls, mask: np.ndarray):
+
+        assert isinstance(mask, np.ndarray)
+
+        if mask.size != cls.NROWS * cls.NCOLS:
+            raise ValueError("Mask must be array of size {}, is {}.".format(cls.NROWS * cls.NCOLS, mask.size))
+
+        return bytes(np.packbits(mask))
+
+    @classmethod
+    def gen_mask_array(cls):
+        return np.zeros((cls.NROWS, cls.NCOLS), dtype=int)
+
+
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
