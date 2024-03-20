@@ -71,7 +71,6 @@ cfl.start_pv()
 ### Monitor ###
 cfl.start_monitor('LIVE')
 ```
-
 It will do:
 
 - starts the poolmanager
@@ -82,7 +81,9 @@ It will do:
 (The script is stored under [Ccs/scripts](Ccs/scripts). The
 `pool_name` is `LIVE`.)
 
-For tests, you can find a dummy socket client under
+If there is a need to **stop a running scipt** (e.g. a script sending telecommands in an endless loop) this can be done with CTRL+SHIFT+C.
+
+For tests, you can find a **dummy socket client** under
 [CoCa/test_scripts/dummy_socket.py](CoCa/test_scripts/dummy_socket.py)
 it will just print out all binary commands sent to it.
 
