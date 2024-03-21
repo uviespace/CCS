@@ -2,6 +2,7 @@
 """
 The verification script
 """
+import time
 import logging
 import sys
 import os
@@ -17,6 +18,9 @@ from datetime import datetime
 from testlib import report
 from testlib import analyse_command_log
 from testlib import testing_logger
+from testlib.tools import TestVars as var
+
+${customImports}
 
 # create logger
 logger = logging.getLogger(__name__)

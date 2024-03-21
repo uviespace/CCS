@@ -24,6 +24,6 @@
 
         summary = self.step_verification(pool_name=pool_name, step_start_cuc=step_start_cuc, param=param, summary=summary,
                                          ver_file=${testSpecFileName}_verification, ver_class="${testSpecClassName}Verification",
-                                         ver_func="step_${testStepNumber}", step_id=step_id)
+                                         ver_func="step_${testStepNumber}", step_id=step_id, cvars=locals())
 
         return summary

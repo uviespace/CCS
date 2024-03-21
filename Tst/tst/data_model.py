@@ -910,6 +910,7 @@ class TestSpecification:
         self._postcon_code = ''
         self._postcon_descr = ''
         self._comment = ''
+        self._custom_imports = ''
         self.sequences = []
 
         if json_data is not None:
@@ -931,6 +932,7 @@ class TestSpecification:
         new_testspec.postcon_code = copy.copy(self.postcon_code)
         new_testspec.postcon_descr = copy.copy(self.postcon_descr)
         new_testspec.comment = copy.copy(self.comment)
+        new_testspec.custom_imports = copy.copy(self.custom_imports)
 
         return new_testspec
 
@@ -1054,6 +1056,15 @@ class TestSpecification:
         assert isinstance(value, str)
         self._comment = value
 
+    @property
+    def custom_imports(self):
+        return self._custom_imports
+
+    @custom_imports.setter
+    def custom_imports(self, value: str):
+        assert isinstance(value, str)
+        self._custom_imports = value
+
     def encode_to_json(self, *args):
         """
         Makes out of the TestSequence a JSON object.
@@ -1079,6 +1090,7 @@ class TestSpecification:
             self.postcon_code = json_data['_postcon_code']
             self.postcon_descr = json_data['_postcon_descr']
             self.comment = json_data['_comment']
+            self.custom_imports = json_data['_custom_imports']
         except KeyError as keyerror:
             self.logger.error('KeyError: no {} could be found in the loaded data'.format(keyerror))
 

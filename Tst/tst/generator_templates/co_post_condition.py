@@ -1,5 +1,5 @@
     # VERIFY EVERY STEP ------------------------------------------------------------------------------------------------
-    def step_verification(self, pool_name, step_start_cuc, param, summary, ver_file, ver_class, ver_func, step_id):
+    def step_verification(self, pool_name, step_start_cuc, param, summary, ver_file, ver_class, ver_func, step_id, cvars):
         """
         This functions does the verification for every step
         :param pool_name: str
@@ -24,7 +24,7 @@
                 ver_instance_call = getattr(ver_file, ver_class)
                 instance = ver_instance_call()
                 ver_func_call = getattr(instance, ver_func)
-                success = ver_func_call(pool_name, start_cuc=step_start_cuc, run_id=self.run_id, step_id=step_id)
+                success = ver_func_call(pool_name, start_cuc=step_start_cuc, run_id=self.run_id, step_id=step_id, cvars=cvars)
                 summary.result = success
             except:
                 logger.exception('Exception in the Verification for Step {}'.format(param['step_no']))

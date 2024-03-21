@@ -95,7 +95,7 @@ class Board(Gtk.Box):
         self.test_meta_data_box.set_orientation(Gtk.Orientation.HORIZONTAL)
 
         self.test_meta_data_info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.test_meta_data_pre_post_con = Gtk.Box()
+        self.test_meta_data_pre_post_con = Gtk.Box(margin_start=10)
         self.test_meta_data_pre_post_con.set_orientation(Gtk.Orientation.VERTICAL)
         self.test_meta_data_pre_post_con_edit = Gtk.Box()
         self.test_meta_data_pre_post_con_edit.set_orientation(Gtk.Orientation.VERTICAL)
@@ -175,9 +175,9 @@ class Board(Gtk.Box):
         self.test_meta_data_pre_post_con.pack_start(precon_line, False, True, 2)
         self.test_meta_data_pre_post_con.pack_start(self.postcon_selection_label, False, True, 2)
         self.test_meta_data_pre_post_con.pack_start(postcon_line, False, True, 0)
-        self.test_meta_data_box.set_spacing(20)
+        self.test_meta_data_box.set_spacing(10)
 
-        self.test_comment_box = Gtk.Box(spacing=2)
+        self.test_comment_box = Gtk.Box(spacing=2, margin_end=5)
         self.test_comment_box.set_orientation(Gtk.Orientation.VERTICAL)
         self.label_comment = Gtk.Label()
         self.label_comment.set_halign(Gtk.Align.START)
@@ -200,6 +200,49 @@ class Board(Gtk.Box):
         self.test_meta_data_box.pack_start(self.test_meta_data_pre_post_con_edit, False, True, 0)
         self.test_meta_data_box.pack_start(self.test_comment_box, True, True, 0)
         self.pack_start(self.test_meta_data_box, False, True, 0)
+
+        # add a custom init code block
+        self.custom_import_box = Gtk.Box(spacing=5, margin_start=10, margin_end=10)
+        self.custom_import_box.set_orientation(Gtk.Orientation.VERTICAL)
+
+        self.bar_custom_import = Gtk.Box()
+        self.bar_custom_import.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.bar_custom_import.set_tooltip_text('Statements that are executed at the beginning of a test.\n'
+                                                'Define imports and variables used throughout the test here.')
+        self.label_custom_import = Gtk.Label()
+        self.label_custom_import.set_halign(Gtk.Align.START)
+        self.label_custom_import.set_markup('<b>Init code</b>')
+
+        self.button_custom_import = Gtk.ToolButton()
+        self.button_custom_import.set_icon_name('pan-down-symbolic')
+        self.button_custom_import.connect('clicked', self.on_init_code_toggle)
+
+        self.bar_custom_import.pack_start(self.button_custom_import, False, True, 0)
+        self.bar_custom_import.pack_start(self.label_custom_import, False, True, 0)
+
+        self.custom_import_scrolled_window = Gtk.ScrolledWindow()
+        self.custom_import_scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.custom_import_scrolled_window.set_size_request(-1, 200)
+        self.test_custom_import = GtkSource.View()
+        self.test_custom_import.set_auto_indent(True)
+        self.test_custom_import.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.test_custom_import.set_show_line_numbers(True)
+        self.test_custom_import.set_monospace(True)
+        self.test_custom_import.set_highlight_current_line(True)
+        self.test_custom_import.set_indent_on_tab(True)
+        self.test_custom_import.set_insert_spaces_instead_of_tabs(True)
+        self.test_custom_import.set_indent_width(4)
+        self.test_custom_import.set_auto_indent(True)
+        self.custom_import_buffer = self.test_custom_import.get_buffer()
+
+        self.custom_import_buffer.set_language(lngg)
+        # self.custom_import_buffer.set_style_scheme(self.board.current_scheme)
+        self.custom_import_scrolled_window.add(self.test_custom_import)
+
+        self.custom_import_box.pack_start(self.bar_custom_import, False, False, 0)
+        self.custom_import_box.pack_start(self.custom_import_scrolled_window, True, True, 0)
+
+        self.pack_start(self.custom_import_box, False, True, 0)
 
         # making the toolbar
         self.btn_add_step = Gtk.ToolButton()
@@ -250,6 +293,7 @@ class Board(Gtk.Box):
         self.test_meta_data_iasw_version.connect('changed', self.on_test_iasw_version_change)
         self.text_meta_data_test_is_locked.connect('toggled', self.on_test_locked_toggled)
         self.test_meta_data_comment.get_buffer().connect('changed', self.on_comment_change)
+        self.custom_import_buffer.connect('changed', self.on_custom_import_change)
 
         Gtk.StyleContext.add_class(self.get_style_context(), 'board')
 
@@ -331,6 +375,17 @@ class Board(Gtk.Box):
 
         # Set the Locked STep numeration
         self.text_meta_data_test_is_locked.set_active(self.model.primary_counter_locked)
+
+        # Set the init code block
+        self.custom_import_buffer.set_text(self.model.custom_imports)
+
+    def on_init_code_toggle(self, widget):
+        if self.custom_import_scrolled_window.is_visible():
+            self.custom_import_scrolled_window.set_visible(False)
+            widget.set_icon_name('pan-end-symbolic')
+        else:
+            self.custom_import_scrolled_window.set_visible(True)
+            widget.set_icon_name('pan-down-symbolic')
 
     def collapse_all_steps(self, button):
         """ Close all expander of the steps """
@@ -507,6 +562,18 @@ class Board(Gtk.Box):
         # update the model
         self.model.comment = comment
         # update the data model viewer
+        self.app.update_model_viewer()
+
+    def on_custom_import_change(self, widget):
+        """
+        update model if buffer changes
+
+        :param widget:
+        :return:
+        """
+
+        custom_code = widget.get_text(widget.get_start_iter(), widget.get_end_iter(), True)
+        self.model.custom_imports = custom_code
         self.app.update_model_viewer()
 
     def destroy_all_step_widgets(self):

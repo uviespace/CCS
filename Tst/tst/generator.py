@@ -93,7 +93,8 @@ def make_command_script(model, model_spec):
         header_template_str = header_file_obj.read()
         header_file_obj.close()
         header_str = string.Template(header_template_str)
-        header = header_str.substitute(testSpecFileName=create_file_name(model_spec.name))
+        header = header_str.substitute(testSpecFileName=create_file_name(model_spec.name),
+                                       customImports=model_spec.custom_imports.strip())
         # add the header string
         content += header
 
@@ -266,8 +267,12 @@ def make_verification_script(model, model_spec):
         header_template_str = header_file_obj.read()
         header_file_obj.close()
 
+        header_str = string.Template(header_template_str)
+        header = header_str.substitute(testSpecFileName=create_file_name(model_spec.name),
+                                       customImports=model_spec.custom_imports.strip())
+
         # add the header string
-        content += header_template_str
+        content += header
 
     # add the class definition
     with open(ver_class_path, 'r') as class_file_obj:
