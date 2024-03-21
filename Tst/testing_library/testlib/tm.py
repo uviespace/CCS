@@ -2184,10 +2184,10 @@ def get_tc_identifier(pool_name="LIVE", tc_apid=321, tc_ssc=1, tc_time=0.):
     return tc_identifier
 
 
+def await_tc_ack(*args, **kwargs):
 
+    return cfl.Verification.await_tc_ack(*args, **kwargs)
 
 
 if __name__ == '__main__':
     sys.path.append('.')
-    r=get_tc_acknow('PLM',0.,321,5)
-    print(r)
