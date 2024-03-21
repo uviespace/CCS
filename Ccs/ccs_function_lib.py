@@ -3685,7 +3685,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
     return crc(pdata[:-PEC_LEN])
 
 
-def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
+def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
                    progress=True, calc_crc=True, byte_align=4):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
@@ -4414,23 +4414,6 @@ def _get_upload_service_info(tcname=None):
             endspares += bytes(par[6] // 8)
 
     return apid, memid_ref, fmt, endspares
-
-"""
-Test Function to get tm and tc from database tm
-"""
-def get_acute_tm_tc(description=None):
-
-    if description is None:
-        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
-                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
-    else:
-        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
-                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
-
-"""
-Test function ends
-"""
-
 
 
 def get_tc_list(ccf_descr=None):
