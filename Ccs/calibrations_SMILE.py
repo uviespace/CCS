@@ -716,13 +716,16 @@ def calibrate_ext(adu, signal, exception=False):
     # return adu if not exception else None
 
 
-class BadPixelMask:
+class _BadPixelMask2:
     """
     Convenience functions for handling the SMILE SXI bad pixel mask stored in MRAM
     """
 
     NROWS = 639
     NCOLS = 384
+
+    CCD2_MASK_ADDR = 0x40654C00
+    CCD4_MASK_ADDR = 0x4065CC00
 
     @classmethod
     def from_bytes(cls, buffer):
@@ -741,6 +744,53 @@ class BadPixelMask:
     @classmethod
     def gen_mask_array(cls):
         return np.zeros((cls.NROWS, cls.NCOLS), dtype=int)
+
+
+class BadPixelMask:
+
+    NROWS = 639
+    NCOLS = 384
+
+    CCD2_MASK_ADDR = 0x40654C00
+    CCD4_MASK_ADDR = 0x4065CC00
+
+    def __init__(self):
+        self._bin_len = int((self.NROWS * self.NCOLS) / 8)
+        self._bin = bytes(self._bin_len)
+
+    @property
+    def binary(self):
+        return self._bin
+
+    @binary.setter
+    def binary(self, data: bytes):
+
+        assert isinstance(data, bytes)
+        assert len(data) == self._bin_len
+
+        self._bin = data
+
+    @property
+    def array(self):
+        return np.unpackbits(bytearray(self._bin)).reshape((self.NROWS, self.NCOLS))
+
+    @array.setter
+    def array(self, arr: np.ndarray):
+
+        assert isinstance(arr, np.ndarray)
+        assert arr.shape == (self.NROWS, self.NCOLS)
+
+        self._bin = bytes(np.packbits(arr))
+
+    def mask_pixel(self, row, col):
+        mask = self.array
+        mask[row, col] = 1
+        self.array = mask
+
+    def unmask_pixel(self, row, col):
+        mask = self.array
+        mask[row, col] = 0
+        self.array = mask
 
 
 if __name__ == '__main__':
