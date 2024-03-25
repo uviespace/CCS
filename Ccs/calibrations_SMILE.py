@@ -751,8 +751,10 @@ class BadPixelMask:
     NROWS = 639
     NCOLS = 384
 
-    CCD2_MASK_ADDR = 0x40654C00
-    CCD4_MASK_ADDR = 0x4065CC00
+    CCD2E_MASK_ADDR = 0x40644C00
+    CCD2F_MASK_ADDR = 0x4064CC00
+    CCD4E_MASK_ADDR = 0x40654C00
+    CCD4F_MASK_ADDR = 0x4065CC00
 
     def __init__(self):
         self._bin_len = int((self.NROWS * self.NCOLS) / 8)
