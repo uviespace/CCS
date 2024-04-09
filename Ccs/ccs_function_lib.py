@@ -2601,30 +2601,41 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
 
         if np.any([i[4] for i in params]):
             varpos, = np.where([i[4] for i in params])
-            grpsize = params[varpos[0]][4]
-            # are there any spares/fixed before the rep. counter? TODO: nested/multiple repetition counters?
-            pars_noedit = [p for p in params[:varpos[0]] if p[5] in ('A', 'F')]
-            npars_noedit = len(pars_noedit)
-            repfac = int(args[varpos[0] - npars_noedit])
+            if len(varpos) == 1:    # There is only one repetition group in the TC
+                grpsize = params[varpos[0]][4]
+                grppos = varpos[0]
+            elif (len(varpos) == 2) and (args[varpos[0]] ==1):      # Two repetition groups and outer group has one element only
+                # We assume that the first repetition group has a size of 1 and 
+                # we only handle the multiplicity in the second (nested) repetition group
+                grpsize = params[varpos[1]][4]  
+                grppos = varpos[1]
+            else:
+                logger.warning('TC Creation fails: CCS only supports TCs with 1 group or with 2 groups where outer group has one 1 element')
+                return None
 
-            fix = encode_pus(params[:varpos[0] + 1], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                         zip_no_pad(params[:varpos[0] + 1], args[:varpos[0] - npars_noedit + 1])])
+            # are there any spares/fixed before the rep. counter? TODO: nested/multiple repetition counters?
+            pars_noedit = [p for p in params[:grppos] if p[5] in ('A', 'F')]
+            npars_noedit = len(pars_noedit)
+            repfac = int(args[grppos - npars_noedit])
+
+            fix = encode_pus(params[:grppos + 1], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
+                         zip_no_pad(params[:grppos + 1], args[:grppos - npars_noedit + 1])])
 
             if not [i[8] for i in params].count(11):
-                var = encode_pus(repfac * params[varpos[0] + 1:varpos[0] + 1 + grpsize], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                                                    zip_no_pad(repfac * params[varpos[0] + 1:varpos[0] + 1 + grpsize],
-                                                    args[varpos[0] - npars_noedit + 1:varpos[0] - npars_noedit + 1 + grpsize * repfac])])
+                var = encode_pus(repfac * params[grppos + 1:grppos + 1 + grpsize], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
+                                                    zip_no_pad(repfac * params[grppos + 1:grppos + 1 + grpsize],
+                                                    args[grppos - npars_noedit + 1:grppos - npars_noedit + 1 + grpsize * repfac])])
 
             # for derived type parameters, not supported for SMILE
             else:
                 raise NotImplementedError("Deduced parameter types in TCs are not supported!")
-                # formats, args2 = build_packstr_11(st, sst, apid, params, varpos[0], grpsize, repfac, *args,
+                # formats, args2 = build_packstr_11(st, sst, apid, params, grppos, grpsize, repfac, *args,
                 #                                        no_check=no_check)
-                # #var = pack(fstring, *args2[varpos[0] + 1:varpos[0] + 1 + grpsize * repfac])
-                # var = encode_pus(formats, *args2[varpos[0] + 1:varpos[0] + 1 + grpsize * repfac])
+                # #var = pack(fstring, *args2[grppos + 1:grppos + 1 + grpsize * repfac])
+                # var = encode_pus(formats, *args2[grppos + 1:grppos + 1 + grpsize * repfac])
 
             # add the parameters after the variable part, if any
-            npars_with_var = varpos[0] + grpsize + 1
+            npars_with_var = grppos + grpsize + 1
             if len(params) > npars_with_var:
                 fix2 = encode_pus(params[npars_with_var:],
                                   *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
