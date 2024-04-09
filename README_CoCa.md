@@ -125,4 +125,6 @@ cfl.start_pv(console=True)
 In this way, unhandled exceptions will be seen in the CCS console. 
 
 ### Use of the Python Debugger
-If there is a need to run the python debugger, most modules can also be run by executing the respective Python files directly (e.g. `poolview_sql.py` for the Poolviewer in the Ccs subfolder) and then the debugger should be accessible normally.
+If there is a need to run the python debugger, most modules can also be run by executing the respective Python files directly which allows the debugger to be accessed normally. Examples of modules which can be started in this way include:
+- The PoolViewer is started by running `./Ccs/poolview_sql.py`
+- The TestSpecificationTool is started by running `./Tst/tst/tst.py`
