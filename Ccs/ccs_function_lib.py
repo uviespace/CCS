@@ -1066,7 +1066,7 @@ def decode_pus(tm_data, parameters, decode_tc=False):
 #  @param fmt Input String that defines the format of the bytes
 #  @param pos Input The BytePosition in the input bytes
 #  @param offbi
-def read_stream(stream, fmt, pos=None, offbi=0):
+def read_stream(stream, fmt, pos=None, offbi=0, none_on_fail=False):
     """
 
     :param stream:
@@ -1082,7 +1082,11 @@ def read_stream(stream, fmt, pos=None, offbi=0):
     data = stream.read(readsize)
 
     if not data:
-        raise BufferError('No data left to read from [{}]!'.format(fmt))
+        if none_on_fail:
+            logger.debug('No data left to read from [{}]!'.format(fmt))
+            return
+        else:
+            raise BufferError('No data left to read from [{}]!'.format(fmt))
 
     if fmt == 'I24':
         x = int.from_bytes(data, 'big')
@@ -1746,6 +1750,10 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     :param nocal:
     :return:
     """
+
+    if rawval is None:
+        return
+
     if properties is None:
 
         # cache
@@ -2263,16 +2271,16 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
 
         if mk_array:
             xy = [(get_cuctime(tm),
-                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi, none_on_fail=True),
                                   properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
         else:
             xy = [(get_cuctime(tm),
-                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi, none_on_fail=True),
                                   properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=nocal)) for tm in
                   tmlist_filt]
 
     else:
-        xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]
+        xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi, none_on_fail=True)) for tm in tmlist_filt]
 
     dbcon.close()
 
