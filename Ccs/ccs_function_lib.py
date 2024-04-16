@@ -2577,14 +2577,6 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     :param kwargs:
     :return:
     """
-    # with self.poolmgr.lock:
-    # que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
-    #       'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
-    #       'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-    #       'WHERE BINARY ccf_descr="%s"' % cmd
-    # dbcon = scoped_session_idb
-    # params = dbcon.execute(que).fetchall()
-    # dbcon.close()
 
     try:
         params = _get_tc_params(cmd)
@@ -2595,8 +2587,6 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     try:
         st, sst, apid, npars = params[0][:4]
     except IndexError:
-        # print('Unknown command "{}"'.format(cmd))
-        # Notify.Notification.new('Unknown command "{}"'.format(cmd)).show()
         raise NameError('Unknown command "{}"'.format(cmd))
 
     if ack is None:
@@ -2618,55 +2608,23 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
                 params.remove(params[n])
                 params.insert(n, tuple(x))
 
+        # generate full list of parameters from input values for variable packets
         if np.any([i[4] for i in params]):
-            varpos, = np.where([i[4] for i in params])
-            grpsize = params[varpos[0]][4]
-            # are there any spares/fixed before the rep. counter? TODO: nested/multiple repetition counters?
-            pars_noedit = [p for p in params[:varpos[0]] if p[5] in ('A', 'F')]
-            npars_noedit = len(pars_noedit)
-            repfac = int(args[varpos[0] - npars_noedit])
 
-            fix = encode_pus(params[:varpos[0] + 1], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                         zip_no_pad(params[:varpos[0] + 1], args[:varpos[0] - npars_noedit + 1])])
+            params, idx = _get_tc_params_var(params, args)
 
-            if not [i[8] for i in params].count(11):
-                var = encode_pus(repfac * params[varpos[0] + 1:varpos[0] + 1 + grpsize], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                                                    zip_no_pad(repfac * params[varpos[0] + 1:varpos[0] + 1 + grpsize],
-                                                    args[varpos[0] - npars_noedit + 1:varpos[0] - npars_noedit + 1 + grpsize * repfac])])
+            if idx != len(args):
+                raise ValueError('Wrong number of TC parameter values ({}), expected {}.'.format(len(args), idx))
 
-            # for derived type parameters, not supported for SMILE
-            else:
-                raise NotImplementedError("Deduced parameter types in TCs are not supported!")
-                # formats, args2 = build_packstr_11(st, sst, apid, params, varpos[0], grpsize, repfac, *args,
-                #                                        no_check=no_check)
-                # #var = pack(fstring, *args2[varpos[0] + 1:varpos[0] + 1 + grpsize * repfac])
-                # var = encode_pus(formats, *args2[varpos[0] + 1:varpos[0] + 1 + grpsize * repfac])
-
-            # add the parameters after the variable part, if any
-            npars_with_var = varpos[0] + grpsize + 1
-            if len(params) > npars_with_var:
-                fix2 = encode_pus(params[npars_with_var:],
-                                  *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                                    zip_no_pad(params[npars_with_var:],
-                                               args[npars_with_var - npars_noedit + grpsize * (repfac - 1):])])
-            else:
-                fix2 = b''
-
-            pdata = fix + var + fix2
-
-            if source_data_only:
-                return pdata
-
+        if hack_value is None:
+            values = [tc_param_alias(p[-1], v, no_check=no_check) for p, v in zip_no_pad(params, args)]
         else:
-            if hack_value is None:
-                values = [tc_param_alias(p[-1], v, no_check=no_check) for p, v in zip_no_pad(params, args)]
-            else:
-                values = hack_value
+            values = hack_value
 
-            pdata = encode_pus(params, *values)
+        pdata = encode_pus(params, *values)
 
-            if source_data_only:
-                return pdata
+        if source_data_only:
+            return pdata
 
     return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
 
@@ -2687,6 +2645,56 @@ def _get_tc_params(cmd, paf_cal=False):
     params = scoped_session_idb.execute(que).fetchall()
     scoped_session_idb.close()
     return params
+
+
+def _get_tc_params_var(params, vals, idx=None):
+    """
+    Generate list of TC parameters for variable packets.
+
+    :param params:
+    :param vals:
+    :param idx:
+    :return:
+    """
+
+    rp = []
+    grp = 0
+
+    if idx is None:
+        idx = 0
+
+    try:
+        for i, p in enumerate(params):
+            if grp > 0:
+                grp -= 1
+                continue
+            grp = p[4]
+
+            if grp == 0:
+                rp.append(p)
+                if p[5] == 'E':
+                    idx += 1
+            else:
+                rp.append(p)
+                if p[5] == 'E':
+                    rep = vals[idx]
+                    idx += 1
+                elif p[5] == 'F':
+                    try:
+                        rep = int(p[7])
+                    except (TypeError, ValueError) as err:
+                        raise ValueError('Configuration error for {}: {}'.format(p, err))
+                else:
+                    raise ValueError('Configuration error for {}'.format(p))
+
+                while rep > 0:
+                    nrp, idx = _get_tc_params_var(params[i + 1:i + 1 + grp], vals, idx=idx)
+                    rep -= 1
+                    rp += nrp
+    except IndexError as err:
+        raise IndexError('Misconfigured TC! ({})'.format(err))
+
+    return rp, idx
 
 
 def encode_pus(params, *values, params_as_fmt_string=False):
