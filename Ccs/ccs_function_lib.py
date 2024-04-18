@@ -2604,7 +2604,7 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         if len(padded) != 0:
             for n in padded:
                 x = list(params[n])
-                x[-4:-2] = 'SPARE', x[-6]
+                x[8:10] = 'SPARE', x[6]
                 params.remove(params[n])
                 params.insert(n, tuple(x))
 
@@ -2638,7 +2638,7 @@ def _get_tc_params(cmd, paf_cal=False):
               'WHERE BINARY ccf_descr="%s"' % cmd
     else:
         que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
-              'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
+              'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_categ,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
               'WHERE BINARY ccf_descr="%s"' % cmd
 
@@ -2725,9 +2725,29 @@ def encode_pus(params, *values, params_as_fmt_string=False):
 
     fmts = [parameter_ptt_type_tc(par) for par in params]
 
-    # deduced parameter types are not supported for TCs TODO
     if 'deduced' in fmts:
-        raise NotImplementedError("Deduced parameter types in TCs are not supported! ({})".format(', '.join([p[-2] for p in params if p[8] == 11])))
+
+        pfmt = None
+
+        vidx = 0
+        for i, p in enumerate(params):
+
+            if fmts[i] == 'deduced':
+                if pfmt is None:
+                    raise ValueError('Configuration error: no format for parameter of deduced type has yet been defined! {}'.format(p))
+                else:
+                    fmts[i] = pfmt
+                    vidx += 1
+
+            elif p[10] == 'P':
+                pfmt = _dp_items[values[vidx]]['fmt']
+                vidx += 1
+
+            elif not fmts[i].endswith('x'):
+                vidx += 1
+
+            else:
+                pass  # nothing to do for spares
 
     try:
         fmt_string = '>'+''.join(fmts)
@@ -2856,7 +2876,7 @@ def parameter_ptt_type_tc(par):
     :param par:
     :return:
     """
-    return ptt(par[-4], par[-3])
+    return ptt(par[8], par[9])
 
 
 ##
@@ -3296,37 +3316,37 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 #  @param varpos  Position of the parameter indicating repetition
 #  @param grpsize Parameter group size
 #  @param repfac  Number of parameter (group) repetitions
-def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_check=False):
-    """
-
-    :param st:
-    :param sst:
-    :param apid:
-    :param params:
-    :param varpos:
-    :param grpsize:
-    :param repfac:
-    :param args:
-    :param no_check:
-    :return:
-    """
-    ptypeindex = [i[-1] == FMT_TYPE_PARAM for i in params].index(True)  # check where fmt type defining parameter is
-    ptype = args[varpos + ptypeindex::grpsize]
-    args2 = list(args)
-    args2[varpos + 1:] = [tc_param_alias(param[-1], val, no_check=no_check) for param, val in
-                          zip(params[varpos + 1:] * repfac, args[varpos + 1:])]
-    ptc = 0
-    varlist = []
-    for par in params[varpos + 1:] * repfac:
-        if par[-4] != 11:
-            #varlist.append(ptt[par[-4]][par[-3]])
-            varlist.append(parameter_ptt_type_tc(par))
-        else:
-            varlist.append(
-                ptt(par[-4], par[-3])[tc_param_alias(FMT_TYPE_PARAM, ptype[ptc], no_check=no_check)])
-            #varlist.append(ptt[par[-4]][par[-3]][tc_param_alias('DPP70044', ptype[ptc], no_check=no_check)])
-            ptc += 1
-    return varlist, args2
+# def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_check=False):
+#     """
+#
+#     :param st:
+#     :param sst:
+#     :param apid:
+#     :param params:
+#     :param varpos:
+#     :param grpsize:
+#     :param repfac:
+#     :param args:
+#     :param no_check:
+#     :return:
+#     """
+#     ptypeindex = [i[-1] == FMT_TYPE_PARAM for i in params].index(True)  # check where fmt type defining parameter is
+#     ptype = args[varpos + ptypeindex::grpsize]
+#     args2 = list(args)
+#     args2[varpos + 1:] = [tc_param_alias(param[-1], val, no_check=no_check) for param, val in
+#                           zip(params[varpos + 1:] * repfac, args[varpos + 1:])]
+#     ptc = 0
+#     varlist = []
+#     for par in params[varpos + 1:] * repfac:
+#         if par[-4] != 11:
+#             #varlist.append(ptt[par[-4]][par[-3]])
+#             varlist.append(parameter_ptt_type_tc(par))
+#         else:
+#             varlist.append(
+#                 ptt(par[-4], par[-3])[tc_param_alias(FMT_TYPE_PARAM, ptype[ptc], no_check=no_check)])
+#             #varlist.append(ptt[par[-4]][par[-3]][tc_param_alias('DPP70044', ptype[ptc], no_check=no_check)])
+#             ptc += 1
+#     return varlist, args2
 
 
 ##
