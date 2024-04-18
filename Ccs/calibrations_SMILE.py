@@ -1,7 +1,7 @@
 """
 Calibration functions and utilities for raw/engineering conversions in SMILE
 
-Data from SMILE-IWF-PL-UM-147-d0-3_SXI_EBox_User_Manual (ID 5233)
+Data from SMILE-IWF-PL-UM-147-d0-3_SXI_EBox_User_Manual (ID 5233) and SMILE-IWF-PL-UM-147-i1-0_SXI_EBox_User_Manual (ID 5233)
 """
 
 import os
@@ -14,6 +14,14 @@ T_ZERO = 273.15
 # common ADC coefficients
 ADC_INPRNG = 7.34783  # V
 ADC_OFFSET = -1.69565  # V
+
+# PFM
+# # nom
+# ADC_INPRNG = 7.58261  # V
+# ADC_OFFSET = -1.76956  # V
+# # red
+# ADC_INPRNG = 7.54783  # V
+# ADC_OFFSET = -1.77391  # V
 
 
 class Dpu:
@@ -56,6 +64,16 @@ class V_T0:
     TEMP1 = 2.5770
     FEE = 1.2800
 
+    # PFM
+    # # nom
+    # CCD = 2.5688
+    # TEMP1 = 2.5599
+    # FEE = 1.2749
+    # # red
+    # CCD = 2.5547
+    # TEMP1 = 2.5649
+    # FEE = 1.2779
+
 
 class K_T:
     CCD = 0.00385
@@ -93,6 +111,66 @@ CCD_TEMP_TABLE = [
     (-20.0, 2.362, 9048, 0x2358)
 ]
 
+# PFM
+# # nom
+# CCD_TEMP_TABLE = [
+#     (-140.0, 1.123, 6250, 0x186A),
+#     (-135.0, 1.176, 6364, 0x18DC),
+#     (-130.0, 1.229, 6478, 0x194E),
+#     (-125.0, 1.281, 6592, 0x19C0),
+#     (-120.0, 1.334, 6705, 0x1A31),
+#     (-115.0, 1.386, 6818, 0x1AA2),
+#     (-110.0, 1.438, 6931, 0x1B13),
+#     (-105.0, 1.491, 7044, 0x1B84),
+#     (-100.0, 1.542, 7156, 0x1BF4),
+#     (-95.0, 1.594, 7268, 0x1C64),
+#     (-90.0, 1.646, 7380, 0x1CD4),
+#     (-85.0, 1.698, 7491, 0x1D43),
+#     (-80.0, 1.749, 7602, 0x1DB2),
+#     (-75.0, 1.800, 7713, 0x1E21),
+#     (-70.0, 1.852, 7824, 0x1E90),
+#     (-65.0, 1.903, 7935, 0x1EFF),
+#     (-60.0, 1.954, 8045, 0x1F6D),
+#     (-55.0, 2.005, 8155, 0x1FDB),
+#     (-50.0, 2.056, 8265, 0x2049),
+#     (-45.0, 2.107, 8375, 0x20B7),
+#     (-40.0, 2.157, 8484, 0x2124),
+#     (-35.0, 2.208, 8594, 0x2192),
+#     (-30.0, 2.258, 8703, 0x21FF),
+#     (-25.0, 2.309, 8812, 0x226C),
+#     (-20.0, 2.359, 8921, 0x22D9)
+# ]
+#
+# # red
+# CCD_TEMP_TABLE = [
+#     (-140.0, 1.121, 6283, 0x188B),
+#     (-135.0, 1.174, 6398, 0x18FE),
+#     (-130.0, 1.226, 6512, 0x1970),
+#     (-125.0, 1.279, 6626, 0x19E2),
+#     (-120.0, 1.331, 6740, 0x1A54),
+#     (-115.0, 1.383, 6853, 0x1AC5),
+#     (-110.0, 1.436, 6966, 0x1B36),
+#     (-105.0, 1.488, 7079, 0x1BA7),
+#     (-100.0, 1.539, 7192, 0x1C18),
+#     (-95.0, 1.591, 7304, 0x1C88),
+#     (-90.0, 1.643, 7416, 0x1CF8),
+#     (-85.0, 1.694, 7528, 0x1D68),
+#     (-80.0, 1.746, 7639, 0x1DD7),
+#     (-75.0, 1.797, 7750, 0x1E46),
+#     (-70.0, 1.848, 7861, 0x1EB5),
+#     (-65.0, 1.899, 7972, 0x1F24),
+#     (-60.0, 1.950, 8083, 0x1F93),
+#     (-55.0, 2.001, 8193, 0x2001),
+#     (-50.0, 2.052, 8304, 0x2070),
+#     (-45.0, 2.102, 8414, 0x20DE),
+#     (-40.0, 2.153, 8523, 0x214B),
+#     (-35.0, 2.203, 8633, 0x21B9),
+#     (-30.0, 2.254, 8742, 0x2226),
+#     (-25.0, 2.304, 8852, 0x2294),
+#     (-20.0, 2.354, 8961, 0x2301)
+# ]
+
+
 # interpolation table for PSU temperature
 # (degC, ADC_V, ADU_dec, ADU_hex)
 PSU_TEMP = [
@@ -108,6 +186,21 @@ PSU_TEMP = [
     (90.0, 0.323, 4501, 0x1194),
     (100.0, 0.252, 4343, 0x10F6)
 ]
+
+# PFM
+# PSU_TEMP = [
+#     (-50.0, 3.237, 10998, 0x2AF6),
+#     (-40.0, 3.187, 10887, 0x2A86),
+#     (-20.0, 2.960, 10380, 0x288C),
+#     (0.0, 2.487, 9326, 0x246D),
+#     (20.0, 1.816, 7830, 0x1E95),
+#     (25.0, 1.643, 7444, 0x1D13),
+#     (40.0, 1.169, 6387, 0x18F3),
+#     (60.0, 0.703, 5348, 0x14E4),
+#     (80.0, 0.417, 4710, 0x1266),
+#     (90.0, 0.323, 4501, 0x1194),
+#     (100.0, 0.252, 4343, 0x10F6)
+# ]
 
 
 class Psu:
@@ -129,6 +222,15 @@ K_PSU = {
     Psu.ADC_I_HEATER: 0.4349
 }
 
+# PFM
+# K_PSU = {
+#     Psu.ADC_I_FEE_ANA: 0.3058,
+#     Psu.ADC_I_FEE_DIG: 0.1528,
+#     Psu.ADC_I_DPU: 0.603,
+#     Psu.ADC_I_RSE: 0.844,
+#     Psu.ADC_I_HEATER: 0.4349
+# }
+
 PSU_OFFSET = {
     Psu.ADC_I_FEE_ANA: 0,
     Psu.ADC_I_FEE_DIG: 0,
@@ -147,12 +249,15 @@ class Rse:
 
 
 # fit polynomial of degree POLY_DEG through CCD ADU-degC relation (operational range)
-_ccd_temp_adu_array = np.array(CCD_TEMP_TABLE).T  # (degC, ADC_V, ADU_dec, ADU_hex)
+# IASW coefs for PFM nom: ['-4.02587E+02', '4.33198E-02', '-9.26990E-07', '1.53423E-10', '-6.16102E-15']
+# IASW coefs for PFM red: ['-3.78077E+02', '2.99914E-02', '1.66375E-06', '-7.20486E-11', '1.17412E-15']
 POLY_DEG = 4
+_ccd_temp_adu_array = np.array(CCD_TEMP_TABLE).T  # (degC, ADC_V, ADU_dec, ADU_hex)
 _ccd_temp_fit_adu = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[2], _ccd_temp_adu_array[0],
                                                             POLY_DEG).convert()
 _ccd_temp_fit_adu_inv = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2],
                                                                 POLY_DEG).convert()
+
 
 # cubic-spline interpolation of PSU ADU-degC relation (nominal values)
 _psu_temp_adu_array = np.array(PSU_TEMP).T  # (degC, ADC_V, ADU_dec, ADU_hex)
@@ -551,6 +656,15 @@ _ptx = np.arange(-200, 851)
 _pty = cal_pt1000(_ptx)
 _pt1000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT1000 curve for Ohm to °C conversion
 
+# quadratic fit to PT1000 curve in custom range to get
+# inverse formula parameters for Ohms to °C conversion (used in on-board FEE temp calculation)
+# -140 - -20°C: [ 9.99495990e+02,  3.88482301e+00, -8.51690296e-04]
+_FEE_TEMP_MIN = -140
+_FEE_TEMP_TMAX = -20
+_trng = np.arange(_FEE_TEMP_MIN, _FEE_TEMP_TMAX, .1)
+_rrng = cal_pt1000(_trng)
+_fee_temp_p2fit = np.polynomial.polynomial.Polynomial.fit(_trng, _rrng, 2).convert()
+
 
 def t_ccd_fee_adu_to_deg(adu, ccd):
     """
@@ -629,14 +743,22 @@ class Fee:
 
 # FEE HK gains/offsets
 # EQM
+#     Fee.CCD2_TS_A: (0.048589970854, 326.709603726099),
+#     Fee.CCD4_TS_B: (0.048346071846, 317.545999899085),
+#     Fee.PRT1: (0.049337666752, 310.304954966437),
+#     Fee.PRT2: (0.048871723231, 322.563832689621),
+#     Fee.PRT3: (0.048882740559, 322.418053560869),
+#     Fee.PRT4: (0.048777132761, 322.321990156487),
+#     Fee.PRT5: (0.048683458078, 323.746239172483),
+
 FEE_GAIN_OFFSET = {
-    Fee.CCD2_TS_A: (0.048589970854, 326.709603726099),
-    Fee.CCD4_TS_B: (0.048346071846, 317.545999899085),
-    Fee.PRT1: (0.049337666752, 310.304954966437),
-    Fee.PRT2: (0.048871723231, 322.563832689621),
-    Fee.PRT3: (0.048882740559, 322.418053560869),
-    Fee.PRT4: (0.048777132761, 322.321990156487),
-    Fee.PRT5: (0.048683458078, 323.746239172483),
+    Fee.CCD2_TS_A: (0.0143896, 507.7463659),
+    Fee.CCD4_TS_B: (0.0143869, 508.0853237),
+    Fee.PRT1: (0.013942679, 511.4689646),
+    Fee.PRT2: (0.014066366, 520.9910997),
+    Fee.PRT3: (0.014075819, 520.1841103),
+    Fee.PRT4: (0.013816741, 535.4382444),
+    Fee.PRT5: (0.014074936, 520.4885901),
     Fee.CCD4_VOD_MON_E: (0.000563088127, -0.00209746042908421),
     Fee.CCD4_VOG_MON: (0.000135181804, -0.166559933290103),
     Fee.CCD4_VRD_MON_E: (0.000563174116, 0.0193461050916852),
@@ -716,34 +838,34 @@ def calibrate_ext(adu, signal, exception=False):
     # return adu if not exception else None
 
 
-class _BadPixelMask2:
-    """
-    Convenience functions for handling the SMILE SXI bad pixel mask stored in MRAM
-    """
-
-    NROWS = 639
-    NCOLS = 384
-
-    CCD2_MASK_ADDR = 0x40654C00
-    CCD4_MASK_ADDR = 0x4065CC00
-
-    @classmethod
-    def from_bytes(cls, buffer):
-        return np.unpackbits(bytearray(buffer)).reshape((cls.NROWS, cls.NCOLS))
-
-    @classmethod
-    def to_bytes(cls, mask: np.ndarray):
-
-        assert isinstance(mask, np.ndarray)
-
-        if mask.size != cls.NROWS * cls.NCOLS:
-            raise ValueError("Mask must be array of size {}, is {}.".format(cls.NROWS * cls.NCOLS, mask.size))
-
-        return bytes(np.packbits(mask))
-
-    @classmethod
-    def gen_mask_array(cls):
-        return np.zeros((cls.NROWS, cls.NCOLS), dtype=int)
+# class _BadPixelMask2:
+#     """
+#     Convenience functions for handling the SMILE SXI bad pixel mask stored in MRAM
+#     """
+#
+#     NROWS = 639
+#     NCOLS = 384
+#
+#     CCD2_MASK_ADDR = 0x40654C00
+#     CCD4_MASK_ADDR = 0x4065CC00
+#
+#     @classmethod
+#     def from_bytes(cls, buffer):
+#         return np.unpackbits(bytearray(buffer)).reshape((cls.NROWS, cls.NCOLS))
+#
+#     @classmethod
+#     def to_bytes(cls, mask: np.ndarray):
+#
+#         assert isinstance(mask, np.ndarray)
+#
+#         if mask.size != cls.NROWS * cls.NCOLS:
+#             raise ValueError("Mask must be array of size {}, is {}.".format(cls.NROWS * cls.NCOLS, mask.size))
+#
+#         return bytes(np.packbits(mask))
+#
+#     @classmethod
+#     def gen_mask_array(cls):
+#         return np.zeros((cls.NROWS, cls.NCOLS), dtype=int)
 
 
 class BadPixelMask:
