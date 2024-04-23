@@ -87,6 +87,58 @@ For tests, you can find a **dummy socket client** under
 [CoCa/test_scripts/dummy_socket.py](CoCa/test_scripts/dummy_socket.py)
 it will just print out all binary commands sent to it.
 
+## Scripting Tips
+Tests are often controlled by a script. This section explains how to perform useful tasks from a script.
+
+### Accessing Current TM Time and Display Row (GitHub Issue 14)
+During testing, incoming TM Packets are displayed in the PoolViewer. Each packet is displayed in a dedicated row. The row contains, among other things, a Row Number (first item in the row) and the TM Packet Time-Stamp.
+
+To access packets in a TM pool, there is the general-purpose command `cfl.get_pool_rows(<pool_name>)`. It returns a  `Query` object that supports interaction with the rows in the _tm_ table of the _xxx_data_storage_ schema. This class provides a number of useful methods. For example, to fetch a list of `DbTelemetry` objects, each representing a row in the queried pool, type
+
+`cfl.get_pool_rows(<pool_name>).all()`
+
+The `DbTelemetry` class in turn provides direct access to the properties of the individual rows, which hold the values that are also displayed in the PoolViewer columns. Exemplarily, `cfl.get_pool_rows("LIVE").all()[10].timestamp` will return the timestamp of the 11th packet in the pool _LIVE_.
+
+The `Query` also allows very efficient filtering of rows by column values before the data are actually fetched, e.g., to obtain only TM packets of service type 5:
+
+`cfl.get_pool_rows("LIVE").filter(cfl.DbTelemetry.stc==5).all()`
+
+or only rows starting from index 100:
+
+`cfl.get_pool_rows("LIVE").filter(cfl.DbTelemetry.idx>=100).all()`
+
+In case of large pools it is highly recommended to filter the Query adequately before fetching the actual data (i.e., executing the `.all()` call or iterating through the Query instance), since instantiating a large number of rows as `DbTelemtery` objects takes a while.
+
+With that in mind, the best way of getting the row index (or, analogously, any other property) of the last packet received will be as follows:
+
+`cfl.get_pool_rows("LIVE").order_by(cfl.DbTelemetry.idx.desc()).first().idx` 
+
+The `.raw` property will return the full packet as a byte-string.
+
+In addition, to simply get the timestamp of the last received TM packet there is also the convenience function `cfl.get_last_pckt_time(pool_name=<pool_name>, string=True)`, which returns the time as a string or float, depending on the value of the`string` argument.
+
+### Accessing TM Parameters (GitHub Issue 14)
+If there is a need to access a specific parameter from a fixed-length TM packet, function `cfl.get_param_values` can be used/. Its most relevant parameters are:
+
+- `param="AdcTemp"` name (description) of the parameter as defined in the MIB (PCF_DESCR)
+- `hk="IASWHK_Essential"` description of the containing TM packet as per MIB (PID_DESCR)
+- `pool_name="LIVE"` pool to query
+- `last=4` the most recent 4 values of the parameters are retrieved
+
+For instance:
+
+`x = cfl.get_param_values(param='HB_TOGGLE', hk='TM_HB_REP', pool_name='LIVE', last=4)`
+
+Variable x is a pair with 
+
+- `x[0][0]` is an array of size 4 holding the time-stamps for the 4 requested parameter values
+- `x[0][1]` is an array of size 4 holding the 4 requested parameter values
+- `x[1]` is a pair holding the name of the parameter name and its unit of measure
+
+In case of text-calibrated parameters it is necessary to set `mk_array=False` to get the calibrated values as strings, otherwise their raw numerical values will be returned. For instance:
+
+`cfl.get_param_values(param='HB_MASW_MODE', hk='TM_HB_REP', pool_name='LIVE', last=4, mk_array=False)`
+
 ## Troubleshooting
 
 ### Add Additional Logs to CCS Log Window
