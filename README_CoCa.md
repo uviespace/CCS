@@ -113,9 +113,21 @@ With that in mind, the best way of getting the row index (or, analogously, any o
 
 `cfl.get_pool_rows("LIVE").order_by(cfl.DbTelemetry.idx.desc()).first().idx` 
 
-The `.raw` property will return the full packet as a byte-string.
+The `.raw` property will return the full packet as a byte-string. This is useful if there is a need to parse the TM packet:
 
-In addition, to simply get the timestamp of the last received TM packet there is also the convenience function `cfl.get_last_pckt_time(pool_name=<pool_name>, string=True)`, which returns the time as a string or float, depending on the value of the`string` argument.
+```
+tmPckt = cfl.get_pool_rows("LIVE").order_by(cfl.DbTelemetry.idx.desc()).first().raw
+tmPcktParsed = cfl.Tmdata(tmPckt)
+``` 
+
+Here `tmPcktParsed` is a pair with (i starts from zero):
+
+- `tmPcktParsed[0]` is a list of the TM packet parameters and their values
+- `tmPcktParsed[0][i][0]` is the value of the i-th parameter in the TM packet 
+- `tmPcktParsed[0][i][2]` is the descriptive name of the i-th parameter in the TM packet
+- `tmPcktParsed[1]` is the descriptive name of the TM packet
+
+Finally, to simply get the timestamp of the last received TM packet there is also the convenience function `cfl.get_last_pckt_time(pool_name=<pool_name>, string=True)`, which returns the time as a string or float, depending on the value of the`string` argument.
 
 ### Accessing TM Parameters (GitHub Issue 14)
 If there is a need to access a specific parameter from a fixed-length TM packet, function `cfl.get_param_values` can be used/. Its most relevant parameters are:
