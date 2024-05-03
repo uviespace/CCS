@@ -8,6 +8,13 @@ Author: Marko Mecina (UVIE)
 """
 
 import ctypes
+import io
+import os
+import queue
+import socket
+
+import numpy as np
+from astropy.io import fits
 from packet_config_ATHENA import RawGetterSetter
 
 
@@ -69,6 +76,7 @@ class CommandBaseStruct(ctypes.BigEndianStructure):
         super(CommandBaseStruct).__init__()
 
 
+IF_LEN = 1
 CMD_LEN = ctypes.sizeof(CommandBaseStruct)
 ACK_LEN = 3
 SCI_CMD_LEN = 2
@@ -170,6 +178,10 @@ class HkPkt:
 
 
 # Science interface
+
+FRAME_SIZE_X = 512
+FRAME_SIZE_Y = 512
+
 EVT_PKT_ELEMENT_LEN = 6  # length of event packet element (timestamp, header, pixel, footer) in bytes
 STRUCT_EVT_PIX = {  # name, bitsize, bitoffset (LSB)
     "FRAME_N": (8, 40),
@@ -289,7 +301,7 @@ class EvtPix(EvtPktBase):
 
 class EvtHeader(EvtPktBase):
     """
-    *EventPacket* header
+    *EventFrame* header
     """
 
     def __init__(self, raw):
@@ -306,7 +318,7 @@ class EvtHeader(EvtPktBase):
 
 class EvtFooter(EvtPktBase):
     """
-    *EventPacket* footer
+    *EventFrame* footer
     """
 
     def __init__(self, raw):
@@ -319,7 +331,7 @@ class EvtFooter(EvtPktBase):
 
 class EvtTimestamp(EvtPktBase):
     """
-    *EventPacket* time stamp structure
+    *EventFrame* time stamp structure
     """
 
     def __init__(self, raw):
@@ -351,29 +363,74 @@ def _shift_mask(x, bs_os):
     return (x >> bs_os[1]) & (2 ** bs_os[0] - 1)
 
 
-class EventPacket:
+class EventFrame:
     """
-    FP science event packet
+    FP frame containing event data
     """
 
-    def __init__(self, raw, process=True):
+    def __init__(self, raw, process=True, notime=False):
         self._raw = raw
         self._len = len(raw)
-        self.pixels_list_proc = None
+        self.evt_list_proc = None
 
-        self.timestamp = EvtTimestamp(raw[:EVT_PKT_ELEMENT_LEN])
-        self.header = EvtHeader(raw[EVT_PKT_ELEMENT_LEN:2 * EVT_PKT_ELEMENT_LEN])
+        if notime:
+            hoff = 1
+            poff = 2
+            self.timestamp = None
+        else:
+            hoff = 1
+            poff = 2
+            self.timestamp = EvtTimestamp(raw[:EVT_PKT_ELEMENT_LEN])
+
+        self.header = EvtHeader(raw[hoff * EVT_PKT_ELEMENT_LEN:poff * EVT_PKT_ELEMENT_LEN])
         # self._pixels_block = raw[2 * EVT_PKT_ELEMENT_LEN:-EVT_PKT_ELEMENT_LEN]  # if footer is present
-        self._pixels_block = raw[2 * EVT_PKT_ELEMENT_LEN:]
-        self.pixels_list = [self._pixels_block[i:i + EVT_PKT_ELEMENT_LEN] for i in
-                            range(0, len(self._pixels_block), EVT_PKT_ELEMENT_LEN)]
+        self._pixels_block = raw[poff * EVT_PKT_ELEMENT_LEN:]
+        self.evt_list = [self._pixels_block[i:i + EVT_PKT_ELEMENT_LEN] for i in
+                         range(0, len(self._pixels_block), EVT_PKT_ELEMENT_LEN)]
         # self.footer = EvtFooter(raw[-EVT_PKT_ELEMENT_LEN:])
 
         if process:
-            self._process_pixels()
+            self._process_evts()
 
-    def _process_pixels(self):
-        self.pixels_list_proc = [EvtPix(pix) for pix in self.pixels_list]
+    def __str__(self):
+        return 'EventFrame (ID {}, {} events)'.format(self.frameid, self.nevts)
+
+    @property
+    def nevts(self):
+        return len(self.evt_list_proc)
+
+    @property
+    def frameid(self):
+        return self._raw[0]
+
+    def get_inv_evts(self):
+        return [x for x in self.evt_list if x[-1] != 0xFF]
+
+    def _process_evts(self):
+        # only include valid events (LSB == 0xFF)
+        self.evt_list_proc = [EvtPix(pix) for pix in self.evt_list if pix[-1] == 0xFF]
+
+    def as_array(self, nans=False):
+
+        # initialise empty array
+        if nans:
+            arr = np.zeros((FRAME_SIZE_Y, FRAME_SIZE_X))
+            arr[:] = np.NAN
+        else:
+            arr = np.zeros((FRAME_SIZE_Y, FRAME_SIZE_X), dtype=np.uint16)
+
+        for p in self.evt_list_proc:
+            arr[p.line_n, p.pixel_n] = p.energy
+
+        return arr
+
+    def save_fits(self, fname, nans=False, overwrite=False):
+        hdu = fits.ImageHDU(data=self.as_array(nans=nans))
+        hdu.header['FRAMENUM'] = self.header.frame_n
+        hdu.header['NEVTS'] = len(self.evt_list)
+
+        hdu.writeto(fname, overwrite=overwrite)
+        return fname
 
 
 # delay = 0xXX * sys_clk period
@@ -408,42 +465,204 @@ class SciCmd:
         return self._raw[1]
 
 
-def read_de_pkt(pkt, process=True):
+class FpmPktParser:
+    """
+    Parses telemetry received from FPM
+    """
 
-    assert isinstance(pkt, (bytes, bytearray))
+    def __init__(self, scibytes, echobytes=None, defaultbytes=1024):
 
-    p = None
+        self.scibytes = scibytes
+        self.echobytes = echobytes
+        self.defaultbytes = defaultbytes
 
-    if pkt[0] == IfAddr.HK:
-        if len(pkt) == ACK_LEN:
-            p = Ack(pkt)
-        elif len(pkt) == CMD_LEN:
-            p = CommandBase(pkt)
+        self.lastpkt = None
+
+    def __call__(self, sock):
+
+        strict = True
+        msg = sock.recv(IF_LEN)
+
+        if not msg:
+            return b''
+
+        if msg[0] == IfAddr.CMD:
+            mlen = ACK_LEN - IF_LEN
+        elif msg[0] == IfAddr.SCI:
+            mlen = self.scibytes
+        elif msg[0] == IfAddr.HK:
+            mlen = ACK_LEN - IF_LEN
+            # TODO: HK interface
+            # msg += sock.recv(1)
+            # mlen = msg[1]  # first byte after interface ID specifies HK length?
+        elif msg[0] == IfAddr.ECHO:
+            if self.echobytes is None:
+                print('WARNING: Echo length is not defined, reading {}!'.format(self.defaultbytes))
+                mlen = self.defaultbytes
+                strict = False
+                # raise ValueError('WARNING: Echo length is not defined, reading {}!'.format(self.defaultbytes))
+            else:
+                mlen = self.echobytes
+
         else:
-            p = HkPkt(pkt)
-    elif pkt[0] == IfAddr.CMD:
-        if len(pkt) == ACK_LEN:
-            p = Ack(pkt)
-        elif len(pkt) == CMD_LEN:
-            p = CommandBase(pkt)
-    elif pkt[0] == IfAddr.SCI and len(pkt) == SCI_CMD_LEN:
-        p = SciCmd(pkt)
-    elif pkt[0] == IfAddr.ECHO:
-        p = pkt
-    elif pkt[0] == IfAddr.SCI and len(pkt[1:]) % EVT_PKT_ELEMENT_LEN == 0:
-        p = EventPacket(pkt[1:], process=process)
+            print('ERROR: Unknown interface ID {:02X}'.format(msg[0]))
+            mlen = self.defaultbytes
+            strict = False
 
-    if p is None:
-        raise NotImplementedError('Unknown interface ID {}'.format(pkt[0]))
+        msg += self.read_socket(sock, mlen, strict=strict)
 
-    return p
+        self.lastpkt = msg
+
+        return msg
+
+    def set_scibytes(self, nbytes):
+        self.scibytes = nbytes
+
+    def set_echobytes(self, nbytes):
+        self.echobytes = nbytes
+
+    def set_defaultbytes(self, nbytes):
+        self.defaultbytes = nbytes
+
+    def read_socket(self, sock, rlen, strict=True):
+        msg = b''
+
+        if strict:
+            while len(msg) < rlen:
+                try:
+                    msg += sock.recv(rlen - len(msg))
+                except socket.timeout:
+                    continue
+        else:
+            msg += sock.recv(rlen)
+
+        return msg
 
 
-def split_de_dump(data, de_pkt_size):
+class FpmProcessor:
+    """
+    Processes FPM packets and assembles event frames.
+    """
 
-    assert isinstance(data, bytes)
+    def __init__(self, ashex=True, process=True, notime=False, tofile=None, queue_to=10):
+        self.ashex = ashex
+        self.process = process
+        self.notime = notime
 
-    return [data[i:i+de_pkt_size] for i in range(0, len(data), de_pkt_size)]
+        self.cfdata = b''
+        self.curfrm = -1
+        self.framecnt = 0
+
+        self.frames = []
+        self.tofile = tofile
+
+        self.queue_to = queue_to
+
+        if tofile is not None:
+            self.tofile = open(tofile, 'wb')
+
+    def __call__(self, buf, ts=None):
+
+        assert isinstance(buf, queue.Queue)
+
+        try:
+            pkt = buf.get(timeout=self.queue_to)
+        except queue.Empty:
+            return
+
+        self.frames.clear()
+
+        try:
+            if self.tofile is not None:
+                self.tofile.write(pkt)
+                self.tofile.flush()
+
+            # process non-SCI data
+            if pkt[0] != IfAddr.SCI:
+                return pkt.hex(sep=' ') if self.ashex else pkt
+
+            # process data from SCI itnerface
+            nevts = (len(pkt) - 1) // EVT_PKT_ELEMENT_LEN
+            buf = io.BytesIO(pkt[1:])
+            for i in range(nevts):
+                self.proc(buf)
+
+            if self.frames:
+                return self.frames
+
+        except Exception as err:
+            print(err)
+
+    def proc(self, buf, verbose=False):
+
+        ed = buf.read(EVT_PKT_ELEMENT_LEN)
+
+        if ed[0] == self.curfrm:
+            self.cfdata += ed
+
+        else:
+
+            if self.curfrm != -1:
+                self.frames.append(self.mk_evt_frame(verbose=verbose))
+
+            self.cfdata = ed
+            self.framecnt += 1
+            self.curfrm = ed[0]
+
+    def mk_evt_frame(self, verbose=False):
+        try:
+            frame = EventFrame(self.cfdata)
+            if verbose:
+                print(frame)
+        except Exception as err:
+            print(err)
+            return self.cfdata
+
+        return frame
+
+    def close_file(self):
+        self.tofile.close()
+
+    def proc_file(self, fname, npkts_sci=16, binary=False):
+
+        assert os.path.isfile(fname)
+
+        if binary:
+            buf = open(fname, 'rb')
+        else:
+            f = bytes.fromhex(open(fname, 'r').read())
+            buf = io.BytesIO(f)
+
+        while True:
+            pt = buf.read(IF_LEN)
+            if not pt:
+                print('END OF FILE.', buf.tell(), 'bytes read.')
+                break
+            if pt[0] == IfAddr.CMD:
+                msg = buf.read(ACK_LEN - IF_LEN)
+                print((pt + msg).hex(sep=' '))
+            elif pt[0] == IfAddr.SCI:
+                for i in range(npkts_sci):
+                    self.proc(buf, verbose=True)
+            else:
+                print('ERROR', pt, buf.tell())
+
+        return self.frames
+
+    def reset(self):
+        self.cfdata = b''
+        self.curfrm = -1
+        self.framecnt = 0
+
+        self.frames.clear()
+
+
+def filter_frames(objlist, empty_frames=True):
+
+    if not empty_frames:
+        return [x for x in objlist if isinstance(x, EventFrame)]
+    else:
+        return [x for x in objlist if isinstance(x, EventFrame) and x.nevts > 0]
 
 
 # PCM Registers [TBC]

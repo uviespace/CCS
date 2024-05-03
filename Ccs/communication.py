@@ -227,7 +227,7 @@ class Receiver:
     SEL_TIMEOUT = 2
     RECV_BUF_SIZE = 1024**3
 
-    def __init__(self, sockfds, procfunc=None, recv_buf_size=RECV_BUF_SIZE, outfile=None, ofmode='w', pkt_parser_func=None):
+    def __init__(self, sockfds, procfunc=None, recv_buf_size=RECV_BUF_SIZE, outfile=None, ofmode='w', pkt_parser_func=None, extend_processed=True):
 
         self.sockfds = sockfds
         self.recvd_data_buf = queue.Queue(recv_buf_size)
@@ -235,6 +235,7 @@ class Receiver:
         self._recv_thread = None
         self._proc_thread = None
         self.proc_data = []
+        self.extend_processed = extend_processed
         self._pkt_parser_func = pkt_parser_func
 
         if outfile is not None:
@@ -257,6 +258,12 @@ class Receiver:
     def stop(self):
         self._isrunning = False
 
+    def set_procfunc(self, func):
+        self._procfunc = func
+
+    def set_pkt_parser_func(self, func):
+        self._pkt_parser_func = func
+
     def _start_recv(self):
         self._isrunning = True
         self._recv_thread = threading.Thread(target=self._recv_worker, name='recv_worker')
@@ -276,7 +283,7 @@ class Receiver:
                 rd, wr, er = select.select(self.sockfds, [], self.sockfds, self.SEL_TIMEOUT)
                 for sock in rd:
                     if self._pkt_parser_func is not None:
-                        self.recvd_data_buf.put((time.time(), self._pkt_parser_func(sock)))
+                        self.recvd_data_buf.put(self._pkt_parser_func(sock))
                     else:
                         self.recvd_data_buf.put((time.time(), sock.recv(self.RECV_BYTES)))
 
@@ -306,24 +313,40 @@ class Receiver:
     def _proc_worker(self):
         while self._isrunning:
             try:
-                t, data = self.recvd_data_buf.get(timeout=1)
-                procdata = self._procfunc(data, ts=t)
-                self.proc_data.append(procdata)
+                if self._procfunc is None:
+                    time.sleep(1)
+                    continue
 
-                if self.proc_data_fd is not None:
-                    try:
-                        if self.proc_data_fd.mode.count('b'):
-                            self.proc_data_fd.write(procdata)
-                        else:
-                            self.proc_data_fd.write(str(procdata))
-                    except io.UnsupportedOperation as err:
-                        print(err)
-                        break
-                    except Exception as err:
-                        self.proc_data_fd.write('# {} #\n'.format(err))
-                        continue
-                    finally:
-                        self.proc_data_fd.flush()
+                # t, data = self.recvd_data_buf.get(timeout=1)
+                procdata = self._procfunc(self.recvd_data_buf)
+
+                if procdata is not None:
+                    if self.extend_processed:
+                        self.proc_data.extend(procdata)
+                    else:
+                        self.proc_data.append(procdata)
+
+                    if self.proc_data_fd is not None:
+                        try:
+                            if self.proc_data_fd.mode.count('b'):
+                                wdata = procdata
+                            else:
+                                wdata = str(procdata)
+
+                            if self.extend_processed:
+                                for x in wdata:
+                                    self.proc_data_fd.write(x)
+                            else:
+                                self.proc_data_fd.write(wdata)
+
+                        except io.UnsupportedOperation as err:
+                            print(err)
+                            break
+                        except Exception as err:
+                            self.proc_data_fd.write('# {} #\n'.format(err))
+                            continue
+                        finally:
+                            self.proc_data_fd.flush()
 
             except queue.Empty:
                 continue
