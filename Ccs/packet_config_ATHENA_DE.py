@@ -659,7 +659,7 @@ class FpmProcessor:
 
 def filter_frames(objlist, empty_frames=True):
 
-    if not empty_frames:
+    if empty_frames:
         return [x for x in objlist if isinstance(x, EventFrame)]
     else:
         return [x for x in objlist if isinstance(x, EventFrame) and x.nevts > 0]
