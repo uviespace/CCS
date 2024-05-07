@@ -34,6 +34,7 @@ from s2k_partypes import ptt, ptt_reverse, ptype_parameters, ptype_values
 import confignator
 import importlib
 
+import timeformats
 
 cfg = confignator.get_config(check_interpolation=False)
 
@@ -1065,7 +1066,7 @@ def decode_pus(tm_data, parameters, decode_tc=False):
 #  @param fmt Input String that defines the format of the bytes
 #  @param pos Input The BytePosition in the input bytes
 #  @param offbi
-def read_stream(stream, fmt, pos=None, offbi=0):
+def read_stream(stream, fmt, pos=None, offbi=0, none_on_fail=False):
     """
 
     :param stream:
@@ -1081,7 +1082,11 @@ def read_stream(stream, fmt, pos=None, offbi=0):
     data = stream.read(readsize)
 
     if not data:
-        raise BufferError('No data left to read from [{}]!'.format(fmt))
+        if none_on_fail:
+            logger.debug('No data left to read from [{}]!'.format(fmt))
+            return
+        else:
+            raise BufferError('No data left to read from [{}]!'.format(fmt))
 
     if fmt == 'I24':
         x = int.from_bytes(data, 'big')
@@ -1104,6 +1109,8 @@ def read_stream(stream, fmt, pos=None, offbi=0):
             x = x.decode('utf-8', errors='replace')
     elif fmt == timepack[0]:
         x = timecal(data)
+    elif fmt.startswith('CUC'):
+        x = timeformats.cuctime.get(fmt).calc_time(data)
     else:
         x = struct.unpack('>' + fmt, data)[0]
 
@@ -1130,6 +1137,11 @@ def csize(fmt, offbi=0, bitsize=False):
         return (int(fmt[4:]) + offbi - 1) // 8 + 1
     elif fmt == timepack[0]:
         return timepack[1] - timepack[3]
+    elif fmt.startswith('CUC'):
+        try:
+            return timeformats.cuctime.get(fmt).cize
+        except AttributeError:
+            raise NotImplementedError('Unknown format {}'.format(fmt))
     elif fmt.startswith('oct'):
         return int(fmt[3:])
     elif fmt.startswith('ascii'):
@@ -1138,7 +1150,7 @@ def csize(fmt, offbi=0, bitsize=False):
         try:
             return struct.calcsize(fmt)
         except struct.error:
-            raise NotImplementedError(fmt)
+            raise NotImplementedError('Unknown format {}'.format(fmt))
 
 
 ##
@@ -1318,8 +1330,8 @@ def cuc_time_str(head, logger=logger):
         else:
             return ''
     except Exception as err:
-        logger.info(err)
-        return ''
+        logger.warning(err)
+        return '#######'
 
 
 ##
@@ -1738,6 +1750,10 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     :param nocal:
     :return:
     """
+
+    if rawval is None:
+        return
+
     if properties is None:
 
         # cache
@@ -2037,7 +2053,10 @@ def filter_by_discr(rows, pi1_off, pi1_wid, pi1_val):
     :return:
     """
 
-    rows = rows.filter(func.mid(DbTelemetry.raw, pi1_off + 1, pi1_wid) == pi1_val.to_bytes(pi1_wid, 'big'))
+    if not isinstance(pi1_val, bytes):
+        pi1_val = pi1_val.to_bytes(pi1_wid, 'big')
+
+    rows = rows.filter(func.mid(DbTelemetry.raw, pi1_off + 1, pi1_wid) == pi1_val)
     return rows
 
 
@@ -2252,16 +2271,16 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
 
         if mk_array:
             xy = [(get_cuctime(tm),
-                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi, none_on_fail=True),
                                   properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=True)) for tm in tmlist_filt]  # no calibration here, done below on array
         else:
             xy = [(get_cuctime(tm),
-                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi),
+                   get_calibrated(name, read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi, none_on_fail=True),
                                   properties=[ptc, pfc, categ, curtx], numerical=numerical, nocal=nocal)) for tm in
                   tmlist_filt]
 
     else:
-        xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi)) for tm in tmlist_filt]
+        xy = [(get_cuctime(tm), read_stream(io.BytesIO(tm[offby:offby + bylen]), ufmt, offbi=offbi, none_on_fail=True)) for tm in tmlist_filt]
 
     dbcon.close()
 
@@ -2558,14 +2577,6 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     :param kwargs:
     :return:
     """
-    # with self.poolmgr.lock:
-    # que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
-    #       'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
-    #       'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-    #       'WHERE BINARY ccf_descr="%s"' % cmd
-    # dbcon = scoped_session_idb
-    # params = dbcon.execute(que).fetchall()
-    # dbcon.close()
 
     try:
         params = _get_tc_params(cmd)
@@ -2576,8 +2587,6 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     try:
         st, sst, apid, npars = params[0][:4]
     except IndexError:
-        # print('Unknown command "{}"'.format(cmd))
-        # Notify.Notification.new('Unknown command "{}"'.format(cmd)).show()
         raise NameError('Unknown command "{}"'.format(cmd))
 
     if ack is None:
@@ -2595,70 +2604,27 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         if len(padded) != 0:
             for n in padded:
                 x = list(params[n])
-                x[-4:-2] = 'SPARE', x[-6]
+                x[8:10] = 'SPARE', x[6]
                 params.remove(params[n])
                 params.insert(n, tuple(x))
 
+        # generate full list of parameters from input values for variable packets
         if np.any([i[4] for i in params]):
-            varpos, = np.where([i[4] for i in params])
-            if len(varpos) == 1:    # There is only one repetition group in the TC
-                grpsize = params[varpos[0]][4]
-                grppos = varpos[0]
-            elif (len(varpos) == 2) and (args[varpos[0]] ==1):      # Two repetition groups and outer group has one element only
-                # We assume that the first repetition group has a size of 1 and 
-                # we only handle the multiplicity in the second (nested) repetition group
-                grpsize = params[varpos[1]][4]  
-                grppos = varpos[1]
-            else:
-                logger.warning('TC Creation fails: CCS only supports TCs with 1 group or with 2 groups where outer group has one 1 element')
-                return None
 
-            # are there any spares/fixed before the rep. counter? TODO: nested/multiple repetition counters?
-            pars_noedit = [p for p in params[:grppos] if p[5] in ('A', 'F')]
-            npars_noedit = len(pars_noedit)
-            repfac = int(args[grppos - npars_noedit])
+            params, idx = _get_tc_params_var(params, args)
 
-            fix = encode_pus(params[:grppos + 1], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                         zip_no_pad(params[:grppos + 1], args[:grppos - npars_noedit + 1])])
+            if idx != len(args):
+                raise ValueError('Wrong number of TC parameter values ({}), expected {}.'.format(len(args), idx))
 
-            if not [i[8] for i in params].count(11):
-                var = encode_pus(repfac * params[grppos + 1:grppos + 1 + grpsize], *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                                                    zip_no_pad(repfac * params[grppos + 1:grppos + 1 + grpsize],
-                                                    args[grppos - npars_noedit + 1:grppos - npars_noedit + 1 + grpsize * repfac])])
-
-            # for derived type parameters, not supported for SMILE
-            else:
-                raise NotImplementedError("Deduced parameter types in TCs are not supported!")
-                # formats, args2 = build_packstr_11(st, sst, apid, params, grppos, grpsize, repfac, *args,
-                #                                        no_check=no_check)
-                # #var = pack(fstring, *args2[grppos + 1:grppos + 1 + grpsize * repfac])
-                # var = encode_pus(formats, *args2[grppos + 1:grppos + 1 + grpsize * repfac])
-
-            # add the parameters after the variable part, if any
-            npars_with_var = grppos + grpsize + 1
-            if len(params) > npars_with_var:
-                fix2 = encode_pus(params[npars_with_var:],
-                                  *[tc_param_alias(p[-1], v, no_check=no_check) for p, v in
-                                    zip_no_pad(params[npars_with_var:],
-                                               args[npars_with_var - npars_noedit + grpsize * (repfac - 1):])])
-            else:
-                fix2 = b''
-
-            pdata = fix + var + fix2
-
-            if source_data_only:
-                return pdata
-
+        if hack_value is None:
+            values = [tc_param_alias(p[-1], v, no_check=no_check) for p, v in zip_no_pad(params, args)]
         else:
-            if hack_value is None:
-                values = [tc_param_alias(p[-1], v, no_check=no_check) for p, v in zip_no_pad(params, args)]
-            else:
-                values = hack_value
+            values = hack_value
 
-            pdata = encode_pus(params, *values)
+        pdata = encode_pus(params, *values)
 
-            if source_data_only:
-                return pdata
+        if source_data_only:
+            return pdata
 
     return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
 
@@ -2672,13 +2638,63 @@ def _get_tc_params(cmd, paf_cal=False):
               'WHERE BINARY ccf_descr="%s"' % cmd
     else:
         que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
-              'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
+              'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_categ,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
               'WHERE BINARY ccf_descr="%s"' % cmd
 
     params = scoped_session_idb.execute(que).fetchall()
     scoped_session_idb.close()
     return params
+
+
+def _get_tc_params_var(params, vals, idx=None):
+    """
+    Generate list of TC parameters for variable packets.
+
+    :param params:
+    :param vals:
+    :param idx:
+    :return:
+    """
+
+    rp = []
+    grp = 0
+
+    if idx is None:
+        idx = 0
+
+    try:
+        for i, p in enumerate(params):
+            if grp > 0:
+                grp -= 1
+                continue
+            grp = p[4]
+
+            if grp == 0:
+                rp.append(p)
+                if p[5] == 'E':
+                    idx += 1
+            else:
+                rp.append(p)
+                if p[5] == 'E':
+                    rep = vals[idx]
+                    idx += 1
+                elif p[5] == 'F':
+                    try:
+                        rep = int(p[7])
+                    except (TypeError, ValueError) as err:
+                        raise ValueError('Configuration error for {}: {}'.format(p, err))
+                else:
+                    raise ValueError('Configuration error for {}'.format(p))
+
+                while rep > 0:
+                    nrp, idx = _get_tc_params_var(params[i + 1:i + 1 + grp], vals, idx=idx)
+                    rep -= 1
+                    rp += nrp
+    except IndexError as err:
+        raise IndexError('Misconfigured TC! ({})'.format(err))
+
+    return rp, idx
 
 
 def encode_pus(params, *values, params_as_fmt_string=False):
@@ -2700,20 +2716,38 @@ def encode_pus(params, *values, params_as_fmt_string=False):
         raise ValueError('Wrong number of parameters: Expected {}, but got {}.\n{}'.format(len(ed_pars), len(values), ', '.join(x[10] for x in ed_pars)))
 
     params_nospares = [param for param in params if param[5] not in ['A']]
-    
+
     # insert fixed parameter values, cdf_value=param[7]
     for i, par in enumerate(params_nospares):
         if par[5] == 'F':
-            if par[8] in (3, 4):    # The fixed-value parameter is of integer type (see GitHub 9)
-                values.insert(i, tc_param_alias(par[-1], int(par[7])))  
-            else: 
-                values.insert(i, tc_param_alias(par[-1], par[7]))
+            fixed_val = cast_str_value_ptc(par[7], par[8])
+            values.insert(i, tc_param_alias(par[-1], fixed_val))
 
     fmts = [parameter_ptt_type_tc(par) for par in params]
 
-    # deduced parameter types are not supported for TCs
     if 'deduced' in fmts:
-        raise NotImplementedError("Deduced parameter types in TCs are not supported! ({})".format(', '.join([p[-2] for p in params if p[8] == 11])))
+
+        pfmt = None
+
+        vidx = 0
+        for i, p in enumerate(params):
+
+            if fmts[i] == 'deduced':
+                if pfmt is None:
+                    raise ValueError('Configuration error: no format for parameter of deduced type has yet been defined! {}'.format(p))
+                else:
+                    fmts[i] = pfmt
+                    vidx += 1
+
+            elif p[10] == 'P':
+                pfmt = _dp_items[values[vidx]]['fmt']
+                vidx += 1
+
+            elif not fmts[i].endswith('x'):
+                vidx += 1
+
+            else:
+                pass  # nothing to do for spares
 
     try:
         fmt_string = '>'+''.join(fmts)
@@ -2724,6 +2758,40 @@ def encode_pus(params, *values, params_as_fmt_string=False):
         # proper insertion of spares
         vals_iter = iter(values)
         return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+
+
+def cast_str_value_ptc(val, ptc):
+    """
+    Cast string type value to type given by PTC
+
+    :param val:
+    :param ptc:
+    :return:
+    """
+
+    if ptc == 1:
+        return int(bool(int(val)))
+    elif ptc == 2:
+        try:
+            v = int(val)  # test if val is text-calibrated
+            logger.info("Numerical fixed value ({}) defined for enumerated type parameter (PTC=2).".format(val))
+            return v
+        except ValueError:
+            return str(val)
+    elif ptc in [3, 4]:
+        try:
+            return int(val)  # test if val is text-calibrated
+        except ValueError:
+            logger.info("String fixed value ({}) defined for integer type parameter (PTC=3).".format(val))
+            return val
+    elif ptc in [5, 9, 10]:
+        return float(val)
+    elif ptc == 7:
+        return bytes.fromhex(val)
+    elif ptc == 8:
+        return str(val)
+    else:
+        raise NotImplementedError("TC fixed parameter values not supported for PTC={}".format(ptc))
 
 
 def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
@@ -2808,7 +2876,7 @@ def parameter_ptt_type_tc(par):
     :param par:
     :return:
     """
-    return ptt(par[-4], par[-3])
+    return ptt(par[8], par[9])
 
 
 ##
@@ -3220,7 +3288,7 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 
         elif typ == 0 and dhead == 1:
             header.bits.PUS_VERSION = tmv
-            header.bits.SC_REFTIME = tref_stat
+            # header.bits.SC_REFTIME = tref_stat  # replaced with TIMESYNC to be backwards-compatible with PUS-A
             header.bits.SERV_TYPE = st
             header.bits.SERV_SUB_TYPE = sst
             header.bits.MSG_TYPE_CNT = msg_type_cnt
@@ -3248,37 +3316,37 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 #  @param varpos  Position of the parameter indicating repetition
 #  @param grpsize Parameter group size
 #  @param repfac  Number of parameter (group) repetitions
-def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_check=False):
-    """
-
-    :param st:
-    :param sst:
-    :param apid:
-    :param params:
-    :param varpos:
-    :param grpsize:
-    :param repfac:
-    :param args:
-    :param no_check:
-    :return:
-    """
-    ptypeindex = [i[-1] == FMT_TYPE_PARAM for i in params].index(True)  # check where fmt type defining parameter is
-    ptype = args[varpos + ptypeindex::grpsize]
-    args2 = list(args)
-    args2[varpos + 1:] = [tc_param_alias(param[-1], val, no_check=no_check) for param, val in
-                          zip(params[varpos + 1:] * repfac, args[varpos + 1:])]
-    ptc = 0
-    varlist = []
-    for par in params[varpos + 1:] * repfac:
-        if par[-4] != 11:
-            #varlist.append(ptt[par[-4]][par[-3]])
-            varlist.append(parameter_ptt_type_tc(par))
-        else:
-            varlist.append(
-                ptt(par[-4], par[-3])[tc_param_alias(FMT_TYPE_PARAM, ptype[ptc], no_check=no_check)])
-            #varlist.append(ptt[par[-4]][par[-3]][tc_param_alias('DPP70044', ptype[ptc], no_check=no_check)])
-            ptc += 1
-    return varlist, args2
+# def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_check=False):
+#     """
+#
+#     :param st:
+#     :param sst:
+#     :param apid:
+#     :param params:
+#     :param varpos:
+#     :param grpsize:
+#     :param repfac:
+#     :param args:
+#     :param no_check:
+#     :return:
+#     """
+#     ptypeindex = [i[-1] == FMT_TYPE_PARAM for i in params].index(True)  # check where fmt type defining parameter is
+#     ptype = args[varpos + ptypeindex::grpsize]
+#     args2 = list(args)
+#     args2[varpos + 1:] = [tc_param_alias(param[-1], val, no_check=no_check) for param, val in
+#                           zip(params[varpos + 1:] * repfac, args[varpos + 1:])]
+#     ptc = 0
+#     varlist = []
+#     for par in params[varpos + 1:] * repfac:
+#         if par[-4] != 11:
+#             #varlist.append(ptt[par[-4]][par[-3]])
+#             varlist.append(parameter_ptt_type_tc(par))
+#         else:
+#             varlist.append(
+#                 ptt(par[-4], par[-3])[tc_param_alias(FMT_TYPE_PARAM, ptype[ptc], no_check=no_check)])
+#             #varlist.append(ptt[par[-4]][par[-3]][tc_param_alias('DPP70044', ptype[ptc], no_check=no_check)])
+#             ptc += 1
+#     return varlist, args2
 
 
 ##
@@ -3308,7 +3376,7 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
         return
 
     # get the SSC of the sent packet
-    ssc = counters[int(str(apid), 0)]
+    ssc = counters.setdefault(int(str(apid), 0), 1)
     # increase the SSC counter
     counters[int(str(apid), 0)] += 1
     # More specific Logging format that is compatible with the TST
@@ -3323,29 +3391,33 @@ def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time
 #   @param pool_name: name of the pool
 #   @param string: <boolean> if true the CUC timestamp is returned as a string, otherwise as a float
 #   @return: <CUC> timestamp or None if failing
-def get_last_pckt_time(pool_name='LIVE', string=True):
+def get_last_pckt_time(pool_name='LIVE', string=True, use_pmgr=False):
     """
 
     :param pool_name:
     :param string:
     :return:
     """
-    pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
-    if not pmgr:
-        logger.warning('Accessing PMGR failed!')
-        return
+    if use_pmgr:
+        pmgr = dbus_connection('poolmanager', communication['poolmanager'])
 
-    packet = None
-    # fetch the pool_name
-    try:
-        poolname = pmgr.Dictionaries('loaded_pools', pool_name)
-    except (dbus.DBusException, KeyError):
-        logger.error('Pool {} is not connected/accessible!'.format(pool_name))
-        return
+        if not pmgr:
+            logger.warning('Accessing PMGR failed!')
+            return
 
-    filename = poolname[2]  # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
-    if not filename:
+        packet = None
+        # fetch the pool_name
+        try:
+            poolname = pmgr.Dictionaries('loaded_pools', pool_name)
+        except (dbus.DBusException, KeyError):
+            logger.error('Pool {} is not connected/accessible!'.format(pool_name))
+            return
+
+        filename = poolname[2]  # 3rd entry is the filename of the named tuple, named tuple not possible via dbus
+        if not filename:
+            filename = pool_name
+    else:
         filename = pool_name
 
     # get the first packet from the pool
@@ -3384,6 +3456,26 @@ def get_last_pckt_time(pool_name='LIVE', string=True):
                     .format(Tmread(packet), Tmdata(packet)))
                 cuc = None
     return cuc
+
+
+def get_last_tc(pool_name, idbytes=False):
+    dbcon = scoped_session_storage
+    row = dbcon.query(
+        DbTelemetry
+    ).join(
+        DbTelemetryPool,
+        DbTelemetry.pool_id == DbTelemetryPool.iid
+    ).filter(
+        DbTelemetryPool.pool_name == pool_name, DbTelemetry.is_tm == 1
+    ).order_by(
+        DbTelemetry.idx.desc()
+    ).first()
+    dbcon.close()
+
+    if idbytes:
+        return row.raw[:4]  # return first 4 header bytes used for identification in PUS Ack service
+    else:
+        return row
 
 
 def _has_tc_connection(pool_name, pmgr_handle):
@@ -3629,7 +3721,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
     return crc(pdata[:-PEC_LEN])
 
 
-def load_to_memory(data, memid, memaddr, max_pkt_size=1000, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
+def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
                    progress=True, calc_crc=True, byte_align=4):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
@@ -4358,23 +4450,6 @@ def _get_upload_service_info(tcname=None):
             endspares += bytes(par[6] // 8)
 
     return apid, memid_ref, fmt, endspares
-
-"""
-Test Function to get tm and tc from database tm
-"""
-def get_acute_tm_tc(description=None):
-
-    if description is None:
-        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
-                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
-    else:
-        test = scoped_session_idb.execute("SELECT * FROM smile_data_storage.tm "
-                                          "WHERE smile_data_storage.tm.pool_id = 40;").fetchall()
-
-"""
-Test function ends
-"""
-
 
 
 def get_tc_list(ccf_descr=None):
@@ -6137,21 +6212,28 @@ class DbTools:
 
     @staticmethod
     def import_dump_in_db(pool_info, loadinfo, brute=False, protocol='PUS', pecmode='warn'):
+
         loadinfo.ok_button.set_sensitive(False)
         loadinfo.spinner.start()
         new_session = scoped_session_storage
-        new_session.query(
-            DbTelemetryPool
-        ).filter(
-            DbTelemetryPool.pool_name == pool_info.filename
-        ).delete()
-        new_session.flush()
-        newPoolRow = DbTelemetryPool(
-            pool_name=pool_info.filename,
-            modification_time=pool_info.modification_time,
-            protocol=protocol)
-        new_session.add(newPoolRow)
-        new_session.flush()  # DB assigns auto-increment field (primary key iid) used below
+
+        try:
+            new_session.query(
+                DbTelemetryPool
+            ).filter(
+                DbTelemetryPool.pool_name == pool_info.filename
+            ).delete()
+            new_session.flush()
+            newPoolRow = DbTelemetryPool(
+                pool_name=pool_info.filename,
+                modification_time=pool_info.modification_time,
+                protocol=protocol)
+            new_session.add(newPoolRow)
+            new_session.flush()  # DB assigns auto-increment field (primary key iid) used below
+        except Exception as err:
+            new_session.rollback()
+            new_session.close()
+            raise err
 
         bulk_insert_size = 1000  # number of rows to transfer in one transaction
         state = [1]
@@ -6206,6 +6288,7 @@ class DbTools:
                             timestamp=cuc_time_str(tm),
                             data=tmd[1][:MAX_PKT_LEN],
                             raw=tm_raw[:MAX_PKT_LEN])
+
             state[0] += 1
             if state[0] % bulk_insert_size == 0:
                 GLib.idle_add(loadinfo.log.set_text, "Loaded {:d} rows.".format(state[0], ))
@@ -6281,9 +6364,15 @@ class DbTools:
                     pcktdicts.append(processor(unpack_pus(pckt), pckt))
                     pcktcount += 1
                     if pcktcount % bulk_insert_size == 0:
-                        new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
-                        # new_session.bulk_insert_mappings(DbTelemetry, pcktdicts)
-                        pcktdicts = []
+                        try:
+                            new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
+                            # new_session.bulk_insert_mappings(DbTelemetry, pcktdicts)
+                            pcktdicts = []
+                        except Exception as err:
+                            new_session.rollback()
+                            new_session.close()
+                            logger.error(err)
+                            raise err
 
                 new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
 
@@ -6317,6 +6406,76 @@ class DbTools:
             new_session.execute('set unique_checks=1, foreign_key_checks=1')
             new_session.commit()
             new_session.close()
+
+
+class Verification:
+    """
+    Packet verification tools
+    """
+
+    PKTIDLEN = 4
+
+    @classmethod
+    def await_tc_ack(cls, pool_name, pktid=None, idx_from=None, time_from=None, acktypes=(1, 7), timeout=3.):
+
+        t1 = time.time()
+
+        acks_remain = list(acktypes)
+
+        if pktid is None:
+            pkt = get_last_tc(pool_name)
+            pktid = pkt.raw[:cls.PKTIDLEN]
+
+            if idx_from is None:
+                idx_from = pkt.idx
+
+        elif isinstance(pktid, (tuple, list)):
+            pktid = cls.mk_pktid(*pktid)
+
+        elif isinstance(pktid, DbTelemetry):
+            pktid = pktid.raw[:cls.PKTIDLEN]
+
+            if idx_from is None:
+                idx_from = pktid.idx
+
+        else:
+            if len(pktid) != cls.PKTIDLEN or not isinstance(pktid, (bytes, bytearray)):
+                raise ValueError
+
+        while time.time() - t1 < timeout:
+
+            acks = cls.get_acks(pool_name, idx_from=idx_from, time_from=time_from)
+            # filter by pktid
+            acks_found = filter_by_discr(acks, TM_HEADER_LEN, cls.PKTIDLEN, pktid)
+
+            for ack in acks_found:
+                if ack.sst in acks_remain:
+                    acks_remain.remove(ack.sst)
+
+            if len(acks_remain) == 0:
+                return True, acks_found.all()
+
+            time.sleep(.1)
+
+        return False, acks_found.all()
+
+    @staticmethod
+    def get_acks(pool_name, idx_from=None, time_from=None):
+
+        rows = get_pool_rows(pool_name)
+        acks = filter_rows(rows, st=1, idx_from=idx_from, time_from=time_from)
+
+        return acks
+
+    @classmethod
+    def mk_pktid(cls, apid, sc):
+        pktid = TCHeader()
+        pktid.bits.SEC_HEAD_FLAG = 1
+        pktid.bits.APID = apid
+        pktid.bits.SEQ_FLAGS = 3
+        pktid.bits.PKT_SEQ_CNT = sc
+
+        return pktid.raw[:cls.PKTIDLEN]
 
 
 class LoadInfo(Gtk.Window):
