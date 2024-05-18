@@ -917,6 +917,67 @@ class BadPixelMask:
         self.array = mask
 
 
+class RowColCorrection:
+
+    ROW_CORR_ADDR = 0x40664C00
+    COL_CORR_ADDR = 0x40665C00
+
+    ROW_CORR_SIZE = 4096
+    COL_CORR_SIZE = 2048
+
+    def __init__(self):
+        self._row_corr = bytearray(self.ROW_CORR_SIZE)
+        self._col_corr = bytearray(self.COL_CORR_SIZE)
+
+        self.ccd2_e_rows = bytearray(self.ROW_CORR_SIZE // 4)
+        self.ccd2_f_rows = bytearray(self.ROW_CORR_SIZE // 4)
+        self.ccd4_e_rows = bytearray(self.ROW_CORR_SIZE // 4)
+        self.ccd4_f_rows = bytearray(self.ROW_CORR_SIZE // 4)
+
+        self.ccd2_e_cols = bytearray(self.COL_CORR_SIZE // 4)
+        self.ccd2_f_cols = bytearray(self.COL_CORR_SIZE // 4)
+        self.ccd4_e_cols = bytearray(self.COL_CORR_SIZE // 4)
+        self.ccd4_f_cols = bytearray(self.COL_CORR_SIZE // 4)
+
+    @property
+    def row_corr(self):
+        self._row_corr[::4] = self.ccd4_e_rows
+        self._row_corr[1::4] = self.ccd4_f_rows
+        self._row_corr[2::4] = self.ccd2_e_rows
+        self._row_corr[3::4] = self.ccd2_f_rows
+        
+        return bytes(self._row_corr)
+
+    @row_corr.setter
+    def row_corr(self, binary):
+        assert len(binary) == self.ROW_CORR_SIZE
+        self._row_corr = bytearray(binary)
+
+        self.ccd4_e_rows = self._row_corr[::4]
+        self.ccd4_f_rows = self._row_corr[1::4]
+        self.ccd2_e_rows = self._row_corr[2::4]
+        self.ccd2_f_rows = self._row_corr[3::4]
+
+    @property
+    def col_corr(self):
+        self._col_corr[::4] = self.ccd4_e_cols
+        self._col_corr[1::4] = self.ccd4_f_cols
+        self._col_corr[2::4] = self.ccd2_e_cols
+        self._col_corr[3::4] = self.ccd2_f_cols
+
+        return bytes(self._col_corr)
+
+    @col_corr.setter
+    def col_corr(self, binary):
+        assert len(binary) == self.COL_CORR_SIZE
+        self._col_corr = bytearray(binary)
+
+        self.ccd4_e_cols = self._col_corr[::4]
+        self.ccd4_f_cols = self._col_corr[1::4]
+        self.ccd2_e_cols = self._col_corr[2::4]
+        self.ccd2_f_cols = self._col_corr[3::4]
+
+
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
