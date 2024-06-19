@@ -254,6 +254,7 @@ class Rse:
 
 
 # fit polynomial of degree POLY_DEG through CCD ADU-degC relation (operational range)
+# IASW coefs for EQM: [-3.55073060e+02,  2.04890302e-02,  3.32985037e-06, -2.20945595e-10, 6.07858723e-15]
 # IASW coefs for PFM nom: ['-4.02587E+02', '4.33198E-02', '-9.26990E-07', '1.53423E-10', '-6.16102E-15']
 # IASW coefs for PFM red: ['-3.78077E+02', '2.99914E-02', '1.66375E-06', '-7.20486E-11', '1.17412E-15']
 POLY_DEG = 4
@@ -262,7 +263,8 @@ _ccd_temp_fit_adu = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[
                                                             POLY_DEG).convert()
 _ccd_temp_fit_adu_inv = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2],
                                                                 POLY_DEG).convert()
-
+_ccd_temp_interp_adu_inv = sp.interpolate.interp1d(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2], kind='cubic',
+                                                   fill_value='extrapolate')
 
 # cubic-spline interpolation of PSU ADU-degC relation (nominal values)
 _psu_temp_adu_array = np.array(PSU_TEMP).T  # (degC, ADC_V, ADU_dec, ADU_hex)
@@ -283,7 +285,7 @@ def t_ccd_deg_to_adu_oper(t, warn=True):
     if not ((_ccd_temp_adu_array[0].min() <= t) & (t <= _ccd_temp_adu_array[0].max())).all() and warn:
         print('WARNING! Value(s) outside operational range ({} - {})!'.format(_ccd_temp_adu_array[0].min(),
                                                                               _ccd_temp_adu_array[0].max()))
-    return np.rint(_ccd_temp_fit_adu_inv(t)).astype(int)
+    return np.rint(_ccd_temp_interp_adu_inv(t)).astype(int)
 
 
 def t_ccd_adu_to_deg_nonoper(adu):
@@ -564,6 +566,23 @@ class Limits:
 
     # raw ambient CCD limits
     ADC_TEMP_CCD_AMB = (0x1968, 0x19DD, 0x29DB, 0x2A49)
+
+    @classmethod
+    def limitparametersformram(cls):
+
+        MRAM_ORDER = ["ADC_P3V9","ADC_P3V3","ADC_P3V3_LVDS","ADC_P2V5","ADC_P1V8","ADC_P1V2","ADC_REF","ADC_TEMP1",
+                      "ADC_TEMP_CCD","ADC_TEMP_FEE","ADC_I_FEE_ANA","ADC_I_FEE_DIG","ADC_I_DPU","ADC_I_RSE",
+                      "ADC_I_HEATER","ADC_PSU_TEMP"]
+
+        out = []
+        cmd = []
+        for par in MRAM_ORDER:
+            ll,lw,uw,ul = getattr(Limits,par)
+            line = '{nn}WarnLowerLimit = {}\n{nn}AlarmLowerLimit = {}\n{nn}WarnUpperLimit = {}\n{nn}AlarmUpperLimit = {}'.format(lw, ll, uw, ul,nn=par)
+            out.append(line)
+            cmd.append('{nn}WarnLowerLimit, {nn}AlarmLowerLimit, {nn}WarnUpperLimit, {nn}AlarmUpperLimit'.format(nn=par))
+
+        print('\n'.join(out) + '\n\n\n' + ', '.join(cmd))
 
 
 class LimitTables:
