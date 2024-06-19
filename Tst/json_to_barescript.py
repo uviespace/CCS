@@ -13,7 +13,7 @@ import os
 import json
 import sys
 
-MIB_VERSION = '1.5'
+MIB_VERSION = '1.8.1'
 
 
 def run(jfile, outfile, reportfunc=False, specfile=None):
@@ -45,7 +45,10 @@ def run(jfile, outfile, reportfunc=False, specfile=None):
         script += 'ask_tc_exec = True\n'
         script += 'report = cfl.TestReport(specfile, rep_version, mib_version, gui=True)\n\n'
 
-    script += '# Precond.\n# {}\n#! CCS.BREAKPOINT\n\n'.format(replace_newline(data['_precon_descr']))
+    # init code
+    script += '# INIT CODE\n{}\n#! CCS.BREAKPOINT\n\n'.format(data['_custom_imports'])
+
+    script += '# PRECONDITIONS\n# {}\n#! CCS.BREAKPOINT\n\n'.format(replace_newline(data['_precon_descr']))
     # script += '{}\n\n\n'.format(data['_precon_code'].strip())  # Add the precondition code
 
     for step in data['sequences'][0]['steps']:
@@ -74,7 +77,7 @@ def run(jfile, outfile, reportfunc=False, specfile=None):
 
         script += txt
 
-    script += '# Postcond.\n# {}\n'.format(replace_newline(data['_postcon_descr']))
+    script += '# POSTCONDITIONS\n# {}\n'.format(replace_newline(data['_postcon_descr']))
     # script += data['_postcon_code'].strip()  # Add the postcondition code
 
     if reportfunc:
