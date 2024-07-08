@@ -1,0 +1,94 @@
+KTC40022	DBS_TC_REQUEST_HK	Request a Housekeeping Report		N	TC_PUS	3	128	321	2	A	Y	N	C		N				9	
+KTC40001	DBS_TC_SET_HKREP_FREQ	Set Housekeeping Reporting Frequency		N	TC_PUS	3	131	321	2	A	Y	N	C		N				9	
+KTC40002	DBS_TC_ENABLE_EVENT	Enables one or more event reports		N	TC_PUS	5	5	321	4	A	Y	N	C		N				9	
+KTC40003	DBS_TC_DISABLE_EVENT	Disables one or more event reports		N	TC_PUS	5	6	321	4	A	Y	N	C		N				9	
+KTC40004	DBS_TC_LOAD_MEMORY	Load data to the onboard memory		N	TC_PUS	6	2	321	5	A	Y	N	C		N				9	
+KTC40005	DBS_TC_DUMP_MEMORY	Dump data from the onboard memory		N	TC_PUS	6	5	321	4	A	Y	N	C		N				9	
+KTC40006	DBS_TC_CHECK_MEMORY	Check the onboard memory		N	TC_PUS	6	9	321	4	A	Y	N	C		N				9	
+KTC40007	DBS_TC_CLEAR_MEMORY	Clear a section of the the RAM		N	TC_PUS	6	129	321	4	A	Y	N	C		N				9	
+KTC40008	DBS_TC_UPDATE_TIME	Set the onboard time		N	TC_PUS	9	128	321	2	A	Y	N	C		N				9	
+KTC40009	DBS_TC_TEST_CONNECTION	Test the connection to the DPU		N	TC_PUS	17	1	321	0	A	Y	N	C		N				9	
+KTC40010	DBS_TC_DUMP_PARAMETERS	Dump parameters		N	TC_PUS	20	1	321	2	A	Y	N	C		N				9	
+KTC40011	DBS_TC_PARLOAD_ADCRANGES	Load parameterset for ADC ranges		N	TC_PUS	20	3	321	66	A	Y	N	C		N				9	
+KTC40012	DBS_TC_PARLOAD_RSEPARAM	Load parameterset for RSE		N	TC_PUS	20	3	321	12	A	Y	N	C		N				9	
+KTC40013	DBS_TC_PARLOAD_ARM	Arm the software for loading of parameters to the MRAM		N	TC_PUS	20	128	321	0	A	Y	N	C		N				9	
+KTC40014	DBS_TC_PARLOAD_DISARM	Disarm the software for loading of parameters		N	TC_PUS	20	129	321	0	A	Y	N	C		N				9	
+KTC40015	DBS_TC_RESET_TO_SAFE	Reset the DPU (and go to SAFE mode)		N	TC_PUS	210	1	321	0	A	Y	N	C		N				9	
+KTC40016	DBS_TC_ENABLE_WATCHDOG	Enable the watchdog of the DPU		N	TC_PUS	210	2	321	0	A	Y	N	C		N				9	
+KTC40017	DBS_TC_DISABLE_WATCHDOG	DISable the watchdog of the DPU		N	TC_PUS	210	3	321	0	A	Y	N	C		N				9	
+KTC40018	DBS_TC_BOOT_IASW	Start the Application Software		N	TC_PUS	210	4	321	9	A	Y	N	C		N				9	
+KTC40019	DBS_TC_LOAD_REGISTER	Load data to the registers in the GR712RC or FPGA		N	TC_PUS	210	6	321	4	A	Y	N	C		N				9	
+KTC40020	DBS_TC_LOAD_REG_ARM	Arm the software for loading into a register		N	TC_PUS	210	7	321	0	A	Y	N	C		N				9	
+KTC40021	DBS_TC_LOAD_REG_DISARM	Disarm the software for loading into a register		N	TC_PUS	210	8	321	0	A	Y	N	C		N				9	
+KSC50052	SASW CreHkCmd	Create a Housekeeping Parameter Report Structure		N	TC_PUS	3	1	321	5	A	Y	N	C		N				9	
+KSC50053	SASW DelHkCmd	Delete a Housekeeping or Diagnostic Parameter Report Structure		N	TC_PUS	3	3	321	2	A	Y	N	C		N				9	
+KSC50054	SASW EnbHkCmd	Enable Periodic Generation of a Housekeeping Parameter Report St		N	TC_PUS	3	5	321	2	A	Y	N	C		N				9	
+KSC50055	SASW DisHkCmd	Disable Periodic Generation of a Housekeeping Parameter Report S		N	TC_PUS	3	6	321	2	A	Y	N	C		N				9	
+KSC50056	SASW RepStructHkCmd	Report Housekeeping Parameter Report Structure		N	TC_PUS	3	9	321	2	A	Y	N	C		N				9	
+KSC50061	SASW ModHkPeriodCmd	Modify the Period of Housekeeping Parameter Report Structures		N	TC_PUS	3	131	321	2	A	Y	N	C		N				9	
+KSC50137	SASW EnbCmd	Enable Generation of Event Identifiers		N	TC_PUS	5	5	321	4	A	Y	N	C		N				9	
+KSC50138	SASW DisCmd	Disable Generation of Event Identifiers		N	TC_PUS	5	6	321	4	A	Y	N	C		N				9	
+KSC50139	SASW LoadCmd	Load Memory using Absolute Addresses		N	TC_PUS	6	2	321	5	A	Y	N	C		N				9	
+KSC50140	SASW DumpCmd	Dump Memory using Absolute Addresses		N	TC_PUS	6	5	321	4	A	Y	N	C		N				9	
+KSC50241	SASW CheckCmd	Check Memory using Absolute Addresses		N	TC_PUS	6	9	321	4	A	Y	N	C		N				9	
+KSC50142	SASW TimeUpdt	Update Time		N	TC_PUS	9	128	321	2	A	Y	N	C		N				9	
+KSC50147	SASW DownAbortCmd	Abort Downlink		N	TC_PUS	13	8	321	3	A	Y	N	C		N				9	
+KSC50148	SASW UpFirstCmd	First Uplink Part		N	TC_PUS	13	9	321	4	A	Y	N	C		N				9	
+KSC50149	SASW UpInterCmd	Intermediate Uplink Part		N	TC_PUS	13	10	321	4	A	Y	N	C		N				9	
+KSC50150	SASW UpLastCmd	Last Uplink Part		N	TC_PUS	13	11	321	4	A	Y	N	C		N				9	
+KSC50152	SASW StartDownCmd	Trigger Large Packet Down-Transfer		N	TC_PUS	13	129	321	3	A	Y	N	C		N				9	
+KSC50153	SASW AreYouAliveCmd	Perform Are-You-Alive Connection Test		N	TC_PUS	17	1	321	0	A	Y	N	C		N				9	
+KSC50155	SASW RepParamValuesCmd	Report Parameter Values		N	TC_PUS	20	1	321	2	A	Y	N	C		N				9	
+KSC50159	SASW SetParValAdcRngsCmd	Set Parameter Values for ADC Ranges		N	TC_PUS	20	3	321	66	A	Y	N	C		N				9	
+KSC50160	SASW SetParValHeatCtlCmd	Set Parameter Values for Heater Control of IASW		N	TC_PUS	20	3	321	13	A	Y	N	C		N				9	
+KSC50161	SASW SetParValRseParCmd	Set Parameter Values for RSE Parameters		N	TC_PUS	20	3	321	12	A	Y	N	C		N				9	
+KSC50162	SASW ParamLoadArmCmd	Arm Parameter Load		N	TC_PUS	20	128	321	0	A	Y	N	C		N				9	
+KSC50163	SASW ParamLoadDisarmCmd	Disarm Parameter Load		N	TC_PUS	20	129	321	0	A	Y	N	C		N				9	
+KSC50164	SASW FdCheckEnbGlobCmd	Globally EnableFdChecks		N	TC_PUS	191	1	321	0	A	Y	N	C		N				9	
+KSC50165	SASW FdCheckDisGlobCmd	Globally Disable FdChecks		N	TC_PUS	191	2	321	0	A	Y	N	C		N				9	
+KSC50166	SASW FdCheckEnbCmd	Enable FdCheck		N	TC_PUS	191	3	321	2	A	Y	N	C		N				9	
+KSC50167	SASW FdCheckDisCmd	Disable FdCheck		N	TC_PUS	191	4	321	2	A	Y	N	C		N				9	
+KSC50168	SASW FdRecovEnbGlobCmd	Globally Enable Recovery Procedures		N	TC_PUS	191	5	321	0	A	Y	N	C		N				9	
+KSC50169	SASW FdRecovDisGlobCmd	Globally Disable Recovery Procedures		N	TC_PUS	191	6	321	0	A	Y	N	C		N				9	
+KSC50170	SASW FdRecovEnbCmd	Enable Recovery Procedure		N	TC_PUS	191	7	321	2	A	Y	N	C		N				9	
+KSC50171	SASW FdRecovDisCmd	Disable Recovery Procedure		N	TC_PUS	191	8	321	2	A	Y	N	C		N				9	
+KSC50172	SASW IaModePreSciCmd	Prepare Science		N	TC_PUS	193	1	321	0	A	Y	N	C		N				9	
+KSC50173	SASW IaModeStrtSciCmd	Start Science		N	TC_PUS	193	2	321	0	A	Y	N	C		N				9	
+KSC50174	SASW IaModeStpSciCmd	Stop Science		N	TC_PUS	193	3	321	0	A	Y	N	C		N				9	
+KSC50175	SASW IaModeGotoStbyCmd	Goto Standby		N	TC_PUS	193	4	321	0	A	Y	N	C		N				9	
+KSC50176	SASW IaModeStrtManCmd	Start Manual FEE Mode		N	TC_PUS	193	5	321	0	A	Y	N	C		N				9	
+KSC50177	SASW IaModeContrSwOffCmd	Controlled Switch-Off IASW		N	TC_PUS	193	6	321	0	A	Y	N	C		N				9	
+KSC50222	SASW AlgoStrtCmd	Start Algorithm		N	TC_PUS	194	1	321	2	A	Y	N	C		N				9	
+KSC50180	SASW AlgoStopCmd	Stop Algorithm		N	TC_PUS	194	2	321	2	A	Y	N	C		N				9	
+KSC50181	SASW AlgoSuspCmd	Suspend Algorithm		N	TC_PUS	194	3	321	2	A	Y	N	C		N				9	
+KSC50182	SASW AlgoResCmd	Resume Algorithm		N	TC_PUS	194	4	321	2	A	Y	N	C		N				9	
+KSC50184	SASW BootRepGenCmd	Generate Boot Report		N	TC_PUS	197	2	321	0	A	Y	N	C		N				9	
+KSC50212	SASW ProcStrCmd_FEE_IN_A	FEE_IN_ALL_SYNC_PR Procedure Start Cmd		N	TC_PUS	198	1	321	2	A	Y	N	C		N				9	
+KSC50213	SASW ProcStrCmd_FEE_IN_S	FEE_IN_SYNC_PR Procedure Start Cmd		N	TC_PUS	198	1	321	3	A	Y	N	C		N				9	
+KSC50214	SASW ProcStrCmd_FEE_OUT_	FEE_OUT_SYNC_PR Procedure Start Cmd		N	TC_PUS	198	1	321	4	A	Y	N	C		N				9	
+KSC50215	SASW ProcStrCmd_RSE_CONF	RSE_CONFIG_PR Procedure Start Cmd		N	TC_PUS	198	1	321	2	A	Y	N	C		N				9	
+KSC50216	SASW ProcStrCmd_RSE_STAT	RSE_STATUS_PR Procedure Start Cmd		N	TC_PUS	198	1	321	2	A	Y	N	C		N				9	
+KSC50217	SASW ProcStpCmd_FEE_IN_A	FEE_IN_ALL_SYNC_PR Procedure Stop Cmd		N	TC_PUS	198	2	321	2	A	Y	N	C		N				9	
+KSC50218	SASW ProcStpCmd_FEE_IN_S	FEE_IN_SYNC_PR Procedure Stop Cmd		N	TC_PUS	198	2	321	2	A	Y	N	C		N				9	
+KSC50219	SASW ProcStpCmd_FEE_OUT_	FEE_OUT_SYNC_PR Procedure Stop Cmd		N	TC_PUS	198	2	321	2	A	Y	N	C		N				9	
+KSC50220	SASW ProcStpCmd_RSE_CONF	RSE_CONFIG_PR Procedure Stop Cmd		N	TC_PUS	198	2	321	2	A	Y	N	C		N				9	
+KSC50221	SASW ProcStpCmd_RSE_STAT	RSE_STATUS_PR Procedure Stop Cmd		N	TC_PUS	198	2	321	2	A	Y	N	C		N				9	
+KSC50187	SASW ResetDpuSafeCmd	Reset DPU to SAFE		N	TC_PUS	210	1	321	0	A	Y	N	C		N				9	
+KSC50188	SASW WatchdogEnbCmd	Enable Watchdog		N	TC_PUS	210	2	321	0	A	Y	N	C		N				9	
+KSC50189	SASW WatchdogDisCmd	Disable Watchdog		N	TC_PUS	210	3	321	0	A	Y	N	C		N				9	
+KSC50190	SASW LoadRegisterCmd	Load Register		N	TC_PUS	210	6	321	4	A	Y	N	C		N				9	
+KSC50191	SASW LoadRegisterArmCmd	Arm Load Register		N	TC_PUS	210	7	321	0	A	Y	N	C		N				9	
+KSC50192	SASW LoadRegisterDisarmC	Disarm Load Register		N	TC_PUS	210	8	321	0	A	Y	N	C		N				9	
+KSC50193	SASW ParamUpdtBoolCmd	Update Parameter of type Boolean		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50194	SASW ParamUpdtInt8Cmd	Update Parameter of type INT8		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50195	SASW ParamUpdtInt16Cmd	Update Parameter of type INT16		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50196	SASW ParamUpdtInt32Cmd	Update Parameter of type INT32		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50197	SASW ParamUpdtUint8Cmd	Update Parameter of type UINT8		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50198	SASW ParamUpdtUint16Cmd	Update Parameter of type UINT16		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50199	SASW ParamUpdtUint32Cmd	Update Parameter of type UINT32		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50200	SASW ParamUpdtFloatCmd	Update Parameter of type FLOAT		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50201	SASW ParamUpdtCucCmd	Update Parameter of type CUC		N	TC_PUS	211	1	321	6	A	Y	N	C		N				9	
+KSC50202	SASW CopyCmd	Copy Data		N	TC_PUS	212	1	321	5	A	Y	N	C		N				9	
+KSC50203	SASW ComprCmd	Compress Data		N	TC_PUS	212	2	321	6	A	Y	N	C		N				9	
+KSC50204	SASW DecomprCmd	Decompress Data		N	TC_PUS	212	3	321	6	A	Y	N	C		N				9	
+KSC50205	SASW SchedSegmCmd	Schedule Program Segment		N	TC_PUS	213	1	321	1	A	Y	N	C		N				9	

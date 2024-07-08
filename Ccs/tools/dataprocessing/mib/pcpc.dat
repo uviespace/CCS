@@ -1,0 +1,7 @@
+PH_0004	APID	U
+DFH_0010	AckTermFlag	U
+DFH_0011	AckProgFlag	U
+DFH_0012	AckStartFlag	U
+DFH_0013	AckAccFlag	U
+DFH_0014	ServType	U
+DFH_0015	ServSubType	U
