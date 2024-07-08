@@ -8,8 +8,7 @@ from packetstruct import timepack, timecal, APID, TM_HEADER_LEN, PEC_LEN, PI1W
 from s2k_partypes import ptt
 import timeformats
 
-
-MIBDIR = 'mib'
+MIBDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mib')
 PIC_TAB = os.path.join(MIBDIR, 'pic.dat')
 PID_TAB = os.path.join(MIBDIR, 'pid.dat')
 PLF_TAB = os.path.join(MIBDIR, 'plf.dat')

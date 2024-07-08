@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Process SMILE SXI L0b product to L0d
+Process SMILE SXI L0b product
 """
 
 import datetime
@@ -45,7 +45,7 @@ seqcnt = None
 
 trashcnt = 0
 
-CE_EXEC = "./smile_raw_ce_converter.py"
+CE_EXEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smile_raw_ce_converter.py")
 
 PRODUCT_IDS = {0: 'SXI-SCI-ED',
                2: 'SXI-SCI-FT',
@@ -59,6 +59,7 @@ SCI_PRODUCTS = {0: 'ED', 1: 'UNKNOWN', 2: 'FT', 3: 'UV', 4: 'FF'}
 MODES = tuple(PRODUCT_IDS.values())
 
 FT_NODES = ('FT_CCD_NODE_0', 'FT_CCD_NODE_1', 'FT_CCD_NODE_2', 'FT_CCD_NODE_3')
+UV_NODES = ('UV_CCD_NODE_0', 'UV_CCD_NODE_1', 'UV_CCD_NODE_2', 'UV_CCD_NODE_3')
 
 ED_BIN_DTYPE = np.dtype(
     [('TIME', '>f8'), ('CCDFRAME', '>u4'), ('CCDNR', 'u1'), ('RAWX', '>u2'), ('RAWY', '>u2'), ('AMP', 'u1'),
@@ -619,7 +620,7 @@ def decompress(cefile, outdir):
     return fitspath
 
 
-def mk_hk_prod(hks, infile):
+def mk_hk_prod(hks, infile, outdir):
     hdl = mk_hdl('HK')
 
     for key in hks:
@@ -630,7 +631,7 @@ def mk_hk_prod(hks, infile):
         except Exception as err:
             logging.error(err)
 
-    fname = infile.replace('L0b', 'L0d').replace('.dat', '_ENG.fits')
+    fname = os.path.join(outdir, os.path.basename(infile) + '_ENG.fits')
     hdl.writeto(fname, overwrite=True)
 
     return fname
@@ -692,15 +693,16 @@ def merge_fits(sorted_files, infile):
     ff_merged = merge_ff(sorted_files['SXI-SCI-FF'], infile)
 
     # ST
-    st_merged = merge_st(sorted_files['SXI-SCI-ST'], infile)
+    # st_merged = merge_st(sorted_files['SXI-SCI-ST'], infile)
 
     # PT
-    pt_merged = merge_pt(sorted_files['SXI-SCI-PT'], infile)
+    # pt_merged = merge_pt(sorted_files['SXI-SCI-PT'], infile)
 
     # UV
     uv_merged = merge_uv(sorted_files['SXI-SCI-UV'], infile)
 
-    return ed_merged, ft_merged, ff_merged, st_merged, pt_merged, uv_merged
+    return ed_merged, ft_merged, ff_merged, None, None, uv_merged
+    # return ed_merged, ft_merged, ff_merged, st_merged, pt_merged, uv_merged
 
 
 def merge_ed(files, infile):
@@ -757,7 +759,7 @@ def merge_ed(files, infile):
     hdul.append(frame_table)
     hdul.append(ed_table)
 
-    fname = infile.replace('L0b', 'L0d').replace('.dat', '.fits')
+    fname = infile + '_ED.fits'
 
     try:
         hdul.writeto(fname, overwrite=True)
@@ -828,7 +830,7 @@ def merge_ft(files, infile):
             ff = format_ft_fits(file, group_idx)
             group_data.append(ff[0])
             frame_data += ff[1]
-            ft_data += ff[2]
+            ft_data.append(ff[2])
 
             if meta is None:
                 metaf = fits.open(file)
@@ -839,10 +841,10 @@ def merge_ft(files, infile):
             logging.error(err)
         group_idx += 1
 
-    fname = infile.replace('L0b', 'L0d').replace('.dat', '-FT.fits')
+    fname = infile + '_FT.fits'
 
     try:
-        hdul.writeto(fname)
+        hdul.writeto(fname, overwrite=True)
     except Exception as err:
         logging.exception(err)
         return
@@ -863,8 +865,8 @@ def format_ft_fits(fname, gidx):
         else:
             nodes.append(None)
 
-    group_new = tuple([gidx] + group.data.tolist())
-    frames_new = tuple(frames.data.tolist() + [gidx])
+    group_new = tuple([gidx] + group.data.tolist()[0])
+    frames_new = tuple([frm + [gidx] for frm in frames.data.tolist()])
 
     return group_new, frames_new, nodes
 
@@ -875,18 +877,32 @@ def merge_ff(files, infile):
 
     hdul = mk_hdl('FF')
 
+    group_idx = 1  # to associate frames to a group
+    group_data = []
+    frame_data = []
+    ff_data = []
+
+    meta = None
     for file in files:
         try:
-            ff = fits.open(file)
-            print(ff)
-        except Exception as err:
-            print(err)
-            logging.error(err)
+            ff = format_ft_fits(file, group_idx)
+            group_data.append(ff[0])
+            frame_data += ff[1]
+            ff_data += ff[2]
 
-    fname = infile.replace('L0b', 'L0d').replace('.dat', '-FF.fits')
+            if meta is None:
+                metaf = fits.open(file)
+                metah = metaf[0]
+                metah.verify('fix')
+                meta = metah.header
+        except Exception as err:
+            logging.error(err)
+        group_idx += 1
+
+    fname = infile + '_FF.fits'
 
     try:
-        hdul.writeto(fname)
+        hdul.writeto(fname, overwrite=True)
     except Exception as err:
         logging.exception(err)
         return
@@ -894,8 +910,24 @@ def merge_ff(files, infile):
     return fname
 
 
+def format_ff_fits(fname, gidx):
+    ff = fits.open(fname)
+
+    group = ff['GROUP_HK']
+    frames = ff['FRAME_HK']
+
+    fullframe = ff['FULLFRAME']
+
+    group_new = tuple([gidx] + group.data.tolist()[0])
+    frames_new = tuple([frm + [gidx] for frm in frames.data.tolist()])
+
+    return group_new, frames_new, fullframe.data
+
+
 def merge_st(files, infile):
     fname = None
+
+    return fname
 
     hdul = mk_hdl('ST')
 
@@ -913,6 +945,8 @@ def merge_st(files, infile):
 def merge_pt(files, infile):
     fname = None
 
+    return fname
+
     hdul = mk_hdl('PT')
 
     for file in files:
@@ -927,27 +961,69 @@ def merge_pt(files, infile):
 
 
 def merge_uv(files, infile):
-    fname = None
+    if len(files) == 0:
+        return
 
     hdul = mk_hdl('UV')
 
+    group_idx = 1  # to associate frames to a group
+    group_data = []
+    frame_data = []
+    uv_data = []
+
+    meta = None
     for file in files:
         try:
-            ff = fits.open(file)
-            print(ff)
+            ff = format_uv_fits(file, group_idx)
+            group_data.append(ff[0])
+            frame_data += ff[1]
+            uv_data += ff[2]
+
+            if meta is None:
+                metaf = fits.open(file)
+                metah = metaf[0]
+                metah.verify('fix')
+                meta = metah.header
         except Exception as err:
-            print(err)
             logging.error(err)
+        group_idx += 1
+
+    fname = infile + '_UV.fits'
+
+    try:
+        hdul.writeto(fname, overwrite=True)
+    except Exception as err:
+        logging.exception(err)
+        return
 
     return fname
 
 
-def get_dp_desc(dpid):
-    try:
-        return data_pool[dpid + DP_OFFSET][0]
-    except KeyError:
-        logging.error("Unknown DP ID {} in header".format(dpid))
-        return str(dpid)[:8]
+def format_uv_fits(fname, gidx):
+    ff = fits.open(fname)
+
+    group = ff['GROUP_HK']
+    frames = ff['FRAME_HK']
+
+    nodes = []
+    for node in UV_NODES:
+        if node in ff:
+            nodes.append(ff[node].data)
+        else:
+            nodes.append(None)
+
+    group_new = tuple([gidx] + group.data.tolist()[0])
+    frames_new = tuple([frm + [gidx] for frm in frames.data.tolist()])
+
+    return group_new, frames_new, nodes
+
+
+# def get_dp_desc(dpid):
+#     try:
+#         return data_pool[dpid + DP_OFFSET][0]
+#     except KeyError:
+#         logging.error("Unknown DP ID {} in header".format(dpid))
+#         return str(dpid)[:8]
 
 
 def calc_frame_time(rarr, reftime):
@@ -1006,7 +1082,7 @@ def process_file(infile, outdir):
             # logging.error('Decompression failed for {}'.format(ce))
             logging.exception(err)
 
-    merged = merge_fits(decompressed, infile)
+    # merged = merge_fits(decompressed, infile)
 
     # put HK in FITS
     try:
@@ -1015,21 +1091,28 @@ def process_file(infile, outdir):
         hkfile = None
         logging.error("Failed creating ENG product for {} ({}).".format(infile, err))
 
-    return *merged, hkfile
+    print(hkfile)
+
+    # return *merged, hkfile
 
 
-def load_dp():
-    with open('dp.csv', 'r') as fd:
-        dp = fd.read()
-
-    data = [x.split('|')[:3] for x in dp.split('\n')[2:]]
-
-    return {int(x[1]): (x[0].strip(), x[2].strip()) for x in data if x[0]}
+# def load_dp():
+#     with open('dp.csv', 'r') as fd:
+#         dp = fd.read()
+#
+#     data = [x.split('|')[:3] for x in dp.split('\n')[2:]]
+#
+#     return {int(x[1]): (x[0].strip(), x[2].strip()) for x in data if x[0]}
 
 
 def setup_logging(output_dir):
     # Configure logging to write to a file in the output directory
     log_filename = os.path.join(output_dir, "log.json")
+
+    if not os.path.isfile(log_filename):
+        with open(log_filename, 'w') as fd:
+            fd.write('')
+
     logging.basicConfig(filename=log_filename, level=logging.INFO,
                         format='  {\n    "timestamp": "%(asctime)s",  \n    "level": "%(levelname)s",  \n    "message": "%(message)s"\n  },')
 
@@ -1038,19 +1121,16 @@ def setup_logging(output_dir):
 
 if __name__ == '__main__':
 
-    setup_logging('/home/marko/space/smile/cedata/proc')
-    process_file('/home/marko/space/smile/datapools/UL_flatsat_08072024_1156_rev_clk_dgen.bin', '/home/marko/space/smile/cedata/proc')
-    sys.exit()
+    # setup_logging('/home/marko/space/smile/cedata/proc')
+    # process_file('/home/marko/space/smile/cedata/datapools/UL_flatsat_08072024_1156_rev_clk_dgen.bin', '/home/marko/space/smile/cedata/proc')
+    # sys.exit()
 
     infile = sys.argv[1]
 
     if len(sys.argv) >= 3:
         outdir = sys.argv[2]
     else:
-        outdir = None
+        outdir = os.path.dirname(infile)
 
+    setup_logging(outdir)
     process_file(infile, outdir)
-
-
-
-
