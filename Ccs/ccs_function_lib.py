@@ -67,6 +67,8 @@ _pcf_cache = {}
 _cap_cache = {}
 _txp_cache = {}
 _pcf_descr_cache = {}
+_pcf_name_cache = {}
+
 
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
@@ -4565,6 +4567,22 @@ def pcf_name_to_descr(pcfname):
 
     if res:
         _pcf_descr_cache[pcfname] = res[0][0]
+        return res[0][0]
+
+
+def pcf_descr_to_name(pcfdescr):
+    """
+    Look up PCF_NAME for PCF_DESCR in MIB
+    """
+
+    if pcfdescr in _pcf_name_cache:
+        return _pcf_name_cache[pcfname]
+
+    que = 'SELECT pcf_name FROM pcf WHERE pcf_descr="{}"'.format(pcfdescr)
+    res = scoped_session_idb.execute(que).fetchall()
+
+    if res:
+        _pcf_name_cache[pcfdescr] = res[0][0]
         return res[0][0]
 
 
