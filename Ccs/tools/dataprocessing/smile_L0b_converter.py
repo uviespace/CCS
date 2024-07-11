@@ -1086,7 +1086,7 @@ def process_file(infile, outdir):
 
     # put HK in FITS
     try:
-        hkfile = mk_hk_prod(hks, infile)
+        hkfile = mk_hk_prod(hks, infile, outdir)
     except Exception as err:
         hkfile = None
         logging.error("Failed creating ENG product for {} ({}).".format(infile, err))
