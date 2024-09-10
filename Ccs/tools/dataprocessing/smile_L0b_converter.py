@@ -56,6 +56,8 @@ PRODUCT_IDS = {0: 'SXI-SCI-ED',
 
 SCI_PRODUCTS = {0: 'ED', 1: 'UNKNOWN', 2: 'FT', 3: 'UV', 4: 'FF'}
 
+UNKNOWN_PROD = 'UNKNOWN'
+
 MODES = tuple(PRODUCT_IDS.values())
 
 FT_NODES = ('FT_CCD_NODE_0', 'FT_CCD_NODE_1', 'FT_CCD_NODE_2', 'FT_CCD_NODE_3')
@@ -419,7 +421,7 @@ def get_ce_id(pkt):
     obsid = int.from_bytes(pkt[SDU_DATA_OFF + 12: SDU_DATA_OFF + 16], 'big')
     cecnt = int.from_bytes(pkt[SDU_DATA_OFF + 16: SDU_DATA_OFF + 18], 'big')
 
-    product = PRODUCT_IDS[pkt[SDU_DATA_OFF + 28]]
+    product = PRODUCT_IDS.get(pkt[SDU_DATA_OFF + 28], UNKNOWN_PROD)
     # product = pkt[SDU_DATA_OFF + 28]
 
     return '{:010d}_{:05d}_{:09d}{:06d}_{:05d}_{}'.format(obsid, cecnt, coarse, fine, pktseqcnt, product)
@@ -535,7 +537,7 @@ def parse_pkts(fd):
             elif pkt[SST_OFF] == 4:
                 if tx:
                     logging.warning('aborted downlink at {}'.format(get_pkt_time(pkt)))
-                    txpkts.append(extract_ce_data(pkt))
+                    txpkts.append(extract_ce_data(pkt, check_seq=False))
                     bad_ces[ce_id] = b''.join(txpkts)
                     tx = False
                 else:
@@ -575,6 +577,7 @@ def extract(infile, outdir):
                 logging.warning('skipped {} bytes because of wrong CRCs'.format(trashcnt))
         except Exception as err:
             logging.exception(err)
+            good_ces, bad_ces, hks = [], [], []
 
     logging.info('extracted {} files'.format(len(good_ces)))
 
@@ -1075,11 +1078,17 @@ def process_file(infile, outdir):
     decompressed = {mode: [] for mode in MODES}
     for ce in ces:
         try:
+
+            if ce.endswith('_{}.ce'.format(UNKNOWN_PROD)):
+                logging.exception('Skipped decompression of {}'.format(ce))
+                continue
+
             fitspath = decompress(ce, outdir)
             if os.path.isfile(fitspath):
                 decompressed = sort_by_mode(decompressed, fitspath)
+
         except Exception as err:
-            # logging.error('Decompression failed for {}'.format(ce))
+            logging.error('Decompression failed for {}'.format(ce))
             logging.exception(err)
 
     # merged = merge_fits(decompressed, infile)
@@ -1122,7 +1131,7 @@ def setup_logging(output_dir):
 if __name__ == '__main__':
 
     # setup_logging('/home/marko/space/smile/cedata/proc')
-    # process_file('/home/marko/space/smile/cedata/datapools/UL_flatsat_08072024_1156_rev_clk_dgen.bin', '/home/marko/space/smile/cedata/proc')
+    # process_file('/home/marko/ucloud/madrid/2024/X_BAND_SCOE/SXI_TMTC_RRC1_PS_X_20240729_merged.bin', '/home/marko/ucloud/madrid/2024/X_BAND_SCOE')
     # sys.exit()
 
     infile = sys.argv[1]

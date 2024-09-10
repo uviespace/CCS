@@ -24,8 +24,9 @@ SIZE_FF = NROWS_FF * NCOLS_FF * 2
 SIZE_FT = NROWS_FT * NCOLS_FT * 2  # 1 node
 SIZE_UV = NROWS_UV * NCOLS_UV * 2  # 1 node
 SIZE_ED = 64  # 1 event
+NODE_NUM = 4  # total number of nodes
 
-SCI_PRODUCTS = {0: 'ED', 1: 'UNKNOWN', 2: 'FT', 3: 'UV', 4: 'FF'}
+SCI_PRODUCTS = {0: 'ED', 1: 'UNKNOWN', 2: 'FT', 3: 'UV', 4: 'FF', 5: 'ED_WP'}
 
 FILE_PREFIX = 'SMILE_SXI_L1'
 
@@ -49,10 +50,17 @@ def convert_ce(cefile, fitsfile=None, guess=False):
         else:
             print('Cannot determine product type for CE of length {}, aborting.'.format(len(cedata)))
             sys.exit()
+
+        obsid = 0
+
     else:
         try:
             ce = CompressionEntity(cedata)
             prod = ce.header.items.product
+
+            obsid = ce.header.items.obsid
+
+            assert ce.meta_frame.shape[0] == ce.header.items.sdp_group_members
 
             if SCI_PRODUCTS.get(prod) == 'FF':
                 mode, hdl = mk_ff(ce)
@@ -72,7 +80,7 @@ def convert_ce(cefile, fitsfile=None, guess=False):
 
     if fitsfile is None:
         outdir = os.path.dirname(os.path.abspath(cefile))
-        fitsfile = os.path.join(outdir, '{}_{}_{}.fits'.format(FILE_PREFIX, mode, _mk_ts()))
+        fitsfile = os.path.join(outdir, '{}_{}_{:010d}_{}.fits'.format(FILE_PREFIX, mode, obsid, _mk_ts()))
 
     hdl.writeto(fitsfile, overwrite=True)
 
@@ -106,17 +114,27 @@ def mk_ft(data):
     arr = np.frombuffer(data.scidata, dtype='>H').reshape(-1, NROWS_FT, NCOLS_FT)
 
     hdl = _mk_hdl('FT', data.header)
-    for n in range(arr.shape[0]):
-        node = fits.ImageHDU(data=arr[n, :, :], name='FT_CCD_NODE_{}'.format(n))
-        node.add_checksum()
-        hdl.append(node)
+    n_nodes = arr.shape[0]
+
+    if n_nodes % NODE_NUM:
+        print('Total number of nodes ({}) is not a multiple of 4!'.format(n_nodes))
+
+        for n in range(arr.shape[0]):
+            node = fits.ImageHDU(data=arr[n, :, :], name='FT_CCD_NODE_{}'.format(n))
+            node.add_checksum()
+            hdl.append(node)
+    else:
+        for n in range(NODE_NUM):
+            node = fits.ImageHDU(data=arr[n::NODE_NUM, :, :], name='FT_CCD_NODE_{}'.format(n))
+            node.add_checksum()
+            hdl.append(node)
 
     # arrange all nodes to full CCD
-    if arr.shape[0] == 4:
+    if n_nodes % 4 == 0:
 
         nn = _assemble_ft_frames_to_fp_view(arr)
 
-        hdl.append(fits.ImageHDU(data=nn, name='FULLCCD'))
+        hdl.append(fits.ImageHDU(data=nn, name='FULLARRAY'))
 
     group_table = fits.BinTableHDU(data=data.meta_group, name='GROUP_HK')
     frame_table = fits.BinTableHDU(data=data.meta_frame, name='FRAME_HK')
@@ -134,17 +152,25 @@ def mk_uv(data):
     arr = np.frombuffer(data.scidata, dtype='>H').reshape(-1, NROWS_UV, NCOLS_UV)
 
     hdl = _mk_hdl('UV', data.header)
-    for n in range(arr.shape[0]):
-        node = fits.ImageHDU(data=arr[n, :, :], name='UV_CCD_NODE_{}'.format(n))
-        node.add_checksum()
-        hdl.append(node)
+    n_nodes = arr.shape[0]
+
+    if n_nodes % NODE_NUM:
+        for n in range(arr.shape[0]):
+            node = fits.ImageHDU(data=arr[n, :, :], name='UV_CCD_NODE_{}'.format(n))
+            node.add_checksum()
+            hdl.append(node)
+    else:
+        for n in range(NODE_NUM):
+            node = fits.ImageHDU(data=arr[n::NODE_NUM, :, :], name='UV_CCD_NODE_{}'.format(n))
+            node.add_checksum()
+            hdl.append(node)
 
     # arrange all nodes to full CCD
-    if arr.shape[0] == 4:
+    if n_nodes % 4 == 0:
 
         nn = _assemble_ft_frames_to_fp_view(arr)
 
-        hdl.append(fits.ImageHDU(data=nn, name='FULLCCD'))
+        hdl.append(fits.ImageHDU(data=nn, name='FULLARRAY'))
 
     group_table = fits.BinTableHDU(data=data.meta_group, name='GROUP_HK')
     frame_table = fits.BinTableHDU(data=data.meta_frame, name='FRAME_HK')
@@ -162,10 +188,34 @@ def mk_ed(data):
     # reshape into array of evt packets
     arr = np.frombuffer(data.scidata, dtype='>H').reshape(-1, SIZE_ED // 2)
 
+    frmevtcnt = data.meta_frame['LastFrameEvtCount']
+
+    # handle wandering pixel mask if present
+    wpm = []
+    if frmevtcnt.sum() != arr.shape[0]:
+        print('Inconsistent LastFrameEvtCount {} (sum). {} in data block.'.format(frmevtcnt.sum(), arr.shape[0]))
+        if data.header.items.sdp_group_members == (arr.shape[0] - frmevtcnt.sum()):
+            print('Extracting {} wandering pixel(s).'.format(data.header.items.sdp_group_members))
+            wpm = arr[-data.header.items.sdp_group_members:]
+            arr = arr[:-data.header.items.sdp_group_members]
+
+    if data.meta_frame['LastFrameEvtCount'].sum() != data.meta_group['NOfEvtDet'][0]:
+        print('Inconsistent CE frame count: LastFrameEvtCount_sum = {}, NOfEvtDet = {}'.format(frmevtcnt.sum(), data.meta_group['NOfEvtDet'][0]))
+
     hdl = _mk_hdl('ED', data.header)
     # ts = int(hdl['PRIMARY'].header['OBS_ID'])
     ts = data.meta_frame['sdpProductStarttimeCrs'] + data.meta_frame['sdpProductStarttimeFine'] / 1e6
-    bindata = np.array([_mk_bin_entry(evt, ts) for evt in arr], dtype=ED_BIN_DTYPE)
+    ts_ext = ts.repeat(frmevtcnt)
+    bindata = np.array([_mk_bin_entry(evt, t, wpm_raise=True) for evt, t in zip(arr, ts_ext)], dtype=ED_BIN_DTYPE)
+
+    if len(wpm) != 0:
+        try:
+            wpmdata = np.array([_mk_bin_entry(evt, t) for evt, t in zip(arr, ts)], dtype=ED_BIN_DTYPE)
+        except Exception as err:
+            wpmdata = None
+            print('Failed extracting wandering pixel masks ({})'.format(err))
+    else:
+        wpmdata = None
 
     # also add an HDU with event map
     nodes = np.zeros((2, 2, NROWS_FT, NCOLS_FT))
@@ -176,7 +226,7 @@ def mk_ed(data):
         except:
             print(col, row, 'FAILED')
 
-    nodes[nodes == 0] = np.nan
+    # nodes[nodes == 0] = np.nan
 
     ed_img = _assemble_ft_frames_to_fp_view(nodes)
 
@@ -189,6 +239,11 @@ def mk_ed(data):
     group_table = fits.BinTableHDU(data=data.meta_group, name='GROUP_HK')
     frame_table = fits.BinTableHDU(data=data.meta_frame, name='FRAME_HK')
 
+    if wpmdata is not None:
+        wpm_table = fits.BinTableHDU(data=wpmdata, name='WNDRNG_PXL')
+        wpm_table.add_checksum()
+        hdl.append(wpm_table)
+
     # checksums
     group_table.add_checksum()
     frame_table.add_checksum()
@@ -198,11 +253,15 @@ def mk_ed(data):
     return 'ED', hdl
 
 
-def _mk_bin_entry(data, timestamp):
+def _mk_bin_entry(data, timestamp, wpm_raise=False):
     spw, dlen, dtyp, fc, sc, col, row, *evts = data
 
     ccdnr = (dtyp >> 4) & 1
     node = (dtyp >> 5) & 0b11
+
+    if wpm_raise:
+        if (dtyp & 0b11) == 3:
+            raise ValueError('WPM detected')
 
     return timestamp, fc, ccdnr, col, row, node, evts
 
@@ -214,23 +273,31 @@ def _assemble_ft_frames_to_fp_view(arrnd):
     # FT
     # according to MSSL-IF-122 the nodes arrive in the following order: E2, F2, E4, F4
     if arrnd.ndim == 3:
-        n00 = arrnd[1, ::-1, ::-1]  # CCD2 F-side (upper right in FP view)
-        n01 = arrnd[0, ::-1, :]  # CCD2 E-side (upper left in FP view)
-        n10 = arrnd[3, :, :]  # CCD4 F-side (lower left in FP view)
-        n11 = arrnd[2, :, ::-1]  # CCD4 E-side (lower right in FP view)
+        n00 = arrnd[1::NODE_NUM, ::-1, ::-1]  # CCD2 F-side (upper right in FP view)
+        n01 = arrnd[0::NODE_NUM, ::-1, :]  # CCD2 E-side (upper left in FP view)
+        n10 = arrnd[3::NODE_NUM, :, :]  # CCD4 F-side (lower left in FP view)
+        n11 = arrnd[2::NODE_NUM, :, ::-1]  # CCD4 E-side (lower right in FP view)
+
     # ED
     elif arrnd.ndim == 4:
         n00 = arrnd[0, 0, :, :][::-1, ::-1]  # CCD2 F-side
         n01 = arrnd[0, 1, :, :][::-1, :]  # CCD2 E-side
         n10 = arrnd[1, 0, :, :]  # CCD4 F-side
         n11 = arrnd[1, 1, :, :][:, ::-1]  # CCD4 E-side
+
     else:
         return
 
-    n0 = np.concatenate((n01, n00), axis=1)  # CCD2
-    n1 = np.concatenate((n10, n11), axis=1)  # CCD4
+    # in case multiple frames are in the FT/UV CE
+    if n00.ndim == 3:
+        ax = 1
+    else:
+        ax = 0
 
-    return np.concatenate((n1, n0), axis=0)
+    n0 = np.concatenate((n01, n00), axis=1 + ax)  # CCD2
+    n1 = np.concatenate((n10, n11), axis=1 + ax)  # CCD4
+
+    return np.concatenate((n1, n0), axis=0 + ax)
 
 
 def _mk_hdl(dmode, dhead):
@@ -241,6 +308,8 @@ def _mk_hdl(dmode, dhead):
     phdu.header['INSTRUME'] = 'SXI'
     phdu.header['DATAMODE'] = dmode
     phdu.header['OBS_ID'] = dhead.items.obsid
+    phdu.header['PRODTYP'] = 'single CE'
+    phdu.header['SDPGRPN'] = (dhead.items.sdp_group_members, 'number of SDP group members')
 
     phdu.header['SOFTVER'] = dhead.items.version_number
     phdu.header['BUILD'] = dhead.items.build_number
@@ -444,7 +513,7 @@ class CeHeader(ctypes.Union):
     def __str__(self):
         return '\n'.join(['{}: {}'.format(n, getattr(self.items, n)) for n, _ in self.items._fields_])
 
-    def show(self):
+    def info(self):
         print(self.__str__())
 
 
@@ -480,6 +549,11 @@ class CompressionEntity:
 
 
 if __name__ == "__main__":
+
+    # cefile="/home/marko/space/smile/betatest/eqm_flatsat/newsci/LDT_207_0207139797_026819.ce"
+    # convert_ce(cefile, fitsfile=None)
+    #
+    # sys.exit()
 
     if len(sys.argv) > 2:
         cefile, fitsfile = sys.argv[1:3]
