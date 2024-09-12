@@ -151,6 +151,16 @@ In case of text-calibrated parameters it is necessary to set `mk_array=False` to
 
 `cfl.get_param_values(param='HB_MASW_MODE', hk='TM_HB_REP', pool_name='LIVE', last=4, mk_array=False)`
 
+
+## Parameter Monitoring
+A Monitoring Module is available which can be started from the Editor Terminal: `acfl.start_monitor('LIVE', parameter_set='states')`. Alternatively, it can also be started from a terminal: `python monitor.py <POOLNAME> <PARAMSET>`.
+
+The parameter sets are stored in the `Ccs/ccs_main_config,cfg` under the [ccs-monitor_parameter_sets] section.
+If you want to delete a set, you have to remove the corresponding entry in that file, there is no GUI interface for this yet.
+
+On the left-hand side of the monitor display you have counters that monitor the number of event reports received in the pool (LOW, MID, HIGH). The reset button sets the colour of these counters to black such that a change in counts can again be highlighted by switching to red.
+
+
 ## Troubleshooting
 
 ### Add Additional Logs to CCS Log Window
