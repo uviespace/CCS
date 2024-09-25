@@ -179,8 +179,8 @@ class HkPkt:
 
 # Science interface
 
-FRAME_SIZE_X = 512
-FRAME_SIZE_Y = 512
+NPIX_LD = 512
+NPIX_FD = 64
 
 EVT_PKT_ELEMENT_LEN = 6  # length of event packet element (timestamp, header, pixel, footer) in bytes
 STRUCT_EVT_PIX = {  # name, bitsize, bitoffset (LSB)
@@ -368,10 +368,11 @@ class EventFrame:
     FP frame containing event data
     """
 
-    def __init__(self, raw, process=True, notime=False):
+    def __init__(self, raw, framesize=NPIX_LD, process=True, notime=False):
         self._raw = raw
         self._len = len(raw)
         self.evt_list_proc = None
+        self.framesize = framesize
 
         if notime:
             hoff = 1
@@ -414,10 +415,10 @@ class EventFrame:
 
         # initialise empty array
         if nans:
-            arr = np.zeros((FRAME_SIZE_Y, FRAME_SIZE_X))
-            arr[:] = np.NAN
+            arr = np.zeros((self.framesize, self.framesize))
+            arr[:] = np.nan
         else:
-            arr = np.zeros((FRAME_SIZE_Y, FRAME_SIZE_X), dtype=np.uint16)
+            arr = np.zeros((self.framesize, self.framesize), dtype=np.uint16)
 
         for p in self.evt_list_proc:
             arr[p.line_n, p.pixel_n] = p.energy
@@ -476,6 +477,8 @@ class FpmPktParser:
         self.echobytes = echobytes
         self.defaultbytes = defaultbytes
 
+        self.nbytes_tot = 0
+
         self.lastpkt = None
 
     def __call__(self, sock):
@@ -512,6 +515,7 @@ class FpmPktParser:
         msg += self.read_socket(sock, mlen, strict=strict)
 
         self.lastpkt = msg
+        self.nbytes_tot += len(msg)
 
         return msg
 
@@ -544,7 +548,8 @@ class FpmProcessor:
     Processes FPM packets and assembles event frames.
     """
 
-    def __init__(self, ashex=True, process=True, notime=False, tofile=None, queue_to=10):
+    def __init__(self, framesize=NPIX_LD, ashex=True, process=True, notime=False, tofile=None, queue_to=10):
+        self.framesize = framesize
         self.ashex = ashex
         self.process = process
         self.notime = notime
@@ -579,9 +584,9 @@ class FpmProcessor:
 
             # process non-SCI data
             if pkt[0] != IfAddr.SCI:
-                return pkt.hex(sep=' ') if self.ashex else pkt
+                return [pkt.hex(sep=' ')] if self.ashex else [pkt]
 
-            # process data from SCI itnerface
+            # process data from SCI interface
             nevts = (len(pkt) - 1) // EVT_PKT_ELEMENT_LEN
             buf = io.BytesIO(pkt[1:])
             for i in range(nevts):
@@ -603,15 +608,15 @@ class FpmProcessor:
         else:
 
             if self.curfrm != -1:
-                self.frames.append(self.mk_evt_frame(verbose=verbose))
+                self.frames.append(self.mk_evt_frame(framesize=self.framesize, verbose=verbose))
 
             self.cfdata = ed
             self.framecnt += 1
             self.curfrm = ed[0]
 
-    def mk_evt_frame(self, verbose=False):
+    def mk_evt_frame(self, framesize=NPIX_LD, verbose=False):
         try:
-            frame = EventFrame(self.cfdata)
+            frame = EventFrame(self.cfdata, framesize=framesize)
             if verbose:
                 print(frame)
         except Exception as err:
@@ -623,7 +628,7 @@ class FpmProcessor:
     def close_file(self):
         self.tofile.close()
 
-    def proc_file(self, fname, npkts_sci=16, binary=False):
+    def proc_file(self, fname, npkts_sci=16, binary=False, verbose=True):
 
         assert os.path.isfile(fname)
 
@@ -643,7 +648,7 @@ class FpmProcessor:
                 print((pt + msg).hex(sep=' '))
             elif pt[0] == IfAddr.SCI:
                 for i in range(npkts_sci):
-                    self.proc(buf, verbose=True)
+                    self.proc(buf, verbose=verbose)
             else:
                 print('ERROR', pt, buf.tell())
 
@@ -655,6 +660,16 @@ class FpmProcessor:
         self.framecnt = 0
 
         self.frames.clear()
+
+
+class FrameList(list):
+
+    def get_frame_ids(self):
+        return [x.frameid for x in self if isinstance(x, EventFrame)]
+
+
+def get_frame_ids(framelist):
+    return [x.frameid for x in framelist if isinstance(x, EventFrame)]
 
 
 def filter_frames(objlist, empty_frames=True):
