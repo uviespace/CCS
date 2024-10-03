@@ -67,7 +67,7 @@
     },
     "ccf": {
       "columns": {
-        "CCF_CNAME": " VARCHAR(8) NOT NULL ",
+        "CCF_CNAME": " VARCHAR(12) NOT NULL ",
         "CCF_DESCR": " VARCHAR(24) NOT NULL ",
         "CCF_DESCR2": " VARCHAR(64) NULL DEFAULT NULL ",
         "CCF_CTYPE": " VARCHAR(8) NULL DEFAULT NULL ",
@@ -114,7 +114,7 @@
     },
     "cdf": {
       "columns": {
-        "CDF_CNAME": " VARCHAR(8) NOT NULL ",
+        "CDF_CNAME": " VARCHAR(12) NOT NULL ",
         "CDF_ELTYPE": " CHAR(1) NOT NULL ",
         "CDF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
         "CDF_ELLEN": " INT(4) NOT NULL ",
@@ -277,7 +277,7 @@
     },
     "pcf": {
       "columns": {
-        "PCF_NAME": " VARCHAR(8) NOT NULL ",
+        "PCF_NAME": " VARCHAR(12) NOT NULL ",
         "PCF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
         "PCF_PID": " INT(10) NULL DEFAULT NULL ",
         "PCF_UNIT": " VARCHAR(4) NULL DEFAULT NULL ",
@@ -285,7 +285,7 @@
         "PCF_PFC": " INT(5) NOT NULL ",
         "PCF_WIDTH": " SMALLINT(6) NULL DEFAULT NULL ",
         "PCF_VALID": " VARCHAR(8) NULL DEFAULT NULL ",
-        "PCF_RELATED": " VARCHAR(8) NULL DEFAULT NULL ",
+        "PCF_RELATED": " VARCHAR(12) NULL DEFAULT NULL ",
         "PCF_CATEG": " CHAR(1) NOT NULL ",
         "PCF_NATUR": " CHAR(1) NOT NULL ",
         "PCF_CURTX": " VARCHAR(10) NULL DEFAULT NULL ",
@@ -309,7 +309,7 @@
     },
     "cur": {
       "columns": {
-        "CUR_PNAME": " VARCHAR(8) NOT NULL ",
+        "CUR_PNAME": " VARCHAR(12) NOT NULL ",
         "CUR_POS": " INT(2) NOT NULL ",
         "CUR_RLCHK": " VARCHAR(8) NOT NULL ",
         "CUR_VALPAR": " INT(5) NOT NULL ",
@@ -364,7 +364,7 @@
     },
     "cvp": {
       "columns": {
-        "CVP_TASK": " VARCHAR(8) NOT NULL ",
+        "CVP_TASK": " VARCHAR(12) NOT NULL ",
         "CVP_TYPE": " CHAR(1) NOT NULL DEFAULT 'C' ",
         "CVP_CVSID": " INT(5) NOT NULL "
       },
@@ -561,7 +561,7 @@
     },
     "ocf": {
       "columns": {
-        "OCF_NAME": " VARCHAR(8) NOT NULL ",
+        "OCF_NAME": " VARCHAR(12) NOT NULL ",
         "OCF_NBCHCK": " INT(2) NOT NULL ",
         "OCF_NBOOL": " INT(2) NOT NULL ",
         "OCF_INTER": " CHAR(1) NOT NULL ",
@@ -580,7 +580,7 @@
     },
     "ocp": {
       "columns": {
-        "OCP_NAME": " VARCHAR(8) NOT NULL ",
+        "OCP_NAME": " VARCHAR(12) NOT NULL ",
         "OCP_POS": " INT(2) NOT NULL ",
         "OCP_TYPE": " CHAR(1) NOT NULL ",
         "OCP_LVALU": " VARCHAR(14) NULL DEFAULT NULL ",
@@ -741,7 +741,7 @@
     },
     "plf": {
       "columns": {
-        "PLF_NAME": " VARCHAR(8) NOT NULL ",
+        "PLF_NAME": " VARCHAR(12) NOT NULL ",
         "PLF_SPID": " INT(10) NOT NULL ",
         "PLF_OFFBY": " INT(5) NOT NULL ",
         "PLF_OFFBI": " INT(1) NOT NULL ",
@@ -857,7 +857,7 @@
     },
     "ptv": {
       "columns": {
-        "PTV_CNAME": " VARCHAR(8) NOT NULL ",
+        "PTV_CNAME": " VARCHAR(12) NOT NULL ",
         "PTV_PARNAM": " VARCHAR(8) NOT NULL ",
         "PTV_INTER": " CHAR(1) NULL DEFAULT 'R' ",
         "PTV_VAL": " VARCHAR(17) NOT NULL "
@@ -1007,7 +1007,7 @@
       "columns": {
         "VPD_TPSD": " INT(10) NOT NULL ",
         "VPD_POS": " INT(4) NOT NULL ",
-        "VPD_NAME": " VARCHAR(8) NOT NULL ",
+        "VPD_NAME": " VARCHAR(12) NOT NULL ",
         "VPD_GRPSIZE": " INT(3) NULL DEFAULT '0' ",
         "VPD_FIXREP": " INT(3) NULL DEFAULT '0' ",
         "VPD_CHOICE": " CHAR(1) NULL DEFAULT 'N' ",
