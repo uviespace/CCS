@@ -11,9 +11,11 @@ import sys
 
 from astropy.io import fits
 import numpy as np
+from numpy.lib import recfunctions as rf
 
 from hk_processing import proc_hk
 from packetstruct import ST_OFF, SST_OFF
+from smile_raw_ce_converter import convert_ce, ED_BIN_DTYPE, STRUCT_CE_HEADER
 
 import crcmod
 
@@ -23,7 +25,7 @@ puscrc = crcmod.predefined.mkPredefinedCrcFun('crc-ccitt-false')
 
 DP_OFFSET = 345544320
 
-PROC_ST = [1, 3, 5, 20]  # PUS service types to be processed for ENG product
+PROC_ST = [1, 3, 5, 17, 20, 197]  # PUS service types to be processed for ENG product
 
 SDUID = 1
 
@@ -45,7 +47,8 @@ seqcnt = None
 
 trashcnt = 0
 
-CE_EXEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smile_raw_ce_converter.py")
+# CE_EXEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "smile_raw_ce_converter.py")
+CE_EXEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_decompress.sh")
 
 PRODUCT_IDS = {0: 'SXI-SCI-ED',
                2: 'SXI-SCI-FT',
@@ -60,12 +63,12 @@ UNKNOWN_PROD = 'UNKNOWN'
 
 MODES = tuple(PRODUCT_IDS.values())
 
-FT_NODES = ('FT_CCD_NODE_0', 'FT_CCD_NODE_1', 'FT_CCD_NODE_2', 'FT_CCD_NODE_3')
-UV_NODES = ('UV_CCD_NODE_0', 'UV_CCD_NODE_1', 'UV_CCD_NODE_2', 'UV_CCD_NODE_3')
+FT_NODES = ['FT_NODE_0']#, 'FT_NODE_1', 'FT_NODE_2', 'FT_NODE_3']
+UV_NODES = ['UV_NODE_0']#, 'UV_NODE_1', 'UV_NODE_2', 'UV_NODE_3']
 
-ED_BIN_DTYPE = np.dtype(
-    [('TIME', '>f8'), ('CCDFRAME', '>u4'), ('CCDNR', 'u1'), ('RAWX', '>u2'), ('RAWY', '>u2'), ('AMP', 'u1'),
-     ('PHAS', '>u2', (25,))])
+# ED_BIN_DTYPE = np.dtype(
+#     [('TIME', '>f8'), ('CCDFRAME', '>u4'), ('CCDNR', 'u1'), ('RAWX', '>u2'), ('RAWY', '>u2'), ('AMP', 'u1'),
+#      ('PHAS', '>u2', (25,))])
 
 FMT_LUT = {'UINT8': '>u1',
            'B': '>u1',
@@ -90,7 +93,9 @@ FMT_LUT = {'UINT8': '>u1',
            'f': '>f8',
            'd': '>f8',
            'CUC918': '>f8',
-           'S10': '|S10'}
+           'I24': '>S3',
+           'S8': '>S8',
+           'S10': '>S10'}
 
 GROUP_TABLE_STRUCT = [('groupIdx', 'UINT16'),
                       ('timetag', 'FLOAT'),
@@ -98,8 +103,8 @@ GROUP_TABLE_STRUCT = [('groupIdx', 'UINT16'),
                       ('ceCounter', 'UINT16'),
                       ('sdpGroupMembers', 'UINT32'),
                       ('ceSize', 'UINT32'),
-                      ('ceKey', 'S10'),
-                      ('product', 'S10'),
+                      ('ceKey', 'S8'),
+                      ('product', 'UINT8'),
                       ('ceIntegrity', 'UINT8'),
                       ('groupMetaSize', 'UINT32'),
                       ('frameMetaSize', 'UINT32'),
@@ -343,6 +348,35 @@ def fmt_func_signed_int16(uint_arr):
     return uint_arr.astype(np.uint16).view(np.int16)
 
 
+def remove_duplicates(infile, outfile=None):
+
+    if outfile is None:
+        outfile = infile + '_CLEAN.bin'
+
+    unique = []
+
+    with open(infile, 'rb') as fd:
+
+        while True:
+            pkt = extract_pus_crc(fd)
+            if pkt is None:
+                break
+
+            unique.append(pkt)
+
+        diff = len(unique)
+        clean = set()
+        unique = [pkt for pkt in unique if pkt not in clean and clean.add(pkt) is None]
+        diff -= len(unique)
+
+        if diff > 0:
+            print('{} duplicate S13 packets found.'.format(diff))
+
+    with open(outfile, 'wb') as fd:
+        fd.write(b''.join(unique))
+        print('Clean file written to {}'.format(outfile))
+
+
 def read_pus(data):
     """
     Read single PUS packet from buffer
@@ -442,7 +476,7 @@ def extract_ce_data(pkt, check_seq=CHECK_SEQ):
     return pkt[SDU_DATA_OFF:SDU_DATA_OFF + datalen]
 
 
-def parse_pkts(fd):
+def parse_pkts(fd, no_hk=False, sduid=1):
     global seqcnt
 
     ces = {}
@@ -452,6 +486,11 @@ def parse_pkts(fd):
     txtime = None
     ce_id = None
     txpkts = None
+
+    if no_hk:
+        hk_to_proc = []
+    else:
+        hk_to_proc = PROC_ST
 
     while True:
         pkt = extract_pus_crc(fd)
@@ -463,7 +502,7 @@ def parse_pkts(fd):
             continue
 
         # handle ENG telemetry
-        elif pkt[ST_OFF] in PROC_ST:
+        elif pkt[ST_OFF] in hk_to_proc:
             pktkey, descr, procpkt, timestamp, decoded = proc_hk(pkt)
 
             if pktkey is None:
@@ -495,7 +534,7 @@ def parse_pkts(fd):
 
                 hks[key] = {'descr': descr, 'tpsd': tpsd, 'params': params, 'values': [values], 'decoded': decoded}
 
-        elif pkt[ST_OFF] == 13 and pkt[SDUID_OFF] == SDUID:  # TODO: replace with SDUID
+        elif pkt[ST_OFF] == 13 and pkt[SDUID_OFF] == sduid:
 
             if pkt[SST_OFF] == 1:
                 if not tx:
@@ -575,6 +614,13 @@ def extract(infile, outdir):
             good_ces, bad_ces, hks = parse_pkts(fd)
             if trashcnt != 0:
                 logging.warning('skipped {} bytes because of wrong CRCs'.format(trashcnt))
+
+            # rewind to parse and add FFs with SDUID=2
+            fd.seek(0)
+            good_ffs, bad_ffs, _ = parse_pkts(fd, no_hk=True, sduid=2)
+            good_ces.update(good_ffs)
+            bad_ces.update(bad_ffs)
+
         except Exception as err:
             logging.exception(err)
             good_ces, bad_ces, hks = [], [], []
@@ -603,7 +649,7 @@ def decompress(cefile, outdir):
     cefile = os.path.join(outdir, cefile)
 
     logging.info("Decompressing {}".format(cefile))
-    fitsfile = os.path.basename(cefile)[:-2] + 'fits'
+    fitsfile = os.path.basename(cefile)[:-2] + 'de'
     fitspath = os.path.join(outdir, fitsfile)
 
     proc = subprocess.run([CE_EXEC, cefile, fitspath], capture_output=True)
@@ -633,8 +679,9 @@ def mk_hk_prod(hks, infile, outdir):
             hdl.append(hdu)
         except Exception as err:
             logging.error(err)
+            logging.error(str(key))
 
-    fname = os.path.join(outdir, os.path.basename(infile) + '_ENG.fits')
+    fname = mk_outfile_name(outdir, os.path.basename(infile), '_ENG.fits')
     hdl.writeto(fname, overwrite=True)
 
     return fname
@@ -685,15 +732,15 @@ def mk_hk_table(data):
     return tab
 
 
-def merge_fits(sorted_files, infile):
+def merge_to_fits(sorted, infile, outdir):
     # ED
-    ed_merged = merge_ed(sorted_files['SXI-SCI-ED'], infile)
+    ed_merged = merge_ed(sorted['SXI-SCI-ED'], infile, outdir)
 
     # FT
-    ft_merged = merge_ft(sorted_files['SXI-SCI-FT'], infile)
+    ft_merged = merge_ft(sorted['SXI-SCI-FT'], infile, outdir)
 
     # FF
-    ff_merged = merge_ff(sorted_files['SXI-SCI-FF'], infile)
+    ff_merged = merge_ff(sorted['SXI-SCI-FF'], infile, outdir)
 
     # ST
     # st_merged = merge_st(sorted_files['SXI-SCI-ST'], infile)
@@ -702,13 +749,93 @@ def merge_fits(sorted_files, infile):
     # pt_merged = merge_pt(sorted_files['SXI-SCI-PT'], infile)
 
     # UV
-    uv_merged = merge_uv(sorted_files['SXI-SCI-UV'], infile)
+    uv_merged = merge_uv(sorted['SXI-SCI-UV'], infile, outdir)
 
     return ed_merged, ft_merged, ff_merged, None, None, uv_merged
     # return ed_merged, ft_merged, ff_merged, st_merged, pt_merged, uv_merged
 
 
-def merge_ed(files, infile):
+def merge_meta(mode, groups):
+    hdul = mk_hdl(mode)
+
+    data_list = []
+    meta_group = []
+    meta_frame = []
+
+    group_idx = []
+
+    for i, grp in enumerate(groups, 1):
+        head, data, metag, metaf = grp
+
+        data_list.append(data)
+
+        meta_frame.append(metaf)
+        group_idx.append(np.repeat(i, metaf.size))
+
+        g = (i, head.items.timestamp, head.items.obsid, head.items.ce_counter, head.items.sdp_group_members, head.items.ce_size,
+             '{:08X}'.format(head.items.ce_key), head.items.product, head.items.ce_integrity, head.items.group_meta_size,
+             head.items.frame_meta_size, head.items.compressed_meta_size, head.items.data_size, head.items.compressed_data_size, *metag[0])
+
+        meta_group.append(g)
+
+    meta_frame = rf.append_fields(np.concatenate(meta_frame), 'groupIdx', np.array(group_idx).flatten(), dtypes='>u2', usemask=False)
+    meta_group = np.array(meta_group, dtype=[(p[0], FMT_LUT.get(p[1])) for p in GROUP_TABLE_STRUCT])
+
+    p_head = hdul[0].header
+    p_head['SOFTVER'] = head.items.version_number
+    p_head['BUILD'] = head.items.build_number
+    p_head['SDPVER'] = head.items.sdp_version
+    p_head['CREATOR'] = "SXITLM2FITS"
+    p_head['TLM2FITS'] = "0.1"
+    p_head['DATE'] = datetime.datetime.isoformat(datetime.datetime.now(datetime.UTC))
+
+    group_table = fits.BinTableHDU(data=meta_group, name='GROUP_HK')
+    frame_table = fits.BinTableHDU(data=meta_frame, name='FRAME_HK')
+
+    # comment header items
+    gcom = group_table.header.comments
+
+    # checksums
+    group_table.add_checksum()
+    frame_table.add_checksum()
+
+    hdul.append(group_table)
+    hdul.append(frame_table)
+
+    return hdul, data_list
+
+
+def merge_ed(groups, infile, outdir):
+
+    if len(groups) == 0:
+        return
+
+    hdul, data = merge_meta('ED', groups)
+
+    ed_data, wp_data = list(zip(*data))
+    ed_data = np.concatenate(ed_data)
+    wp_data = np.concatenate(wp_data)
+
+    ed_table = fits.BinTableHDU(data=ed_data, name='EVENTS')
+    ed_table.add_checksum()
+    hdul.append(ed_table)
+
+    wp_table = fits.BinTableHDU(data=wp_data, name='WANDERING_PIXEL')
+    wp_table.add_checksum()
+    hdul.append(wp_table)
+
+    fname = mk_outfile_name(outdir, infile, '_ED.fits')
+
+    try:
+        hdul.writeto(fname, overwrite=True)
+    except Exception as err:
+        logging.exception(err)
+        return
+
+    return fname
+
+
+def merge_ed2(files, infile):
     if len(files) == 0:
         return
 
@@ -762,7 +889,7 @@ def merge_ed(files, infile):
     hdul.append(frame_table)
     hdul.append(ed_table)
 
-    fname = infile + '_ED.fits'
+    fname = mk_outfile_name(outdir, infile, '_ED.fits')
 
     try:
         hdul.writeto(fname, overwrite=True)
@@ -816,35 +943,22 @@ def format_ed_fits(fname, gidx):
     return group_new, frames_new, ed_new
 
 
-def merge_ft(files, infile):
-    if len(files) == 0:
+def merge_ft(groups, infile, outdir):
+
+    if len(groups) == 0:
         return
 
-    hdul = mk_hdl('FT')
+    hdul, data = merge_meta('FT', groups)
 
-    group_idx = 1  # to associate frames to a group
-    group_data = []
-    frame_data = []
-    ft_data = []
+    data = np.concatenate(data)
 
-    meta = None
-    for file in files:
-        try:
-            ff = format_ft_fits(file, group_idx)
-            group_data.append(ff[0])
-            frame_data += ff[1]
-            ft_data.append(ff[2])
+    for i, node in enumerate(FT_NODES):
+        ndata = data[:, i, :, :]
+        dhdu = fits.ImageHDU(data=ndata, name=node)
+        dhdu.add_checksum()
+        hdul.append(dhdu)
 
-            if meta is None:
-                metaf = fits.open(file)
-                metah = metaf[0]
-                metah.verify('fix')
-                meta = metah.header
-        except Exception as err:
-            logging.error(err)
-        group_idx += 1
-
-    fname = infile + '_FT.fits'
+    fname = mk_outfile_name(outdir, infile, '_FT.fits')
 
     try:
         hdul.writeto(fname, overwrite=True)
@@ -874,35 +988,21 @@ def format_ft_fits(fname, gidx):
     return group_new, frames_new, nodes
 
 
-def merge_ff(files, infile):
-    if len(files) == 0:
+def merge_ff(groups, infile, outdir):
+
+    if len(groups) == 0:
         return
 
-    hdul = mk_hdl('FF')
+    hdul, data = merge_meta('FF', groups)
 
-    group_idx = 1  # to associate frames to a group
-    group_data = []
-    frame_data = []
-    ff_data = []
+    ffdata = np.stack(data)
 
-    meta = None
-    for file in files:
-        try:
-            ff = format_ft_fits(file, group_idx)
-            group_data.append(ff[0])
-            frame_data += ff[1]
-            ff_data += ff[2]
+    dhdu = fits.ImageHDU(data=ffdata, name='FULLFRAME')
+    dhdu.add_checksum()
+    hdul.append(dhdu)
 
-            if meta is None:
-                metaf = fits.open(file)
-                metah = metaf[0]
-                metah.verify('fix')
-                meta = metah.header
-        except Exception as err:
-            logging.error(err)
-        group_idx += 1
-
-    fname = infile + '_FF.fits'
+    # fname = infile + '_FF.fits'
+    fname = mk_outfile_name(outdir, infile, '_FF.fits')
 
     try:
         hdul.writeto(fname, overwrite=True)
@@ -927,7 +1027,7 @@ def format_ff_fits(fname, gidx):
     return group_new, frames_new, fullframe.data
 
 
-def merge_st(files, infile):
+def merge_st(files, infile, outdir):
     fname = None
 
     return fname
@@ -945,7 +1045,7 @@ def merge_st(files, infile):
     return fname
 
 
-def merge_pt(files, infile):
+def merge_pt(files, infile, outdir):
     fname = None
 
     return fname
@@ -963,35 +1063,21 @@ def merge_pt(files, infile):
     return fname
 
 
-def merge_uv(files, infile):
-    if len(files) == 0:
+def merge_uv(groups, infile, outdir):
+
+    if len(groups) == 0:
         return
 
-    hdul = mk_hdl('UV')
+    hdul, data = merge_meta('UV', groups)
 
-    group_idx = 1  # to associate frames to a group
-    group_data = []
-    frame_data = []
-    uv_data = []
+    data = np.concatenate(data)
 
-    meta = None
-    for file in files:
-        try:
-            ff = format_uv_fits(file, group_idx)
-            group_data.append(ff[0])
-            frame_data += ff[1]
-            uv_data += ff[2]
+    for i, node in enumerate(UV_NODES):
+        dhdu = fits.ImageHDU(data=data[:, i, :, :], name=node)
+        dhdu.add_checksum()
+        hdul.append(dhdu)
 
-            if meta is None:
-                metaf = fits.open(file)
-                metah = metaf[0]
-                metah.verify('fix')
-                meta = metah.header
-        except Exception as err:
-            logging.error(err)
-        group_idx += 1
-
-    fname = infile + '_UV.fits'
+    fname = mk_outfile_name(outdir, infile, '_UV.fits')
 
     try:
         hdul.writeto(fname, overwrite=True)
@@ -1021,6 +1107,9 @@ def format_uv_fits(fname, gidx):
     return group_new, frames_new, nodes
 
 
+def mk_outfile_name(outdir, filepath, suffix):
+    return os.path.join(outdir, os.path.basename(filepath)) + suffix
+
 # def get_dp_desc(dpid):
 #     try:
 #         return data_pool[dpid + DP_OFFSET][0]
@@ -1043,20 +1132,15 @@ def calc_frame_time(rarr, reftime):
     return {i: t for i, t in zip(fcnt, ct + (ft << 8) / 1e6)}
 
 
-def sort_by_mode(sorted_modes, file):
-    fn = os.path.basename(file)
-
-    recognised = False
-    for mode in MODES:
-        if fn.count(mode):
-            sorted_modes[mode].append(file)
-            recognised = True
-            break
-
-    if not recognised:
-        logging.error('Unidentified mode for file {}'.format(file))
-
-    return sorted_modes
+# def sort_by_mode(sorted_modes, scimode, cehead, arrays):
+#
+#     if scimode in MODES:
+#         sorted_modes[scimode].append([cehead, *arrays])
+#
+#     else:
+#         logging.error('Unidentified mode {}'.format(scimode))
+#
+#     return sorted_modes
 
 
 def mk_hdl(dmode):
@@ -1075,7 +1159,8 @@ def mk_hdl(dmode):
 def process_file(infile, outdir):
     ces, hks = extract(infile, outdir)
 
-    decompressed = {mode: [] for mode in MODES}
+    decompressed = {PRODUCT_IDS[k]: [] for k in PRODUCT_IDS}
+
     for ce in ces:
         try:
 
@@ -1083,15 +1168,22 @@ def process_file(infile, outdir):
                 logging.exception('Skipped decompression of {}'.format(ce))
                 continue
 
-            fitspath = decompress(ce, outdir)
-            if os.path.isfile(fitspath):
-                decompressed = sort_by_mode(decompressed, fitspath)
+            depath = decompress(ce, outdir)
+            if os.path.isfile(depath):
+                cehead, arrays = convert_ce(depath)
+                scimode = cehead.items.product
+                # decompressed = sort_by_mode(decompressed, scimode, cehead, arrays)
+                if scimode in SCI_PRODUCTS:
+                    decompressed[PRODUCT_IDS[scimode]].append([cehead, *arrays])
+                else:
+                    logging.error('Unidentified mode {}'.format(scimode))
 
         except Exception as err:
             logging.error('Decompression failed for {}'.format(ce))
             logging.exception(err)
 
-    # merged = merge_fits(decompressed, infile)
+    merged = merge_to_fits(decompressed, infile, outdir)
+    print('\n'.join([x for x in merged if x is not None]))
 
     # put HK in FITS
     try:
@@ -1102,7 +1194,7 @@ def process_file(infile, outdir):
 
     print(hkfile)
 
-    # return *merged, hkfile
+    return *merged, hkfile
 
 
 # def load_dp():

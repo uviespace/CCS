@@ -39,11 +39,13 @@ class PktStructs:
         params = []
 
         if tpsd == -1:
-            for plf in self.pus_tabs.plf[spid]:
-                name, offby, offbi = plf
-                descr, ptc, pfc, _ = self.pus_tabs.pcf[name]
-                fmts.append(ptt(ptc, pfc))
-                params.append((name, descr, offby, offbi, ptc, pfc))
+            # only try if there are any parameters defined
+            if spid in self.pus_tabs.plf:
+                for plf in self.pus_tabs.plf[spid]:
+                    name, offby, offbi = plf
+                    descr, ptc, pfc, _ = self.pus_tabs.pcf[name]
+                    fmts.append(ptt(ptc, pfc))
+                    params.append((name, descr, offby, offbi, ptc, pfc))
         else:
             for vpd in self.pus_tabs.vpd[spid]:
                 pos, name, grp, fixrep = vpd
