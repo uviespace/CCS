@@ -364,17 +364,50 @@ def remove_duplicates(infile, outfile=None):
 
             unique.append(pkt)
 
-        diff = len(unique)
-        clean = set()
-        unique = [pkt for pkt in unique if pkt not in clean and clean.add(pkt) is None]
-        diff -= len(unique)
+    diff = len(unique)
+    clean = set()
+    unique = [pkt for pkt in unique if pkt not in clean and clean.add(pkt) is None]
+    diff -= len(unique)
 
-        if diff > 0:
-            print('{} duplicate S13 packets found.'.format(diff))
+    if diff > 0:
+        print('{} duplicate S13 packets found.'.format(diff))
 
     with open(outfile, 'wb') as fd:
         fd.write(b''.join(unique))
         print('Clean file written to {}'.format(outfile))
+
+
+def merge_raw_pus_data(flist, outfile, sort=True, rm_duplicates=False):
+
+    acc = []
+    for fn in flist:
+        unique = []
+        with open(fn, 'rb') as fd:
+
+                while True:
+                    pkt = extract_pus_crc(fd)
+                    if pkt is None:
+                        break
+                    unique.append(pkt)
+
+        if rm_duplicates:
+            diff = len(unique)
+            clean = set()
+            unique = [pkt for pkt in unique if pkt not in clean and clean.add(pkt) is None]
+            diff -= len(unique)
+
+            if diff > 0:
+                print('{} duplicate S13 packets found ({}).'.format(diff, fn))
+
+        acc += unique
+
+    if sort:
+        acc.sort(key=get_pkt_time)
+
+    with open(outfile, 'wb') as fd:
+        fd.write(b''.join(acc))
+
+    print('Merged data written to {}.'.format(outfile))
 
 
 def read_pus(data):
@@ -778,7 +811,9 @@ def merge_meta(mode, groups):
 
         meta_group.append(g)
 
-    meta_frame = rf.append_fields(np.concatenate(meta_frame), 'groupIdx', np.array(group_idx).flatten(), dtypes='>u2', usemask=False)
+    meta_frame = np.concatenate(meta_frame)
+    frametimes = meta_frame['sdpProductStarttimeCrs'] + meta_frame['sdpProductStarttimeFine'] / 1e6
+    meta_frame = rf.append_fields(meta_frame, ('TIME', 'groupIdx'), (frametimes, np.array(group_idx).flatten()), dtypes=('>f8', '>u2'), usemask=False)
     meta_group = np.array(meta_group, dtype=[(p[0], FMT_LUT.get(p[1])) for p in GROUP_TABLE_STRUCT])
 
     p_head = hdul[0].header
@@ -1226,12 +1261,16 @@ if __name__ == '__main__':
     # process_file('/home/marko/ucloud/madrid/2024/X_BAND_SCOE/SXI_TMTC_RRC1_PS_X_20240729_merged.bin', '/home/marko/ucloud/madrid/2024/X_BAND_SCOE')
     # sys.exit()
 
-    infile = sys.argv[1]
+    if len(sys.argv) < 2:
+        print('Usage: ./{} <INFILE> [<OUTDIR>]'.format(os.path.basename(__file__)))
+        sys.exit()
 
-    if len(sys.argv) >= 3:
-        outdir = sys.argv[2]
-    else:
+    elif len(sys.argv) == 2:
+        infile = sys.argv[1]
         outdir = os.path.dirname(infile)
+
+    else:
+        infile, outdir = sys.argv[1:3]
 
     setup_logging(outdir)
     process_file(infile, outdir)
