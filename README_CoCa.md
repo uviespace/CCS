@@ -153,7 +153,7 @@ In case of text-calibrated parameters it is necessary to set `mk_array=False` to
 
 
 ## Parameter Monitoring
-A Monitoring Module is available which can be started from the Editor Terminal: `acfl.start_monitor('LIVE', parameter_set='states')`. Alternatively, it can also be started from a terminal: `python monitor.py <POOLNAME> <PARAMSET>`.
+A Monitoring Module is available which can be started from the Editor Terminal: `cfl.start_monitor('LIVE', parameter_set='states')`. Alternatively, it can also be started from a terminal: `python ./Ccs/monitor.py <POOLNAME> [<PARAMETER_SET>].
 
 The parameter sets are stored in the `Ccs/ccs_main_config,cfg` under the [ccs-monitor_parameter_sets] section.
 If you want to delete a set, you have to remove the corresponding entry in that file, there is no GUI interface for this yet.
