@@ -74,11 +74,11 @@ pc = importlib.import_module(PCPREFIX + str(project).upper())
 # project specific parameters, must be present in all packet_config_* files
 try:
     PUS_VERSION, TMHeader, TCHeader, PHeader, TM_HEADER_LEN, TC_HEADER_LEN, P_HEADER_LEN, PEC_LEN, MAX_PKT_LEN, timepack, \
-        timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc, PLM_PKT_PREFIX_TC_SEND, PLM_PKT_SUFFIX, FMT_TYPE_PARAM = \
+        timecal, calc_timestamp, CUC_OFFSET, CUC_EPOCH, crc, PLM_PKT_PREFIX_TC_SEND, PLM_PKT_SUFFIX = \
         [pc.PUS_VERSION, pc.TMHeader, pc.TCHeader, pc.PHeader,
          pc.TM_HEADER_LEN, pc.TC_HEADER_LEN, pc.P_HEADER_LEN, pc.PEC_LEN,
          pc.MAX_PKT_LEN, pc.timepack, pc.timecal, pc.calc_timestamp,
-         pc.CUC_OFFSET, pc.CUC_EPOCH, pc.puscrc, pc.PLM_PKT_PREFIX_TC_SEND, pc.PLM_PKT_SUFFIX, pc.FMT_TYPE_PARAM]
+         pc.CUC_OFFSET, pc.CUC_EPOCH, pc.puscrc, pc.PLM_PKT_PREFIX_TC_SEND, pc.PLM_PKT_SUFFIX]
 
     s13_unpack_data_header = pc.s13_unpack_data_header
     SPW_PROTOCOL_IDS_R = {pc.SPW_PROTOCOL_IDS[key]: key for key in pc.SPW_PROTOCOL_IDS}
@@ -1531,59 +1531,6 @@ def prettyhex(inbytes, separator=' '):
     return separator.join(['%02X' % x for x in inbytes])
 
 
-##
-#  Varpack
-#
-#  Decode variable-length part of TM/TC source data
-#  @param data    input data of bitstring.BitStream type
-#  @param parameters  list of parameter properties present in data
-#  @param paramid parameter counter
-#  @param outlist list of decoded source data parameter values
-#  @param parlist list of decoded source data parameter properties
-def read_varpack(data, parameters, paramid, outlist, parlist):
-    """
-
-    :param data:
-    :param parameters:
-    :param paramid:
-    :param outlist:
-    :param parlist:
-    :return:
-    """
-    while paramid < len(parameters):
-        fmt = ptt(parameters[paramid][2], parameters[paramid][3])
-        if parameters[paramid][2] == 11:  # TODO: handle deduced parameter types
-            raise NotImplementedError('Deduced parameter type PTC=11')
-            # fmt = fmt[ptype]
-            # if ptype == 7:  # ptt fmt string for bool not parsable with .read
-            #     fmt = 'uint8'
-        outdata = data.read(fmt)
-        grpsize = parameters[paramid][-2]
-        if parameters[paramid][6] == FMT_TYPE_PARAM:
-            ptype = outdata
-        outlist.append(outdata)
-        parlist.append(parameters[paramid])
-
-        if grpsize == 0:
-            paramid += 1
-        else:
-            if parlist[-1][-1] == 0:
-                repeat = outlist[-1]
-            else:
-                repeat = parlist[-1][-1]
-                data.pos -= parlist[-1][5]
-                # delete counter entry from lists
-                outlist.pop(-1)
-                parlist.pop(-1)
-
-            while repeat > 0:
-                outlist, parlist = read_varpack(data, parameters[paramid + 1:paramid + grpsize + 1], 0,
-                                                outlist, parlist)
-                repeat -= 1
-            paramid += grpsize + 1
-    return outlist, parlist
-
-
 def read_variable_pckt(tm_data, parameters, tc=False):
     """
     Read parameters from a variable length packet
@@ -2186,7 +2133,7 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
     if tmlist is None and pool_name is not None:
         tmlist = get_pool_rows(pool_name, check_existence=True)
 
-    dbcon = scoped_session_idb()
+    dbcon = scoped_session_idb
     if hk is None:
         que = 'SELECT plf.plf_name,plf.plf_spid,plf.plf_offby,plf.plf_offbi,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_unit,\
                    pcf.pcf_descr,pid.pid_apid,pid.pid_type,pid.pid_stype,pid.pid_descr,pid.pid_pi1_val from pcf\
@@ -3303,50 +3250,6 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
         raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
 
     return bytes(header.bin) + data
-
-
-##
-#  Build Packstring 11
-#
-#  Create pack string if datatypes are defined in the packet iti.e. PTC/PTF=11/0
-#  @param st      Service type
-#  @param sst     Service sub-tpye
-#  @param apid    APID of TC
-#  @param params  List of parameter properties
-#  @param varpos  Position of the parameter indicating repetition
-#  @param grpsize Parameter group size
-#  @param repfac  Number of parameter (group) repetitions
-# def build_packstr_11(st, sst, apid, params, varpos, grpsize, repfac, *args, no_check=False):
-#     """
-#
-#     :param st:
-#     :param sst:
-#     :param apid:
-#     :param params:
-#     :param varpos:
-#     :param grpsize:
-#     :param repfac:
-#     :param args:
-#     :param no_check:
-#     :return:
-#     """
-#     ptypeindex = [i[-1] == FMT_TYPE_PARAM for i in params].index(True)  # check where fmt type defining parameter is
-#     ptype = args[varpos + ptypeindex::grpsize]
-#     args2 = list(args)
-#     args2[varpos + 1:] = [tc_param_alias(param[-1], val, no_check=no_check) for param, val in
-#                           zip(params[varpos + 1:] * repfac, args[varpos + 1:])]
-#     ptc = 0
-#     varlist = []
-#     for par in params[varpos + 1:] * repfac:
-#         if par[-4] != 11:
-#             #varlist.append(ptt[par[-4]][par[-3]])
-#             varlist.append(parameter_ptt_type_tc(par))
-#         else:
-#             varlist.append(
-#                 ptt(par[-4], par[-3])[tc_param_alias(FMT_TYPE_PARAM, ptype[ptc], no_check=no_check)])
-#             #varlist.append(ptt[par[-4]][par[-3]][tc_param_alias('DPP70044', ptype[ptc], no_check=no_check)])
-#             ptc += 1
-#     return varlist, args2
 
 
 ##
