@@ -1058,6 +1058,115 @@ class RowColCorrection:
         self.ccd2_f_cols = self._col_corr[3::4]
 
 
+class EvtIds:
+
+    _evt_dict = {
+        "EVT_MEM_COR_RAM": 256,
+        "EVT_MEM_UNCOR_RAM": 257,
+        "EVT_MEM_UNCOR_MRAM": 258,
+        "EVT_MEM_LOAD_CMP": 259,
+        "EVT_PARLOAD_CMP": 260,
+        "EVT_ADC_LOGIC": 272,
+        "EVT_ADC_FAILURE": 273,
+        "EVT_ADC_NORANGES": 274,
+        "EVT_DPU_VOLT_WARN": 275,
+        "EVT_DPU_TEMP_WARN": 276,
+        "EVT_DPU_PERM_WARN": 277,
+        "EVT_DPU_VOLT_FAIL": 278,
+        "EVT_DPU_TEMP_FAIL": 279,
+        "EVT_DPU_PERM_FAIL": 280,
+        "EVT_SPW_RXTO": 288,
+        "EVT_SPW_TXTO": 289,
+        "EVT_SPW_CONTO": 290,
+        "EVT_SPW_PARITY": 291,
+        "EVT_SPW_DISCONNECT": 292,
+        "EVT_SPW_ESCAPE": 293,
+        "EVT_SPW_CREDIT": 294,
+        "EVT_SPW_RXAHB": 295,
+        "EVT_SPW_TXAHB": 296,
+        "EVT_SPW_EARLYEOP": 297,
+        "EVT_SPW_INVADDR": 298,
+        "EVT_SPW_EEP": 299,
+        "EVT_SPW_TOOBIG": 300,
+        "EVT_RSE_PARITY": 304,
+        "EVT_RSE_FRAME": 305,
+        "EVT_RSE_ERRRESP": 306,
+        "EVT_RSE_TIMEOUT": 307,
+        "EVT_RSE_MOTORHOT": 308,
+        "EVT_RSE_ELECHOT": 309,
+        "EVT_RSE_CLOSE_TO": 310,
+        "EVT_RSE_NOCOM": 311,
+        "EVT_RSE_NOPARAM": 312,
+        "EVT_PSU_CURR_WARN": 320,
+        "EVT_PSU_TEMP_WARN": 321,
+        "EVT_PSU_PERM_WARN": 322,
+        "EVT_PSU_CURR_FAIL": 323,
+        "EVT_PSU_TEMP_FAIL": 324,
+        "EVT_PSU_PERM_FAIL": 325,
+        "EVT_PSU_PSUOK_ERR": 326,
+        "EVT_PSU_RSEOK_ERR": 327,
+        "EVT_PSU_PSUOK_PERM": 328,
+        "EVT_PSU_RSEOK_PERM": 329,
+        "EVT_CMD_INV_APID": 336,
+        "EVT_FEE_TR": 768,
+        "EVT_IASW_TR": 769,
+        "EVT_SC_PR_STRT": 770,
+        "EVT_SC_PR_END": 771,
+        "EVT_INIT_SUCC": 772,
+        "EVT_SEQ_CNT_ERR": 784,
+        "EVT_SBIT_ERR": 785,
+        "EVT_FEE_DATA_ERR": 786,
+        "EVT_PCRL2_FULL": 800,
+        "EVT_INSTRM_PQF": 801,
+        "EVT_IN_ILLGR": 802,
+        "EVT_DBIT_ERR": 803,
+        "EVT_SYNC_LOSS": 804,
+        "EVT_FD_FAILED": 805,
+        "EVT_CMPR_SIZE": 806,
+        "EVT_SDP_FAIL": 807,
+        "EVT_SDP_NOMEM": 808,
+        "EVT_SDP_DATAFAIL": 809,
+        "EVT_FEE_ILL_ST": 810,
+        "EVT_INIT_FAIL": 816,
+        "EVT_THRD_OR": 817,
+        "EVT_NOTIF_ERR": 818,
+        "EVT_SPW_ERR_H": 819,
+        "EVT_RP_STARTED": 820,
+        "EVT_MEM_COR_MRAM": 261,
+        "EVT_MEM_MRAM_LCL": 262,
+        "EVT_ADC_OUT_OF_RANGE": 281,
+        "EVT_HCTRL_NOPARAM": 811,
+        "EVT_FEE_TEMP_WARN": 821,
+        "EVT_CCD_TEMP_WARN": 822,
+        "EVT_FEE_TEMP_FAIL": 823,
+        "EVT_CCD_TEMP_FAIL": 824,
+        "EVT_FEE_NOT_ALIVE": 826,
+        "EVT_FEE_ANOMALY": 827,
+        "EVT_FEE_ANO_FAIL": 828,
+        "EVT_FEE_PARAM_OOL": 829,
+        "EVT_RES_ERR": 830,
+        "EVT_FULL_SUN": 831,
+        "EVT_FULL_SUN_FAIL": 832,
+        "EVT_FEE_EC_SAT": 833,
+        "EVT_FEE_EC_RATE": 834,
+        "EVT_DPU_EC_SAT": 835,
+        "EVT_DPU_EC_RATE": 836,
+        "EVT_FEE_CCD_TEMP_FAIL": 825,
+        "EVT_DOOR_OPER_TO": 837,
+        "EVT_FEE_PARAM_WARN": 838
+    }
+
+    evts = list(_evt_dict.keys())
+
+    @classmethod
+    def get_idx(cls, evt):
+        return cls.evts.index(evt)
+
+    @classmethod
+    def get_evtid(cls, evt):
+        return cls._evt_dict.get(evt)
+
+
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
