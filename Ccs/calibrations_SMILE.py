@@ -261,8 +261,10 @@ POLY_DEG = 4
 _ccd_temp_adu_array = np.array(CCD_TEMP_TABLE).T  # (degC, ADC_V, ADU_dec, ADU_hex)
 _ccd_temp_fit_adu = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[2], _ccd_temp_adu_array[0],
                                                             POLY_DEG).convert()
-_ccd_temp_fit_adu_inv = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2],
-                                                                POLY_DEG).convert()
+_ccd_temp_interp_adu = sp.interpolate.interp1d(_ccd_temp_adu_array[2], _ccd_temp_adu_array[0], kind='cubic',
+                                               fill_value='extrapolate')
+# _ccd_temp_fit_adu_inv = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2],
+#                                                                 POLY_DEG).convert()
 _ccd_temp_interp_adu_inv = sp.interpolate.interp1d(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2], kind='cubic',
                                                    fill_value='extrapolate')
 
