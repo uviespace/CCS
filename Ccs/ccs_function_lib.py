@@ -1312,6 +1312,17 @@ def cuc_to_utc(cuc):
     return utc.isoformat()
 
 
+def cuc_to_date(cuc):
+    """
+    Returns datetime object of the provided second offset from the reference epoch
+
+    :param cuc:
+    :return:
+    """
+
+    return CUC_EPOCH + datetime.timedelta(seconds=cuc)
+
+
 def cuc_time_str(head, logger=logger):
     """
     Return PUS header timestamp as string
