@@ -1336,7 +1336,7 @@ def cuc_time_str(head, logger=logger):
             if head.TIMESYNC in tsync_flag:
                 return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], tsync_flag[head.TIMESYNC])
             else:
-                logger.warning('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.raw[:4].hex()))
+                logger.warning('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.PKT_SEQ_CNT))
                 return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], 'U')
         else:
             return ''
