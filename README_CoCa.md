@@ -202,3 +202,9 @@ In this way, unhandled exceptions will be seen in the CCS console.
 If there is a need to run the python debugger, most modules can also be run by executing the respective Python files directly which allows the debugger to be accessed normally. Examples of modules which can be started in this way include:
 - The PoolViewer is started by running `./Ccs/poolview_sql.py`
 - The TestSpecificationTool is started by running `./Tst/tst/tst.py`
+
+
+### Tmpool Reset
+If an incoming packet is corrupted (perhaps because a byte was long on the SpaceWire connection), the CCS will go ut of synch with the incoming telemetry flow and might freeze. 
+
+The simplest way to resume normal operation is to clear the pool (red button with white cross) but this causes the loss of the tmpool data. An alternative solution (not yet tested) might be as follows: disconnect from the socket, e.g., via the Poolmanager GUI, but without closing the app window; then just reconnect with your usual commands; a new packet parser instance will be created (but it might be necessary to re-open the Poolviewer as well for the auto-update to work again).
