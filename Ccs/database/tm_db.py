@@ -86,8 +86,8 @@ class DbTelemetry(DB_BASE):  # type: ignore
     destID = Column(Integer, nullable=False)
     timestamp = Column(Unicode(250, collation='utf8_general_ci'), nullable=True,
                        index=True)  # Should this be TIMESTAMP?
-    data = Column(VARBINARY(1024), nullable=False)  # Much faster than BLOB
-    raw = Column(VARBINARY(1024), nullable=False)  # Much faster than BLOB
+    data = Column(VARBINARY(2048), nullable=False)  # Much faster than BLOB
+    raw = Column(VARBINARY(2048), nullable=False)  # Much faster than BLOB
 
     # Helper attribute to access the associated pool.
     pool = relationship("DbTelemetryPool")
