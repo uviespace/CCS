@@ -135,6 +135,15 @@ class Board(Gtk.Box):
         self.test_meta_data_iasw_box.pack_start(self.test_meta_data_iasw_version_label, False, False, 4)
         self.test_meta_data_iasw_box.pack_end(self.test_meta_data_iasw_version, False, False, 0)
         self.test_meta_data_info.pack_start(self.test_meta_data_iasw_box, True, True, 0)
+        # IASW Software Version
+        self.test_meta_data_req_label = Gtk.Label()
+        self.test_meta_data_req_label.set_text('Requirements:')
+        self.test_meta_data_req = Gtk.Entry(width_chars=25)
+        self.test_meta_data_req.set_placeholder_text('< Requirements >')
+        self.test_meta_data_req_box = Gtk.Box(spacing=5, orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_req_box.pack_start(self.test_meta_data_req_label, False, False, 4)
+        self.test_meta_data_req_box.pack_end(self.test_meta_data_req, False, False, 0)
+        self.test_meta_data_info.pack_start(self.test_meta_data_req_box, True, True, 0)
         # checkbox for locking the step numbers
         self.test_is_locked_label = Gtk.Label()
         self.test_is_locked_label.set_text(_('Lock step enumeration:'))
@@ -830,6 +839,51 @@ class StepWidget(Gtk.EventBox):
         self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
         self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)
         self.detail_box.pack_start(self.whole_commands_box, True, True, 0)
+
+                
+        # Area for TM/TC
+        self.whole_tmtc_box = Gtk.Box()
+        self.whole_tmtc_box.set_orientation(Gtk.Orientation.VERTICAL)
+        # box for TM/TC
+        self.tmtc_box = Gtk.Box()
+        self.tmtc_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.tmtc_label = Gtk.Label.new()
+        self.tmtc_label.set_text(_('TM/TC'))
+        self.tmtc_box.pack_start(self.tmtc_label, False, False, 0)
+
+        self.tmtc_scrolled_window = Gtk.ScrolledWindow()
+        self.tmtc_scrolled_window.set_size_request(-1, 10)
+        self.tmtc_view = GtkSource.View()
+        self.tmtc_view.set_auto_indent(True)
+        self.tmtc_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.tmtc_view.set_show_line_numbers(True)
+        # self.tmtc_view.set_show_right_margin(True)
+        self.tmtc_view.set_monospace(True)
+        self.tmtc_view.set_highlight_current_line(True)
+        self.tmtc_view.set_indent_on_tab(True)
+        self.tmtc_view.set_insert_spaces_instead_of_tabs(True)
+        self.tmtc_view.set_indent_width(4)
+        self.tmtc_view.set_auto_indent(True)
+        self.tmtc_buffer = self.tmtc_view.get_buffer()
+        # draganddrop here
+        """
+        self.tmtc_view.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        self.tmtc_view.drag_dest_set_target_list(None)
+        self.tmtc_view.drag_dest_add_text_targets()
+        
+        self.tmtc_view.connect("drag-motion", self.on_drag_motion_2)
+        self.tmtc_view.connect("drag-leave", self.on_drag_leave)
+        """
+
+        self.tmtc_buffer.set_language(lngg)
+        # self.tmtc_buffer.set_style_scheme(self.board.current_scheme)
+        self.tmtc_scrolled_window.add(self.tmtc_view)
+
+        self.whole_tmtc_box.pack_start(self.tmtc_box, False, False, 0)
+        self.whole_tmtc_box.pack_start(self.tmtc_scrolled_window, True, True, 0)
+        self.detail_box.pack_start(self.whole_tmtc_box, True, True, 0)
+        
+
         # area for the verification
         self.whole_verification_box = Gtk.Grid()
         self.whole_verification_box.set_column_homogeneous(True)
