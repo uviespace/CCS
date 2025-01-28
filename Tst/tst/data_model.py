@@ -113,6 +113,7 @@ class Step:
         self._description = ''
         self._command_code = ''
         self._step_comment = ''
+        self._tmtc_comment = ''
         self._verification_code = ''
         self._verification_description = ''
         self._is_active = True
@@ -144,6 +145,7 @@ class Step:
         new_step.description = copy.copy(self.description)
         new_step.command_code = copy.copy(self.command_code)
         new_step.step_comment = copy.copy(self.step_comment)
+        new_step.tmtc_comment = copy.copy(self.tmtc_comment)
         new_step.verification_code = copy.copy(self.verification_code)
         new_step.verification_description = copy.copy(self.verification_description)
         new_step.is_active = copy.copy(self.is_active)
@@ -225,6 +227,15 @@ class Step:
         self._step_comment = value
 
     @property
+    def tmtc_comment(self):
+        return self._tmtc_comment
+
+    @tmtc_comment.setter
+    def tmtc_comment(self, value: str):
+        assert isinstance(value, str)
+        self._tmtc_comment = value
+
+    @property
     def verification_code(self):
         return self._verification_code
 
@@ -288,6 +299,7 @@ class Step:
             self.description = step['_description']
             self.command_code = step['_command_code']
             self.step_comment = step['_step_comment']
+            self.tmtc_comment = step['_tmtc_comment']
             self.verification_code = step['_verification_code']
             self.verification_description = step['_verification_description']
             self.is_active = step['_is_active']
@@ -902,6 +914,7 @@ class TestSpecification:
         self._description = ''
         self._spec_version = ''
         self._iasw_version = ''
+        self._requirements = ''
         self._primary_counter_locked = False
         self._precon_name = ''
         self._precon_code = ''
@@ -924,6 +937,7 @@ class TestSpecification:
         new_testspec.description = copy.copy(self.description)
         new_testspec.spec_version = copy.copy(self.spec_version)
         new_testspec.iasw_version = copy.copy(self.iasw_version)
+        new_testspec.requirements = copy.copy(self.requirements)
         new_testspec.primary_counter_locked = copy.copy(self.primary_counter_locked)
         new_testspec.precon_name = copy.copy(self.precon_name)
         new_testspec.precon_code = copy.copy(self.precon_code)
@@ -984,6 +998,15 @@ class TestSpecification:
     def iasw_version(self, value: str):
         assert isinstance(value, str)
         self._iasw_version = value
+
+    @property
+    def requirements(self):
+        return self._requirements
+
+    @requirements.setter
+    def requirements(self, value: str):
+        assert isinstance(value, str)
+        self._requirements = value
 
     @property
     def precon_name(self):
@@ -1082,6 +1105,7 @@ class TestSpecification:
             self.description = json_data['_description']
             self.spec_version = json_data['_spec_version']
             self.iasw_version = json_data['_iasw_version']
+            self.requirements = json_data['_requirements']
             self.primary_counter_locked = json_data['_primary_counter_locked']
             self.precon_name = json_data['_precon_name']
             self.precon_code = json_data['_precon_code']
