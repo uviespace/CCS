@@ -46,6 +46,8 @@ TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_con
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
+REPORTFORMAT = cfg.get('ccs-viewer', 'drag_report_fmt').lower() == 'true'  # format drag-action data for test report
+
 
 class TMPoolView(Gtk.Window):
     # (label, data column alignment)
@@ -699,7 +701,15 @@ class TMPoolView(Gtk.Window):
             ).filter(
                 Telemetry[self.decoding_type].idx == model[my_iter][0]
             )
-            selection_data.set_text(str(row.first().raw), -1)
+
+            rawpkt = row.first().raw
+
+            if REPORTFORMAT:
+                data = cfl.pktinfo_report(rawpkt)
+            else:
+                data = str(rawpkt)
+
+            selection_data.set_text(data, -1)
             new_session.close()
 
     def fetch_lines_from_db(self, offset=0, limit=None, sort=None, order='asc', buffer=10, rows=None, scrolled=False,
@@ -1856,7 +1866,12 @@ class TMPoolView(Gtk.Window):
     def on_drag_tmdata_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
-        selection_data.set_text('{} = {}'.format(*model[my_iter][:2]), -1)
+        txt = '{} = {}'.format(*model[my_iter][:2])
+
+        if REPORTFORMAT:
+            txt = txt.replace('_', '\\_')
+
+        selection_data.set_text(txt, -1)
 
     def create_decoder_bar(self):
         box = Gtk.VBox()
