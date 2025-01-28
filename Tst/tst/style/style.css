@@ -97,14 +97,15 @@
     /* padding-bottom: 0px; */
 }
 .step-detail-box {
-    padding-left: 40px;
-    padding-right: 40px;
+    padding-left: 20px;
+    padding-right: 20px;
     padding-top: 10px;
     padding-bottom: 10px;
-    border-top: 1px solid red;
-    border-bottom: 1px solid red;
-    border-left: 1px solid red;
-    border-right: 1px solid red;
+    border-top: 1px solid grey;
+    /*border-bottom: 1px solid grey;
+    border-left: 1px solid grey;
+    border-right: 1px solid grey;*/
+    border-radius: 0px;
 }
 .highlight_top_border frame{
     border-top: 5px solid @fg_color;

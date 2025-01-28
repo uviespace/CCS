@@ -748,6 +748,7 @@ class StepWidget(Gtk.EventBox):
         self.detail_box = Gtk.Box()
         self.detail_box.set_orientation(Gtk.Orientation.VERTICAL)
         self.detail_box.connect('show', self.on_detail_box_show)
+        self.detail_box.set_spacing(5)
         # self.detail_box.set_homogeneous(True)
         Gtk.StyleContext.add_class(self.detail_box.get_style_context(), 'step-detail-box')  # for CSS styling
 
@@ -806,12 +807,17 @@ class StepWidget(Gtk.EventBox):
         # lm = GtkSource.LanguageManager()
 
         # Area for Commands and TM/TC
-        self.commands_and_tmtc_box = Gtk.Grid()
-        self.commands_and_tmtc_box.set_column_homogeneous(False)
+        # self.commands_and_tmtc_box = Gtk.Grid()
+        # self.commands_and_tmtc_box.set_column_homogeneous(False)
+
+        self.commands_and_tmtc_box = Gtk.Box()
+        self.commands_and_tmtc_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.commands_and_tmtc_box.set_spacing(10)
 
         # Area for the commands
-        #self.whole_commands_box = Gtk.Box()
-        #self.whole_commands_box.set_orientation(Gtk.Orientation.VERTICAL)
+        self.whole_commands_box = Gtk.Box()
+        self.whole_commands_box.set_orientation(Gtk.Orientation.VERTICAL)
+
         # Make the label, inside a own Box to show it on the left side
         self.lbl_box_commands = Gtk.Box()
         self.lbl_box_commands.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -851,21 +857,21 @@ class StepWidget(Gtk.EventBox):
         # self.commands_buffer.set_style_scheme(self.board.current_scheme)
         self.commands_scrolled_window.add(self.commands_view)
 
-        #self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
-        #self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)
+        self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
+        self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)
         
-        #self.commands_and_tmtc_box.pack_start(self.whole_commands_box, True, True, 0)
-        #self.detail_box.pack_start(self.commands_and_tmtc_box, True, True, 0)
+        self.commands_and_tmtc_box.pack_start(self.whole_commands_box, True, True, 0)
 
-                
         # Area for TM/TC
-        #self.whole_tmtc_box = Gtk.Box()
-        #self.whole_tmtc_box.set_orientation(Gtk.Orientation.VERTICAL)
+        self.whole_tmtc_box = Gtk.Box()
+        self.whole_tmtc_box.set_orientation(Gtk.Orientation.VERTICAL)
+
         # box for TM/TC
         self.tmtc_box = Gtk.Box()
         self.tmtc_box.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.tmtc_label = Gtk.Label.new()
         self.tmtc_label.set_text(_('TM/TC'))
+        self.tmtc_label.set_tooltip_text(_('List of TM/TC packet instances used in this step'))
         self.tmtc_box.pack_start(self.tmtc_label, False, False, 0)
 
         self.tmtc_scrolled_window = Gtk.ScrolledWindow()
@@ -883,32 +889,28 @@ class StepWidget(Gtk.EventBox):
         self.tmtc_view.set_auto_indent(True)
         self.tmtc_comment_buffer = self.tmtc_view.get_buffer()
         # draganddrop here
-        """
-        self.tmtc_view.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
-        self.tmtc_view.drag_dest_set_target_list(None)
-        self.tmtc_view.drag_dest_add_text_targets()
-        
-        self.tmtc_view.connect("drag-motion", self.on_drag_motion_2)
-        self.tmtc_view.connect("drag-leave", self.on_drag_leave)
-        """
+        # self.tmtc_view.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        # self.tmtc_view.drag_dest_set_target_list(None)
+        # self.tmtc_view.drag_dest_add_text_targets()
+        #
+        # self.tmtc_view.connect("drag-motion", self.on_drag_motion_2)
+        # self.tmtc_view.connect("drag-leave", self.on_drag_leave)
 
-        self.tmtc_comment_buffer.set_language(lngg)
+        # self.tmtc_comment_buffer.set_language(lngg)
         # self.tmtc_buffer.set_style_scheme(self.board.current_scheme)
         self.tmtc_scrolled_window.add(self.tmtc_view)
 
-        #self.whole_tmtc_box.pack_start(self.tmtc_box, False, False, 0)
-        #self.whole_tmtc_box.pack_start(self.tmtc_scrolled_window, True, True, 0)
-        # self.commands_and_tmtc_box.pack_start(self.whole_tmtc_box, True, True, 0)
-        # self.detail_box.pack_start(self.commands_and_tmtc_box, True, True, 0)
-        
-        #ADD everything to the whole grid
-        self.commands_and_tmtc_box.set_column_spacing(10)
-        self.commands_and_tmtc_box.attach(self.lbl_box_commands, 0, 0, 3, 1)
-        self.commands_and_tmtc_box.attach(self.commands_scrolled_window, 0, 1, 3, 5)
-        self.commands_and_tmtc_box.attach_next_to(self.tmtc_box, self.lbl_box_commands, Gtk.PositionType.RIGHT, 3, 1)
-        self.commands_and_tmtc_box.attach_next_to(self.tmtc_scrolled_window, self.commands_scrolled_window, Gtk.PositionType.RIGHT, 3, 5)
+        self.whole_tmtc_box.pack_start(self.tmtc_box, False, False, 0)
+        self.whole_tmtc_box.pack_start(self.tmtc_scrolled_window, True, True, 0)
+        self.commands_and_tmtc_box.pack_start(self.whole_tmtc_box, True, True, 0)
         self.detail_box.pack_start(self.commands_and_tmtc_box, True, True, 0)
-
+        
+        # self.commands_and_tmtc_box.set_column_spacing(10)
+        # self.commands_and_tmtc_box.attach(self.lbl_box_commands, 0, 0, 3, 1)
+        # self.commands_and_tmtc_box.attach(self.commands_scrolled_window, 0, 1, 3, 5)
+        # self.commands_and_tmtc_box.attach_next_to(self.tmtc_box, self.lbl_box_commands, Gtk.PositionType.RIGHT, 3, 1)
+        # self.commands_and_tmtc_box.attach_next_to(self.tmtc_scrolled_window, self.commands_scrolled_window, Gtk.PositionType.RIGHT, 3, 5)
+        # self.detail_box.pack_start(self.commands_and_tmtc_box, True, True, 0)
 
         # area for the verification
         self.whole_verification_box = Gtk.Grid()
@@ -920,7 +922,7 @@ class StepWidget(Gtk.EventBox):
         self.lbl_box_verification.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.verification_label = Gtk.Label.new()
         self.verification_label.set_text(_('Verification Code'))
-        self.verification_label.set_tooltip_text(_('The verification code-block must define a variable "result" that is TRUE/FALSE'))
+        self.verification_label.set_tooltip_text(_("The verification code-block must define a variable 'result' that evaluates to True/False"))
         # self.btn_exec_verification = Gtk.Button.new_from_icon_name(icon_name='media-playback-start', size=Gtk.IconSize.BUTTON)
         # self.btn_exec_verification.connect('clicked', self.on_exec_verification)
         self.lbl_box_verification.pack_start(self.verification_label, False, False, 0)
