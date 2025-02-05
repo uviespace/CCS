@@ -1156,7 +1156,7 @@ class TstAppWindow(Gtk.ApplicationWindow):
 
     def on_about(self, *args):
         about_dialog = Gtk.AboutDialog(transient_for=self, modal=True)
-        about_dialog.set_authors(['Stefan Winkler', 'Dominik Möslinger', 'Sebastian Miksch', 'Marko Mecina'])
+        about_dialog.set_authors(['Stefan Winkler', 'Dominik Möslinger', 'Sebastian Miksch', 'Marko Mecina', 'Christopher Granabetter'])
         about_dialog.set_website('https://space.univie.ac.at/en')
         about_dialog.set_website_label('space.univie.ac.at')
         about_dialog.set_version(VERSION)

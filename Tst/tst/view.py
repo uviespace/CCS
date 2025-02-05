@@ -358,8 +358,11 @@ class Board(Gtk.Box):
         self.test_meta_data_req.set_text(self.model.requirements)
         # set the pre-condition name
         if self.model.precon_name:
+            print("IN PRECON")
+            print("NAME: ", self.model.precon_name)
             found = False
             for index, precon_name in enumerate(self.precon_selection.get_model()):
+                print(*precon_name)
                 if precon_name[0] == self.model.precon_name:
                     found = True
                     self.precon_selection.set_active(index)
@@ -367,12 +370,31 @@ class Board(Gtk.Box):
                 msg = 'Given Pre-Condition Name could not be found/loaded'
                 self.logger.warning(msg)
                 # self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
+
+                # write new precondition db entry if not found
+                db_interaction.write_into_pre_post_con(code_type=None, name=self.model.precon_name, 
+                                                       description=self.model.precon_descr, 
+                                                       code_block=self.model.precon_code)
+                time.sleep(0.1)
+                
+                print()
+                for index, precon_name in enumerate(self.precon_selection.get_model()):
+                    print(index, list(precon_name))
+                    if precon_name[0] == self.model.precon_name:
+                        self.precon_selection.set_active(index)
+                
+                self.set_precon_model(self.model.precon_name)
                 self.on_precon_changed(self.precon_selection)
+
+        time.sleep(1)
 
         # set the post-condition name
         if self.model.postcon_name:
+            print("IN POSTCON")
+            print("NAME:", self.model.postcon_name)
             found = False
             for index, postcon_name in enumerate(self.postcon_selection.get_model()):
+                print(*postcon_name)
                 if postcon_name[0] == self.model.postcon_name:
                     found = True
                     self.postcon_selection.set_active(index)
@@ -380,7 +402,21 @@ class Board(Gtk.Box):
                 msg = 'Given Post-Condition Name could not be found/loaded'
                 self.logger.warning(msg)
                 # self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
-                self.on_postcon_changed(self.precon_selection)
+                
+                # write new precondition db entry if not found
+                db_interaction.write_into_pre_post_con(code_type=None, name=self.model.postcon_name, 
+                                                       description=self.model.postcon_descr, 
+                                                       code_block=self.model.postcon_code)
+                time.sleep(0.1)
+                
+                self.set_postcon_model(self.model.postcon_name)
+                
+                for index, postcon_name in enumerate(self.postcon_selection.get_model()):
+                    if postcon_name[0] == self.model.postcon_name:
+                        self.postcon_selection.set_active(index)
+                
+                
+                self.on_postcon_changed(self.postcon_selection)
 
         # Set the test comment
         self.test_meta_data_comment.get_buffer().set_text(self.model.comment)
