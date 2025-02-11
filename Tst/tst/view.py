@@ -358,14 +358,10 @@ class Board(Gtk.Box):
         self.test_meta_data_req.set_text(self.model.requirements)
         # set the pre-condition name
         if self.model.precon_name:
-            print("\nIN PRECON")
-            print("NAME: ", self.model.precon_name)
             found = False
             #self.set_precon_model()
             for index, precon_name in enumerate(self.precon_selection.get_model()):
-                print(index, *precon_name)
                 if precon_name[0] == self.model.precon_name:
-                    print("MATCH")
                     found = True
                     self.precon_selection.set_active(index)
             if not found:
@@ -377,14 +373,10 @@ class Board(Gtk.Box):
 
         # set the post-condition name
         if self.model.postcon_name:
-            print("\nIN POSTCON")
-            print("NAME:", self.model.postcon_name)
             found = False
             #self.set_postcon_model()
             for index, postcon_name in enumerate(self.postcon_selection.get_model()):
-                print(index, *postcon_name)
                 if postcon_name[0] == self.model.postcon_name:
-                    print("MATCH")
                     found = True
                     self.postcon_selection.set_active(index)
             if not found:
