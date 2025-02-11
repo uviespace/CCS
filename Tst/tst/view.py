@@ -406,7 +406,7 @@ class Board(Gtk.Box):
         db_interaction.write_into_pre_post_con(code_type=None, name=self.model.precon_name, 
                                                        description=self.model.precon_descr, 
                                                        code_block=self.model.precon_code)
-        time.sleep(1)
+        time.sleep(0.1)
         self.precon_selection.remove_all()
         section_dict = db_interaction.get_pre_post_con(None)
         active_nbr = 0
@@ -433,7 +433,7 @@ class Board(Gtk.Box):
         db_interaction.write_into_pre_post_con(code_type=None, name=self.model.postcon_name, 
                                                        description=self.model.postcon_descr, 
                                                        code_block=self.model.postcon_code)
-        time.sleep(1)
+        time.sleep(0.1)
         self.postcon_selection.remove_all()
         section_dict = db_interaction.get_pre_post_con(None)
         active_nbr = 0
