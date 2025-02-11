@@ -365,11 +365,13 @@ class Board(Gtk.Box):
                     found = True
                     self.precon_selection.set_active(index)
             if not found:
-                msg = 'Given Pre-Condition Name could not be found/loaded'
+                msg = f'Given Pre-Condition "{self.model.precon_name}" could not be found/loaded'
                 self.logger.warning(msg)
                 # self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
 
-                self.gen_pre_con()
+                self.gen_pre_con(self.model.precon_name)
+                msg = f'Pre-Condition "{self.model.precon_name}" added to db'
+                self.logger.info(msg)
 
         # set the post-condition name
         if self.model.postcon_name:
@@ -380,11 +382,13 @@ class Board(Gtk.Box):
                     found = True
                     self.postcon_selection.set_active(index)
             if not found:
-                msg = 'Given Post-Condition Name could not be found/loaded'
+                msg = f'Given Post-Condition "{self.model.postcon_name}" could not be found/loaded'
                 self.logger.warning(msg)
                 # self.app.add_info_bar(message_type=Gtk.MessageType.INFO, message=msg)
                 
-                self.gen_post_con()
+                self.gen_post_con(self.model.postcon_name)
+                msg = f'Post-Condition "{self.model.postcon_name}" added to db'
+                self.logger.info(msg)
 
         # Set the test comment
         self.test_meta_data_comment.get_buffer().set_text(self.model.comment)
@@ -395,18 +399,33 @@ class Board(Gtk.Box):
         # Set the init code block
         self.custom_import_buffer.set_text(self.model.custom_imports)
 
-    def gen_pre_con(self):
+    def gen_pre_con(self, precon_name):
         """
         writes pre-condition into database if it does not exist
         """
         db_interaction.write_into_pre_post_con(code_type=None, name=self.model.precon_name, 
                                                        description=self.model.precon_descr, 
                                                        code_block=self.model.precon_code)
-        time.sleep(0.1)
+        time.sleep(1)
         self.precon_selection.remove_all()
-        self.set_precon_model(self.model.precon_name, self.model.precon_name)
+        section_dict = db_interaction.get_pre_post_con(None)
+        active_nbr = 0
+        for count, condition in enumerate(section_dict):
+            self.precon_selection.append_text(condition.name)
+            #print(precon_name, condition.name)
+            if precon_name == condition.name:
+                active_nbr = count
+        self.precon_selection.set_active(active_nbr)
+        # Set the Precon Description
+        section_dict = db_interaction.get_pre_post_con(None)
+        for condition in section_dict:
+            if condition.name == precon_name:
+                self.model.precon_descr = condition.description
+                self.model.precon_code = condition.condition
+        # update the data model viewer
+        self.app.update_model_viewer()
 
-    def gen_post_con(self):
+    def gen_post_con(self, postcon_name):
         """
         writes post-condition into database if it does not exist
         """
@@ -414,9 +433,24 @@ class Board(Gtk.Box):
         db_interaction.write_into_pre_post_con(code_type=None, name=self.model.postcon_name, 
                                                        description=self.model.postcon_descr, 
                                                        code_block=self.model.postcon_code)
-        time.sleep(0.1)
+        time.sleep(1)
         self.postcon_selection.remove_all()
-        self.set_postcon_model(self.model.postcon_name, self.model.postcon_name)
+        section_dict = db_interaction.get_pre_post_con(None)
+        active_nbr = 0
+        for count, condition in enumerate(section_dict):
+            self.postcon_selection.append_text(condition.name)
+            #print(postcon_name, condition.name)
+            if postcon_name == condition.name:
+                active_nbr = count
+        self.postcon_selection.set_active(active_nbr)
+        # Set the Postcon Description
+        section_dict = db_interaction.get_pre_post_con(None)
+        for condition in section_dict:
+            if condition.name == postcon_name:
+                self.model.postcon_descr = condition.description
+                self.model.postcon_code = condition.condition
+        # update the data model viewer
+        self.app.update_model_viewer()
 
     def on_init_code_toggle(self, widget):
         if self.custom_import_scrolled_window.is_visible():
@@ -477,7 +511,7 @@ class Board(Gtk.Box):
         self.update_widget_data()
         self.app.update_model_viewer()
 
-    def set_precon_model(self, active_name=None, precon_name=None):
+    def set_precon_model(self, active_name=None):
         section_dict = db_interaction.get_pre_post_con(None)
         active_nbr = 0
         for count, condition in enumerate(section_dict):
@@ -485,13 +519,12 @@ class Board(Gtk.Box):
             if active_name == condition.name:
                 active_nbr = count
         self.precon_selection.set_active(active_nbr)
-        self.on_precon_changed(self.precon_selection, precon_name=precon_name)
+        self.on_precon_changed(self.precon_selection)
         return
 
-    def on_precon_changed(self, widget, precon_name=""):
-        if precon_name == None:
-            # get the name out of the widget
-            precon_name = widget.get_active_text()
+    def on_precon_changed(self, widget):
+        # get the name out of the widget
+        precon_name = widget.get_active_text()
         # update the model
         self.model.precon_name = precon_name
         # Set the Precon Description
@@ -503,7 +536,7 @@ class Board(Gtk.Box):
         # update the data model viewer
         self.app.update_model_viewer()
 
-    def set_postcon_model(self, active_name=None, postcon_name=None):
+    def set_postcon_model(self, active_name=None):
         section_dict = db_interaction.get_pre_post_con(None)
         active_nbr = 0
         for count, condition in enumerate(section_dict):
@@ -511,13 +544,12 @@ class Board(Gtk.Box):
             if active_name == condition.name:
                 active_nbr = count
         self.postcon_selection.set_active(active_nbr)
-        self.on_postcon_changed(self.postcon_selection, postcon_name=postcon_name)
+        self.on_postcon_changed(self.postcon_selection)
         return
 
-    def on_postcon_changed(self, widget, postcon_name=""):
-        if postcon_name == None:
-            # get the name out of the widget
-            postcon_name = widget.get_active_text() 
+    def on_postcon_changed(self, widget):
+        # get the name out of the widget
+        postcon_name = widget.get_active_text() 
         # update the model
         self.model.postcon_name = postcon_name
         # Set the Postcon Description
