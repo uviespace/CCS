@@ -82,7 +82,7 @@ def create_step_number(primary_counter: int, secondary_counter: int) -> str:
     return step_number_string
 
 
-def parse_step_number(step_number: (str, int, float)):
+def parse_step_number(step_number: (str, int, float)): # type: ignore
     """
     Parses the input value into a tuple of primary counter and secondary counter.
 
@@ -479,7 +479,7 @@ class TestSequence:
             self.logger.debug('list of steps is empty')
         self.logger.debug('--------------------------------------------')
 
-    def get_step_index(self, step_number: (str, int, float)):
+    def get_step_index(self, step_number: (str, int, float)): # type: ignore
         """
         Retrieves, for a given step_number, the index of the step in the step list.
         Raises LookupError if the step_number has no matching step in the list.
@@ -501,7 +501,7 @@ class TestSequence:
         else:
             return index_ref_step
 
-    def get_step(self, step_number: (str, int, float)):
+    def get_step(self, step_number: (str, int, float)): # type: ignore
         """
         Retrieves, for a given step_number, the step object
 
@@ -631,7 +631,7 @@ class TestSequence:
 
         return new_step
 
-    def remove_step(self, step_number: (str, int, float)):
+    def remove_step(self, step_number: (str, int, float)): # type: ignore
         """
         Deletes a step out of the dictionary for steps. If the step is found, decrease all the following step numbers,
         then delete the step.
@@ -769,7 +769,7 @@ class TestSequence:
                 step.secondary_counter = 0
         return
 
-    def decrease_step_numbers(self, reference_step_number: (str, int, float) = '', reference_step_index: int = None):
+    def decrease_step_numbers(self, reference_step_number: (str, int, float) = '', reference_step_index: int = None): # type: ignore
         """
         Decreases the step numbers of all steps following the reference step, excluding it.
         This function is used to reassign the step numbers after
@@ -810,7 +810,7 @@ class TestSequence:
                     step.decrease_secondary_counter()
         return
 
-    def increase_step_numbers(self, reference_step_number: (str, int, float) = '', reference_step_index: int = None):
+    def increase_step_numbers(self, reference_step_number: (str, int, float) = '', reference_step_index: int = None): # type: ignore
         """
         Increases the step numbers of all steps following the reference step, excluding it.
         This function is used to reassign the step numbers after
