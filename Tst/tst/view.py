@@ -936,7 +936,7 @@ class StepWidget(Gtk.EventBox):
         self.tmtc_view.set_wrap_mode(Gtk.WrapMode.WORD)
         #self.tmtc_view.set_show_line_numbers(True)
         # self.tmtc_view.set_show_right_margin(True)
-        self.tmtc_view.set_monospace(True)
+        #self.tmtc_view.set_monospace(True)
         #self.tmtc_view.set_highlight_current_line(True)
         self.tmtc_view.set_indent_on_tab(True)
         self.tmtc_view.set_insert_spaces_instead_of_tabs(True)
@@ -953,7 +953,7 @@ class StepWidget(Gtk.EventBox):
         self.tmtc_view.connect("drag-leave", self.on_drag_leave)
         """
 
-        self.tmtc_comment_buffer.set_language(lngg)
+        #self.tmtc_comment_buffer.set_language(lngg)
         # self.tmtc_buffer.set_style_scheme(self.board.current_scheme)
         self.tmtc_scrolled_window.add(self.tmtc_view)
 
