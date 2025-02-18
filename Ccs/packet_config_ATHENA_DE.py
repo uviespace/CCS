@@ -471,11 +471,16 @@ class FpmPktParser:
     Parses telemetry received from FPM
     """
 
-    def __init__(self, scibytes, echobytes=None, defaultbytes=1024):
+    def __init__(self, scibytes, echobytes=None, defaultbytes=1024, scifile=None):
 
         self.scibytes = scibytes
         self.echobytes = echobytes
         self.defaultbytes = defaultbytes
+
+        if scifile is not None:
+            self.scifile = open(scifile, 'wb')
+        else:
+            self.scifile = scifile
 
         self.nbytes_tot = 0
 
@@ -485,6 +490,7 @@ class FpmPktParser:
 
         strict = True
         msg = sock.recv(IF_LEN)
+        tofile = False
 
         if not msg:
             return b''
@@ -492,6 +498,7 @@ class FpmPktParser:
         if msg[0] == IfAddr.CMD:
             mlen = ACK_LEN - IF_LEN
         elif msg[0] == IfAddr.SCI:
+            tofile = True
             mlen = self.scibytes
         elif msg[0] == IfAddr.HK:
             mlen = ACK_LEN - IF_LEN
@@ -516,6 +523,9 @@ class FpmPktParser:
 
         self.lastpkt = msg
         self.nbytes_tot += len(msg)
+
+        if tofile and self.scifile is not None:
+            self.scifile.write(msg[1:])
 
         return msg
 
@@ -568,7 +578,7 @@ class FpmProcessor:
 
     def __call__(self, buf, ts=None):
 
-        assert isinstance(buf, queue.Queue)
+        # assert isinstance(buf, queue.Queue)
 
         try:
             pkt = buf.get(timeout=self.queue_to)
@@ -608,7 +618,10 @@ class FpmProcessor:
         else:
 
             if self.curfrm != -1:
-                self.frames.append(self.mk_evt_frame(framesize=self.framesize, verbose=verbose))
+                if not self.process:
+                    self.frames.append(self.cfdata)
+                else:
+                    self.frames.append(self.mk_evt_frame(framesize=self.framesize, verbose=verbose))
 
             self.cfdata = ed
             self.framecnt += 1
@@ -651,6 +664,91 @@ class FpmProcessor:
                     self.proc(buf, verbose=verbose)
             else:
                 print('ERROR', pt, buf.tell())
+
+        return self.frames
+
+    def reset(self):
+        self.cfdata = b''
+        self.curfrm = -1
+        self.framecnt = 0
+
+        self.frames.clear()
+
+
+class FpmProcessorMod:
+    """
+    Processes FPM packets and assembles event frames.
+    """
+
+    def __init__(self, fromfile, framesize=NPIX_LD, ashex=True, process=True, notime=False, queue_to=10):
+        self.framesize = framesize
+        self.ashex = ashex
+        self.process = process
+        self.notime = notime
+
+        self.cfdata = b''
+        self.curfrm = -1
+        self.framecnt = 0
+
+        self.frames = []
+
+        self.queue_to = queue_to
+
+        self.fromfile = open(fromfile, 'rb')
+
+    def __call__(self, ts=None):
+
+        # assert isinstance(buf, queue.Queue)
+
+        try:
+            pkt = self.fromfile.read(EVT_PKT_ELEMENT_LEN)
+            if not pkt:
+                return
+        except:
+            return
+
+        self.frames.clear()
+
+        try:
+            # process data from SCI interface
+            self.proc(pkt)
+
+            if self.frames:
+                return self.frames
+
+        except Exception as err:
+            print(err)
+
+    def proc(self, ed, verbose=False):
+
+        if ed[0] == self.curfrm:
+            self.cfdata += ed
+
+        else:
+
+            if self.curfrm != -1:
+                if not self.process:
+                    self.frames.append(self.cfdata)
+                else:
+                    self.frames.append(self.mk_evt_frame(framesize=self.framesize, verbose=verbose))
+
+            self.cfdata = ed
+            self.framecnt += 1
+            self.curfrm = ed[0]
+
+    def mk_evt_frame(self, framesize=NPIX_LD, verbose=False):
+        try:
+            frame = EventFrame(self.cfdata, framesize=framesize)
+            if verbose:
+                print(frame)
+        except Exception as err:
+            print(err)
+            return self.cfdata
+
+        return frame
+
+    def close_file(self):
+        self.fromfile.close()
 
         return self.frames
 

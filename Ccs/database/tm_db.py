@@ -27,6 +27,17 @@ protocols = {'PUS': ('', DB_BASE),
              'RMAP': ('rmap_', DB_BASE),
              'FEEDATA': ('feedata_', DB_BASE)}
 
+# get max packet size from project
+try:
+    sys.path.insert(0, '..')
+    packet_config = 'packet_config_' + config_db.cfg.get('project', 'name').strip()
+    pcmodule = __import__(packet_config)
+    MAX_PKT_LEN = pcmodule.MAX_PKT_LEN
+except Exception as err:
+    print(err)
+    print('Setting max. packet length to 1024')
+    MAX_PKT_LEN = 1024  # default max packet length
+
 
 class DbTelemetryPool(DB_BASE):  # type: ignore
     """
@@ -86,8 +97,8 @@ class DbTelemetry(DB_BASE):  # type: ignore
     destID = Column(Integer, nullable=False)
     timestamp = Column(Unicode(250, collation='utf8_general_ci'), nullable=True,
                        index=True)  # Should this be TIMESTAMP?
-    data = Column(VARBINARY(1024), nullable=False)  # Much faster than BLOB
-    raw = Column(VARBINARY(1024), nullable=False)  # Much faster than BLOB
+    data = Column(VARBINARY(MAX_PKT_LEN), nullable=False)  # Much faster than BLOB
+    raw = Column(VARBINARY(MAX_PKT_LEN), nullable=False)  # Much faster than BLOB
 
     # Helper attribute to access the associated pool.
     pool = relationship("DbTelemetryPool")
@@ -279,14 +290,14 @@ def scoped_session_maker(db_schema, idb_version=None):
         return
     _engine = create_engine(gen_mysql_conn_str(schema=schema), echo="-v" in sys.argv, pool_size=15)
     session_factory = sessionmaker(bind=_engine)
-    scoped_session_factory = scoped_session(session_factory)
-    #scoped_session_factory = scoped_session_v2(session_factory)
+    # scoped_session_factory = scoped_session(session_factory)
+    scoped_session_factory = scoped_session_v2(session_factory)
     return scoped_session_factory
 
 
 class scoped_session_v2(scoped_session):
     """
-    Wrapper class to cast SQL query statement string to TextClause before execution, as this is required since SQLAlchemy 2.0.
+    Wrapper class to cast SQL query statement string to TextClause before execution, as this is required from SQLAlchemy 2.0.
     """
 
     def execute(self, x, *args, **kwargs):

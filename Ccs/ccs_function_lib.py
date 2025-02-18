@@ -3907,7 +3907,7 @@ def srectosrecmod(input_srec, output_srec, imageaddr=0x40180000, linesperpack=61
     source_to_srec('srec_binary_source.TC', output_srec, memaddr=imageaddr)
 
 
-def srec_to_s6(fname, memid, memaddr, segid, tcname=None, linesperpack=50, max_pkt_size=MAX_PKT_LEN, image_crc=True):
+def srec_to_s6(fname, memid, memaddr, segid, tcname=None, linesperpack=50, max_pkt_size=MAX_PKT_LEN, image_crc=True, return_upload=False):
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
     pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + SEG_HEADER_LEN + SEG_SPARE_LEN + SEG_CRC_LEN + len(
@@ -3983,9 +3983,15 @@ def srec_to_s6(fname, memid, memaddr, segid, tcname=None, linesperpack=50, max_p
 
     if image_crc:
         # return total length of uploaded data (without termination segment) and CRC over entire image, including segment headers
-        return pckts, len(upload_bytes), crc(upload_bytes)
+        if return_upload:
+            return pckts, upload_bytes, crc(upload_bytes)
+        else:
+            return pckts, len(upload_bytes), crc(upload_bytes)
 
-    return pckts
+    if return_upload:
+        return pckts, upload_bytes
+    else:
+        return pckts
 
 
 def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
@@ -4242,19 +4248,23 @@ def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname
 
     linecount = 0
     nextlinelength = len(lines[linecount]) // 2
-    while linecount < len(f) - 1:
+    while linecount < len(f):
 
         t1 = time.time()
 
         linepacklist = []
         packlen = 0
         while (packlen + nextlinelength) <= payload_len:
-            if linecount >= (len(lines) - 1):
+            if linecount >= (len(lines)):
                 break
             linepacklist.append(lines[linecount])
             linelength = len(lines[linecount]) // 2
             packlen += linelength
-            if int(f[linecount + 1][4:12], 16) != (int(f[linecount][4:12], 16) + linelength):
+
+            if (linecount + 1) >= len(f):
+                linecount += 1
+                break
+            elif int(f[linecount + 1][4:12], 16) != (int(f[linecount][4:12], 16) + linelength):
                 linecount += 1
                 newstartaddr = int(f[linecount][4:12], 16)
                 break
@@ -4294,6 +4304,7 @@ def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname
 
         if data == b'':
             print('No data left, exit upload.')
+            print('Upload finished, {} bytes sent in {} packets.'.format(bcnt, pcnt))
             return
 
         memaddr = newstartaddr
@@ -5571,7 +5582,7 @@ def get_packets_from_pool(pool_name, indices=None, st=None, sst=None, apid=None,
     :param apid:
     :return:
     """
-    new_session = scoped_session_storage
+    new_session = scoped_session_storage()
 
     rows = new_session.query(
         DbTelemetry
@@ -5948,6 +5959,25 @@ def get_hk_def_tcs(filename, sid=None, sidoff=TC_HEADER_LEN, sidbs=2):
         pkts = [pkt for pkt in pkts if (pkt[7] == 3) and (pkt[8] == 1) and (int.from_bytes(pkt[sidoff:sidoff+sidbs], 'big') == sid)]
 
     return pkts
+
+
+def pktinfo_report(pkt):
+    """
+    Format raw packet data for insertion into test report
+
+    :param pkt:
+    :return:
+    """
+
+    TEXT = "& \\multicolumn{{3}}{{|p{{18cm}}|}}{{\\vspace{{-2mm}} \\footnotesize \nTM({},{}) {} @ {} \\newline\n\\begin{{tabular}}{{l}} \\end{{tabular}}\\vspace{{1mm}} }}\\\\ \\hline\n"
+
+    name = Tmdata(pkt)[-1][0]
+    head = Tmread(pkt)[0]
+    t = get_cuctime(pkt)
+
+    msg = TEXT.format(head.SERV_TYPE, head.SERV_SUB_TYPE, name, t).replace('_', '\\_')
+
+    return msg
 
 
 class DbTools:
@@ -6509,11 +6539,11 @@ class TestReport:
                 response = dialog.run()
 
                 if response == Gtk.ResponseType.YES:
-                    result = 'VERIFIED'
+                    result = 'OK'
                     comment = dialog.comment.get_text()
                     dialog.destroy()
                 elif response == Gtk.ResponseType.NO:
-                    result = 'FAILED'
+                    result = 'NOT_OK'
                     comment = dialog.comment.get_text()
                     dialog.destroy()
                 else:

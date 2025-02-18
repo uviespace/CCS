@@ -227,14 +227,13 @@ class Receiver:
     SEL_TIMEOUT = 2
     RECV_BUF_SIZE = 1024**3
 
-    def __init__(self, sockfds, procfunc=None, recv_buf_size=RECV_BUF_SIZE, outfile=None, ofmode='w', pkt_parser_func=None, extend_processed=True):
+    def __init__(self, sockfds, procfunc=None, recv_buf_size=RECV_BUF_SIZE, outfile=None, ofmode='w', pkt_parser_func=None, extend_processed=True, procdata=None):
 
         self.sockfds = sockfds
         self.recvd_data_buf = queue.Queue(recv_buf_size)
         self._procfunc = procfunc
         self._recv_thread = None
         self._proc_thread = None
-        self.proc_data = []
         self.extend_processed = extend_processed
         self._pkt_parser_func = pkt_parser_func
 
@@ -242,6 +241,11 @@ class Receiver:
             self.proc_data_fd = open(outfile, ofmode)
         else:
             self.proc_data_fd = None
+
+        if procdata is not None:
+            self.proc_data = procdata
+        else:
+            self.proc_data = []
 
         self._isrunning = False
 
