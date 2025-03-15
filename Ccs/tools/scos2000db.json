@@ -279,7 +279,7 @@
       "columns": {
         "PCF_NAME": " VARCHAR(12) NOT NULL ",
         "PCF_DESCR": " VARCHAR(24) NULL DEFAULT NULL ",
-        "PCF_PID": " INT(10) NULL DEFAULT NULL ",
+        "PCF_PID": " BIGINT NULL DEFAULT NULL ",
         "PCF_UNIT": " VARCHAR(4) NULL DEFAULT NULL ",
         "PCF_PTC": " INT(2) NOT NULL ",
         "PCF_PFC": " INT(5) NOT NULL ",
