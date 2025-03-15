@@ -67,6 +67,7 @@ _pcf_cache = {}
 _cap_cache = {}
 _txp_cache = {}
 _pcf_descr_cache = {}
+_pid_to_pcf_name = {}
 
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
@@ -761,7 +762,7 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
 #
 #  Decode source data field of TM packet
 #  @param tm TM packet bytestring
-def Tmdata(tm, udef=False, floatfmt=None):
+def Tmdata(tm: bytes, udef=False, floatfmt=None):
     """
 
     :param tm:
@@ -869,14 +870,14 @@ def Tmdata(tm, udef=False, floatfmt=None):
 
         else:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,\
-            pcf.pcf_unit,pcf.pcf_pid,vpd_pos,vpd_grpsize,vpd_fixrep from vpd left join pcf on \
+            pcf.pcf_unit,pcf.pcf_pid,pcf_related,vpd_pos,vpd_grpsize,vpd_fixrep,vpd_pidref from vpd left join pcf on \
             vpd.vpd_name=pcf.pcf_name where vpd_tpsd={} AND pcf_name NOT LIKE "DPTG%" \
             AND pcf_name NOT LIKE "SCTG%" ORDER BY vpd_pos'.format(tpsd)
             dbres = dbcon.execute(que)
             params_in = dbres.fetchall()
 
             vals_params = read_variable_pckt(data, params_in)
-            tmdata = [(get_calibrated(i[0], j, floatfmt=floatfmt), i[6], i[1], pidfmt(i[7]), j) for j, i in vals_params]
+            tmdata = [(get_calibrated(i[0], j, floatfmt=floatfmt, ispid=i[-1], pidval=i[7]), i[6], i[1], pidfmt(i[7]), j) for j, i in vals_params]
             # tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         if spid is not None:
@@ -1558,7 +1559,7 @@ def read_variable_pckt(tm_data, parameters, tc=False):
     return result
 
 
-def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
+def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fmtpids=None):
     """
     Recursively operating function for decoding variable length packets
 
@@ -1571,22 +1572,26 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
     """
 
     decoded = [] if decoded is None else decoded
+    fmtpids = {} if fmtpids is None else fmtpids
 
     skip = 0
     for par_idx, par in enumerate(parameters):
         if skip > 0:
             skip -= 1
             continue
-        grp = par[-2]
+        grp = par[-3]
 
         if grp is None:  # None happens for UDEF
             grp = 0
 
         fmt = ptt(par[2], par[3])
         if fmt == 'deduced':
-            raise NotImplementedError('Deduced parameter type PTC=11')
+            fmt = get_pid_fmt(fmtpids.get(par[8]))
+            # add pid to par info for use in calibration func
+            par = par[:7] + (fmtpids.get(par[8]),) + par[8:]
+            # raise NotImplementedError('Deduced parameter type PTC=11')
 
-        fixrep = par[-1]
+        fixrep = par[-2]
 
         # don't use fixrep in case of a TC, since it is only defined for TMs
         if grp and fixrep and not tc:
@@ -1605,14 +1610,24 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
 
             decoded.append((value, par))
 
+        if par[-1].upper() == 'Y':
+            fmtpids[par[0]] = value
+
         if grp != 0:
             skip = grp
             rep = value
             while rep > 0:
-                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off, tc=tc)
+                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off, tc=tc, fmtpids=fmtpids)
                 rep -= 1
 
     return decoded
+
+
+def get_pid_fmt(pid):
+    if pid not in _dp_items:
+        # return None
+        raise ValueError('Cannot determine format for PID={}'.format(pid))
+    return _dp_items.get(pid).get('fmt')
 
 
 def tc_param_alias_reverse(paf, cca, val, pname=None):
@@ -1697,7 +1712,8 @@ def pidfmt_reverse(val):
 #  Calibrate raw parameter values
 #  @param pcf_name PCF_NAME
 #  @param rawval   Raw value of the parameter
-def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False, floatfmt=None):
+def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False, floatfmt=None,
+                   ispid='N', pidval=None):
     """
 
     :param pcf_name:
@@ -1706,11 +1722,17 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     :param numerical:
     :param dbcon:
     :param nocal:
+    :param floatfmt:
+    :param ispid:
     :return:
     """
 
     if rawval is None:
         return
+
+    # override pcf_name if parameter is deduced
+    if pidval is not None:
+        pcf_name = get_pcf_name_from_pid(pidval)
 
     if properties is None:
 
@@ -1743,6 +1765,9 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
             return rawval if isinstance(rawval, (int, float)) else rawval[0]
         except IndexError:
             return rawval
+
+    if ispid == 'Y':
+        return get_pid_name(rawval)
 
     if type_par == timepack[0]:
         return timecal(rawval)
@@ -4491,6 +4516,17 @@ def pcf_name_to_descr(pcfname):
     if res:
         _pcf_descr_cache[pcfname] = res[0][0]
         return res[0][0]
+
+
+def get_pcf_name_from_pid(pid):
+    if pid in _pid_to_pcf_name:
+        return _pid_to_pcf_name[pid]
+
+    que = 'SELECT pcf_name FROM pcf WHERE pcf_pid={}'.format(pid)
+    res = scoped_session_idb.execute(que).fetchall()
+    _pid_to_pcf_name[pid] = res[0][0]
+
+    return _pid_to_pcf_name[pid]
 
 
 def get_tm_id(pcf_descr=None):
@@ -7516,7 +7552,7 @@ try:
 except (SQLOperationalError, NotImplementedError, IndexError):
     logger.warning('Could not get S13 info from MIB, using default values')
     SDU_PAR_LENGTH = 1
-    S13_HEADER_LEN_TOTAL = 21
-    S13_DATALEN_PAR_OFFSET = 19
+    S13_HEADER_LEN_TOTAL = 25
+    S13_DATALEN_PAR_OFFSET = 23
     S13_DATALEN_PAR_SIZE = 2
 
