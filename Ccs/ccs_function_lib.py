@@ -1400,12 +1400,12 @@ def Tcdata(tm):
             raise ValueError('Unknown discriminant: {}'.format(fvalue))
 
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
-              ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
+              ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
               ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
 
     else:
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
-             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit FROM ccf left join cdf on \
+             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
              ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
              ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
 
@@ -1420,7 +1420,7 @@ def Tcdata(tm):
         #     cdf_pname=cpc_pname where ccf_type={} and ccf_stype={}'.format(st, sst))
         dbres = dbcon.execute(
             'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr, cpc_prfref,\
-             cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit FROM ccf left join cdf on ccf_cname=cdf_cname left join cpc on\
+             cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join cpc on\
              cdf_pname=cpc_pname where ccf_type={} and ccf_stype={}'.format(st, sst))
 
         params = dbres.fetchall()
@@ -1453,7 +1453,7 @@ def Tcdata(tm):
             params[params.index(par)] = newpar
 
     # check for variable length packet
-    var_len = any([p[-2] for p in params])
+    var_len = any([p[11] for p in params])
 
     if not var_len:
         #extr_fmt = ','.join([ptt[p[2]][p[3]] for p in params]) ### only 2010/6 key error 20
@@ -1610,7 +1610,7 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fm
 
             decoded.append((value, par))
 
-        if par[-1].upper() == 'Y':
+        if isinstance(par[-1], str) and par[-1].upper() == 'Y':
             fmtpids[par[0]] = value
 
         if grp != 0:
