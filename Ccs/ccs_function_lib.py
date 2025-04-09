@@ -148,6 +148,31 @@ ActivePoolInfo = NamedTuple(
         ('live', bool)])
 
 
+# save parameters used for python to java test conversion
+SAVE_PARAMETERS_ENABLED = False
+
+def enable_save_parameters():
+    """Enable the save_parameters_to_file function."""
+    global SAVE_PARAMETERS_ENABLED
+    SAVE_PARAMETERS_ENABLED = True
+
+def disable_save_parameters():
+    """Disable the save_parameters_to_file function."""
+    global SAVE_PARAMETERS_ENABLED
+    SAVE_PARAMETERS_ENABLED = False
+
+def save_parameters_to_file(parameters, filename="params_log.txt"):
+    """Save parameters to a file if the feature is enabled."""
+    if not SAVE_PARAMETERS_ENABLED:
+        return
+    else:
+        try:
+            with open(filename, "a") as file:
+                file.write(str(parameters))
+            print(f"Parameters saved to {filename}")
+        except Exception as e:
+            print(f"Error saving parameters: {e}")
+
 def _reset_mib_caches():
     _pcf_cache.clear()
     _cap_cache.clear()
@@ -3260,6 +3285,7 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
     else:
         raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
 
+    save_parameters_to_file(locals())
     return bytes(header.bin) + data
 
 
@@ -3275,6 +3301,8 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time=False):
 
     global counters
+
+    save_parameters_to_file(tc_bytes)
 
     # Note: in general, it is not possible to obtain the OBC time, thus the last packet time is used if available
     if pkt_time:
