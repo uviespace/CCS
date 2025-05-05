@@ -67,6 +67,7 @@ _pcf_cache = {}
 _cap_cache = {}
 _txp_cache = {}
 _pcf_descr_cache = {}
+_pid_to_pcf_name = {}
 
 project = cfg.get('ccs-database', 'project')
 pc = importlib.import_module(PCPREFIX + str(project).upper())
@@ -147,31 +148,6 @@ ActivePoolInfo = NamedTuple(
         ('pool_name', str),
         ('live', bool)])
 
-
-# save parameters used for python to java test conversion
-SAVE_PARAMETERS_ENABLED = False
-
-def enable_save_parameters():
-    """Enable the save_parameters_to_file function."""
-    global SAVE_PARAMETERS_ENABLED
-    SAVE_PARAMETERS_ENABLED = True
-
-def disable_save_parameters():
-    """Disable the save_parameters_to_file function."""
-    global SAVE_PARAMETERS_ENABLED
-    SAVE_PARAMETERS_ENABLED = False
-
-def save_parameters_to_file(parameters, filename="params_log.txt"):
-    """Save parameters to a file if the feature is enabled."""
-    if not SAVE_PARAMETERS_ENABLED:
-        return
-    else:
-        try:
-            with open(filename, "a") as file:
-                file.write(str(parameters))
-            print(f"Parameters saved to {filename}")
-        except Exception as e:
-            print(f"Error saving parameters: {e}")
 
 def _reset_mib_caches():
     _pcf_cache.clear()
@@ -786,7 +762,7 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
 #
 #  Decode source data field of TM packet
 #  @param tm TM packet bytestring
-def Tmdata(tm, udef=False, floatfmt=None):
+def Tmdata(tm: bytes, udef=False, floatfmt=None):
     """
 
     :param tm:
@@ -894,14 +870,14 @@ def Tmdata(tm, udef=False, floatfmt=None):
 
         else:
             que = 'SELECT pcf.pcf_name,pcf.pcf_descr,pcf.pcf_ptc,pcf.pcf_pfc,pcf.pcf_curtx,pcf.pcf_width,\
-            pcf.pcf_unit,pcf.pcf_pid,vpd_pos,vpd_grpsize,vpd_fixrep from vpd left join pcf on \
+            pcf.pcf_unit,pcf.pcf_pid,pcf_related,vpd_pos,vpd_grpsize,vpd_fixrep,vpd_pidref from vpd left join pcf on \
             vpd.vpd_name=pcf.pcf_name where vpd_tpsd={} AND pcf_name NOT LIKE "DPTG%" \
             AND pcf_name NOT LIKE "SCTG%" ORDER BY vpd_pos'.format(tpsd)
             dbres = dbcon.execute(que)
             params_in = dbres.fetchall()
 
             vals_params = read_variable_pckt(data, params_in)
-            tmdata = [(get_calibrated(i[0], j, floatfmt=floatfmt), i[6], i[1], pidfmt(i[7]), j) for j, i in vals_params]
+            tmdata = [(get_calibrated(i[0], j, floatfmt=floatfmt, ispid=i[-1], pidval=i[7]), i[6], i[1], pidfmt(i[7]), j) for j, i in vals_params]
             # tmdata = [(get_calibrated(i[0], j[0]), i[6], i[1], pidfmt(i[7]), j) for i, j in zip(params, vals_params)]
 
         if spid is not None:
@@ -1424,12 +1400,12 @@ def Tcdata(tm):
             raise ValueError('Unknown discriminant: {}'.format(fvalue))
 
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
-              ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
+              ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
               ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
 
     else:
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
-             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit FROM ccf left join cdf on \
+             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
              ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
              ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
 
@@ -1444,7 +1420,7 @@ def Tcdata(tm):
         #     cdf_pname=cpc_pname where ccf_type={} and ccf_stype={}'.format(st, sst))
         dbres = dbcon.execute(
             'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr, cpc_prfref,\
-             cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit FROM ccf left join cdf on ccf_cname=cdf_cname left join cpc on\
+             cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join cpc on\
              cdf_pname=cpc_pname where ccf_type={} and ccf_stype={}'.format(st, sst))
 
         params = dbres.fetchall()
@@ -1477,7 +1453,7 @@ def Tcdata(tm):
             params[params.index(par)] = newpar
 
     # check for variable length packet
-    var_len = any([p[-2] for p in params])
+    var_len = any([p[11] for p in params])
 
     if not var_len:
         #extr_fmt = ','.join([ptt[p[2]][p[3]] for p in params]) ### only 2010/6 key error 20
@@ -1583,7 +1559,7 @@ def read_variable_pckt(tm_data, parameters, tc=False):
     return result
 
 
-def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
+def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fmtpids=None):
     """
     Recursively operating function for decoding variable length packets
 
@@ -1596,22 +1572,26 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
     """
 
     decoded = [] if decoded is None else decoded
+    fmtpids = {} if fmtpids is None else fmtpids
 
     skip = 0
     for par_idx, par in enumerate(parameters):
         if skip > 0:
             skip -= 1
             continue
-        grp = par[-2]
+        grp = par[-3]
 
         if grp is None:  # None happens for UDEF
             grp = 0
 
         fmt = ptt(par[2], par[3])
         if fmt == 'deduced':
-            raise NotImplementedError('Deduced parameter type PTC=11')
+            fmt = get_pid_fmt(fmtpids.get(par[8]))
+            # add pid to par info for use in calibration func
+            par = par[:7] + (fmtpids.get(par[8]),) + par[8:]
+            # raise NotImplementedError('Deduced parameter type PTC=11')
 
-        fixrep = par[-1]
+        fixrep = par[-2]
 
         # don't use fixrep in case of a TC, since it is only defined for TMs
         if grp and fixrep and not tc:
@@ -1630,14 +1610,24 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False):
 
             decoded.append((value, par))
 
+        if isinstance(par[-1], str) and par[-1].upper() == 'Y':
+            fmtpids[par[0]] = value
+
         if grp != 0:
             skip = grp
             rep = value
             while rep > 0:
-                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off, tc=tc)
+                decoded = read_stream_recursive(tms, parameters[par_idx + 1:par_idx + 1 + grp], decoded, bit_off=bit_off, tc=tc, fmtpids=fmtpids)
                 rep -= 1
 
     return decoded
+
+
+def get_pid_fmt(pid):
+    if pid not in _dp_items:
+        # return None
+        raise ValueError('Cannot determine format for PID={}'.format(pid))
+    return _dp_items.get(pid).get('fmt')
 
 
 def tc_param_alias_reverse(paf, cca, val, pname=None):
@@ -1722,7 +1712,8 @@ def pidfmt_reverse(val):
 #  Calibrate raw parameter values
 #  @param pcf_name PCF_NAME
 #  @param rawval   Raw value of the parameter
-def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False, floatfmt=None):
+def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=None, nocal=False, floatfmt=None,
+                   ispid='N', pidval=None):
     """
 
     :param pcf_name:
@@ -1731,11 +1722,17 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
     :param numerical:
     :param dbcon:
     :param nocal:
+    :param floatfmt:
+    :param ispid:
     :return:
     """
 
     if rawval is None:
         return
+
+    # override pcf_name if parameter is deduced
+    if pidval is not None:
+        pcf_name = get_pcf_name_from_pid(pidval)
 
     if properties is None:
 
@@ -1768,6 +1765,9 @@ def get_calibrated(pcf_name, rawval, properties=None, numerical=False, dbcon=Non
             return rawval if isinstance(rawval, (int, float)) else rawval[0]
         except IndexError:
             return rawval
+
+    if ispid == 'Y':
+        return get_pid_name(rawval)
 
     if type_par == timepack[0]:
         return timecal(rawval)
@@ -3285,7 +3285,6 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
     else:
         raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
 
-    save_parameters_to_file(locals())
     return bytes(header.bin) + data
 
 
@@ -3301,8 +3300,6 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
 def _tcsend_common(tc_bytes, apid, st, sst, sleep=0., pool_name='LIVE', pkt_time=False):
 
     global counters
-
-    save_parameters_to_file(tc_bytes)
 
     # Note: in general, it is not possible to obtain the OBC time, thus the last packet time is used if available
     if pkt_time:
@@ -3664,7 +3661,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
 
 
 def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
-                   progress=True, calc_crc=True, byte_align=4):
+                   progress=True, calc_crc=True, byte_align=4, dryrun=False):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_bytes_ function until
@@ -3681,6 +3678,7 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
     :param progress:
     :param calc_crc:
     :param byte_align:
+    :param dryrun:
     :return:
     """
 
@@ -3689,6 +3687,9 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
             data = open(data, 'rb').read()
         else:
             raise TypeError('Data is not bytes or str')
+
+    if dryrun:
+        print('DRYRUN -- NO PACKETS ARE BEING SENT!')
 
     if byte_align and (len(data) % byte_align):
         logger.warning('Data is not {}-byte aligned, padding.'.format(byte_align))
@@ -3699,13 +3700,22 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
     pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + len(endspares) + PEC_LEN
     payload_len = max_pkt_size - pkt_overhead
 
+    # ensure packet payload byte alignment
+    payload_len = (payload_len // byte_align) * byte_align
+
     memid = get_mem_id(memid, memid_ref)
 
     # get permanent pmgr handle to avoid requesting one for each packet
-    pmgr = _get_pmgr_handle(tc_pool=pool_name)
+    if not dryrun:
+        pmgr = _get_pmgr_handle(tc_pool=pool_name)
 
     data_size = len(data)
     startaddr = memaddr
+
+    if len(fmt) == 4:  # PUS-A
+        nseg_and_memid = [memid]
+    else:  # PUS-C, use one segment only
+        nseg_and_memid = [1, memid]
 
     upload_bytes = b''
     pcnt = 0
@@ -3719,14 +3729,16 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
         t1 = time.time()
 
         # create PUS packet
-        packetdata = struct.pack(fmt, memid, startaddr, len(sli)) + sli + endspares
+        packetdata = struct.pack(fmt, *nseg_and_memid, startaddr, len(sli)) + sli + endspares
         seq_cnt = counters.setdefault(apid, 0)
         puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=seq_cnt, ack=ack)
 
         if len(puspckt) > MAX_PKT_LEN:
             logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
 
-        Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+        if not dryrun:
+            Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+
         # collect all uploaded segments for CRC at the end
         upload_bytes += sli
         pcnt += 1
@@ -4519,6 +4531,17 @@ def pcf_name_to_descr(pcfname):
     if res:
         _pcf_descr_cache[pcfname] = res[0][0]
         return res[0][0]
+
+
+def get_pcf_name_from_pid(pid):
+    if pid in _pid_to_pcf_name:
+        return _pid_to_pcf_name[pid]
+
+    que = 'SELECT pcf_name FROM pcf WHERE pcf_pid={}'.format(pid)
+    res = scoped_session_idb.execute(que).fetchall()
+    _pid_to_pcf_name[pid] = res[0][0]
+
+    return _pid_to_pcf_name[pid]
 
 
 def get_tm_id(pcf_descr=None):
@@ -6483,190 +6506,6 @@ class LoadInfo(Gtk.Window):
             print(err)
 
 
-class TestReport:
-    """
-    Provides functions for interactive test reporting
-    """
-    def __init__(self, filename, version, idb_version, gui=False, delimiter='|'):
-        super(TestReport, self).__init__()
-        self.specfile = filename
-        self.delimiter = delimiter
-        self.gui = gui
-        self.report = dict()
-
-        self.version = int(version)
-        self.idb_version = str(idb_version)
-
-        self.step_rowid = dict()
-        self._read_test_spec(filename)
-
-        self.testname = self.report[1][0]
-
-    def _read_test_spec(self, filename):
-        with open(filename, 'r') as fd:
-            csv = fd.readlines()
-
-        for i, line in enumerate(csv):
-            items = line.strip().split(self.delimiter)
-            self.report[i] = items
-            if items[0].startswith('Step '):
-                self.step_rowid[items[0]] = i
-
-    def execute_step(self, step, ask=True):
-        """
-
-        :param step:
-        :param ask:
-        :return:
-        """
-        if not ask:
-            return
-
-        try:
-            exe_msg = '{}:\n{}'.format(step.upper(), self.report[self.step_rowid[str(step)]][1])
-            if self.gui:
-                dialog = TestExecGUI(self.report[1][0], exe_msg)
-                response = dialog.run()
-
-                if response == Gtk.ResponseType.YES:
-                    dialog.destroy()
-                    execute = True
-                else:
-                    dialog.destroy()
-                    execute = False
-
-            else:
-                execute = input(exe_msg + ':\n(y/n)? > ')
-                while execute.lower() not in ('y', 'yes', 'n', 'no'):
-                    execute = input(exe_msg + ':\n(y/n)? > ')
-
-                if execute in ('y', 'yes'):
-                    execute = True
-                else:
-                    execute = False
-
-            if execute:
-                return
-            else:
-                pass  # TODO: abort step execution
-
-        except KeyError:
-            logger.error('"{}": no such step defined!'.format(str(step)))
-            return
-
-    def verify_step(self, step):
-        """
-
-        :param step:
-        :return:
-        """
-        try:
-            ver_msg = '{}:\n{}'.format(step.upper(), self.report[self.step_rowid[str(step)]][2])
-            if self.gui:
-                dialog = TestReportGUI(self.report[1][0], ver_msg)
-                response = dialog.run()
-
-                if response == Gtk.ResponseType.YES:
-                    result = 'OK'
-                    comment = dialog.comment.get_text()
-                    dialog.destroy()
-                elif response == Gtk.ResponseType.NO:
-                    result = 'NOT_OK'
-                    comment = dialog.comment.get_text()
-                    dialog.destroy()
-                else:
-                    dialog.destroy()
-                    return
-
-                if comment:
-                    result += ' ({})'.format(comment)
-
-            else:
-                result = input(ver_msg + ':\n>')
-
-        except KeyError:
-            logger.error('"{}": no such step defined!'.format(str(step)))
-            return
-
-        self.report[self.step_rowid[str(step)]][3] = result
-
-    def export(self, reportdir=None, reportfile=None):
-        """
-
-        :param reportdir:
-        :param reportfile:
-        """
-        if reportfile is None:
-            if reportdir is None:
-                reportfile = self.specfile.replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version)).replace('/testspec/', '/testrep/')
-            else:
-                reportdir += '/' if not reportdir.endswith('/') else ''
-                reportfile = reportdir + self.specfile.split('/')[-1].replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version))
-
-        self.report[1][3] += ' TR-{:03d}, MIB v{}'.format(self.version, self.idb_version)
-        self.report[2][3] = time.strftime('%Y-%m-%d')
-
-        buf = '\n'.join([self.delimiter.join(self.report[line]) for line in range(len(self.report))])
-
-        Path(os.path.dirname(reportfile)).mkdir(parents=True, exist_ok=True)  # create directory if it does not exist
-
-        with open(reportfile, 'w') as fd:
-            fd.write(buf + '\n')
-        logger.info('Report written to {}.'.format(reportfile))
-        print('Report written to {}.'.format(reportfile))
-
-
-class TestReportGUI(Gtk.MessageDialog):
-    """
-    GUI for the TestReport class
-    """
-    def __init__(self, testlabel, message):
-        super(TestReportGUI, self).__init__(title=testlabel,
-                                            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                                     Gtk.STOCK_NO, Gtk.ResponseType.NO,
-                                                     Gtk.STOCK_YES, Gtk.ResponseType.YES,))
-
-        head, body = self.get_message_area().get_children()
-        head.set_text(message)
-
-        cancel, fail, verify = self.get_action_area().get_children()
-
-        cancel.get_child().get_child().get_children()[1].set_label('Skip')
-        fail.get_child().get_child().get_children()[1].set_label('FAILED')
-        verify.get_child().get_child().get_children()[1].set_label('VERIFIED')
-
-        self.comment = Gtk.Entry()
-        self.comment.set_placeholder_text('Optional comment')
-        self.get_message_area().add(self.comment)
-
-        verify.grab_focus()
-
-        self.show_all()
-
-
-class TestExecGUI(Gtk.MessageDialog):
-    """
-    Dialog window to confirm test step execution
-    """
-    def __init__(self, testlabel, message):
-        super(TestExecGUI, self).__init__(title=testlabel,
-                                          buttons=(# Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                                   Gtk.STOCK_YES, Gtk.ResponseType.YES,))
-
-        head, body = self.get_message_area().get_children()
-        head.set_text(message)
-
-        # abort, exe = self.get_action_area().get_children()
-        exe, = self.get_action_area().get_children()
-
-        # abort.get_child().get_child().get_children()[1].set_label('ABORT')
-        exe.get_child().get_child().get_children()[1].set_label('EXECUTE')
-
-        exe.grab_focus()
-
-        self.show_all()
-
-
 class TmParameterDecoderDialog(Gtk.Dialog):
     """
     Interface to define custom paramters
@@ -7544,7 +7383,7 @@ try:
 except (SQLOperationalError, NotImplementedError, IndexError):
     logger.warning('Could not get S13 info from MIB, using default values')
     SDU_PAR_LENGTH = 1
-    S13_HEADER_LEN_TOTAL = 21
-    S13_DATALEN_PAR_OFFSET = 19
+    S13_HEADER_LEN_TOTAL = 25
+    S13_DATALEN_PAR_OFFSET = 23
     S13_DATALEN_PAR_SIZE = 2
 
