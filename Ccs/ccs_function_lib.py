@@ -3661,7 +3661,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
 
 
 def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
-                   progress=True, calc_crc=True, byte_align=4):
+                   progress=True, calc_crc=True, byte_align=4, dryrun=False):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_bytes_ function until
@@ -3678,6 +3678,7 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
     :param progress:
     :param calc_crc:
     :param byte_align:
+    :param dryrun:
     :return:
     """
 
@@ -3686,6 +3687,9 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
             data = open(data, 'rb').read()
         else:
             raise TypeError('Data is not bytes or str')
+
+    if dryrun:
+        print('DRYRUN -- NO PACKETS ARE BEING SENT!')
 
     if byte_align and (len(data) % byte_align):
         logger.warning('Data is not {}-byte aligned, padding.'.format(byte_align))
@@ -3696,13 +3700,22 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
     pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + len(endspares) + PEC_LEN
     payload_len = max_pkt_size - pkt_overhead
 
+    # ensure packet payload byte alignment
+    payload_len = (payload_len // byte_align) * byte_align
+
     memid = get_mem_id(memid, memid_ref)
 
     # get permanent pmgr handle to avoid requesting one for each packet
-    pmgr = _get_pmgr_handle(tc_pool=pool_name)
+    if not dryrun:
+        pmgr = _get_pmgr_handle(tc_pool=pool_name)
 
     data_size = len(data)
     startaddr = memaddr
+
+    if len(fmt) == 4:  # PUS-A
+        nseg_and_memid = [memid]
+    else:  # PUS-C, use one segment only
+        nseg_and_memid = [1, memid]
 
     upload_bytes = b''
     pcnt = 0
@@ -3716,14 +3729,16 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
         t1 = time.time()
 
         # create PUS packet
-        packetdata = struct.pack(fmt, memid, startaddr, len(sli)) + sli + endspares
+        packetdata = struct.pack(fmt, *nseg_and_memid, startaddr, len(sli)) + sli + endspares
         seq_cnt = counters.setdefault(apid, 0)
         puspckt = Tcpack(data=packetdata, st=6, sst=2, apid=apid, sc=seq_cnt, ack=ack)
 
         if len(puspckt) > MAX_PKT_LEN:
             logger.warning('Packet length ({}) exceeding MAX_PKT_LEN of {} bytes!'.format(len(puspckt), MAX_PKT_LEN))
 
-        Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+        if not dryrun:
+            Tcsend_bytes(puspckt, pool_name=pool_name, pmgr_handle=pmgr)
+
         # collect all uploaded segments for CRC at the end
         upload_bytes += sli
         pcnt += 1
