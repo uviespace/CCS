@@ -74,7 +74,7 @@ public class {filename} extends PlCbkFgsArielTestSequence {{
 			getSpwN().isLinkStarted();
 
             SpwSpyPacket spwPkt = spySpwN.getPacket();
-            byte[] data = spwPkt.getData();
+            // byte[] data = spwPkt.getData();
 
             byte[] pkt = new byte[1032];
         """
@@ -112,7 +112,7 @@ def send_bytes(byte_array):
 
             sim.timeStep(1);
 			
-			System.out.println(Arrays.toString(data));
+			//System.out.println(Arrays.toString(data));
 			tester.logSection("Check msg");
 			sim.activateMethod(dpuName + ".dumpTm");
         """
