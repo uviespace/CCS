@@ -146,6 +146,21 @@ def sequence_counter(data):
     next_byte = data[3]
     return (lower6 << 8) | next_byte
 
+def execute_code(code, namespace, data, step):
+    """
+    Execute the given code in the provided namespace.
+    """
+    try:
+        print("TEST: " + data['_name'])
+        print("STEP: " + step['_step_number'])
+        print("DESCRIPTION: " + step['_description'])
+        print("CODE:\n" + code)
+        print("VERIFICATION: " + step['_verification_description'] + "\n")
+        exec(code, namespace)
+    except Exception as e:
+        print(f"Error executing code: {e}")
+        raise
+
 def run(jfile, output_path):
 
     if os.path.isfile(jfile):
@@ -168,15 +183,6 @@ def run(jfile, output_path):
     script += log_note('--------------------------------------------')
     script += log_note('COMMENT: {}'.format(data['_comment'].replace('\n', '\n# ')))
 
-    # if reportfunc:
-    #     if specfile is None:
-    #         specfile = '{}-TS-{}.csv_PIPE'.format(data['_name'], data['_spec_version'])
-    #     script += 'specfile = "{}"\n'.format(specfile)
-    #     script += 'rep_version = 1\n'
-    #     script += 'mib_version = "{}"\n'.format(MIB_VERSION)
-    #     script += 'ask_tc_exec = True\n'
-    #     script += 'report = cfl.TestReport(specfile, rep_version, mib_version, gui=True)\n\n'
-
     # # init code
     # script += '# INIT CODE\n{}\n#! CCS.BREAKPOINT\n\n'.format(data.get('_custom_imports'))
 
@@ -191,52 +197,42 @@ def run(jfile, output_path):
         cmd_code = step['_command_code'].strip()
         cmd_code += '\n' if cmd_code else ''
 
-        # if reportfunc:
-        #     step_tag = 'Step {}'.format(step['_step_number'])
-        #     exec_step = 'report.execute_step("{}", ask=ask_tc_exec)\n'.format(step_tag)
-        #     verif_step = 'report.verify_step("{}")\n'.format(step_tag)
-        # else:
-        #     exec_step = ''
-        #     verif_step = ''
-
         txt = "\n" + log_step('STEP {}'.format(step['_step_number']))
         txt += log_note('{}'.format(step['_description']).replace('\n', ''))
 
-        # TODO: Add the command code, extract byte_str
-        # if _tcsend_common in code pick tc
-        # if Tcsend_DB --> Tcbuild pick return
-
         print("\n\n")
-        cmd_code = cmd_code.replace("cfl.Tcsend_DB", "tc, tc_para = cfl.Tcbuild").replace("sent = cfl._tcsend_common", "# sent = cfl._tcsend_common")
-        cmd_code_lines = cmd_code.splitlines()
-        skip_i = None
-        for i_code_lines, line in enumerate(cmd_code_lines):
-            if i_code_lines == skip_i:
-                skip_i = None
-                continue
-
-            indent = re.match(r"\s*", line).group()
-            if "Tcbuild" in line:
-                if not "wrong Source ID" in step['_description']:
-                    cmd_code_lines.insert(i_code_lines+1, indent + "try: cfl.counters[int(str(apid), 0)] += 1\n" + indent + "except: cfl.counters[int(str(tc_para[-1]), 0)] += 1")
-                    skip_i = i_code_lines + 1
-                    
-        cmd_code = "\n".join(cmd_code_lines) + "\n"
-
-        if ("\nfor" in cmd_code or cmd_code.startswith("for")) and "    tc" in cmd_code or "\ttc" in cmd_code:
-            cmd_code = "tcs = []\n" + cmd_code
-            cmd_code += "    tcs.append(tc)"
-            print(data['_name'])
-            print(step['_step_number'])
-            print(cmd_code)
-            exec(cmd_code, namespace)
-            result = namespace["tcs"] if "tcs" in namespace else None
+        if cmd_code == '':
+            print("TEST: " + data['_name'])
+            print("STEP: " + step['_step_number'])
+            print("DESCRIPTION: " + step['_description'])
+            print("CODE:\n" + cmd_code)
+            print("VERIFICATION: " + step['_verification_description'] + "\n")
+            result = ''
         else:
-            print(data['_name'])
-            print(step['_step_number'])
-            print(cmd_code)
-            exec(cmd_code, namespace)
-            result = namespace["tc"] if "tc" in namespace else None
+            cmd_code = cmd_code.replace("cfl.Tcsend_DB", "tc, tc_para = cfl.Tcbuild").replace("sent = cfl._tcsend_common", "# sent = cfl._tcsend_common")
+            cmd_code_lines = cmd_code.splitlines()
+            skip_i = None
+            for i_code_lines, line in enumerate(cmd_code_lines):
+                if i_code_lines == skip_i:
+                    skip_i = None
+                    continue
+
+                indent = re.match(r"\s*", line).group()
+                if "Tcbuild" in line:
+                    if not "wrong Source ID" in step['_description']:
+                        cmd_code_lines.insert(i_code_lines+1, indent + "try: cfl.counters[int(str(apid), 0)] += 1\n" + indent + "except: cfl.counters[int(str(tc_para[-1]), 0)] += 1")
+                        skip_i = i_code_lines + 1
+                        
+            cmd_code = "\n".join(cmd_code_lines) + "\n"
+
+            if ("\nfor" in cmd_code or cmd_code.startswith("for")) and "    tc" in cmd_code or "\ttc" in cmd_code:
+                cmd_code = "tcs = []\n" + cmd_code
+                cmd_code += "    tcs.append(tc)"
+                execute_code(cmd_code, namespace, data, step)
+                result = namespace["tcs"] if "tcs" in namespace else None
+            else:
+                execute_code(cmd_code, namespace, data, step)
+                result = namespace["tc"] if "tc" in namespace else None
         
         print("Returned:", result)
         if isinstance(result, bytes):
@@ -258,24 +254,10 @@ def run(jfile, output_path):
         if comment != '':
             txt += log_note('COMMENT: {}'.format(comment))
 
-        # txt = '# STEP {}\n' \
-        #       '# {}\n' \
-        #       '{}' \
-        #       '{}' \
-        #       '# VERIFICATION: {}\n{}{}\n#! CCS.BREAKPOINT\n\n'.format(step['_step_number'], replace_newline(step['_description']), exec_step,
-        #                                                               cmd_code,
-        #                                                               replace_newline(step['_verification_description']),
-        #                                                               verif_step,
-        #                                                               # step['_verification_code'].strip(), # Add verification code
-        #                                                               comment)
-
         script += txt
 
     script += log_note('POSTCONDITIONS: {}'.format(data['_postcon_descr']))
     # script += data['_postcon_code'].strip()  # Add the postcondition code
-
-    # if reportfunc:
-    #     script += '\nreport.export()\n\n'
 
     script += END
 
@@ -322,3 +304,4 @@ if __name__ == '__main__':
         run(json_file, output_path)
         print("Your converted JSON files are in the directory: " + output_path)
 
+# TODO: Check Packet length discrepancy
