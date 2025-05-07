@@ -192,6 +192,8 @@ def run(jfile, output_path):
     namespace = {"cfl": cfl,
                  "tcs": [],
                  "time": time,}
+    # reset all counters for new test
+    exec("cfl.counters.clear()", namespace)
     for step in data['sequences'][0]['steps']:
         comment = log_note('COMMENT: {}'.format(step['_step_comment'])) if step['_step_comment'] != '' else ''
         cmd_code = step['_command_code'].strip()
