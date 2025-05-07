@@ -287,10 +287,12 @@ if __name__ == '__main__':
     input_path = sys.argv[1]
     if os.path.isfile(input_path):
         json_files = [input_path]
+        output_path = os.path.join(os.path.dirname(input_path) + "_java")
     else:
         json_files = [os.path.join(input_path, f) for f in os.listdir(input_path) if f.endswith('.json')]
+        output_path = os.path.join(input_path + "_java")
 
-    output_path = os.path.join(os.path.dirname(input_path) + "_java")
+    
 
     os.makedirs(output_path, exist_ok=True)
 
