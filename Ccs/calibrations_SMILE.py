@@ -1,7 +1,7 @@
 """
 Calibration functions and utilities for raw/engineering conversions in SMILE
 
-Data from SMILE-IWF-PL-UM-147-d0-3_SXI_EBox_User_Manual (ID 5233)
+Data from SMILE-IWF-PL-UM-147-d0-3_SXI_EBox_User_Manual (ID 5233) and SMILE-IWF-PL-UM-147-i1-0_SXI_EBox_User_Manual (ID 5233)
 """
 
 import os
@@ -12,8 +12,17 @@ import scipy as sp
 T_ZERO = 273.15
 
 # common ADC coefficients
-ADC_INPRNG = 7.34783  # V
-ADC_OFFSET = -1.69565  # V
+# EQM (?)
+# ADC_INPRNG = 7.34783  # V
+# ADC_OFFSET = -1.69565  # V
+
+# PFM
+# # nom
+ADC_INPRNG = 7.58261  # V
+ADC_OFFSET = -1.76956  # V
+# # red
+# ADC_INPRNG = 7.54783  # V
+# ADC_OFFSET = -1.77391  # V
 
 
 class Dpu:
@@ -52,9 +61,20 @@ class Temp:
 
 # Signal specific coefficients
 class V_T0:
-    CCD = 2.5650
-    TEMP1 = 2.5770
-    FEE = 1.2800
+    # EQM
+    # CCD = 2.5650
+    # TEMP1 = 2.5770
+    # FEE = 1.2800
+
+    # PFM
+    # # nom
+    CCD = 2.5688
+    TEMP1 = 2.5599
+    FEE = 1.2749
+    # # red
+    # CCD = 2.5547
+    # TEMP1 = 2.5649
+    # FEE = 1.2779
 
 
 class K_T:
@@ -65,36 +85,113 @@ class K_T:
 
 # interpolation table for nominal operation CCD temperature
 # (degC, ADC_V, ADU_dec, ADU_hex)
+# EQM
+# CCD_TEMP_TABLE = [
+#     (-140.0, 1.125, 6288, 0x1890),
+#     (-135.0, 1.178, 6407, 0x1906),
+#     (-130.0, 1.231, 6524, 0x197C),
+#     (-125.0, 1.283, 6642, 0x19F1),
+#     (-120.0, 1.336, 6759, 0x1A66),
+#     (-115.0, 1.388, 6876, 0x1ADB),
+#     (-110.0, 1.440, 6992, 0x1B50),
+#     (-105.0, 1.493, 7109, 0x1BC4),
+#     (-100.0, 1.545, 7225, 0x1C38),
+#     (-95.0, 1.596, 7340, 0x1CAC),
+#     (-90.0, 1.648, 7456, 0x1D1F),
+#     (-85.0, 1.700, 7571, 0x1D92),
+#     (-80.0, 1.751, 7686, 0x1E05),
+#     (-75.0, 1.803, 7800, 0x1E78),
+#     (-70.0, 1.854, 7915, 0x1EEA),
+#     (-65.0, 1.905, 8029, 0x1F5D),
+#     (-60.0, 1.957, 8143, 0x1FCF),
+#     (-55.0, 2.008, 8257, 0x2040),
+#     (-50.0, 2.059, 8371, 0x20B2),
+#     (-45.0, 2.109, 8484, 0x2123),
+#     (-40.0, 2.160, 8597, 0x2195),
+#     (-35.0, 2.211, 8710, 0x2206),
+#     (-30.0, 2.261, 8823, 0x2276),
+#     (-25.0, 2.312, 8936, 0x22E7),
+#     (-20.0, 2.362, 9048, 0x2358)
+# ]
+
+# PFM
+# # nom
 CCD_TEMP_TABLE = [
-    (-140.0, 1.125, 6288, 0x1890),
-    (-135.0, 1.178, 6407, 0x1906),
-    (-130.0, 1.231, 6524, 0x197C),
-    (-125.0, 1.283, 6642, 0x19F1),
-    (-120.0, 1.336, 6759, 0x1A66),
-    (-115.0, 1.388, 6876, 0x1ADB),
-    (-110.0, 1.440, 6992, 0x1B50),
-    (-105.0, 1.493, 7109, 0x1BC4),
-    (-100.0, 1.545, 7225, 0x1C38),
-    (-95.0, 1.596, 7340, 0x1CAC),
-    (-90.0, 1.648, 7456, 0x1D1F),
-    (-85.0, 1.700, 7571, 0x1D92),
-    (-80.0, 1.751, 7686, 0x1E05),
-    (-75.0, 1.803, 7800, 0x1E78),
-    (-70.0, 1.854, 7915, 0x1EEA),
-    (-65.0, 1.905, 8029, 0x1F5D),
-    (-60.0, 1.957, 8143, 0x1FCF),
-    (-55.0, 2.008, 8257, 0x2040),
-    (-50.0, 2.059, 8371, 0x20B2),
-    (-45.0, 2.109, 8484, 0x2123),
-    (-40.0, 2.160, 8597, 0x2195),
-    (-35.0, 2.211, 8710, 0x2206),
-    (-30.0, 2.261, 8823, 0x2276),
-    (-25.0, 2.312, 8936, 0x22E7),
-    (-20.0, 2.362, 9048, 0x2358)
+    (-140.0, 1.123, 6250, 0x186A),
+    (-135.0, 1.176, 6364, 0x18DC),
+    (-130.0, 1.229, 6478, 0x194E),
+    (-125.0, 1.281, 6592, 0x19C0),
+    (-120.0, 1.334, 6705, 0x1A31),
+    (-115.0, 1.386, 6818, 0x1AA2),
+    (-110.0, 1.438, 6931, 0x1B13),
+    (-105.0, 1.491, 7044, 0x1B84),
+    (-100.0, 1.542, 7156, 0x1BF4),
+    (-95.0, 1.594, 7268, 0x1C64),
+    (-90.0, 1.646, 7380, 0x1CD4),
+    (-85.0, 1.698, 7491, 0x1D43),
+    (-80.0, 1.749, 7602, 0x1DB2),
+    (-75.0, 1.800, 7713, 0x1E21),
+    (-70.0, 1.852, 7824, 0x1E90),
+    (-65.0, 1.903, 7935, 0x1EFF),
+    (-60.0, 1.954, 8045, 0x1F6D),
+    (-55.0, 2.005, 8155, 0x1FDB),
+    (-50.0, 2.056, 8265, 0x2049),
+    (-45.0, 2.107, 8375, 0x20B7),
+    (-40.0, 2.157, 8484, 0x2124),
+    (-35.0, 2.208, 8594, 0x2192),
+    (-30.0, 2.258, 8703, 0x21FF),
+    (-25.0, 2.309, 8812, 0x226C),
+    (-20.0, 2.359, 8921, 0x22D9)
 ]
+#
+# # red
+# CCD_TEMP_TABLE = [
+#     (-140.0, 1.121, 6283, 0x188B),
+#     (-135.0, 1.174, 6398, 0x18FE),
+#     (-130.0, 1.226, 6512, 0x1970),
+#     (-125.0, 1.279, 6626, 0x19E2),
+#     (-120.0, 1.331, 6740, 0x1A54),
+#     (-115.0, 1.383, 6853, 0x1AC5),
+#     (-110.0, 1.436, 6966, 0x1B36),
+#     (-105.0, 1.488, 7079, 0x1BA7),
+#     (-100.0, 1.539, 7192, 0x1C18),
+#     (-95.0, 1.591, 7304, 0x1C88),
+#     (-90.0, 1.643, 7416, 0x1CF8),
+#     (-85.0, 1.694, 7528, 0x1D68),
+#     (-80.0, 1.746, 7639, 0x1DD7),
+#     (-75.0, 1.797, 7750, 0x1E46),
+#     (-70.0, 1.848, 7861, 0x1EB5),
+#     (-65.0, 1.899, 7972, 0x1F24),
+#     (-60.0, 1.950, 8083, 0x1F93),
+#     (-55.0, 2.001, 8193, 0x2001),
+#     (-50.0, 2.052, 8304, 0x2070),
+#     (-45.0, 2.102, 8414, 0x20DE),
+#     (-40.0, 2.153, 8523, 0x214B),
+#     (-35.0, 2.203, 8633, 0x21B9),
+#     (-30.0, 2.254, 8742, 0x2226),
+#     (-25.0, 2.304, 8852, 0x2294),
+#     (-20.0, 2.354, 8961, 0x2301)
+# ]
+
 
 # interpolation table for PSU temperature
 # (degC, ADC_V, ADU_dec, ADU_hex)
+# EQM
+# PSU_TEMP = [
+#     (-50.0, 3.237, 10998, 0x2AF6),
+#     (-40.0, 3.187, 10887, 0x2A86),
+#     (-20.0, 2.960, 10380, 0x288C),
+#     (0.0, 2.487, 9326, 0x246D),
+#     (20.0, 1.816, 7830, 0x1E95),
+#     (25.0, 1.643, 7444, 0x1D13),
+#     (40.0, 1.169, 6387, 0x18F3),
+#     (60.0, 0.703, 5348, 0x14E4),
+#     (80.0, 0.417, 4710, 0x1266),
+#     (90.0, 0.323, 4501, 0x1194),
+#     (100.0, 0.252, 4343, 0x10F6)
+# ]
+
+# PFM
 PSU_TEMP = [
     (-50.0, 3.237, 10998, 0x2AF6),
     (-40.0, 3.187, 10887, 0x2A86),
@@ -121,10 +218,20 @@ class Psu:
     ADC_I_HEATER = "HK_ADC_I_HEATER"
 
 
+# EQM
+# K_PSU = {
+#     Psu.ADC_I_FEE_ANA: 0.3058,
+#     Psu.ADC_I_FEE_DIG: 0.1528,
+#     Psu.ADC_I_DPU: 0.4913,
+#     Psu.ADC_I_RSE: 0.844,
+#     Psu.ADC_I_HEATER: 0.4349
+# }
+
+# PFM
 K_PSU = {
     Psu.ADC_I_FEE_ANA: 0.3058,
     Psu.ADC_I_FEE_DIG: 0.1528,
-    Psu.ADC_I_DPU: 0.4913,
+    Psu.ADC_I_DPU: 0.603,
     Psu.ADC_I_RSE: 0.844,
     Psu.ADC_I_HEATER: 0.4349
 }
@@ -147,12 +254,19 @@ class Rse:
 
 
 # fit polynomial of degree POLY_DEG through CCD ADU-degC relation (operational range)
-_ccd_temp_adu_array = np.array(CCD_TEMP_TABLE).T  # (degC, ADC_V, ADU_dec, ADU_hex)
+# IASW coefs for EQM: [-3.55073060e+02,  2.04890302e-02,  3.32985037e-06, -2.20945595e-10, 6.07858723e-15]
+# IASW coefs for PFM nom: ['-4.02587E+02', '4.33198E-02', '-9.26990E-07', '1.53423E-10', '-6.16102E-15']
+# IASW coefs for PFM red: ['-3.78077E+02', '2.99914E-02', '1.66375E-06', '-7.20486E-11', '1.17412E-15']
 POLY_DEG = 4
+_ccd_temp_adu_array = np.array(CCD_TEMP_TABLE).T  # (degC, ADC_V, ADU_dec, ADU_hex)
 _ccd_temp_fit_adu = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[2], _ccd_temp_adu_array[0],
                                                             POLY_DEG).convert()
-_ccd_temp_fit_adu_inv = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2],
-                                                                POLY_DEG).convert()
+_ccd_temp_interp_adu = sp.interpolate.interp1d(_ccd_temp_adu_array[2], _ccd_temp_adu_array[0], kind='cubic',
+                                               fill_value='extrapolate')
+# _ccd_temp_fit_adu_inv = np.polynomial.polynomial.Polynomial.fit(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2],
+#                                                                 POLY_DEG).convert()
+_ccd_temp_interp_adu_inv = sp.interpolate.interp1d(_ccd_temp_adu_array[0], _ccd_temp_adu_array[2], kind='cubic',
+                                                   fill_value='extrapolate')
 
 # cubic-spline interpolation of PSU ADU-degC relation (nominal values)
 _psu_temp_adu_array = np.array(PSU_TEMP).T  # (degC, ADC_V, ADU_dec, ADU_hex)
@@ -173,7 +287,7 @@ def t_ccd_deg_to_adu_oper(t, warn=True):
     if not ((_ccd_temp_adu_array[0].min() <= t) & (t <= _ccd_temp_adu_array[0].max())).all() and warn:
         print('WARNING! Value(s) outside operational range ({} - {})!'.format(_ccd_temp_adu_array[0].min(),
                                                                               _ccd_temp_adu_array[0].max()))
-    return np.rint(_ccd_temp_fit_adu_inv(t)).astype(int)
+    return np.rint(_ccd_temp_interp_adu_inv(t)).astype(int)
 
 
 def t_ccd_adu_to_deg_nonoper(adu):
@@ -455,6 +569,23 @@ class Limits:
     # raw ambient CCD limits
     ADC_TEMP_CCD_AMB = (0x1968, 0x19DD, 0x29DB, 0x2A49)
 
+    @classmethod
+    def limitparametersformram(cls):
+
+        MRAM_ORDER = ["ADC_P3V9","ADC_P3V3","ADC_P3V3_LVDS","ADC_P2V5","ADC_P1V8","ADC_P1V2","ADC_REF","ADC_TEMP1",
+                      "ADC_TEMP_CCD","ADC_TEMP_FEE","ADC_I_FEE_ANA","ADC_I_FEE_DIG","ADC_I_DPU","ADC_I_RSE",
+                      "ADC_I_HEATER","ADC_PSU_TEMP"]
+
+        out = []
+        cmd = []
+        for par in MRAM_ORDER:
+            ll,lw,uw,ul = getattr(Limits,par)
+            line = '{nn}WarnLowerLimit = {}\n{nn}AlarmLowerLimit = {}\n{nn}WarnUpperLimit = {}\n{nn}AlarmUpperLimit = {}'.format(lw, ll, uw, ul,nn=par)
+            out.append(line)
+            cmd.append('{nn}WarnLowerLimit, {nn}AlarmLowerLimit, {nn}WarnUpperLimit, {nn}AlarmUpperLimit'.format(nn=par))
+
+        print('\n'.join(out) + '\n\n\n' + ', '.join(cmd))
+
 
 class LimitTables:
 
@@ -551,6 +682,15 @@ _ptx = np.arange(-200, 851)
 _pty = cal_pt1000(_ptx)
 _pt1000_curve_inv = sp.interpolate.interp1d(_pty, _ptx, kind='cubic', fill_value='extrapolate')  # inverse PT1000 curve for Ohm to °C conversion
 
+# quadratic fit to PT1000 curve in custom range to get
+# inverse formula parameters for Ohms to °C conversion (used in on-board FEE temp calculation)
+# -140 - -20°C: [ 9.99495990e+02,  3.88482301e+00, -8.51690296e-04]
+_FEE_TEMP_MIN = -140
+_FEE_TEMP_TMAX = -20
+_trng = np.arange(_FEE_TEMP_MIN, _FEE_TEMP_TMAX, .1)
+_rrng = cal_pt1000(_trng)
+_fee_temp_p2fit = np.polynomial.polynomial.Polynomial.fit(_trng, _rrng, 2).convert()
+
 
 def t_ccd_fee_adu_to_deg(adu, ccd):
     """
@@ -628,15 +768,33 @@ class Fee:
 
 
 # FEE HK gains/offsets
+
+# EQM ???
+#     Fee.CCD2_TS_A: (0.0143896, 507.7463659),
+#     Fee.CCD4_TS_B: (0.0143869, 508.0853237),
+#     Fee.PRT1: (0.013942679, 511.4689646),
+#     Fee.PRT2: (0.014066366, 520.9910997),
+#     Fee.PRT3: (0.014075819, 520.1841103),
+#     Fee.PRT4: (0.013816741, 535.4382444),
+#     Fee.PRT5: (0.014074936, 520.4885901),
+#
+#     Fee.CCD2_TS_A: (0.048589970854, 326.709603726099),
+#     Fee.CCD4_TS_B: (0.048346071846, 317.545999899085),
+#     Fee.PRT1: (0.049337666752, 310.304954966437),
+#     Fee.PRT2: (0.048871723231, 322.563832689621),
+#     Fee.PRT3: (0.048882740559, 322.418053560869),
+#     Fee.PRT4: (0.048777132761, 322.321990156487),
+#     Fee.PRT5: (0.048683458078, 323.746239172483),
+
 # EQM
 FEE_GAIN_OFFSET = {
-    Fee.CCD2_TS_A: (0.048589970854, 326.709603726099),
-    Fee.CCD4_TS_B: (0.048346071846, 317.545999899085),
-    Fee.PRT1: (0.049337666752, 310.304954966437),
-    Fee.PRT2: (0.048871723231, 322.563832689621),
-    Fee.PRT3: (0.048882740559, 322.418053560869),
-    Fee.PRT4: (0.048777132761, 322.321990156487),
-    Fee.PRT5: (0.048683458078, 323.746239172483),
+    Fee.CCD2_TS_A: (0.0143896, 507.7463659),
+    Fee.CCD4_TS_B: (0.0143869, 508.0853237),
+    Fee.PRT1: (0.013942679, 511.4689646),
+    Fee.PRT2: (0.014066366, 520.9910997),
+    Fee.PRT3: (0.014075819, 520.1841103),
+    Fee.PRT4: (0.013816741, 535.4382444),
+    Fee.PRT5: (0.014074936, 520.4885901),
     Fee.CCD4_VOD_MON_E: (0.000563088127, -0.00209746042908421),
     Fee.CCD4_VOG_MON: (0.000135181804, -0.166559933290103),
     Fee.CCD4_VRD_MON_E: (0.000563174116, 0.0193461050916852),
@@ -670,6 +828,50 @@ FEE_GAIN_OFFSET = {
     Fee.IG_HI_MON: (0.000186900810, 0),
     Fee.CCD2_VOD_MON_F: (0.000562860544, -0.00642286504851342)
 }
+
+# FM
+# FEE_GAIN_OFFSET = {
+#     Fee.CCD2_TS_A: (0.014369244000, 372.541803600000),
+#     Fee.CCD4_TS_B: (0.014373897000, 372.828009000000),
+#     Fee.PRT1: (0.014371437000, 372.685351900000),
+#     Fee.PRT2: (0.014371437000, 372.685351900000),
+#     Fee.PRT3: (0.014371437000, 372.685351900000),
+#     Fee.PRT4: (0.014371437000, 372.685351900000),
+#     Fee.PRT5: (0.014371437000, 372.685351900000),
+#     Fee.CCD4_VOD_MON_E: (0.000562370000, 0.010150918000),
+#     Fee.CCD4_VOG_MON: (0.000132526000, 0.000030609000),
+#     Fee.CCD4_VRD_MON_E: (0.000562986000, 0.011770430000),
+#     Fee.CCD2_VOD_MON_E: (0.000562758000, -0.000015833000),
+#     Fee.CCD2_VOG_MON: (0.000132538000, -0.000518162000),
+#     Fee.CCD2_VRD_MON_E: (0.000562977000, 0.009355482000),
+#     Fee.CCD4_VRD_MON_F: (0.000562755000, 0.014634286000),
+#     Fee.CCD4_VDD_MON: (0.000878920000, 0.000000000000),
+#     Fee.CCD4_VGD_MON: (0.000562959000, 0.012800967000),
+#     Fee.CCD2_VRD_MON_F: (0.000562992000, 0.012512884000),
+#     Fee.CCD2_VDD_MON: (0.000802557000, 0.000000000000),
+#     Fee.CCD2_VGD_MON: (0.000563277000, 0.006843414000),
+#     Fee.VCCD: (0.000755650000, 0.000000000000),
+#     Fee.VRCLK_MON: (0.000360278000, 0.000000000000),
+#     Fee.VICLK: (0.000360286000, 0.000000000000),
+#     Fee.CCD4_VOD_MON_F: (0.000562421000, 0.011387822000),
+#     Fee.P5VB_POS_MON: (0.000092222000, 0.000000000000),
+#     Fee.P5VB_NEG_MON: (-0.000125804000, 0.000000000000),
+#     Fee.P3V3B_MON: (0.000062651000, 0.000000000000),
+#     Fee.P2V5A_MON: (0.000062656000, 0.000000000000),
+#     Fee.P3V3D_MON: (0.000062654000, 0.000000000000),
+#     Fee.P2V5D_MON: (0.000062658000, 0.000000000000),
+#     Fee.P1V2D_MON: (0.000031315000, 0.000000000000),
+#     Fee.P5VREF_MON: (0.000097241000, 0.000000000000),
+#     Fee.VCCD_POS_RAW: (0.000756621000, 0.000000000000),
+#     Fee.VCLK_POS_RAW: (0.000360158000, 0.000000000000),
+#     Fee.VAN1_POS_RAW: (0.000163416000, 0.000000000000),
+#     Fee.VAN3_NEG_MON: (-0.000208731000, 0.000000000000),
+#     Fee.VAN2_POS_RAW: (0.000163228000, 0.000000000000),
+#     Fee.VDIG_RAW: (0.000097252000, 0.000000000000),
+#     Fee.IG_HI_MON: (0.000187565000, 0.000000000000),
+#     Fee.CCD2_VOD_MON_F: (0.000563010000, 0.006615808000)
+# }
+
 
 FEE_CCD2TsA_gain, FEE_CCD2TsA_offset = FEE_GAIN_OFFSET[Fee.CCD2_TS_A]
 FEE_CCD4TsB_gain, FEE_CCD4TsB_offset = FEE_GAIN_OFFSET[Fee.CCD4_TS_B]
@@ -716,11 +918,260 @@ def calibrate_ext(adu, signal, exception=False):
     # return adu if not exception else None
 
 
+# class _BadPixelMask2:
+#     """
+#     Convenience functions for handling the SMILE SXI bad pixel mask stored in MRAM
+#     """
+#
+#     NROWS = 639
+#     NCOLS = 384
+#
+#     CCD2_MASK_ADDR = 0x40654C00
+#     CCD4_MASK_ADDR = 0x4065CC00
+#
+#     @classmethod
+#     def from_bytes(cls, buffer):
+#         return np.unpackbits(bytearray(buffer)).reshape((cls.NROWS, cls.NCOLS))
+#
+#     @classmethod
+#     def to_bytes(cls, mask: np.ndarray):
+#
+#         assert isinstance(mask, np.ndarray)
+#
+#         if mask.size != cls.NROWS * cls.NCOLS:
+#             raise ValueError("Mask must be array of size {}, is {}.".format(cls.NROWS * cls.NCOLS, mask.size))
+#
+#         return bytes(np.packbits(mask))
+#
+#     @classmethod
+#     def gen_mask_array(cls):
+#         return np.zeros((cls.NROWS, cls.NCOLS), dtype=int)
+
+
+class BadPixelMask:
+
+    NROWS = 639
+    NCOLS = 384
+
+    CCD2E_MASK_ADDR = 0x40644C00
+    CCD2F_MASK_ADDR = 0x4064CC00
+    CCD4E_MASK_ADDR = 0x40654C00
+    CCD4F_MASK_ADDR = 0x4065CC00
+
+    def __init__(self):
+        self._bin_len = int((self.NROWS * self.NCOLS) / 8)
+        self._bin = bytes(self._bin_len)
+
+    @property
+    def binary(self):
+        return self._bin
+
+    @binary.setter
+    def binary(self, data: bytes):
+
+        assert isinstance(data, bytes)
+        assert len(data) == self._bin_len
+
+        self._bin = data
+
+    @property
+    def array(self):
+        return np.unpackbits(bytearray(self._bin)).reshape((self.NROWS, self.NCOLS))
+
+    @array.setter
+    def array(self, arr: np.ndarray):
+
+        assert isinstance(arr, np.ndarray)
+        assert arr.shape == (self.NROWS, self.NCOLS)
+
+        self._bin = bytes(np.packbits(arr))
+
+    def mask_pixel(self, row, col):
+        mask = self.array
+        mask[row, col] = 1
+        self.array = mask
+
+    def unmask_pixel(self, row, col):
+        mask = self.array
+        mask[row, col] = 0
+        self.array = mask
+
+
+class RowColCorrection:
+
+    ROW_CORR_ADDR = 0x40664C00
+    COL_CORR_ADDR = 0x40665C00
+
+    ROW_CORR_SIZE = 4096
+    COL_CORR_SIZE = 2048
+
+    def __init__(self):
+        self._row_corr = bytearray(self.ROW_CORR_SIZE)
+        self._col_corr = bytearray(self.COL_CORR_SIZE)
+
+        self.ccd2_e_rows = bytearray(self.ROW_CORR_SIZE // 4)
+        self.ccd2_f_rows = bytearray(self.ROW_CORR_SIZE // 4)
+        self.ccd4_e_rows = bytearray(self.ROW_CORR_SIZE // 4)
+        self.ccd4_f_rows = bytearray(self.ROW_CORR_SIZE // 4)
+
+        self.ccd2_e_cols = bytearray(self.COL_CORR_SIZE // 4)
+        self.ccd2_f_cols = bytearray(self.COL_CORR_SIZE // 4)
+        self.ccd4_e_cols = bytearray(self.COL_CORR_SIZE // 4)
+        self.ccd4_f_cols = bytearray(self.COL_CORR_SIZE // 4)
+
+    @property
+    def row_corr(self):
+        self._row_corr[::4] = self.ccd4_e_rows
+        self._row_corr[1::4] = self.ccd4_f_rows
+        self._row_corr[2::4] = self.ccd2_e_rows
+        self._row_corr[3::4] = self.ccd2_f_rows
+        
+        return bytes(self._row_corr)
+
+    @row_corr.setter
+    def row_corr(self, binary):
+        assert len(binary) == self.ROW_CORR_SIZE
+        self._row_corr = bytearray(binary)
+
+        self.ccd4_e_rows = self._row_corr[::4]
+        self.ccd4_f_rows = self._row_corr[1::4]
+        self.ccd2_e_rows = self._row_corr[2::4]
+        self.ccd2_f_rows = self._row_corr[3::4]
+
+    @property
+    def col_corr(self):
+        self._col_corr[::4] = self.ccd4_e_cols
+        self._col_corr[1::4] = self.ccd4_f_cols
+        self._col_corr[2::4] = self.ccd2_e_cols
+        self._col_corr[3::4] = self.ccd2_f_cols
+
+        return bytes(self._col_corr)
+
+    @col_corr.setter
+    def col_corr(self, binary):
+        assert len(binary) == self.COL_CORR_SIZE
+        self._col_corr = bytearray(binary)
+
+        self.ccd4_e_cols = self._col_corr[::4]
+        self.ccd4_f_cols = self._col_corr[1::4]
+        self.ccd2_e_cols = self._col_corr[2::4]
+        self.ccd2_f_cols = self._col_corr[3::4]
+
+
+class EvtIds:
+
+    _evt_dict = {
+        "EVT_MEM_COR_RAM": 256,
+        "EVT_MEM_UNCOR_RAM": 257,
+        "EVT_MEM_UNCOR_MRAM": 258,
+        "EVT_MEM_LOAD_CMP": 259,
+        "EVT_PARLOAD_CMP": 260,
+        "EVT_ADC_LOGIC": 272,
+        "EVT_ADC_FAILURE": 273,
+        "EVT_ADC_NORANGES": 274,
+        "EVT_DPU_VOLT_WARN": 275,
+        "EVT_DPU_TEMP_WARN": 276,
+        "EVT_DPU_PERM_WARN": 277,
+        "EVT_DPU_VOLT_FAIL": 278,
+        "EVT_DPU_TEMP_FAIL": 279,
+        "EVT_DPU_PERM_FAIL": 280,
+        "EVT_SPW_RXTO": 288,
+        "EVT_SPW_TXTO": 289,
+        "EVT_SPW_CONTO": 290,
+        "EVT_SPW_PARITY": 291,
+        "EVT_SPW_DISCONNECT": 292,
+        "EVT_SPW_ESCAPE": 293,
+        "EVT_SPW_CREDIT": 294,
+        "EVT_SPW_RXAHB": 295,
+        "EVT_SPW_TXAHB": 296,
+        "EVT_SPW_EARLYEOP": 297,
+        "EVT_SPW_INVADDR": 298,
+        "EVT_SPW_EEP": 299,
+        "EVT_SPW_TOOBIG": 300,
+        "EVT_RSE_PARITY": 304,
+        "EVT_RSE_FRAME": 305,
+        "EVT_RSE_ERRRESP": 306,
+        "EVT_RSE_TIMEOUT": 307,
+        "EVT_RSE_MOTORHOT": 308,
+        "EVT_RSE_ELECHOT": 309,
+        "EVT_RSE_CLOSE_TO": 310,
+        "EVT_RSE_NOCOM": 311,
+        "EVT_RSE_NOPARAM": 312,
+        "EVT_PSU_CURR_WARN": 320,
+        "EVT_PSU_TEMP_WARN": 321,
+        "EVT_PSU_PERM_WARN": 322,
+        "EVT_PSU_CURR_FAIL": 323,
+        "EVT_PSU_TEMP_FAIL": 324,
+        "EVT_PSU_PERM_FAIL": 325,
+        "EVT_PSU_PSUOK_ERR": 326,
+        "EVT_PSU_RSEOK_ERR": 327,
+        "EVT_PSU_PSUOK_PERM": 328,
+        "EVT_PSU_RSEOK_PERM": 329,
+        "EVT_CMD_INV_APID": 336,
+        "EVT_FEE_TR": 768,
+        "EVT_IASW_TR": 769,
+        "EVT_SC_PR_STRT": 770,
+        "EVT_SC_PR_END": 771,
+        "EVT_INIT_SUCC": 772,
+        "EVT_SEQ_CNT_ERR": 784,
+        "EVT_SBIT_ERR": 785,
+        "EVT_FEE_DATA_ERR": 786,
+        "EVT_PCRL2_FULL": 800,
+        "EVT_INSTRM_PQF": 801,
+        "EVT_IN_ILLGR": 802,
+        "EVT_DBIT_ERR": 803,
+        "EVT_SYNC_LOSS": 804,
+        "EVT_FD_FAILED": 805,
+        "EVT_CMPR_SIZE": 806,
+        "EVT_SDP_FAIL": 807,
+        "EVT_SDP_NOMEM": 808,
+        "EVT_SDP_DATAFAIL": 809,
+        "EVT_FEE_ILL_ST": 810,
+        "EVT_INIT_FAIL": 816,
+        "EVT_THRD_OR": 817,
+        "EVT_NOTIF_ERR": 818,
+        "EVT_SPW_ERR_H": 819,
+        "EVT_RP_STARTED": 820,
+        "EVT_MEM_COR_MRAM": 261,
+        "EVT_MEM_MRAM_LCL": 262,
+        "EVT_ADC_OUT_OF_RANGE": 281,
+        "EVT_HCTRL_NOPARAM": 811,
+        "EVT_FEE_TEMP_WARN": 821,
+        "EVT_CCD_TEMP_WARN": 822,
+        "EVT_FEE_TEMP_FAIL": 823,
+        "EVT_CCD_TEMP_FAIL": 824,
+        "EVT_FEE_NOT_ALIVE": 826,
+        "EVT_FEE_ANOMALY": 827,
+        "EVT_FEE_ANO_FAIL": 828,
+        "EVT_FEE_PARAM_OOL": 829,
+        "EVT_RES_ERR": 830,
+        "EVT_FULL_SUN": 831,
+        "EVT_FULL_SUN_FAIL": 832,
+        "EVT_FEE_EC_SAT": 833,
+        "EVT_FEE_EC_RATE": 834,
+        "EVT_DPU_EC_SAT": 835,
+        "EVT_DPU_EC_RATE": 836,
+        "EVT_FEE_CCD_TEMP_FAIL": 825,
+        "EVT_DOOR_OPER_TO": 837,
+        "EVT_FEE_PARAM_WARN": 838
+    }
+
+    evts = list(_evt_dict.keys())
+
+    @classmethod
+    def get_idx(cls, evt):
+        return cls.evts.index(evt)
+
+    @classmethod
+    def get_evtid(cls, evt):
+        return cls._evt_dict.get(evt)
+
+
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
 
     ct = CalibrationTables()
-    ct._plot(Temp.ADC_TEMP_CCD)
+    ct._plot(Temp.ADC_PSU_TEMP)
     # ct.write_to_files('/home/marko/space/CCS/calibrations')
     lmt = LimitTables()

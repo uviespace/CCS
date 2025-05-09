@@ -4,6 +4,7 @@ Examples for Athena WFI DE communications
 
 import communication as com
 import packet_config_ATHENA_DE as de
+import tools.dataprocessing.athena_de_frame_proc as fputils
 
 # set up socket and connect
 decon = com.Connector('', 12345, msgdecoding='hex')
@@ -36,6 +37,16 @@ decon.setup_storage(logfile)
 decon.start_receiver()
 decon.receiver.recvd_data_buf
 
+# optionally, add custom TM processing
+# define packet parser and event frame processor
+ppa = de.FpmPktParser(96)  # SCI (0x35) packets have 96 bytes by default (plus the interface byte)
+ppr = de.FpmProcessor()
+decon.start_receiver(pkt_parser_func=ppa, procfunc=ppr)
+
+# get the frames from the processed data list and view them
+fv = fputils.FrameViewer(de.filter_frames(decon.proc_data, empty_frames=False))
+fv.show(cmap='inferno', interpolation='none')
+
 
 # custom TM processing function; must take bytestring as arg *data*, and timestamp kwarg *ts*
 def msg_to_hex_string(data, ts=''):
@@ -45,8 +56,6 @@ def msg_to_hex_string(data, ts=''):
         print(err)
         return '# ERROR #\n'
 
-
-# optionally, add custom TM processing
 # this logs the received data hex-formatted in outfile
 decon.start_receiver(procfunc=msg_to_hex_string, outfile='/path/to/de_rx.log', ofmode='w')
 

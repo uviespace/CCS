@@ -20,6 +20,9 @@
 /Tst/test_specs/
 /Tst/logs_test_runs/
 
+# FITS files
+*.fits
+
 ### Example user template
 !.gitkeep
 

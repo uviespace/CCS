@@ -46,6 +46,8 @@ TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_con
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
+REPORTFORMAT = cfg.get('ccs-viewer', 'drag_report_fmt').lower() == 'true'  # format drag-action data for test report
+
 
 class TMPoolView(Gtk.Window):
     # (label, data column alignment)
@@ -699,7 +701,15 @@ class TMPoolView(Gtk.Window):
             ).filter(
                 Telemetry[self.decoding_type].idx == model[my_iter][0]
             )
-            selection_data.set_text(str(row.first().raw), -1)
+
+            rawpkt = row.first().raw
+
+            if REPORTFORMAT:
+                data = cfl.pktinfo_report(rawpkt)
+            else:
+                data = str(rawpkt)
+
+            selection_data.set_text(data, -1)
             new_session.close()
 
     def fetch_lines_from_db(self, offset=0, limit=None, sort=None, order='asc', buffer=10, rows=None, scrolled=False,
@@ -1139,32 +1149,52 @@ class TMPoolView(Gtk.Window):
         self.mon_butt.connect('clicked', self.monitor_parameters)
         self.mon_butt.connect('button-press-event', self.show_context_menu, self.context_menu())
 
-        dump_butt = Gtk.Button.new_from_icon_name('gtk-save', Gtk.IconSize.LARGE_TOOLBAR)
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/document-save.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        dump_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf))
         dump_butt.set_tooltip_text('Save pool')
         dump_butt.connect('clicked', self.save_pool)
-        load_butt = Gtk.Button.new_from_icon_name('gtk-open', Gtk.IconSize.LARGE_TOOLBAR)
+
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/document-open-folder.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        load_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf))
         load_butt.set_tooltip_text('Load pool')
         load_butt.connect('clicked', self.load_pool)
-        extract_butt = Gtk.Button.new_from_icon_name('gtk-paste', Gtk.IconSize.LARGE_TOOLBAR)
+
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/edit-paste.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        extract_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf))
         extract_butt.set_tooltip_text('Extract packets')
         extract_butt.connect('clicked', self.collect_packet_data)
 
         # live buttons
-        self.rec_butt = Gtk.Button(image=Gtk.Image.new_from_icon_name('gtk-media-record', Gtk.IconSize.LARGE_TOOLBAR),
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/media-record.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        self.rec_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf),
                                    tooltip_text='Manage recording to LIVE pool')
+
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/func.png')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
         self.rec_butt.connect('clicked', self.start_recording)
-        self.stop_butt = Gtk.Button(image=Gtk.Image.new_from_icon_name('gtk-media-stop', Gtk.IconSize.LARGE_TOOLBAR),
+
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/media-playback-stop.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        self.stop_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf),
                                     tooltip_text='Stop recording to currently selected LIVE pool')
         self.stop_butt.set_sensitive(False)
         self.stop_butt.connect('clicked', self.stop_recording)
 
-        clear_butt = Gtk.Button.new_from_icon_name('edit-clear', Gtk.IconSize.LARGE_TOOLBAR)
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/edit-clear.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        clear_butt = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf))
         clear_butt.set_tooltip_text('Clear current pool')
         clear_butt.connect('clicked', self.clear_pool)
 
         self.univie_box = self.create_univie_box()
 
-        bigd = Gtk.Button.new_from_icon_name('gtk-justify-fill', Gtk.IconSize.LARGE_TOOLBAR)
+        icon_path = os.path.join(self.cfg.get('paths', 'ccs'), 'pixmap/format-justify-fill.svg')
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 24, 24)
+        bigd = Gtk.Button(image=Gtk.Image.new_from_pixbuf(pixbuf))
         bigd.set_tooltip_text('Open Large Data Viewer')
         bigd.connect('clicked', self.show_bigdata)
 
@@ -1836,7 +1866,12 @@ class TMPoolView(Gtk.Window):
     def on_drag_tmdata_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
-        selection_data.set_text('{} = {}'.format(*model[my_iter][:2]), -1)
+        txt = '{} = {}'.format(*model[my_iter][:2])
+
+        if REPORTFORMAT:
+            txt = txt.replace('_', '\\_')
+
+        selection_data.set_text(txt, -1)
 
     def create_decoder_bar(self):
         box = Gtk.VBox()
