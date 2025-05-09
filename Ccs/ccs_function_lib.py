@@ -1397,11 +1397,17 @@ def Tcdata(tm):
         try:
             cname = [p[0] for p in finfo if p[2] == fname][0]
         except IndexError:
-            raise ValueError('Unknown discriminant: {}'.format(fvalue))
+            # raise ValueError('Unknown discriminant: {}'.format(fvalue))
+            logger.info('Unknown discriminant: {}'.format(fvalue))
 
-        que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
-              ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
-              ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
+            que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
+                         cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
+                         ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
+                         ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
+        else:
+            que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
+                  ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
+                  ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
 
     else:
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
