@@ -2552,7 +2552,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 
 ##
 #  Generate TC
-def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, **kwargs):
+def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, fmt='raw', **kwargs):
     """
     Create TC bytestring for CMD with corresponding parameters
 
@@ -2609,6 +2609,9 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
             values = [tc_param_alias(p[-1], v, no_check=no_check) for p, v in zip_no_pad(params, args)]
         else:
             values = hack_value
+
+        if fmt == 'tcl':
+            return cmd, params, values
 
         pdata = encode_pus(params, *values)
 
