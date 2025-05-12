@@ -46,7 +46,8 @@ TM_HEADER_LEN, TC_HEADER_LEN, PEC_LEN = [packet_config.TM_HEADER_LEN, packet_con
 
 Telemetry = {'PUS': DbTelemetry, 'RMAP': RMapTelemetry, 'FEE': FEEDataTelemetry}
 
-REPORTFORMAT = cfg.get('ccs-viewer', 'drag_report_fmt').lower() == 'true'  # format drag-action data for test report
+REPORTFORMAT = int(cfg.get('ccs-viewer', 'drag_report_fmt'))#.lower() == 'true'  # format drag-action data for test report
+SHOW_UTC = True
 
 
 class TMPoolView(Gtk.Window):
@@ -704,8 +705,10 @@ class TMPoolView(Gtk.Window):
 
             rawpkt = row.first().raw
 
-            if REPORTFORMAT:
+            if REPORTFORMAT == 1:
                 data = cfl.pktinfo_report(rawpkt)
+            elif REPORTFORMAT == 2:
+                data = cfl.Tmformatted(rawpkt, textmode=True, nocal=not self.calibrated_switch.get_active())
             else:
                 data = str(rawpkt)
 
@@ -2131,6 +2134,7 @@ class TMPoolView(Gtk.Window):
             datamodel.clear()
             nocalibration = not self.calibrated_switch.get_active()
             try:
+
                 if self.UDEF:
                     data = cfl.Tmformatted(tm, textmode=False, udef=True, nocal=nocalibration, floatfmt=floatfmt)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
@@ -2139,6 +2143,11 @@ class TMPoolView(Gtk.Window):
                     data = cfl.Tmformatted(tm, textmode=False, nocal=nocalibration, floatfmt=floatfmt)
                     buf = Gtk.TextBuffer(text=cfl.Tm_header_formatted(tm) + '\n{}\n'.format(data[1]))
                     self._feed_tm_data_view_model(datamodel, data[0])
+
+                if SHOW_UTC:
+                    if not (tm[0] >> 4 & 1):
+                        t_utc = '<span foreground="grey">' + cfl.cuc_to_utc(cfl.get_cuctime(tm)) + '</span>\n'
+                        buf.insert_markup(buf.get_end_iter(), t_utc, -1)
 
             except Exception as error:
                 buf = Gtk.TextBuffer(text='Error in decoding packet data:\n{}\n'.format(error))

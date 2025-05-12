@@ -1397,11 +1397,17 @@ def Tcdata(tm):
         try:
             cname = [p[0] for p in finfo if p[2] == fname][0]
         except IndexError:
-            raise ValueError('Unknown discriminant: {}'.format(fvalue))
+            # raise ValueError('Unknown discriminant: {}'.format(fvalue))
+            logger.info('Unknown discriminant: {}'.format(fvalue))
 
-        que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
-              ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
-              ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
+            que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
+                         cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
+                         ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
+                         ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
+        else:
+            que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
+                  ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
+                  ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
 
     else:
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
@@ -4190,7 +4196,7 @@ def segment_data(data, segid, addr, seglen=480):
     return segments
 
 
-def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_bytes=0):
+def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_bytes=0, line_term='\n'):
     """
 
     :param data:
@@ -4222,15 +4228,16 @@ def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_
     data = data[skip_bytes:]
 
     if header is None:
-        fname = outfile.split('/')[-1][-60:]
-        header = 'S0{:02X}0000{:}'.format(len(fname.encode('ascii')) + 3, fname.encode('ascii').ljust(24).hex().upper())
+        # fname = outfile.split('/')[-1][-60:]
+        fname = os.path.basename(outfile)[:32].encode('ascii') + b'\x00'
+        header = 'S0{:02X}0000{:}'.format(len(fname) + 3, fname.hex().upper())
         header += '{:02X}'.format(srec_chksum(header[2:]))
 
     datalen = len(data)
     data = io.BytesIO(data)
 
     sreclist = []
-    terminator = 'S705{:08X}'.format(memaddr)
+    terminator = 'S705{:08X}'.format(0)
     terminator += '{:02X}'.format(srec_chksum(terminator[2:]))
 
     while data.tell() < datalen:
@@ -4243,8 +4250,8 @@ def source_to_srec(data, outfile, memaddr, header=None, bytes_per_line=32, skip_
         memaddr += chunklen
 
     with open(outfile, 'w') as fd:
-        fd.write(header + '\n')
-        fd.write('\n'.join(sreclist) + '\n')
+        fd.write(header + line_term)
+        fd.write(line_term.join(sreclist) + line_term)
         fd.write(terminator)
 
     print('Data written to file: "{}", skipped first {} bytes.'.format(outfile, skip_bytes))
