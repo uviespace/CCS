@@ -1405,7 +1405,7 @@ def Tcdata(tm):
 
     else:
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
-             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
+             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, cpc_categ FROM ccf left join cdf on \
              ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
              ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
 
@@ -1586,10 +1586,13 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fm
 
         fmt = ptt(par[2], par[3])
         if fmt == 'deduced':
-            fmt = get_pid_fmt(fmtpids.get(par[8]))
-            # add pid to par info for use in calibration func
-            par = par[:7] + (fmtpids.get(par[8]),) + par[8:]
-            # raise NotImplementedError('Deduced parameter type PTC=11')
+            if tc:
+                fmt = get_pid_fmt(fmtpids.get(par[0]))
+            else:
+                fmt = get_pid_fmt(fmtpids.get(par[8]))
+                # add pid to par info for use in calibration func
+                par = par[:7] + (fmtpids.get(par[8]),) + par[8:]
+                # raise NotImplementedError('Deduced parameter type PTC=11')
 
         fixrep = par[-2]
 
@@ -1610,8 +1613,12 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fm
 
             decoded.append((value, par))
 
-        if isinstance(par[-1], str) and par[-1].upper() == 'Y':
-            fmtpids[par[0]] = value
+        if tc:
+            if isinstance(par[-1], str) and par[-1].upper() == 'P':
+                fmtpids[par[0]] = value
+        else:
+            if isinstance(par[-1], str) and par[-1].upper() == 'Y':
+                fmtpids[par[0]] = value
 
         if grp != 0:
             skip = grp
