@@ -3724,7 +3724,7 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
     if len(fmt) == 4:  # PUS-A
         nseg_and_memid = [memid]
     else:  # PUS-C, use one segment only
-        nseg_and_memid = [1, memid]
+        nseg_and_memid = [memid, 1]
 
     upload_bytes = b''
     pcnt = 0
