@@ -267,7 +267,10 @@ def run(jfile, output_path):
 
         txt += log_note('VERIFICATION: {}'.format(step['_verification_description'])) if step['_verification_description'] != '' else ''
         if comment != '':
-            txt += log_note('COMMENT: {}'.format(comment))
+            if "sim.insertLog(" in comment:
+                txt += comment
+            else:
+                txt += log_note('COMMENT: {}'.format(comment))
 
         script += txt
 
@@ -318,8 +321,7 @@ if __name__ == '__main__':
         json_files = [os.path.join(input_path, f) for f in os.listdir(input_path) if f.endswith('.json')]
         output_path = os.path.join(input_path + "_java")
 
-    
-
+    # create output directory
     os.makedirs(output_path, exist_ok=True)
 
     for json_file in json_files:
@@ -331,5 +333,3 @@ if __name__ == '__main__':
         print(json_file)
         run(json_file, output_path)
         print("Your converted JSON files are in the directory: " + output_path)
-
-# TODO: Check Packet length discrepancy
