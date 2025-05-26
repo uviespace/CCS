@@ -299,11 +299,11 @@ if __name__ == '__main__':
     not_functional_files = [
         os.path.join(base_path, "IASW-SRV-5_1-TS-0.2.json"),   # ValueError: Range check failed - Invalid parameter value for event_id: EVT_CMD_INV_APID
         os.path.join(base_path, "IASW-SRV-20_1-TS-0.2.json"),  # KeyError: "1"
-        os.path.join(base_path, "IASW-SRV-9_1-TS-0.2.json"),   # struct.error: bad char in struct format
+        #os.path.join(base_path, "IASW-SRV-9_1-TS-0.2.json"),   # struct.error: bad char in struct format
         os.path.join(base_path, "IASW-SRV-213_1-TS-0.2.json"), # Not ready
         os.path.join(base_path, "IASW-SRV-212_1-TS-0.2.json"), # struct.error: 'H' format requires 0 <= number <= 65535
         os.path.join(base_path, "IASW-SRV-194_1-TS-0.2.json"), # ValueError: Range check failed - Invalid parameter value for AlgoId: 1 [valid: TC_ALGO]
-        os.path.join(base_path, "IASW-SRV-3_1-TS-0.2.json"),   # STEP 28 not possible to generate in CCS
+        #os.path.join(base_path, "IASW-SRV-3_1-TS-0.2.json"),   # STEP 28 not possible to generate in CCS
         os.path.join(base_path, "IASW-SRV-198_1-TS-0.2.json"), # ValueError: Range check failed - Invalid parameter value for ProcId: WRONG [valid: CAL_FULL | CHECKOUT_PR | DWN_TRANS_PR | OPER_PR]
     ]
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
