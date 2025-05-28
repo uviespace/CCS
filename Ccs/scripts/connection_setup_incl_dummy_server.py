@@ -2,7 +2,6 @@ import threading
 import socket
 
 def run_server():
-    TM_HEADER = b'\t0\xc0\x01\x00\x12\x10\x01\x01\x00\x00\x07\xf7\x00\x00\x00\x01\x00\x01'
     print("=== TMTC Dummy Server Started ===")
 
     # Set up TC and TM sockets
@@ -34,17 +33,28 @@ def run_server():
             print(f"\n[RECEIVED] TC Packet (hex): {message_hex}")
             #print(f"\n[RECEIVED] TC Packet (hex): {message_bin}")
             
-            #apid = message_bin[2+5:2+5+11]
-            #print(apid, int(apid,2))
+            bits = "".join([bin(b)[2:].zfill(8) for b in data])
+            vn = int(bits[0:3], 2)
+            typ = int(bits[3:4], 2)
+            dfhf = int(bits[4:5], 2)
+            apid = int(bits[5:16], 2)
+            sf = int(bits[16:18], 2)
+            sc = int(bits[18:32], 2)
+            pkt_len = int(bits[32:48], 2)
+            pus_ver = int(bits[48:52], 2)
+            ack = int(bits[52:56], 2)
+            st = int(bits[56:64], 2)
+            sst = int(bits[64:72], 2)
+            sdid = int(bits[72:88], 2)
 
-            TM_DATA = data[0:4]
-            print(f"[INFO] Extracted TM Data (hex): {TM_DATA.hex()}")
+            tm_data = data[:4]
 
-            CRC = cfl.crc(TM_HEADER + TM_DATA).to_bytes(2, 'big')
-            print(f"[INFO] Calculated CRC: {CRC.hex()}")
+            tm = cfl.Tmpack(vn=vn, typ=0, dfhf=dfhf, apid=apid, sc=sc, data=tm_data)
+            #crc = cfl.crc(tm).to_bytes(2, 'big')
 
-            reply = TM_HEADER + TM_DATA + CRC
-            # reply = cfl.Tmpack(st=1, sst=1, apid=int(apid), data=b'', ack=0)
+            print(f"[INFO] Calculated CRC: {crc.hex()}")
+
+            reply = tm #+ crc
             print(f"[SENT] TM Packet (hex): {reply.hex()}")
             connTM.sendall(reply)
 
