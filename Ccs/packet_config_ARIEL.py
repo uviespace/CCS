@@ -30,7 +30,7 @@ RMAP_PEC_LEN = 1
 
 PUS_PKT_VERS_NUM = 0  # 0 for space packets
 PUS_VERSION = 2
-MAX_PKT_LEN = 1024  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
+MAX_PKT_LEN = 4096
 
 TMTC = {0: 'TM', 1: 'TC'}
 TSYNC_FLAG = {1: 'U', 8: 'S'}
