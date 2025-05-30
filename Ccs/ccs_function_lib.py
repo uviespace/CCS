@@ -1401,17 +1401,17 @@ def Tcdata(tm):
             logger.info('Unknown discriminant: {}'.format(fvalue))
 
             que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
-                         cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
+                         cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, cpc_categ FROM ccf left join cdf on \
                          ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
                          ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
         else:
             que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
-                  ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
+                  ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, cpc_categ FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
                   ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
 
     else:
         que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
-             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
+             cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, cpc_categ FROM ccf left join cdf on \
              ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
              ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
 
@@ -1592,10 +1592,13 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fm
 
         fmt = ptt(par[2], par[3])
         if fmt == 'deduced':
-            fmt = get_pid_fmt(fmtpids.get(par[8]))
-            # add pid to par info for use in calibration func
-            par = par[:7] + (fmtpids.get(par[8]),) + par[8:]
-            # raise NotImplementedError('Deduced parameter type PTC=11')
+            if tc:
+                fmt = get_pid_fmt(fmtpids.get(par[0]))
+            else:
+                fmt = get_pid_fmt(fmtpids.get(par[8]))
+                # add pid to par info for use in calibration func
+                par = par[:7] + (fmtpids.get(par[8]),) + par[8:]
+                # raise NotImplementedError('Deduced parameter type PTC=11')
 
         fixrep = par[-2]
 
@@ -1616,8 +1619,12 @@ def read_stream_recursive(tms, parameters, decoded=None, bit_off=0, tc=False, fm
 
             decoded.append((value, par))
 
-        if isinstance(par[-1], str) and par[-1].upper() == 'Y':
-            fmtpids[par[0]] = value
+        if tc:
+            if isinstance(par[-1], str) and par[-1].upper() == 'P':
+                fmtpids[par[0]] = value
+        else:
+            if isinstance(par[-1], str) and par[-1].upper() == 'Y':
+                fmtpids[par[0]] = value
 
         if grp != 0:
             skip = grp
@@ -4729,7 +4736,7 @@ def get_dp_fmt_info(dp_name):
 #         raise NotImplementedError
 
 
-def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     """
 
     :param ccf_descr:
@@ -4748,7 +4755,7 @@ def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', opti
     return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment, add_parcfg=add_parcfg)
 
 
-def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
     """
 
     :param cmd:
@@ -4761,11 +4768,15 @@ def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='
     :return:
     """
     if comment:
-        commentstr = "# TC({},{}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
+        commentstr = "# TC({},{}){} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
+        # commentstr = "# TC({},{}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
         newline = '\n'
     else:
         commentstr = ''
         newline = ''
+
+    if pool_name is None:
+        pool_name = 'POOLNAME'
 
     parcfg = ''
     if add_parcfg:
@@ -4790,7 +4801,7 @@ def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='
     parstr = ', '.join(parsinfo_to_str(pars))
     if len(parstr) > 0:
         parstr = ', ' + parstr
-    exe = "{}('{}'{}, pool_name='{}'{})".format(preamble, cmd[1], parstr, pool_name, options)
+    exe = "{}('{}'{}, pool_name={}{})".format(preamble, cmd[1], parstr, pool_name, options)
     return commentstr + parcfg + exe + newline
 
 
