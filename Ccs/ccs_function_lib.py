@@ -1133,23 +1133,25 @@ def csize(fmt, offbi=0, bitsize=False):
         bits = 1
 
     if fmt in ('i24', 'I24'):
-        return 3
+        return 3 * bits
     elif fmt.startswith('uint'):
-        return (int(fmt[4:]) + offbi - 1) // 8 + 1
+        if bitsize:
+            return (int(fmt[4:]) + offbi)
+        return ((int(fmt[4:]) + offbi - 1) // 8 + 1)
     elif fmt == timepack[0]:
-        return timepack[1] - timepack[3]
+        return (timepack[1] - timepack[3]) * bits
     elif fmt.startswith('CUC'):
         try:
-            return timeformats.cuctime.get(fmt).cize
+            return timeformats.cuctime.get(fmt).cize * bits
         except AttributeError:
             raise NotImplementedError('Unknown format {}'.format(fmt))
     elif fmt.startswith('oct'):
-        return int(fmt[3:])
+        return int(fmt[3:]) * bits
     elif fmt.startswith('ascii'):
-        return int(fmt[5:])
+        return int(fmt[5:]) * bits
     else:
         try:
-            return struct.calcsize(fmt)
+            return struct.calcsize(fmt) * bits
         except struct.error:
             raise NotImplementedError('Unknown format {}'.format(fmt))
 
@@ -2755,8 +2757,8 @@ def encode_pus(params, *values, params_as_fmt_string=False):
     except struct.error as err:
         logger.debug(err)
         # proper insertion of spares
-        vals_iter = iter(values)
-        return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+        # return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+        return pack_bytes_loop(fmts, vals)
 
 
 def cast_str_value_ptc(val, ptc):
@@ -2793,54 +2795,133 @@ def cast_str_value_ptc(val, ptc):
         raise NotImplementedError("TC fixed parameter values not supported for PTC={}".format(ptc))
 
 
-def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
-    """
+# def _pack_bytes_legacy(fmt, value, bitbuffer=0, offbit=0):
+#     """
+#
+#     :param fmt:
+#     :param value:
+#     :param bitbuffer:
+#     :param offbit:
+#     :return:
+#     """
+#     if fmt == 'I24':
+#         x = value.to_bytes(3, 'big')
+#
+#     elif fmt == 'i24':
+#         x = value.to_bytes(3, 'big', signed=True)
+#
+#     elif fmt.startswith('uint'):
+#         bitlen = int(fmt[4:])
+#         bitsize = (bitlen // 8 + 1) * 8
+#         shifted = (value << (bitsize - bitlen - offbit)) + bitbuffer
+#         if (bitsize - bitlen - offbit) == 0:
+#             x = shifted.to_bytes(bitsize // 8, 'big')
+#         else:
+#             return shifted
+#
+#     elif fmt.startswith('oct'):
+#         if not isinstance(value, (bytes, bytearray)):
+#             raise TypeError('Value packed with fmt "{}" is not an octet string: {} {}!'.format(fmt, value, type(value)))
+#         if len(value) != int(fmt[3:]):
+#             logger.warning('Length of octet string ({}) does not match format {}!'.format(len(value), fmt))
+#         x = struct.pack('>{}s'.format(fmt[3:]), value)
+#
+#     elif fmt.startswith('ascii'):
+#         if not isinstance(value, str):
+#             raise TypeError('Value packed with fmt "{}" is not a string: {} {}!'.format(fmt, value, type(value)))
+#         if len(value) != int(fmt[5:]):
+#             logger.warning('Length of string ({}) does not match format {}!'.format(len(value), fmt))
+#         x = struct.pack('>{}s'.format(fmt[5:]), value.encode(encoding='ascii'))
+#
+#     elif fmt == timepack[0]:
+#         x = calc_timestamp(value, sync=None, return_bytes=True)
+#
+#     elif value is None:
+#         x = struct.pack('>' + fmt)
+#
+#     else:
+#         x = struct.pack('>' + fmt, value)
+#
+#     return x
 
-    :param fmt:
-    :param value:
-    :param bitbuffer:
-    :param offbit:
-    :return:
-    """
+
+def pack_bytes_loop(fmts, values):
+    fmts_iter = iter(fmts)
+    vals_iter = iter(values)
+
+    bb = []
+    while True:
+        try:
+            bb.append(pack_bytes(fmts_iter, vals_iter))
+        except StopIteration:
+            break
+
+    return b''.join(bb)
+
+
+def pack_bytes(fmts, vals, bitbuf=0, offbit=0):
+
+    fmt = next(fmts)
+
+    if fmt.endswith('x'):
+        if offbit != 0:
+            raise NotImplementedError('Unaligned packing for data type "{}" is not supported!'.format(fmt))
+        return struct.pack(fmt)
+
+    value = next(vals)
+
+    bsize = csize(fmt, bitsize=True)
+    if (bsize + offbit) % 8 == 0:
+        aligned = True
+    else:
+        if fmt in ['i24', 'f', 'b', 'h', 'i'] or fmt.startswith(('CUC', 'oct', 'ascii')):
+            raise NotImplementedError('Unaligned packing for data type "{}" is not supported!'.format(fmt))
+        aligned = False
+
+    offbit += bsize
+
     if fmt == 'I24':
-        x = value.to_bytes(3, 'big')
+        if aligned:
+            return value.to_bytes(3, 'big')
+
+        bitbuf = (bitbuf << bsize) | value
 
     elif fmt == 'i24':
-        x = value.to_bytes(3, 'big', signed=True)
+        return value.to_bytes(3, 'big', signed=True)
 
     elif fmt.startswith('uint'):
-        bitlen = int(fmt[4:])
-        bitsize = (bitlen // 8 + 1) * 8
-        shifted = (value << (bitsize - bitlen - offbit)) + bitbuffer
-        if (bitsize - bitlen - offbit) == 0:
-            x = shifted.to_bytes(bitsize // 8, 'big')
-        else:
-            return shifted
+        bitbuf = (bitbuf << bsize) | value
+
+        if aligned:
+            return bitbuf.to_bytes(offbit // 8, 'big')
 
     elif fmt.startswith('oct'):
         if not isinstance(value, (bytes, bytearray)):
             raise TypeError('Value packed with fmt "{}" is not an octet string: {} {}!'.format(fmt, value, type(value)))
         if len(value) != int(fmt[3:]):
             logger.warning('Length of octet string ({}) does not match format {}!'.format(len(value), fmt))
-        x = struct.pack('>{}s'.format(fmt[3:]), value)
+        return struct.pack('>{}s'.format(fmt[3:]), value)
 
     elif fmt.startswith('ascii'):
         if not isinstance(value, str):
             raise TypeError('Value packed with fmt "{}" is not a string: {} {}!'.format(fmt, value, type(value)))
         if len(value) != int(fmt[5:]):
             logger.warning('Length of string ({}) does not match format {}!'.format(len(value), fmt))
-        x = struct.pack('>{}s'.format(fmt[5:]), value.encode(encoding='ascii'))
+        return struct.pack('>{}s'.format(fmt[5:]), value.encode(encoding='ascii'))
 
     elif fmt == timepack[0]:
-        x = calc_timestamp(value, sync=None, return_bytes=True)
+        return calc_timestamp(value, sync=None, return_bytes=True)
 
     elif value is None:
-        x = struct.pack('>' + fmt)
+        return struct.pack('>' + fmt)
 
     else:
-        x = struct.pack('>' + fmt, value)
+        if aligned:
+            return struct.pack('>' + fmt, value)
 
-    return x
+        bitbuf = (bitbuf << bsize) | value
+
+    return pack_bytes(fmts, vals, bitbuf=bitbuf, offbit=offbit)
 
 
 def date_to_cuc_bytes(date, sync=None):
