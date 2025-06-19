@@ -2758,7 +2758,7 @@ def encode_pus(params, *values, params_as_fmt_string=False):
         logger.debug(err)
         # proper insertion of spares
         # return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
-        return pack_bytes_loop(fmts, vals)
+        return pack_bytes_loop(fmts, values)
 
 
 def cast_str_value_ptc(val, ptc):
