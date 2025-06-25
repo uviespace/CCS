@@ -35,6 +35,14 @@ class Command(ctypes.BigEndianStructure):
     def __str__(self):
         return self.INSTRUCTION.__str__() + '\nDATUM: 0x{:08X}'.format(self.DATUM)
 
+    @property
+    def instr(self):
+        return int.from_bytes(self.INSTRUCTION, 'big')
+
+    @property
+    def datum(self):
+        return self.DATUM
+
 
 class BlockCommit(ctypes.BigEndianStructure):
     _pack_ = 1
@@ -44,6 +52,14 @@ class BlockCommit(ctypes.BigEndianStructure):
 
     def __str__(self):
         return self.INSTRUCTION.__str__() + '\nN: {}'.format(self.N)
+
+    @property
+    def instr(self):
+        return int.from_bytes(self.INSTRUCTION, 'big')
+
+    @property
+    def datum(self):
+        return (self.N << 26) | self.RESERVED
 
 
 def nop():
