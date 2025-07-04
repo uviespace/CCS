@@ -23,4 +23,4 @@ MemoryID16 = 'MRAM'  # JA0H0124
 # N = 1  # JA0H0042 [NOT EDITABLE]
 StartAddress = mem_addr  # JA0H0125
 Length = asw.size  # JA0H0123
-cfl.Tcbuild('BSW_CheckMemData', MemoryID16, StartAddress, Length, pool_name=POOLNAME)
+cfl.Tcsend_DB('BSW_CheckMemData', MemoryID16, StartAddress, Length, pool_name=POOLNAME)

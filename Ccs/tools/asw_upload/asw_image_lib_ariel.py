@@ -62,7 +62,7 @@ class ImageHeader(ctypes.Union):
         self.fields.FILLER = FILLER
         self.fields.ENTRY_POINT = entrypoint
 
-        self.set_section(1, data, entrypoint, data_addr_offset, memid)
+        self.set_section(1, data, entrypoint, MEM_MRAM_START + ASW_IMG_OFFSET + data_addr_offset, memid)
 
         self.fields.HEADER_CRC16 = puscrc(bytes(self.bin[2:]))
 
