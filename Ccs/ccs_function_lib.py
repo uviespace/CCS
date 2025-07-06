@@ -2519,7 +2519,7 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
 #  @param pool_name Name of pool bound to socket connected to the C&C port
 #  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a
 #  loop to prevent too many packets are being sent over the socket in a too short time interval.
-def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, **kwargs):
+def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, cname=None, **kwargs):
     """
     Build and send a TC packet whose structure is defined in the MIB. Note that for repeating parameter groups
     the arguments are interleaved, e.g., ParID1, ParVal1, ParID2, ParVal2,... Use the function *interleave_lists*
@@ -2544,7 +2544,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
         return
 
     try:
-        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, **kwargs)
+        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, cname=cname**kwargs)
     except TypeError as e:
         raise e
 
@@ -2561,7 +2561,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 
 ##
 #  Generate TC
-def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, fmt='raw', **kwargs):
+def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, fmt='raw', cname=None, **kwargs):
     """
     Create TC bytestring for CMD with corresponding parameters
 
@@ -2577,10 +2577,10 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     """
 
     try:
-        params = _get_tc_params(cmd)
+        params = _get_tc_params(cmd, ccf_cname=cname)
     except SQLOperationalError:
         scoped_session_idb.close()
-        params = _get_tc_params(cmd)
+        params = _get_tc_params(cmd, ccf_cname=cname)
 
     try:
         st, sst, apid, npars = params[0][:4]
@@ -2588,7 +2588,7 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         raise NameError('Unknown command "{}"'.format(cmd))
 
     if ack is None:
-        ack = bin(Tcack(cmd))
+        ack = bin(Tcack(cmd, ccf_cname=cname))
 
     if npars == 0:
         pdata = b''
@@ -2630,18 +2630,23 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
 
 
-def _get_tc_params(cmd, paf_cal=False):
+def _get_tc_params(cmd, paf_cal=False, ccf_cname=None):
+
+    if ccf_cname is not None:
+        ref = 'ccf_cname="{}"'.format(ccf_cname)
+    else:
+        ref = 'ccf_descr="{}"'.format(cmd)
 
     if paf_cal:
         que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
               'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname,cpc.cpc_pafref FROM ccf LEFT JOIN cdf ON ' \
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-              'WHERE BINARY ccf_descr="%s"' % cmd
+              'WHERE BINARY {}'.format(ref)
     else:
         que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
               'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_categ,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-              'WHERE BINARY ccf_descr="%s"' % cmd
+              'WHERE BINARY {}'.format(ref)
 
     params = scoped_session_idb.execute(que).fetchall()
     scoped_session_idb.close()
@@ -2966,14 +2971,17 @@ def parameter_ptt_type_tc(par):
 #  @param st   Service type
 #  @param sst  Service sub-type
 #  @param apid APID of TC
-def Tcack(cmd):
+def Tcack(cmd, ccf_cname=None):
     """
     Get type acknowledgement type for give service (sub-)type and APID from I-DB
 
     :param cmd:
     :return:
     """
-    que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_descr="{}"'.format(cmd)
+    if ccf_cname is not None:
+        que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_cname="{}"'.format(ccf_cname)
+    else:
+        que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_descr="{}"'.format(cmd)
     dbcon = scoped_session_idb
     ack = int(dbcon.execute(que).fetchall()[0][0])
     dbcon.close()
@@ -4515,13 +4523,20 @@ def _get_upload_service_info(tcname=None):
     return apid, memid_ref, fmt, endspares
 
 
-def get_tc_list(ccf_descr=None):
+def get_tc_list(ccf_descr=None, ccf_cname=None):
     """
 
     :param ccf_descr:
     :return:
     """
-    if ccf_descr is None:
+    if ccf_cname is not None:
+        cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
+                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
+                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
+                                          'WHERE ccf_cname="{}"'.format(ccf_cname)).fetchall()
+
+    elif ccf_descr is None:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
                                           'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
@@ -4817,7 +4832,7 @@ def get_dp_fmt_info(dp_name):
 #         raise NotImplementedError
 
 
-def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None):
     """
 
     :param ccf_descr:
@@ -4828,6 +4843,17 @@ def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', option
     :param add_parcfg:
     :return:
     """
+
+    if cname is not None:
+        try:
+            ncmds = len(list(get_tc_list(ccf_descr=ccf_descr).items()))
+            if ncmds > 1:
+                cmd, pars = list(get_tc_list(ccf_cname=cname).items())[0]
+                return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment,
+                                   add_parcfg=add_parcfg, cname=cname)
+        except IndexError:
+            raise IndexError('"{}" not found in IDB.'.format(cname))
+
     try:
         cmd, pars = list(get_tc_list(ccf_descr).items())[0]
     except IndexError:
@@ -4836,7 +4862,7 @@ def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', option
     return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment, add_parcfg=add_parcfg)
 
 
-def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None):
     """
 
     :param cmd:
@@ -4882,7 +4908,11 @@ def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='',
     parstr = ', '.join(parsinfo_to_str(pars))
     if len(parstr) > 0:
         parstr = ', ' + parstr
-    exe = "{}('{}'{}, pool_name={}{})".format(preamble, cmd[1], parstr, pool_name, options)
+    if cname is not None:
+        cnameopt = ", cname='{}'".format(cname)
+    else:
+        cnameopt = ''
+    exe = "{}('{}'{}, pool_name={}{}{})".format(preamble, cmd[1], parstr, pool_name, cnameopt, options)
     return commentstr + parcfg + exe + newline
 
 
