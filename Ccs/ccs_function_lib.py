@@ -2591,6 +2591,10 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         ack = bin(Tcack(cmd, ccf_cname=cname))
 
     if npars == 0:
+
+        if fmt == 'tcl':
+            return cmd, [], []
+
         pdata = b''
 
         if source_data_only:
