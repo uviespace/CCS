@@ -2544,7 +2544,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
         return
 
     try:
-        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, cname=cname**kwargs)
+        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, cname=cname, **kwargs)
     except TypeError as e:
         raise e
 
