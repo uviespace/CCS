@@ -807,7 +807,6 @@ def Tmdata(tm, udef=False, floatfmt=None):
             dbcon.close()
 
     try:
-
         if (tm[0] >> 4) & 1:
             return Tcdata(tm)
 
@@ -4576,7 +4575,7 @@ def pcf_descr_to_name(pcfdescr):
     """
 
     if pcfdescr in _pcf_name_cache:
-        return _pcf_name_cache[pcfname]
+        return _pcf_name_cache[pcfdescr]
 
     que = 'SELECT pcf_name FROM pcf WHERE pcf_descr="{}"'.format(pcfdescr)
     res = scoped_session_idb.execute(que).fetchall()
