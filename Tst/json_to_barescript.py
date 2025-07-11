@@ -103,10 +103,16 @@ def replace_newline(txt):
 if __name__ == '__main__':
     json_file_path = sys.argv[1]
 
+    if '-r' in sys.argv:
+        report = True
+        sys.argv.remove('-r')
+    else:
+        report = False
+
     if len(sys.argv) > 2:  # If filename is given
         outputfile = sys.argv[2]
     else:  # If no filename is given take the working directory path, filename is used from the json file
         outputfile = os.getcwd() + '/'
         #outputfile = '/'.join(json_file_path[:-len(json_file_path.split('/')[-1])-1]) + '/'  # This would take the json File path
 
-    run(json_file_path, outputfile, reportfunc=False)
+    run(json_file_path, outputfile, reportfunc=report)

@@ -151,15 +151,5 @@ def convert(fname):
 
 
 if __name__ == '__main__':
-    # fname = sys.argv[1]
-    # convert(fname)
-    convert('/home/marko/space/ariel/FSW/Documents/testspec/tst/BSW_FFT/BSW-SRV-17_1-TS-1.json')
-
-
-# MemoryID16 = "MRAM"  # JA0H0124
-# # N_16 = 1  # JA0H0042 [NOT EDITABLE]
-# StartAddress = 0x80000  # JA0H0125
-# Length = 8  # JA0H0123
-# Data = b'DEADBEEF'  # JA0H0122
-# tc=build_tcl_cmd('BSW_SetParamValue', 2818572294, 42, pool_name='LIVE')
-# pass
+    fname = sys.argv[1]
+    convert(fname)

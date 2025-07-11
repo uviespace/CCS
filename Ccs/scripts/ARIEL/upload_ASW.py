@@ -3,10 +3,10 @@
 import Ccs.tools.asw_upload.asw_image_lib_ariel as ail
 
 POOLNAME = "LIVE"
-asw_path = "/home/marko/space/ariel/asw_images/asw_xx.elf"
+asw_path = "/home/marko/space/ariel/asw_images/ariel_asw_v1.0_b0006.elf"
 
 #! CCS.BREAKPOINT
-memid = 2  # memory ID
+memid = 18  # memory ID
 start_addr = 0x40000000  # start address/entry point of ASW in RAM
 asw = ail.AswImage(memid, start_addr, asw_path, skip_bytes=65536)
 
@@ -14,9 +14,10 @@ asw = ail.AswImage(memid, start_addr, asw_path, skip_bytes=65536)
 # write image to file
 open(asw_path + '.img', 'wb').write(asw.img)
 
+cfl.Tcsend_DB('BSW_DisableWritePro', 'MRAM', pool_name=POOLNAME)
 #! CCS.BREAKPOINT
 mem_addr = 0x10080000  # address where the data is uploaded to (ail.MEM_MRAM_START + ail.ASW_IMG_OFFSET)
-cfl.load_to_memory(asw.img, memid, mem_addr, max_pkt_size=1024, progress=True, calc_crc=True, byte_align=4, pool_name=POOLNAME)
+cfl.load_to_memory(asw.img, memid, mem_addr, max_pkt_size=1024, progress=True, calc_crc=True, byte_align=4, pool_name=POOLNAME,tcname="BSW_LoadMemData",sleep=.25)
 
 #! CCS.BREAKPOINT
 MemoryID16 = 'MRAM'  # JA0H0124

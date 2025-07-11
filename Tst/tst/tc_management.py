@@ -272,7 +272,7 @@ class TcTable(Gtk.Grid):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
         st, sst, descr, desc2, cname = model[my_iter]
-        selection_data.set_text(cfl.make_tc_template(descr, comment=False, add_parcfg=True, cname=cname), -1)
+        selection_data.set_text(cfl.make_tc_template(descr, comment=True, add_parcfg=True, cname=cname), -1)
 
     def on_drag_begin(self, *args):
         pass
