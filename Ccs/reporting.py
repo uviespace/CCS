@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 SEQUENCE_IDX = 0  # get default sequence from test spec JSON
 
 
+def _fix_markup(s):
+    return s.replace('<','&lt;').replace('>','&gt;')
+
+
 class TestReport:
     """
     Provides functions for interactive test reporting
@@ -136,7 +140,7 @@ class TestReport:
 
         _step = self.steps.get(step)
 
-        exe_msg = '<b>{}_{}</b>\n{}'.format(self.testname, step, _step.get('_description'))
+        exe_msg = '<b>{}_{}</b>\n{}'.format(self.testname, step, _fix_markup(_step.get('_description')))
         comment = _step.get('_step_comment')
         code = _step.get('_command_code') if self._show_code else ''
 
@@ -209,10 +213,10 @@ class TestReport:
 
         _step = self.steps.get(step)
 
-        vmsg = _step.get('_verification_description')
+        vmsg = '<b>{}_{}</b>\n{}'.format(self.testname, step, _fix_markup(_step.get('_verification_description')))
 
         if not vmsg:
-            vmsg = _step.get('_description')
+            vmsg = '<b>{}_{}</b>\n{}'.format(self.testname, step, _fix_markup(_step.get('_description')))
 
         result, comment, tminfo = self._verify_dialog(vmsg)
 
