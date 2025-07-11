@@ -2009,8 +2009,9 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
         rows = rows.filter(DbTelemetry.apid == apid)
 
     if sid:
-        if st is None or sst is None or apid is None:
-            raise ValueError('Must provide st, sst and apid if filtering by sid')
+        #TODO apid
+        #if st is None or sst is None or apid is None:
+        #    raise ValueError('Must provide st, sst and apid if filtering by sid')
 
         sid_offset, sid_bitlen = get_sid(st, sst, apid)
         if sid_offset != -1:
