@@ -783,8 +783,9 @@ class ParameterMonitor(Gtk.Window):
                     editor.Functions('_to_console_via_socket', 'del(monitor'+str(nr)+')')
 
         self.update_all_connections_quit()
-        if Gtk.main_level():
-            Gtk.main_quit()
+        #if Gtk.main_level():
+        Gtk.main_quit()
+        return False
 
     def update_all_connections_quit(self):
         """

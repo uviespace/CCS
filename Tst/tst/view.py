@@ -95,7 +95,7 @@ class Board(Gtk.Box):
         self.test_meta_data_box.set_orientation(Gtk.Orientation.HORIZONTAL)
 
         self.test_meta_data_info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.test_meta_data_pre_post_con = Gtk.Box()
+        self.test_meta_data_pre_post_con = Gtk.Box(margin_start=10)
         self.test_meta_data_pre_post_con.set_orientation(Gtk.Orientation.VERTICAL)
         self.test_meta_data_pre_post_con_edit = Gtk.Box()
         self.test_meta_data_pre_post_con_edit.set_orientation(Gtk.Orientation.VERTICAL)
@@ -135,6 +135,15 @@ class Board(Gtk.Box):
         self.test_meta_data_iasw_box.pack_start(self.test_meta_data_iasw_version_label, False, False, 4)
         self.test_meta_data_iasw_box.pack_end(self.test_meta_data_iasw_version, False, False, 0)
         self.test_meta_data_info.pack_start(self.test_meta_data_iasw_box, True, True, 0)
+        # IASW Requirements
+        self.test_meta_data_req_label = Gtk.Label()
+        self.test_meta_data_req_label.set_text('Requirements:')
+        self.test_meta_data_req = Gtk.Entry(width_chars=25)
+        self.test_meta_data_req.set_placeholder_text('< Requirements >')
+        self.test_meta_data_req_box = Gtk.Box(spacing=5, orientation=Gtk.Orientation.HORIZONTAL)
+        self.test_meta_data_req_box.pack_start(self.test_meta_data_req_label, False, False, 4)
+        self.test_meta_data_req_box.pack_end(self.test_meta_data_req, False, False, 0)
+        self.test_meta_data_info.pack_start(self.test_meta_data_req_box, True, True, 0)
         # checkbox for locking the step numbers
         self.test_is_locked_label = Gtk.Label()
         self.test_is_locked_label.set_text(_('Lock step enumeration:'))
@@ -175,9 +184,9 @@ class Board(Gtk.Box):
         self.test_meta_data_pre_post_con.pack_start(precon_line, False, True, 2)
         self.test_meta_data_pre_post_con.pack_start(self.postcon_selection_label, False, True, 2)
         self.test_meta_data_pre_post_con.pack_start(postcon_line, False, True, 0)
-        self.test_meta_data_box.set_spacing(20)
+        self.test_meta_data_box.set_spacing(10)
 
-        self.test_comment_box = Gtk.Box(spacing=2)
+        self.test_comment_box = Gtk.Box(spacing=2, margin_end=5)
         self.test_comment_box.set_orientation(Gtk.Orientation.VERTICAL)
         self.label_comment = Gtk.Label()
         self.label_comment.set_halign(Gtk.Align.START)
@@ -200,6 +209,49 @@ class Board(Gtk.Box):
         self.test_meta_data_box.pack_start(self.test_meta_data_pre_post_con_edit, False, True, 0)
         self.test_meta_data_box.pack_start(self.test_comment_box, True, True, 0)
         self.pack_start(self.test_meta_data_box, False, True, 0)
+
+        # add a custom init code block
+        self.custom_import_box = Gtk.Box(spacing=5, margin_start=10, margin_end=10)
+        self.custom_import_box.set_orientation(Gtk.Orientation.VERTICAL)
+
+        self.bar_custom_import = Gtk.Box()
+        self.bar_custom_import.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.bar_custom_import.set_tooltip_text('Statements that are executed at the beginning of a test.\n'
+                                                'Define imports and variables used throughout the test here.')
+        self.label_custom_import = Gtk.Label()
+        self.label_custom_import.set_halign(Gtk.Align.START)
+        self.label_custom_import.set_markup('<b>Init code</b>')
+
+        self.button_custom_import = Gtk.ToolButton()
+        self.button_custom_import.set_icon_name('pan-down-symbolic')
+        self.button_custom_import.connect('clicked', self.on_init_code_toggle)
+
+        self.bar_custom_import.pack_start(self.button_custom_import, False, True, 0)
+        self.bar_custom_import.pack_start(self.label_custom_import, False, True, 0)
+
+        self.custom_import_scrolled_window = Gtk.ScrolledWindow()
+        self.custom_import_scrolled_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.custom_import_scrolled_window.set_size_request(-1, 200)
+        self.test_custom_import = GtkSource.View()
+        self.test_custom_import.set_auto_indent(True)
+        self.test_custom_import.set_wrap_mode(Gtk.WrapMode.WORD)
+        self.test_custom_import.set_show_line_numbers(True)
+        self.test_custom_import.set_monospace(True)
+        self.test_custom_import.set_highlight_current_line(True)
+        self.test_custom_import.set_indent_on_tab(True)
+        self.test_custom_import.set_insert_spaces_instead_of_tabs(True)
+        self.test_custom_import.set_indent_width(4)
+        self.test_custom_import.set_auto_indent(True)
+        self.custom_import_buffer = self.test_custom_import.get_buffer()
+
+        self.custom_import_buffer.set_language(lngg)
+        # self.custom_import_buffer.set_style_scheme(self.board.current_scheme)
+        self.custom_import_scrolled_window.add(self.test_custom_import)
+
+        self.custom_import_box.pack_start(self.bar_custom_import, False, False, 0)
+        self.custom_import_box.pack_start(self.custom_import_scrolled_window, True, True, 0)
+
+        self.pack_start(self.custom_import_box, False, True, 0)
 
         # making the toolbar
         self.btn_add_step = Gtk.ToolButton()
@@ -248,8 +300,10 @@ class Board(Gtk.Box):
         self.test_meta_data_desc.connect('changed', self.on_test_desc_change)
         self.test_meta_data_spec_version.connect('changed', self.on_test_spec_version_change)
         self.test_meta_data_iasw_version.connect('changed', self.on_test_iasw_version_change)
+        self.test_meta_data_req.connect('changed', self.on_test_requirements_change)
         self.text_meta_data_test_is_locked.connect('toggled', self.on_test_locked_toggled)
         self.test_meta_data_comment.get_buffer().connect('changed', self.on_comment_change)
+        self.custom_import_buffer.connect('changed', self.on_custom_import_change)
 
         Gtk.StyleContext.add_class(self.get_style_context(), 'board')
 
@@ -300,6 +354,8 @@ class Board(Gtk.Box):
         self.test_meta_data_spec_version.set_text(self.model.spec_version)
         # set the Software version of the test specification from the data model
         self.test_meta_data_iasw_version.set_text(self.model.iasw_version)
+        # set the Requirements of the test specification from the data model
+        self.test_meta_data_req.set_text(self.model.requirements)
         # set the pre-condition name
         if self.model.precon_name:
             found = False
@@ -331,6 +387,17 @@ class Board(Gtk.Box):
 
         # Set the Locked STep numeration
         self.text_meta_data_test_is_locked.set_active(self.model.primary_counter_locked)
+
+        # Set the init code block
+        self.custom_import_buffer.set_text(self.model.custom_imports)
+
+    def on_init_code_toggle(self, widget):
+        if self.custom_import_scrolled_window.is_visible():
+            self.custom_import_scrolled_window.set_visible(False)
+            widget.set_icon_name('pan-end-symbolic')
+        else:
+            self.custom_import_scrolled_window.set_visible(True)
+            widget.set_icon_name('pan-down-symbolic')
 
     def collapse_all_steps(self, button):
         """ Close all expander of the steps """
@@ -489,6 +556,14 @@ class Board(Gtk.Box):
         # update the data model viewer
         self.app.update_model_viewer()
 
+    def on_test_requirements_change(self, widget):
+        # get the IASW Version out of the text buffer of the widget
+        requirements = widget.get_text()
+        # update the model
+        self.model.requirements = requirements
+        # update the data model viewer
+        self.app.update_model_viewer()
+
     def on_test_locked_toggled(self, *args):
         # toggle the value in the widget
         self.test_is_locked = not self.test_is_locked
@@ -507,6 +582,18 @@ class Board(Gtk.Box):
         # update the model
         self.model.comment = comment
         # update the data model viewer
+        self.app.update_model_viewer()
+
+    def on_custom_import_change(self, widget):
+        """
+        update model if buffer changes
+
+        :param widget:
+        :return:
+        """
+
+        custom_code = widget.get_text(widget.get_start_iter(), widget.get_end_iter(), True)
+        self.model.custom_imports = custom_code
         self.app.update_model_viewer()
 
     def destroy_all_step_widgets(self):
@@ -661,6 +748,7 @@ class StepWidget(Gtk.EventBox):
         self.detail_box = Gtk.Box()
         self.detail_box.set_orientation(Gtk.Orientation.VERTICAL)
         self.detail_box.connect('show', self.on_detail_box_show)
+        self.detail_box.set_spacing(5)
         # self.detail_box.set_homogeneous(True)
         Gtk.StyleContext.add_class(self.detail_box.get_style_context(), 'step-detail-box')  # for CSS styling
 
@@ -718,9 +806,18 @@ class StepWidget(Gtk.EventBox):
         # fields for commands and verification
         # lm = GtkSource.LanguageManager()
 
+        # Area for Commands and TM/TC
+        # self.commands_and_tmtc_box = Gtk.Grid()
+        # self.commands_and_tmtc_box.set_column_homogeneous(False)
+
+        self.commands_and_tmtc_box = Gtk.Box()
+        self.commands_and_tmtc_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.commands_and_tmtc_box.set_spacing(10)
+
         # Area for the commands
         self.whole_commands_box = Gtk.Box()
         self.whole_commands_box.set_orientation(Gtk.Orientation.VERTICAL)
+
         # Make the label, inside a own Box to show it on the left side
         self.lbl_box_commands = Gtk.Box()
         self.lbl_box_commands.set_orientation(Gtk.Orientation.HORIZONTAL)
@@ -733,7 +830,7 @@ class StepWidget(Gtk.EventBox):
         # Make the area where the real command is entered
         # self.detail_box.pack_start(self.lbl_box_commands, True, True, 0)
         self.commands_scrolled_window = Gtk.ScrolledWindow()
-        self.commands_scrolled_window.set_size_request(-1, 200)
+        self.commands_scrolled_window.set_size_request(600, 200)
         self.commands_view = GtkSource.View()
         self.commands_view.set_auto_indent(True)
         self.commands_view.set_wrap_mode(Gtk.WrapMode.WORD)
@@ -762,7 +859,59 @@ class StepWidget(Gtk.EventBox):
 
         self.whole_commands_box.pack_start(self.lbl_box_commands, False, False, 0)
         self.whole_commands_box.pack_start(self.commands_scrolled_window, True, True, 0)
-        self.detail_box.pack_start(self.whole_commands_box, True, True, 0)
+        
+        self.commands_and_tmtc_box.pack_start(self.whole_commands_box, True, True, 0)
+
+        # Area for TM/TC
+        self.whole_tmtc_box = Gtk.Box()
+        self.whole_tmtc_box.set_orientation(Gtk.Orientation.VERTICAL)
+
+        # box for TM/TC
+        self.tmtc_box = Gtk.Box()
+        self.tmtc_box.set_orientation(Gtk.Orientation.HORIZONTAL)
+        self.tmtc_label = Gtk.Label.new()
+        self.tmtc_label.set_text(_('TM/TC'))
+        self.tmtc_label.set_tooltip_text(_('List of TM/TC packet instances used in this step'))
+        self.tmtc_box.pack_start(self.tmtc_label, False, False, 0)
+
+        self.tmtc_scrolled_window = Gtk.ScrolledWindow()
+        self.tmtc_scrolled_window.set_size_request(195, 200)
+        self.tmtc_view = GtkSource.View()
+        self.tmtc_view.set_auto_indent(True)
+        self.tmtc_view.set_wrap_mode(Gtk.WrapMode.WORD)
+        #self.tmtc_view.set_show_line_numbers(True)
+        # self.tmtc_view.set_show_right_margin(True)
+        self.tmtc_view.set_monospace(True)
+        #self.tmtc_view.set_highlight_current_line(True)
+        self.tmtc_view.set_indent_on_tab(True)
+        self.tmtc_view.set_insert_spaces_instead_of_tabs(True)
+        self.tmtc_view.set_indent_width(4)
+        self.tmtc_view.set_auto_indent(True)
+        self.tmtc_comment_buffer = self.tmtc_view.get_buffer()
+        # draganddrop here
+        # self.tmtc_view.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        # self.tmtc_view.drag_dest_set_target_list(None)
+        # self.tmtc_view.drag_dest_add_text_targets()
+        #
+        # self.tmtc_view.connect("drag-motion", self.on_drag_motion_2)
+        # self.tmtc_view.connect("drag-leave", self.on_drag_leave)
+
+        # self.tmtc_comment_buffer.set_language(lngg)
+        # self.tmtc_buffer.set_style_scheme(self.board.current_scheme)
+        self.tmtc_scrolled_window.add(self.tmtc_view)
+
+        self.whole_tmtc_box.pack_start(self.tmtc_box, False, False, 0)
+        self.whole_tmtc_box.pack_start(self.tmtc_scrolled_window, True, True, 0)
+        self.commands_and_tmtc_box.pack_start(self.whole_tmtc_box, True, True, 0)
+        self.detail_box.pack_start(self.commands_and_tmtc_box, True, True, 0)
+        
+        # self.commands_and_tmtc_box.set_column_spacing(10)
+        # self.commands_and_tmtc_box.attach(self.lbl_box_commands, 0, 0, 3, 1)
+        # self.commands_and_tmtc_box.attach(self.commands_scrolled_window, 0, 1, 3, 5)
+        # self.commands_and_tmtc_box.attach_next_to(self.tmtc_box, self.lbl_box_commands, Gtk.PositionType.RIGHT, 3, 1)
+        # self.commands_and_tmtc_box.attach_next_to(self.tmtc_scrolled_window, self.commands_scrolled_window, Gtk.PositionType.RIGHT, 3, 5)
+        # self.detail_box.pack_start(self.commands_and_tmtc_box, True, True, 0)
+
         # area for the verification
         self.whole_verification_box = Gtk.Grid()
         self.whole_verification_box.set_column_homogeneous(True)
@@ -773,7 +922,7 @@ class StepWidget(Gtk.EventBox):
         self.lbl_box_verification.set_orientation(Gtk.Orientation.HORIZONTAL)
         self.verification_label = Gtk.Label.new()
         self.verification_label.set_text(_('Verification Code'))
-        self.verification_label.set_tooltip_text(_('The verification code-block must define a variable "result" that is TRUE/FALSE'))
+        self.verification_label.set_tooltip_text(_("The verification code-block must define a variable 'result' that evaluates to True/False"))
         # self.btn_exec_verification = Gtk.Button.new_from_icon_name(icon_name='media-playback-start', size=Gtk.IconSize.BUTTON)
         # self.btn_exec_verification.connect('clicked', self.on_exec_verification)
         self.lbl_box_verification.pack_start(self.verification_label, False, False, 0)
@@ -855,6 +1004,7 @@ class StepWidget(Gtk.EventBox):
         self.desc_text_buffer.connect('changed', self.on_description_buffer_changed)
         self.commands_buffer.connect('changed', self.on_commands_buffer_changed)
         self.step_comment_buffer.connect('changed', self.on_step_comment_buffer_changed)
+        self.tmtc_comment_buffer.connect('changed', self.on_tmtc_buffer_changed)
         self.verification_buffer.connect('changed', self.on_verification_buffer_changed)
         self.verification_description_buffer.connect('changed', self.on_verification_description_buffer_changed)
 
@@ -953,6 +1103,7 @@ class StepWidget(Gtk.EventBox):
         self.set_description_in_widget()
         self.set_commands_in_widget()
         self.set_step_comment_in_widget()
+        self.set_tmtc_comment_in_widget()
         self.set_verification_in_widget()
         self.set_verification_description_in_widget()
         self.set_start_sequence_in_widget()
@@ -990,6 +1141,13 @@ class StepWidget(Gtk.EventBox):
         stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
         step_comment = self.model.get_sequence(self.sequence).steps[stp_ndx].step_comment
         self.step_comment_buffer.set_text(step_comment)
+        return
+    
+    def set_tmtc_comment_in_widget(self):
+        """ gets the commands comment from the model and sets it in the commands comment buffer in order to display it """
+        stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
+        tmtc_comment = self.model.get_sequence(self.sequence).steps[stp_ndx].tmtc_comment
+        self.tmtc_comment_buffer.set_text(tmtc_comment)
         return
 
     def set_verification_in_widget(self):
@@ -1077,6 +1235,7 @@ class StepWidget(Gtk.EventBox):
         step_number = step.step_number
         description = step.description
         comment = step.step_comment
+        tmtc = step.tmtc_comment
         command_code = step.command_code
         verification_code = step.verification_code
         verification_descr = step.verification_description
@@ -1086,6 +1245,7 @@ class StepWidget(Gtk.EventBox):
                                                         step_number,
                                                         description,
                                                         comment,
+                                                        tmtc,
                                                         command_code,
                                                         verification_code,
                                                         verification_descr,
@@ -1164,6 +1324,7 @@ class StepWidget(Gtk.EventBox):
             step.description = data['description']
             step.command_code = data['command_code']
             step.step_comment = data['comment']
+            step.tmtc_comment = data['tmtc']
             step.verification_code = data['verification_code']
             step.verification_description = data['verification_descr']
         if drag_source_type == dnd_data_parser.data_type_step:  # a step is moved
@@ -1260,6 +1421,24 @@ class StepWidget(Gtk.EventBox):
         # use the setter of the data model
         if isinstance(step_in_data_model, data_model.Step):
             step_in_data_model.step_comment = step_comment
+        else:
+            self.logger('step with the step number {} could not be found'.format(self.step_number))
+        # update the data model viewer
+        self.app.update_model_viewer()
+
+    def on_tmtc_buffer_changed(self, text_buffer):
+        """
+        Signal 'changed' for the tmtc comment buffer
+        """
+        # get the text of the commands comment out of the buffer of the widget
+        tmtc_comment = self.read_out_text_buffer(text_buffer)
+        # Setting the commands string for a step in the data model
+        # find the correct step within the data model
+        stp_ndx = self.model.get_sequence(self.sequence).get_step_index(self.step_number)
+        step_in_data_model = self.model.get_sequence(self.sequence).steps[stp_ndx]
+        # use the setter of the data model
+        if isinstance(step_in_data_model, data_model.Step):
+            step_in_data_model.tmtc_comment = tmtc_comment
         else:
             self.logger('step with the step number {} could not be found'.format(self.step_number))
         # update the data model viewer
@@ -1581,6 +1760,7 @@ class InterStepWidget(Gtk.Box):
                 # set the data into the test script data model
                 new_step.description = data['description']
                 new_step.step_comment = data['comment']
+                new_step.tmtc_comment = data['tmtc']
                 new_step.command_code = data['command_code']
                 new_step.verification_code = data['verification_code']
                 new_step.verification_description = data['verification_descr']
@@ -1605,6 +1785,7 @@ class InterStepWidget(Gtk.Box):
                     # set the data into the test script data model
                     new_step.description = data['description']
                     new_step.step_comment = data['comment']
+                    new_step.tmtc_comment = data['tmtc']
                     new_step.command_code = data['command_code']
                     new_step.verification_code = data['verification_code']
                     new_step.verification_description = data['verification_descr']

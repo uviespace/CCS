@@ -54,13 +54,12 @@ ActivePoolInfo = NamedTuple(
         ('pool_name', str),
         ('live', bool)])
 
-# fmtlist = {'INT8': 'b', 'UINT8': 'B', 'INT16': 'h', 'UINT16': 'H', 'INT32': 'i', 'UINT32': 'I', 'INT64': 'q',
-#            'UINT64': 'Q', 'FLOAT': 'f', 'DOUBLE': 'd', 'INT24': 'i24', 'UINT24': 'I24', 'bit*': 'bit'}
+REFRESH_RATE = 1
 
 
 class PlotViewer(Gtk.Window):
 
-    def __init__(self, loaded_pool, refresh_rate=1, parameters=None, start_live=False, **kwargs):
+    def __init__(self, loaded_pool, refresh_rate=REFRESH_RATE, parameters=None, start_live=False, **kwargs):
         Gtk.Window.__init__(self)
 
         assert isinstance(loaded_pool, str)
@@ -230,6 +229,7 @@ class PlotViewer(Gtk.Window):
 
     def create_canvas(self):
         fig = Figure()
+        fig.set_tight_layout(True)
         self.subplot = fig.add_subplot(111)
         self.subplot.grid()
         self.subplot.set_xlabel('CUC time [s]')
@@ -314,12 +314,12 @@ class PlotViewer(Gtk.Window):
 
         hbox = Gtk.HBox(homogeneous=True)
         data_button = Gtk.Button(label='View plot data')
-        data_button.set_image(Gtk.Image.new_from_icon_name('gtk-justify-fill', Gtk.IconSize.BUTTON))
+        data_button.set_image(Gtk.Image.new_from_icon_name('format-justify-fill', Gtk.IconSize.BUTTON))
         data_button.set_always_show_image(True)
         data_button.connect('clicked', self.show_plot_data)
 
         save_button = Gtk.Button(label='Save plot data')
-        save_button.set_image(Gtk.Image.new_from_icon_name('gtk-save', Gtk.IconSize.BUTTON))
+        save_button.set_image(Gtk.Image.new_from_icon_name('document-save', Gtk.IconSize.BUTTON))
         save_button.set_always_show_image(True)
         save_button.connect('clicked', self.save_plot_data)
 
@@ -330,7 +330,7 @@ class PlotViewer(Gtk.Window):
         add_userpar_butt = Gtk.Button(label='Add User Defined Parameter')
         add_userpar_butt.connect('clicked', self.add_user_parameter, self.treeview)
         edit_userpar_butt = Gtk.Button()
-        edit_userpar_butt.set_image(Gtk.Image.new_from_icon_name('gtk-edit', Gtk.IconSize.BUTTON))
+        edit_userpar_butt.set_image(Gtk.Image.new_from_icon_name('edit', Gtk.IconSize.BUTTON))
         edit_userpar_butt.connect('clicked', self.edit_user_parameter, self.treeview)
         edit_userpar_butt.set_tooltip_text('Edit user defined parameter')
         rm_userpar_butt = Gtk.Button()

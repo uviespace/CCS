@@ -394,3 +394,9 @@ def compare_content(data_a, data_b):
         the_same = True
 
     return the_same
+
+
+class TestVars:
+
+    _desc = "This class can be used to define and share variables between test steps"
+

@@ -53,3 +53,26 @@ Use CCS/Ccs/tools/import_mib.py to import a set of SCOS2000 MIB files into the M
 # CCS & TST
 ./start_ccs: starts the CCS
 ./start_tst: starts the TST
+
+# INSTALLATION ON MAC
+The CCS tools should generally also work on a Mac, the installation process will require some modifications and/or additional steps, however.
+
+- it is recommended to use a Python venv (with system-site packages enabled):
+    python3 -m venv ve_ccs --system-site-packages
+
+- some additional (Python) packages may need to be explicitly installed:
+    pip install setuptools
+    brew install libnotify
+    brew install pkg-config
+    brew install gtk+3
+    pip install dbus-python==1.2.18
+    brew install python-argcomplete
+
+    brew install openssl
+    export LDFLAGS="-L$(brew --prefix openssl)/lib"
+    export CPPFLAGS="-I$(brew --prefix openssl)/include"
+    export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig"
+
+    pip install mysqlclient
+
+- potentially, versions have to be specified for some packages in requirements.txt (sqlalchemy==1.4, ipython==7.12.0)

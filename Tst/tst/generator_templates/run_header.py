@@ -13,6 +13,7 @@ sys.path.append(ccs_path)
 import ccs_function_lib as cfl
 cfl.add_tst_import_paths()
 from testlib import tools
+from testlib.tools import TestVars as var
 from testlib import report
 from testlib import tm
 from testlib import tc
