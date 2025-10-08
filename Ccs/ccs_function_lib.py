@@ -1665,11 +1665,11 @@ def tc_param_alias_reverse(paf, cca, val, pname=None):
         return alval[0][0]
     elif cca is not None:
         dbcon = scoped_session_idb
-        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s"' % (cca)
+        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s" ORDER BY ccs_yvals' % cca
         dbres = dbcon.execute(que)
         xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
         dbcon.close()
-        alval = np.interp(val, yvals, xvals)
+        alval = np.interp(val, yvals, xvals, left=np.nan, right=np.nan)
         return alval
     # get name for ParamID if datapool item (in MIB)
     elif pname in DATA_POOL_ID_PARAMETERS:
@@ -1835,8 +1835,14 @@ def get_cap_yval(pcf_name, xval, properties=None, dbcon=None):
 
     else:
         que = 'SELECT cap.cap_xvals,cap.cap_yvals from pcf left join cap on pcf.pcf_curtx=cap.cap_numbr\
-                where pcf.pcf_name="%s"' % pcf_name
+                where pcf.pcf_name="%s" ORDER BY cap_xvals' % pcf_name
         dbres = scoped_session_idb.execute(que)
+
+        # # check extrapolation flag
+        que = 'SELECT caf.caf_inter from pcf left join caf on pcf.pcf_curtx=caf.caf_numbr where pcf.pcf_name="%s"' % pcf_name
+        extrp, = scoped_session_idb.execute(que).first()
+        if extrp == 'P':
+            logger.warning('Extrapolation not supported for numerical parameter calibration! ({})'.format(pcf_name))
 
         try:
             xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
@@ -3010,11 +3016,6 @@ def tc_param_alias(param, val, no_check=False):
     que = 'SELECT cpc_prfref,cpc_ccaref,cpc_pafref,cpc_descr,cpc_categ from cpc where cpc_pname="%s"' % param
     dbcon = scoped_session_idb
     prf, cca, paf, pdesc, categ = dbcon.execute(que).fetchall()[0]
-    # this is a workaround for datapool items not being present in PAF/PAS table # DEPRECATED!
-    # if param in ['DPP70004', 'DPP70043']:  # DataItemID in TC(211,1)
-    #     val = get_pid(val)
-    # else:
-    #     pass
 
     # check if parameter holds a data pool ID (categ=P) and look up numerical value in case it is given as string
     if categ == 'P' and isinstance(val, str):
@@ -3054,18 +3055,26 @@ def tc_param_alias(param, val, no_check=False):
 
         return int(alval)
     elif cca is not None:
+        # check raw format
+        que = 'SELECT cca_rawfmt from cca where cca_numbr="%s"' % cca
+        fmt, = dbcon.execute(que).first()
 
-        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s"' % cca
+        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s" ORDER BY ccs_xvals' % cca
         dbres = dbcon.execute(que)
         xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
         dbcon.close()
-        alval = int(np.interp(val, xvals, yvals))
+        alval = np.interp(val, xvals, yvals, left=np.nan, right=np.nan)
+
+        if not np.isnan(alval) and fmt != 'R':
+            alval = round(alval)
+
+        if np.isnan(alval):
+            logger.warning('Calibrated value for {} is NaN!'.format(param))
 
         return alval
+
     else:
-
         dbcon.close()
-
         return val
 
 
