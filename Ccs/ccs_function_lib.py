@@ -35,6 +35,7 @@ import confignator
 import importlib
 
 import timeformats
+from header_funcs import mk_mib_pus_tc_header
 
 cfg = confignator.get_config(check_interpolation=False)
 
@@ -728,7 +729,11 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
         # check if packet size is variable (because of different returned data structure)
         if not isinstance(sourcedata[0][-1], tuple):
             def _get_val_func(x):
-                return [str(x[2]), str(x[4]), '']
+                try:
+                    return [str(x[2]), str(x[4]), '']
+                except IndexError:  # TODO: verify sourcedata item structure
+                    return [str(x[2]), str(x[3]), '']
+                # return [str(x[2]), str(x[-1]), '']
         else:
             def _get_val_func(x):
                 return [str(x[2]), str(x[4][0]), '']
@@ -2526,7 +2531,7 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
 #  @param pool_name Name of pool bound to socket connected to the C&C port
 #  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a
 #  loop to prevent too many packets are being sent over the socket in a too short time interval.
-def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, cname=None, **kwargs):
+def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, cname=None, mib_head=False, **kwargs):
     """
     Build and send a TC packet whose structure is defined in the MIB. Note that for repeating parameter groups
     the arguments are interleaved, e.g., ParID1, ParVal1, ParID2, ParVal2,... Use the function *interleave_lists*
@@ -2541,6 +2546,8 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
     :param sleep:
     :param no_check:
     :param pkt_time:
+    :param cname:
+    :param mib_head:
     :param kwargs:
     :return:
     """
@@ -2551,7 +2558,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
         return
 
     try:
-        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, cname=cname, **kwargs)
+        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, cname=cname, mib_head=mib_head, **kwargs)
     except TypeError as e:
         raise e
 
@@ -2568,7 +2575,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 
 ##
 #  Generate TC
-def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, fmt='raw', cname=None, **kwargs):
+def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, fmt='raw', cname=None, mib_head=False, **kwargs):
     """
     Create TC bytestring for CMD with corresponding parameters
 
@@ -2579,6 +2586,9 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     :param no_check:
     :param hack_value:
     :param source_data_only:
+    :param fmt: return format of TC. Default is raw, set to tcl to generate TCL style code snippet
+    :param cname: use CCF_CNAME key if CCF_DESCR is ambiguous
+    :param mib_head: use MIB definitions of TC header instead of structure defined in packet_config_*
     :param kwargs:
     :return:
     """
@@ -2638,7 +2648,25 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         if source_data_only:
             return pdata
 
-    return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
+    if mib_head:
+        pktid = _get_pktid(cmd, ccf_cname=cname)
+    else:
+        pktid = None
+
+    return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, pktid=pktid, **kwargs), (st, sst, apid)
+
+
+def _get_pktid(cmd, ccf_cname=None):
+    if ccf_cname is not None:
+        ref = 'ccf_cname="{}"'.format(ccf_cname)
+    else:
+        ref = 'ccf_descr="{}"'.format(cmd)
+
+    que = 'SELECT ccf_pktid from ccf WHERE BINARY {}'.format(ref)
+
+    pktid, = scoped_session_idb.execute(que).first()
+
+    return pktid
 
 
 def _get_tc_params(cmd, paf_cal=False, ccf_cname=None):
@@ -3316,8 +3344,8 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
 #  @param sst     service sub-type
 #  @param sdid    source/destination ID
 #  @param data    application data
-def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
-            tmv=PUS_VERSION, ack=0, st=0, sst=0, sdid=0, tref_stat=0, msg_type_cnt=0, timestamp=0, data=b'', **kwargs):
+def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0, tmv=PUS_VERSION, ack=0, st=0, sst=0, sdid=0,
+            tref_stat=0, msg_type_cnt=0, timestamp=0, data=b'', pktid=None, mib=None, **kwargs):
     """
     Create bytestring conforming to PUS with no CRC appended, for details see PUS documentation
 
@@ -3337,74 +3365,84 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
     :param msg_type_cnt:
     :param timestamp:
     :param data:
+    :param pktid:
+    :param mib:
     :param kwargs:
     :return:
     """
-    if typ == 1 and dhead == 1:
-        header = TCHeader()
-    elif typ == 0 and dhead == 1:
-        header = TMHeader()
-    else:
-        header = PHeader()
 
-    header.bits.PKT_VERS_NUM = version
-    header.bits.PKT_TYPE = typ
-    header.bits.SEC_HEAD_FLAG = dhead
-    header.bits.APID = apid
-    header.bits.SEQ_FLAGS = gflags
-    header.bits.PKT_SEQ_CNT = sc
-    header.bits.PKT_LEN = pktl
+    if pktid is None:
 
-    # PUS-A
-    if PUS_VERSION == 1:
         if typ == 1 and dhead == 1:
-            header.bits.CCSDS_SEC_HEAD_FLAG = 0
-            header.bits.PUS_VERSION = tmv
-            header.bits.ACK = ack
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.SOURCE_ID = sdid
-
+            header = TCHeader()
         elif typ == 0 and dhead == 1:
-            header.bits.SPARE1 = 0
-            header.bits.PUS_VERSION = tmv
-            header.bits.SPARE2 = 0
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.DEST_ID = sdid
-            ctime, ftime, sync = calc_timestamp(timestamp)
-            sync = 0 if sync is None else sync
-            header.bits.CTIME = ctime
-            header.bits.FTIME = ftime
-            header.bits.TIMESYNC = sync
-            # header.bits.SPARE = 0
+            header = TMHeader()
+        else:
+            header = PHeader()
 
-    # PUS-C
-    elif PUS_VERSION == 2:
-        if typ == 1 and dhead == 1:
-            header.bits.PUS_VERSION = tmv
-            header.bits.ACK = ack
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.SOURCE_ID = sdid
+        header.bits.PKT_VERS_NUM = version
+        header.bits.PKT_TYPE = typ
+        header.bits.SEC_HEAD_FLAG = dhead
+        header.bits.APID = apid
+        header.bits.SEQ_FLAGS = gflags
+        header.bits.PKT_SEQ_CNT = sc
+        header.bits.PKT_LEN = pktl
 
-        elif typ == 0 and dhead == 1:
-            header.bits.PUS_VERSION = tmv
-            # header.bits.SC_REFTIME = tref_stat  # replaced with TIMESYNC to be backwards-compatible with PUS-A
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.MSG_TYPE_CNT = msg_type_cnt
-            header.bits.DEST_ID = sdid
-            ctime, ftime, sync = calc_timestamp(timestamp)
-            sync = 0 if sync is None else sync
-            header.bits.CTIME = ctime
-            header.bits.FTIME = ftime
-            header.bits.TIMESYNC = sync
+        # PUS-A
+        if PUS_VERSION == 1:
+            if typ == 1 and dhead == 1:
+                header.bits.CCSDS_SEC_HEAD_FLAG = 0
+                header.bits.PUS_VERSION = tmv
+                header.bits.ACK = ack
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.SOURCE_ID = sdid
+
+            elif typ == 0 and dhead == 1:
+                header.bits.SPARE1 = 0
+                header.bits.PUS_VERSION = tmv
+                header.bits.SPARE2 = 0
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.DEST_ID = sdid
+                ctime, ftime, sync = calc_timestamp(timestamp)
+                sync = 0 if sync is None else sync
+                header.bits.CTIME = ctime
+                header.bits.FTIME = ftime
+                header.bits.TIMESYNC = sync
+                # header.bits.SPARE = 0
+
+        # PUS-C
+        elif PUS_VERSION == 2:
+            if typ == 1 and dhead == 1:
+                header.bits.PUS_VERSION = tmv
+                header.bits.ACK = ack
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.SOURCE_ID = sdid
+
+            elif typ == 0 and dhead == 1:
+                header.bits.PUS_VERSION = tmv
+                # header.bits.SC_REFTIME = tref_stat  # replaced with TIMESYNC to be backwards-compatible with PUS-A
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.MSG_TYPE_CNT = msg_type_cnt
+                header.bits.DEST_ID = sdid
+                ctime, ftime, sync = calc_timestamp(timestamp)
+                sync = 0 if sync is None else sync
+                header.bits.CTIME = ctime
+                header.bits.FTIME = ftime
+                header.bits.TIMESYNC = sync
+
+        else:
+            raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
+
+        header = bytes(header.bin)
 
     else:
-        raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
+        header = mk_mib_pus_tc_header(pktid, apid=apid, sc=sc, pktl=pktl, ack=ack, st=st, sst=sst, srcid=sdid, mib=mib)
 
-    return bytes(header.bin) + data
+    return header + data
 
 
 ##
@@ -3764,7 +3802,7 @@ def str_to_num(string, fmt=None):
     return num
 
 
-def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
+def calc_param_crc(cmd, *args, no_check=False, hack_value=None, **kwargs):
     """
     Calculates the CRC over the packet source data (excluding the checksum parameter).
     Uses the same CRC algo as packet CRC and assumes the checksum is at the end of the packet source data.
@@ -3775,7 +3813,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
     :param hack_value:
     :return:
     """
-    pdata = Tcbuild(cmd, *args, no_check=no_check, hack_value=hack_value, source_data_only=True)
+    pdata = Tcbuild(cmd, *args, no_check=no_check, hack_value=hack_value, source_data_only=True, **kwargs)
     return crc(pdata[:-PEC_LEN])
 
 
