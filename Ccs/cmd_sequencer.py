@@ -10,6 +10,7 @@ MOD = 0b010
 CMT = 0b011
 CBLK = 0b100
 VER = 0b101
+IMOD = 0b110
 
 DATUM_BYTES_N = 4
 
@@ -83,6 +84,17 @@ def mod(reg, shift, width, datum):
 
     cmd = Command()
     cmd.INSTRUCTION.CMD = MOD
+    cmd.INSTRUCTION.REG = reg
+    cmd.INSTRUCTION.SHIFT = shift
+    cmd.INSTRUCTION.WIDTH = width
+    cmd.DATUM = datum
+
+    return cmd
+
+def imod(reg, shift, width, datum):
+
+    cmd = Command()
+    cmd.INSTRUCTION.CMD = IMOD
     cmd.INSTRUCTION.REG = reg
     cmd.INSTRUCTION.SHIFT = shift
     cmd.INSTRUCTION.WIDTH = width
