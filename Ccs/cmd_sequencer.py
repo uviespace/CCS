@@ -19,8 +19,8 @@ class InstructionWord(ctypes.BigEndianStructure):
     _pack_ = 1
     _fields_ = [("CMD", ctypes.c_uint32, 3),
                 ("IM", ctypes.c_uint32, 1),
-                ("DELAY", ctypes.c_uint32, 12),
-                ("REG", ctypes.c_uint32, 6),
+                ("DELAY", ctypes.c_uint32, 8),
+                ("REG", ctypes.c_uint32, 10),
                 ("SHIFT", ctypes.c_uint32, 5),
                 ("WIDTH", ctypes.c_uint32, 5)]
 
