@@ -1,5 +1,5 @@
 """
-Script to interactively debug raw event data in downlinked SMILE SXI frames
+Interactively debug raw event data in downlinked frames
 """
 
 import matplotlib.pyplot as plt
@@ -19,10 +19,13 @@ ces = {k: CompressionEntity(s13[k]) for k in s13}
 ed_ces = {k: ces[k] for k in ces if ces[k].header.items.product == 0}
 
 # create an array with the event packets for a specific frame
-ce = ed_ces[123.456]  # get specific frame/CE
+ce = ed_ces[828.104595]  # get specific frame/CE
 ce.meta_group  # GROUP meta data
 ce.meta_frame  # FRAME meta data
 evts = np.frombuffer(ce.scidata, ED_PKT_DTYPE)
+
+# in case of events from multiple frames in one CE, optionally filter for a single frame counter
+evts = evts[evts['fc']==12]
 
 # create empty node arrays
 ff = np.zeros((4, 639, 384))
