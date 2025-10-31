@@ -612,7 +612,10 @@ class PlotViewer(Gtk.Window):
 
             sid = None
 
-        rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
+        #TODO how to handle different apids?
+        # rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
+        rows = cfl.filter_rows(rows, st=st, sst=sst, sid=sid)
+        apid = 0
 
         if not self.filter_tl2.get_active():
             rows = cfl.filter_rows(rows, time_from=2.)
@@ -833,8 +836,10 @@ class PlotViewer(Gtk.Window):
                 # time_last = round(float(xold[-1]), 6)  # np.float64 not properly understood in sql comparison below
                 # new_rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > time_last)
                 pinfo = self.data_dict_info[hk + ':' + parameter]
-                new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], apid=pinfo['apid'],
-                                           sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
+                #TODO apid
+                #new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], apid=pinfo['apid'],
+                #                           sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
+                new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
 
                 try:
                     # xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True)[0]

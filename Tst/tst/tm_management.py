@@ -182,7 +182,18 @@ class TmTable(Gtk.Grid):
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
-        selection_data.set_text(model[my_iter][-1], -1)
+        # print(*model[my_iter])
+        st, sst, apid, pi1, descr = model[my_iter]
+
+        if True:
+            if pi1 > 0:
+                txt = 'TM({},{},{}){}'.format( st, sst, pi1, descr)
+            else:
+                txt = 'TM({},{}){}'.format( st, sst, descr)
+        else:
+            txt = model[my_iter][-1]
+
+        selection_data.set_text(txt, -1)
 
     def on_drag_begin(self, *args):
         pass
