@@ -312,17 +312,6 @@ def start_plotter(pool_name, console=False, **kwargs):
     start_app(file_path, directory, pool_name, console=console, **kwargs)
 
 
-def start_tst(console=False, **kwargs):
-    """
-
-    :param console:
-    :param kwargs:
-    """
-    directory = cfg.get('paths', 'tst')
-    file_path = os.path.join(directory, 'tst/main.py')
-    start_app(file_path, directory, console=console, **kwargs)
-
-
 def start_progress_view(console=False, **kwargs):
     """
 
@@ -727,7 +716,7 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
 
     if nocal:
         # check if packet size is variable (because of different returned data structure)
-        if not isinstance(sourcedata[0][-1], tuple):
+        if sourcedata and not isinstance(sourcedata[0][-1], tuple):
             def _get_val_func(x):
                 try:
                     return [str(x[2]), str(x[4]), '']
