@@ -5250,15 +5250,29 @@ def create_hk_decoder(sid, *dp_ids, apid=None):
 
     if apid is None:
         que = 'SELECT pic_apid FROM pic WHERE pic_type=3 AND pic_stype=25'
-        res = scoped_session_idb.execute(que).fetchall()
-        apid = int(res[0][0])
+        res, = scoped_session_idb.execute(que).fetchall()[0]
+        lut_apid = int(res) if res is not None else res
+    else:
+        lut_apid = apid
 
+    try:
+        sid_off, sid_width = SID_LUT[(3, 25, lut_apid)]
+    except KeyError:
+        # try APID agnostic definition
+        logger.info('Using APID agnostic definition in PIC')
+        sid_off, sid_width = SID_LUT[(3, 25, None)]
 
-    sid_off, sid_width = SID_LUT[(3, 25, apid)]
+    if apid is None:
+        que = 'SELECT plf_name, pcf_descr, pid_apid FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
+              'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and plf_offby={}'.format(sid_off)
+    else:
+        que = 'SELECT plf_name, pcf_descr, pid_apid FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
+              'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and PID_APID={} and plf_offby={}'.format(apid, sid_off)
 
-    que = 'SELECT plf_name, pcf_descr FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
-                'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and PID_APID={} and plf_offby={}'.format(apid, sid_off)
-    sid_name, sid_descr = scoped_session_idb.execute(que).fetchall()[0]
+    try:
+        sid_name, sid_descr, apid = scoped_session_idb.execute(que).fetchall()[0]
+    except IndexError:
+        raise ValueError('APID {} not supported'.format(apid))
 
     if sid_off != TM_HEADER_LEN:
         logger.warning('Inconsistent definition of SID parameter')
