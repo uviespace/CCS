@@ -2,16 +2,15 @@
 
 ### Poolmanager ###
 cfl.start_pmgr()
+POOLNAME='LIVE'
 
 # PLM connection
-cfl.connect('LIVE', '', 5570, protocol='PUS')
-cfl.connect_tc('LIVE', '', 5571, protocol='PUS')
+cfl.connect(POOLNAME, '', 1234, protocol='PUS')
+cfl.connect_tc(POOLNAME, '', 1234, protocol='PUS')
 
 ### Poolviewer ###
 cfl.start_pv()
 
 #! CCS.BREAKPOINT
 ### Monitor ###
-cfl.start_monitor('LIVE')
-
-
+cfl.start_monitor(POOLNAME)

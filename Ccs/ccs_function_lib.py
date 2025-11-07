@@ -35,6 +35,7 @@ import confignator
 import importlib
 
 import timeformats
+from header_funcs import mk_mib_pus_tc_header
 
 cfg = confignator.get_config(check_interpolation=False)
 
@@ -728,7 +729,11 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
         # check if packet size is variable (because of different returned data structure)
         if not isinstance(sourcedata[0][-1], tuple):
             def _get_val_func(x):
-                return [str(x[2]), str(x[4]), '']
+                try:
+                    return [str(x[2]), str(x[4]), '']
+                except IndexError:  # TODO: verify sourcedata item structure
+                    return [str(x[2]), str(x[3]), '']
+                # return [str(x[2]), str(x[-1]), '']
         else:
             def _get_val_func(x):
                 return [str(x[2]), str(x[4][0]), '']
@@ -1132,23 +1137,25 @@ def csize(fmt, offbi=0, bitsize=False):
         bits = 1
 
     if fmt in ('i24', 'I24'):
-        return 3
+        return 3 * bits
     elif fmt.startswith('uint'):
-        return (int(fmt[4:]) + offbi - 1) // 8 + 1
+        if bitsize:
+            return (int(fmt[4:]) + offbi)
+        return ((int(fmt[4:]) + offbi - 1) // 8 + 1)
     elif fmt == timepack[0]:
-        return timepack[1] - timepack[3]
+        return (timepack[1] - timepack[3]) * bits
     elif fmt.startswith('CUC'):
         try:
-            return timeformats.cuctime.get(fmt).cize
+            return timeformats.cuctime.get(fmt).cize * bits
         except AttributeError:
             raise NotImplementedError('Unknown format {}'.format(fmt))
     elif fmt.startswith('oct'):
-        return int(fmt[3:])
+        return int(fmt[3:]) * bits
     elif fmt.startswith('ascii'):
-        return int(fmt[5:])
+        return int(fmt[5:]) * bits
     else:
         try:
-            return struct.calcsize(fmt)
+            return struct.calcsize(fmt) * bits
         except struct.error:
             raise NotImplementedError('Unknown format {}'.format(fmt))
 
@@ -1400,12 +1407,12 @@ def Tcdata(tm):
             logger.info('Unknown discriminant: {}'.format(fvalue))
 
             que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,\
-                         cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on \
+                         cpc_prfref, cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, cpc_categ FROM ccf left join cdf on \
                          ccf_cname=cdf_cname left join cpc on cdf_pname=cpc_pname where\
                          ccf_type={} and ccf_stype={} and ccf_apid={} order by cdf_bit, ccf_cname'.format(st, sst, apid)
         else:
             que = 'SELECT ccf_cname, ccf_descr, cpc_ptc, cpc_pfc, ccf_npars, cdf_ellen, cdf_pname, cpc_descr,cpc_prfref,' \
-                  ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, NULL FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
+                  ' cpc_pafref, cpc_ccaref, cdf_grpsize, cdf_bit, cpc_categ FROM ccf left join cdf on ccf_cname=cdf_cname left join' \
                   ' cpc on cdf_pname=cpc_pname where ccf_cname="{}" order by cdf_bit, ccf_cname'.format(cname)
 
     else:
@@ -1662,11 +1669,11 @@ def tc_param_alias_reverse(paf, cca, val, pname=None):
         return alval[0][0]
     elif cca is not None:
         dbcon = scoped_session_idb
-        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s"' % (cca)
+        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s" ORDER BY ccs_yvals' % cca
         dbres = dbcon.execute(que)
         xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
         dbcon.close()
-        alval = np.interp(val, yvals, xvals)
+        alval = np.interp(val, yvals, xvals, left=np.nan, right=np.nan)
         return alval
     # get name for ParamID if datapool item (in MIB)
     elif pname in DATA_POOL_ID_PARAMETERS:
@@ -1832,8 +1839,14 @@ def get_cap_yval(pcf_name, xval, properties=None, dbcon=None):
 
     else:
         que = 'SELECT cap.cap_xvals,cap.cap_yvals from pcf left join cap on pcf.pcf_curtx=cap.cap_numbr\
-                where pcf.pcf_name="%s"' % pcf_name
+                where pcf.pcf_name="%s" ORDER BY cap_xvals' % pcf_name
         dbres = scoped_session_idb.execute(que)
+
+        # # check extrapolation flag
+        que = 'SELECT caf.caf_inter from pcf left join caf on pcf.pcf_curtx=caf.caf_numbr where pcf.pcf_name="%s"' % pcf_name
+        extrp, = scoped_session_idb.execute(que).first()
+        if extrp == 'P':
+            logger.warning('Extrapolation not supported for numerical parameter calibration! ({})'.format(pcf_name))
 
         try:
             xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
@@ -2006,8 +2019,9 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
         rows = rows.filter(DbTelemetry.apid == apid)
 
     if sid:
-        if st is None or sst is None or apid is None:
-            raise ValueError('Must provide st, sst and apid if filtering by sid')
+        #TODO apid
+        #if st is None or sst is None or apid is None:
+        #    raise ValueError('Must provide st, sst and apid if filtering by sid')
 
         sid_offset, sid_bitlen = get_sid(st, sst, apid)
         if sid_offset != -1:
@@ -2516,7 +2530,7 @@ def connect_tc(pool_name, host, port, protocol='PUS', drop_rx=True, timeout=10, 
 #  @param pool_name Name of pool bound to socket connected to the C&C port
 #  @param sleep     Idle time in seconds after the packet has been sent. Useful if function is called repeatedly in a
 #  loop to prevent too many packets are being sent over the socket in a too short time interval.
-def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, **kwargs):
+def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pkt_time=False, cname=None, mib_head=False, **kwargs):
     """
     Build and send a TC packet whose structure is defined in the MIB. Note that for repeating parameter groups
     the arguments are interleaved, e.g., ParID1, ParVal1, ParID2, ParVal2,... Use the function *interleave_lists*
@@ -2531,6 +2545,8 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
     :param sleep:
     :param no_check:
     :param pkt_time:
+    :param cname:
+    :param mib_head:
     :param kwargs:
     :return:
     """
@@ -2541,7 +2557,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
         return
 
     try:
-        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, **kwargs)
+        tc, (st, sst, apid) = Tcbuild(cmd, *args, ack=ack, no_check=no_check, cname=cname, mib_head=mib_head, **kwargs)
     except TypeError as e:
         raise e
 
@@ -2558,7 +2574,7 @@ def Tcsend_DB(cmd, *args, ack=None, pool_name=None, sleep=0., no_check=False, pk
 
 ##
 #  Generate TC
-def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, **kwargs):
+def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, source_data_only=False, fmt='raw', cname=None, mib_head=False, **kwargs):
     """
     Create TC bytestring for CMD with corresponding parameters
 
@@ -2569,15 +2585,18 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
     :param no_check:
     :param hack_value:
     :param source_data_only:
+    :param fmt: return format of TC. Default is raw, set to tcl to generate TCL style code snippet
+    :param cname: use CCF_CNAME key if CCF_DESCR is ambiguous
+    :param mib_head: use MIB definitions of TC header instead of structure defined in packet_config_*
     :param kwargs:
     :return:
     """
 
     try:
-        params = _get_tc_params(cmd)
+        params = _get_tc_params(cmd, ccf_cname=cname)
     except SQLOperationalError:
         scoped_session_idb.close()
-        params = _get_tc_params(cmd)
+        params = _get_tc_params(cmd, ccf_cname=cname)
 
     try:
         st, sst, apid, npars = params[0][:4]
@@ -2585,9 +2604,13 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         raise NameError('Unknown command "{}"'.format(cmd))
 
     if ack is None:
-        ack = bin(Tcack(cmd))
+        ack = bin(Tcack(cmd, ccf_cname=cname))
 
     if npars == 0:
+
+        if fmt == 'tcl':
+            return cmd, [], []
+
         pdata = b''
 
         if source_data_only:
@@ -2616,26 +2639,52 @@ def Tcbuild(cmd, *args, sdid=0, ack=None, no_check=False, hack_value=None, sourc
         else:
             values = hack_value
 
+        if fmt == 'tcl':
+            return cmd, params, values
+
         pdata = encode_pus(params, *values)
 
         if source_data_only:
             return pdata
 
-    return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, **kwargs), (st, sst, apid)
+    if mib_head:
+        pktid = _get_pktid(cmd, ccf_cname=cname)
+    else:
+        pktid = None
+
+    return Tcpack(st=st, sst=sst, apid=int(apid), data=pdata, sdid=sdid, ack=ack, pktid=pktid, **kwargs), (st, sst, apid)
 
 
-def _get_tc_params(cmd, paf_cal=False):
+def _get_pktid(cmd, ccf_cname=None):
+    if ccf_cname is not None:
+        ref = 'ccf_cname="{}"'.format(ccf_cname)
+    else:
+        ref = 'ccf_descr="{}"'.format(cmd)
+
+    que = 'SELECT ccf_pktid from ccf WHERE BINARY {}'.format(ref)
+
+    pktid, = scoped_session_idb.execute(que).first()
+
+    return pktid
+
+
+def _get_tc_params(cmd, paf_cal=False, ccf_cname=None):
+
+    if ccf_cname is not None:
+        ref = 'ccf_cname="{}"'.format(ccf_cname)
+    else:
+        ref = 'ccf_descr="{}"'.format(cmd)
 
     if paf_cal:
         que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
               'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_descr,cpc.cpc_pname,cpc.cpc_pafref FROM ccf LEFT JOIN cdf ON ' \
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-              'WHERE BINARY ccf_descr="%s"' % cmd
+              'WHERE BINARY {}'.format(ref)
     else:
         que = 'SELECT ccf_type,ccf_stype,ccf_apid,ccf_npars,cdf.cdf_grpsize,cdf.cdf_eltype,cdf.cdf_ellen,' \
               'cdf.cdf_value,cpc.cpc_ptc,cpc.cpc_pfc,cpc.cpc_categ,cpc.cpc_descr,cpc.cpc_pname FROM ccf LEFT JOIN cdf ON ' \
               'cdf.cdf_cname=ccf.ccf_cname LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname ' \
-              'WHERE BINARY ccf_descr="%s"' % cmd
+              'WHERE BINARY {}'.format(ref)
 
     params = scoped_session_idb.execute(que).fetchall()
     scoped_session_idb.close()
@@ -2751,8 +2800,8 @@ def encode_pus(params, *values, params_as_fmt_string=False):
     except struct.error as err:
         logger.debug(err)
         # proper insertion of spares
-        vals_iter = iter(values)
-        return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+        # return b''.join([pack_bytes(fmt, next(vals_iter)) if not fmt.endswith('x') else struct.pack(fmt) for fmt in fmts])
+        return pack_bytes_loop(fmts, values)
 
 
 def cast_str_value_ptc(val, ptc):
@@ -2789,54 +2838,133 @@ def cast_str_value_ptc(val, ptc):
         raise NotImplementedError("TC fixed parameter values not supported for PTC={}".format(ptc))
 
 
-def pack_bytes(fmt, value, bitbuffer=0, offbit=0):
-    """
+# def _pack_bytes_legacy(fmt, value, bitbuffer=0, offbit=0):
+#     """
+#
+#     :param fmt:
+#     :param value:
+#     :param bitbuffer:
+#     :param offbit:
+#     :return:
+#     """
+#     if fmt == 'I24':
+#         x = value.to_bytes(3, 'big')
+#
+#     elif fmt == 'i24':
+#         x = value.to_bytes(3, 'big', signed=True)
+#
+#     elif fmt.startswith('uint'):
+#         bitlen = int(fmt[4:])
+#         bitsize = (bitlen // 8 + 1) * 8
+#         shifted = (value << (bitsize - bitlen - offbit)) + bitbuffer
+#         if (bitsize - bitlen - offbit) == 0:
+#             x = shifted.to_bytes(bitsize // 8, 'big')
+#         else:
+#             return shifted
+#
+#     elif fmt.startswith('oct'):
+#         if not isinstance(value, (bytes, bytearray)):
+#             raise TypeError('Value packed with fmt "{}" is not an octet string: {} {}!'.format(fmt, value, type(value)))
+#         if len(value) != int(fmt[3:]):
+#             logger.warning('Length of octet string ({}) does not match format {}!'.format(len(value), fmt))
+#         x = struct.pack('>{}s'.format(fmt[3:]), value)
+#
+#     elif fmt.startswith('ascii'):
+#         if not isinstance(value, str):
+#             raise TypeError('Value packed with fmt "{}" is not a string: {} {}!'.format(fmt, value, type(value)))
+#         if len(value) != int(fmt[5:]):
+#             logger.warning('Length of string ({}) does not match format {}!'.format(len(value), fmt))
+#         x = struct.pack('>{}s'.format(fmt[5:]), value.encode(encoding='ascii'))
+#
+#     elif fmt == timepack[0]:
+#         x = calc_timestamp(value, sync=None, return_bytes=True)
+#
+#     elif value is None:
+#         x = struct.pack('>' + fmt)
+#
+#     else:
+#         x = struct.pack('>' + fmt, value)
+#
+#     return x
 
-    :param fmt:
-    :param value:
-    :param bitbuffer:
-    :param offbit:
-    :return:
-    """
+
+def pack_bytes_loop(fmts, values):
+    fmts_iter = iter(fmts)
+    vals_iter = iter(values)
+
+    bb = []
+    while True:
+        try:
+            bb.append(pack_bytes(fmts_iter, vals_iter))
+        except StopIteration:
+            break
+
+    return b''.join(bb)
+
+
+def pack_bytes(fmts, vals, bitbuf=0, offbit=0):
+
+    fmt = next(fmts)
+
+    if fmt.endswith('x'):
+        if offbit != 0:
+            raise NotImplementedError('Unaligned packing for data type "{}" is not supported!'.format(fmt))
+        return struct.pack(fmt)
+
+    value = next(vals)
+
+    bsize = csize(fmt, bitsize=True)
+    if (bsize + offbit) % 8 == 0:
+        aligned = True
+    else:
+        if fmt in ['i24', 'f', 'b', 'h', 'i'] or fmt.startswith(('CUC', 'oct', 'ascii')):
+            raise NotImplementedError('Unaligned packing for data type "{}" is not supported!'.format(fmt))
+        aligned = False
+
+    offbit += bsize
+
     if fmt == 'I24':
-        x = value.to_bytes(3, 'big')
+        if aligned:
+            return value.to_bytes(3, 'big')
+
+        bitbuf = (bitbuf << bsize) | value
 
     elif fmt == 'i24':
-        x = value.to_bytes(3, 'big', signed=True)
+        return value.to_bytes(3, 'big', signed=True)
 
     elif fmt.startswith('uint'):
-        bitlen = int(fmt[4:])
-        bitsize = (bitlen // 8 + 1) * 8
-        shifted = (value << (bitsize - bitlen - offbit)) + bitbuffer
-        if (bitsize - bitlen - offbit) == 0:
-            x = shifted.to_bytes(bitsize // 8, 'big')
-        else:
-            return shifted
+        bitbuf = (bitbuf << bsize) | value
+
+        if aligned:
+            return bitbuf.to_bytes(offbit // 8, 'big')
 
     elif fmt.startswith('oct'):
         if not isinstance(value, (bytes, bytearray)):
             raise TypeError('Value packed with fmt "{}" is not an octet string: {} {}!'.format(fmt, value, type(value)))
         if len(value) != int(fmt[3:]):
             logger.warning('Length of octet string ({}) does not match format {}!'.format(len(value), fmt))
-        x = struct.pack('>{}s'.format(fmt[3:]), value)
+        return struct.pack('>{}s'.format(fmt[3:]), value)
 
     elif fmt.startswith('ascii'):
         if not isinstance(value, str):
             raise TypeError('Value packed with fmt "{}" is not a string: {} {}!'.format(fmt, value, type(value)))
         if len(value) != int(fmt[5:]):
             logger.warning('Length of string ({}) does not match format {}!'.format(len(value), fmt))
-        x = struct.pack('>{}s'.format(fmt[5:]), value.encode(encoding='ascii'))
+        return struct.pack('>{}s'.format(fmt[5:]), value.encode(encoding='ascii'))
 
     elif fmt == timepack[0]:
-        x = calc_timestamp(value, sync=None, return_bytes=True)
+        return calc_timestamp(value, sync=None, return_bytes=True)
 
     elif value is None:
-        x = struct.pack('>' + fmt)
+        return struct.pack('>' + fmt)
 
     else:
-        x = struct.pack('>' + fmt, value)
+        if aligned:
+            return struct.pack('>' + fmt, value)
 
-    return x
+        bitbuf = (bitbuf << bsize) | value
+
+    return pack_bytes(fmts, vals, bitbuf=bitbuf, offbit=offbit)
 
 
 def date_to_cuc_bytes(date, sync=None):
@@ -2881,14 +3009,17 @@ def parameter_ptt_type_tc(par):
 #  @param st   Service type
 #  @param sst  Service sub-type
 #  @param apid APID of TC
-def Tcack(cmd):
+def Tcack(cmd, ccf_cname=None):
     """
     Get type acknowledgement type for give service (sub-)type and APID from I-DB
 
     :param cmd:
     :return:
     """
-    que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_descr="{}"'.format(cmd)
+    if ccf_cname is not None:
+        que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_cname="{}"'.format(ccf_cname)
+    else:
+        que = 'SELECT ccf_ack FROM ccf WHERE BINARY ccf_descr="{}"'.format(cmd)
     dbcon = scoped_session_idb
     ack = int(dbcon.execute(que).fetchall()[0][0])
     dbcon.close()
@@ -2912,11 +3043,6 @@ def tc_param_alias(param, val, no_check=False):
     que = 'SELECT cpc_prfref,cpc_ccaref,cpc_pafref,cpc_descr,cpc_categ from cpc where cpc_pname="%s"' % param
     dbcon = scoped_session_idb
     prf, cca, paf, pdesc, categ = dbcon.execute(que).fetchall()[0]
-    # this is a workaround for datapool items not being present in PAF/PAS table # DEPRECATED!
-    # if param in ['DPP70004', 'DPP70043']:  # DataItemID in TC(211,1)
-    #     val = get_pid(val)
-    # else:
-    #     pass
 
     # check if parameter holds a data pool ID (categ=P) and look up numerical value in case it is given as string
     if categ == 'P' and isinstance(val, str):
@@ -2956,18 +3082,26 @@ def tc_param_alias(param, val, no_check=False):
 
         return int(alval)
     elif cca is not None:
+        # check raw format
+        que = 'SELECT cca_rawfmt from cca where cca_numbr="%s"' % cca
+        fmt, = dbcon.execute(que).first()
 
-        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s"' % cca
+        que = 'SELECT ccs_xvals,ccs_yvals from ccs where ccs_numbr="%s" ORDER BY ccs_xvals' % cca
         dbres = dbcon.execute(que)
         xvals, yvals = np.array([x for x in zip(*dbres.fetchall())], dtype=float)
         dbcon.close()
-        alval = int(np.interp(val, xvals, yvals))
+        alval = np.interp(val, xvals, yvals, left=np.nan, right=np.nan)
+
+        if not np.isnan(alval) and fmt != 'R':
+            alval = round(alval)
+
+        if np.isnan(alval):
+            logger.warning('Calibrated value for {} is NaN!'.format(param))
 
         return alval
+
     else:
-
         dbcon.close()
-
         return val
 
 
@@ -3209,8 +3343,8 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
 #  @param sst     service sub-type
 #  @param sdid    source/destination ID
 #  @param data    application data
-def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
-            tmv=PUS_VERSION, ack=0, st=0, sst=0, sdid=0, tref_stat=0, msg_type_cnt=0, timestamp=0, data=b'', **kwargs):
+def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0, tmv=PUS_VERSION, ack=0, st=0, sst=0, sdid=0,
+            tref_stat=0, msg_type_cnt=0, timestamp=0, data=b'', pktid=None, mib=None, **kwargs):
     """
     Create bytestring conforming to PUS with no CRC appended, for details see PUS documentation
 
@@ -3230,74 +3364,84 @@ def PUSpack(version=0, typ=0, dhead=0, apid=0, gflags=0b11, sc=0, pktl=0,
     :param msg_type_cnt:
     :param timestamp:
     :param data:
+    :param pktid:
+    :param mib:
     :param kwargs:
     :return:
     """
-    if typ == 1 and dhead == 1:
-        header = TCHeader()
-    elif typ == 0 and dhead == 1:
-        header = TMHeader()
-    else:
-        header = PHeader()
 
-    header.bits.PKT_VERS_NUM = version
-    header.bits.PKT_TYPE = typ
-    header.bits.SEC_HEAD_FLAG = dhead
-    header.bits.APID = apid
-    header.bits.SEQ_FLAGS = gflags
-    header.bits.PKT_SEQ_CNT = sc
-    header.bits.PKT_LEN = pktl
+    if pktid is None:
 
-    # PUS-A
-    if PUS_VERSION == 1:
         if typ == 1 and dhead == 1:
-            header.bits.CCSDS_SEC_HEAD_FLAG = 0
-            header.bits.PUS_VERSION = tmv
-            header.bits.ACK = ack
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.SOURCE_ID = sdid
-
+            header = TCHeader()
         elif typ == 0 and dhead == 1:
-            header.bits.SPARE1 = 0
-            header.bits.PUS_VERSION = tmv
-            header.bits.SPARE2 = 0
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.DEST_ID = sdid
-            ctime, ftime, sync = calc_timestamp(timestamp)
-            sync = 0 if sync is None else sync
-            header.bits.CTIME = ctime
-            header.bits.FTIME = ftime
-            header.bits.TIMESYNC = sync
-            # header.bits.SPARE = 0
+            header = TMHeader()
+        else:
+            header = PHeader()
 
-    # PUS-C
-    elif PUS_VERSION == 2:
-        if typ == 1 and dhead == 1:
-            header.bits.PUS_VERSION = tmv
-            header.bits.ACK = ack
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.SOURCE_ID = sdid
+        header.bits.PKT_VERS_NUM = version
+        header.bits.PKT_TYPE = typ
+        header.bits.SEC_HEAD_FLAG = dhead
+        header.bits.APID = apid
+        header.bits.SEQ_FLAGS = gflags
+        header.bits.PKT_SEQ_CNT = sc
+        header.bits.PKT_LEN = pktl
 
-        elif typ == 0 and dhead == 1:
-            header.bits.PUS_VERSION = tmv
-            # header.bits.SC_REFTIME = tref_stat  # replaced with TIMESYNC to be backwards-compatible with PUS-A
-            header.bits.SERV_TYPE = st
-            header.bits.SERV_SUB_TYPE = sst
-            header.bits.MSG_TYPE_CNT = msg_type_cnt
-            header.bits.DEST_ID = sdid
-            ctime, ftime, sync = calc_timestamp(timestamp)
-            sync = 0 if sync is None else sync
-            header.bits.CTIME = ctime
-            header.bits.FTIME = ftime
-            header.bits.TIMESYNC = sync
+        # PUS-A
+        if PUS_VERSION == 1:
+            if typ == 1 and dhead == 1:
+                header.bits.CCSDS_SEC_HEAD_FLAG = 0
+                header.bits.PUS_VERSION = tmv
+                header.bits.ACK = ack
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.SOURCE_ID = sdid
+
+            elif typ == 0 and dhead == 1:
+                header.bits.SPARE1 = 0
+                header.bits.PUS_VERSION = tmv
+                header.bits.SPARE2 = 0
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.DEST_ID = sdid
+                ctime, ftime, sync = calc_timestamp(timestamp)
+                sync = 0 if sync is None else sync
+                header.bits.CTIME = ctime
+                header.bits.FTIME = ftime
+                header.bits.TIMESYNC = sync
+                # header.bits.SPARE = 0
+
+        # PUS-C
+        elif PUS_VERSION == 2:
+            if typ == 1 and dhead == 1:
+                header.bits.PUS_VERSION = tmv
+                header.bits.ACK = ack
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.SOURCE_ID = sdid
+
+            elif typ == 0 and dhead == 1:
+                header.bits.PUS_VERSION = tmv
+                # header.bits.SC_REFTIME = tref_stat  # replaced with TIMESYNC to be backwards-compatible with PUS-A
+                header.bits.SERV_TYPE = st
+                header.bits.SERV_SUB_TYPE = sst
+                header.bits.MSG_TYPE_CNT = msg_type_cnt
+                header.bits.DEST_ID = sdid
+                ctime, ftime, sync = calc_timestamp(timestamp)
+                sync = 0 if sync is None else sync
+                header.bits.CTIME = ctime
+                header.bits.FTIME = ftime
+                header.bits.TIMESYNC = sync
+
+        else:
+            raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
+
+        header = bytes(header.bin)
 
     else:
-        raise NotImplementedError('Invalid PUS version: {}'.format(PUS_VERSION))
+        header = mk_mib_pus_tc_header(pktid, apid=apid, sc=sc, pktl=pktl, ack=ack, st=st, sst=sst, srcid=sdid, mib=mib)
 
-    return bytes(header.bin) + data
+    return header + data
 
 
 ##
@@ -3657,7 +3801,7 @@ def str_to_num(string, fmt=None):
     return num
 
 
-def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
+def calc_param_crc(cmd, *args, no_check=False, hack_value=None, **kwargs):
     """
     Calculates the CRC over the packet source data (excluding the checksum parameter).
     Uses the same CRC algo as packet CRC and assumes the checksum is at the end of the packet source data.
@@ -3668,7 +3812,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None):
     :param hack_value:
     :return:
     """
-    pdata = Tcbuild(cmd, *args, no_check=no_check, hack_value=hack_value, source_data_only=True)
+    pdata = Tcbuild(cmd, *args, no_check=no_check, hack_value=hack_value, source_data_only=True, **kwargs)
     return crc(pdata[:-PEC_LEN])
 
 
@@ -3727,7 +3871,7 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
     if len(fmt) == 4:  # PUS-A
         nseg_and_memid = [memid]
     else:  # PUS-C, use one segment only
-        nseg_and_memid = [1, memid]
+        nseg_and_memid = [memid, 1]
 
     upload_bytes = b''
     pcnt = 0
@@ -4430,13 +4574,20 @@ def _get_upload_service_info(tcname=None):
     return apid, memid_ref, fmt, endspares
 
 
-def get_tc_list(ccf_descr=None):
+def get_tc_list(ccf_descr=None, ccf_cname=None):
     """
 
     :param ccf_descr:
     :return:
     """
-    if ccf_descr is None:
+    if ccf_cname is not None:
+        cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
+                                          'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
+                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
+                                          'WHERE ccf_cname="{}"'.format(ccf_cname)).fetchall()
+
+    elif ccf_descr is None:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
                                           'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
@@ -4732,7 +4883,7 @@ def get_dp_fmt_info(dp_name):
 #         raise NotImplementedError
 
 
-def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None):
     """
 
     :param ccf_descr:
@@ -4743,6 +4894,17 @@ def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', opti
     :param add_parcfg:
     :return:
     """
+
+    if cname is not None:
+        try:
+            ncmds = len(list(get_tc_list(ccf_descr=ccf_descr).items()))
+            if ncmds > 1:
+                cmd, pars = list(get_tc_list(ccf_cname=cname).items())[0]
+                return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment,
+                                   add_parcfg=add_parcfg, cname=cname)
+        except IndexError:
+            raise IndexError('"{}" not found in IDB.'.format(cname))
+
     try:
         cmd, pars = list(get_tc_list(ccf_descr).items())[0]
     except IndexError:
@@ -4751,7 +4913,7 @@ def make_tc_template(ccf_descr, pool_name='LIVE', preamble='cfl.Tcsend_DB', opti
     return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment, add_parcfg=add_parcfg)
 
 
-def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False):
+def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None):
     """
 
     :param cmd:
@@ -4764,11 +4926,15 @@ def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='
     :return:
     """
     if comment:
-        commentstr = "# TC({},{}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
+        commentstr = "# TC({},{}){} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
+        # commentstr = "# TC({},{}): {} [{}]\n# {}\n".format(*cmd[3:], cmd[1], cmd[0], cmd[2])
         newline = '\n'
     else:
         commentstr = ''
         newline = ''
+
+    if pool_name is None:
+        pool_name = 'POOLNAME'
 
     parcfg = ''
     if add_parcfg:
@@ -4793,7 +4959,11 @@ def tc_template(cmd, pars, pool_name='LIVE', preamble='cfl.Tcsend_DB', options='
     parstr = ', '.join(parsinfo_to_str(pars))
     if len(parstr) > 0:
         parstr = ', ' + parstr
-    exe = "{}('{}'{}, pool_name='{}'{})".format(preamble, cmd[1], parstr, pool_name, options)
+    if cname is not None:
+        cnameopt = ", cname='{}'".format(cname)
+    else:
+        cnameopt = ''
+    exe = "{}('{}'{}, pool_name={}{}{})".format(preamble, cmd[1], parstr, pool_name, cnameopt, options)
     return commentstr + parcfg + exe + newline
 
 
