@@ -1942,7 +1942,7 @@ def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
 
 def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None):
     """
-    From tmlist return list of packets that match the specified criteria
+    From a list of binary PUS packets return packets that match the specified criteria
 
     :param tmlist:
     :param st:
@@ -1966,9 +1966,9 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
 
     if sid:
         if st is None or sst is None or apid is None:
-            raise ValueError('Must provide st, sst and apid if filtering by sid')
+            raise ValueError('Must provide ST, SST, and APID if filtering by SID')
 
-        sid_offset, sid_bitlen = get_sid(st, sst, apid)
+        sid_offset, sid_bitlen = get_sid_loc(st, sst, apid)
         tobyte = sid_offset + sid_bitlen // 8
         tmlist = [tm for tm in list(tmlist) if int.from_bytes(tm[sid_offset:tobyte], 'big') == sid]
 
@@ -1982,7 +1982,7 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
 
 
 def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None, idx_from=None, idx_to=None,
-                tmtc=None, get_last=False):
+                tmtc=None, get_last=False, sid_lu_apid=None):
     """
     Filter SQL query object by any of the given arguments, return filtered query.
 
@@ -1999,6 +1999,9 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
     :param get_last:
     """
 
+    if sid_lu_apid is None:
+        sid_lu_apid = apid
+
     if st is not None:
         rows = rows.filter(DbTelemetry.stc == st)
 
@@ -2009,17 +2012,16 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
         rows = rows.filter(DbTelemetry.apid == apid)
 
     if sid:
-        #TODO apid
-        #if st is None or sst is None or apid is None:
-        #    raise ValueError('Must provide st, sst and apid if filtering by sid')
+        if st is None or sst is None or sid_lu_apid is None:
+            raise ValueError('Must provide ST, SST, and APID if filtering by SID')
 
-        sid_offset, sid_bitlen = get_sid(st, sst, apid)
+        sid_offset, sid_bitlen = get_sid_loc(st, sst, sid_lu_apid)
         if sid_offset != -1:
             sid_size = sid_bitlen // 8
             rows = rows.filter(
                 func.mid(DbTelemetry.data, sid_offset - TM_HEADER_LEN + 1, sid_size) == sid.to_bytes(sid_size, 'big'))
         else:
-            logger.error('SID ({}) not applicable for {}-{}-{}'.format(sid, st, sst, apid))
+            logger.error('SID ({}) not applicable for {}-{}-{}'.format(sid, st, sst, sid_lu_apid))
 
     if time_from is not None:
         rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) >= time_from)
@@ -2143,7 +2145,7 @@ def get_pool_rows(pool_name, check_existence=False):
     return rows
 
 
-def get_hk_val(pool_name, sid, par_id, apid=None):
+def get_hk_val(pool_name, sid, par_id, apid=None, strict_apid=True):
 
     assert isinstance(sid, int)
 
@@ -2161,11 +2163,11 @@ def get_hk_val(pool_name, sid, par_id, apid=None):
     if isinstance(par_id, int):
         pass  # TODO
 
-    return get_param_values(pool_name=pool_name, hk=hk, param=par_id, last=1, mk_array=False)
+    return get_param_values(pool_name=pool_name, hk=hk, param=par_id, last=1, mk_array=False, strict_apid=strict_apid)
 
 
 # get values of parameter from HK packets
-def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True, nocal=False):
+def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True, nocal=False, strict_apid=True):
     """
 
     :param tmlist:
@@ -2194,7 +2196,11 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         dbres = dbcon.execute(que)
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
-            tmlist_rows = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)
+            if strict_apid:
+                tmlist_rows = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)
+            else:
+                tmlist_rows = filter_rows(tmlist, st=st, sst=sst, sid_lu_apid=apid, sid=sid)
+
             if tmlist_rows is not None:
                 if last > 1:
                     tmlist = [tm.raw for tm in tmlist_rows.yield_per(1000)[-last:]]
@@ -2254,7 +2260,11 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
     if isinstance(tmlist, list):
         tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
     else:
-        tmlist_filt = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        if strict_apid:
+            tmlist_filt = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        else:
+            tmlist_filt = filter_rows(tmlist, st=st, sst=sst, sid_lu_apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+
         tmlist_filt = [x.raw for x in tmlist_filt]
 
     if name is not None:
@@ -3119,7 +3129,7 @@ def get_pid(parnames):
     return pids if len(pids) > 1 else pids[0]
 
 
-def get_sid(st, sst, apid):
+def get_sid_loc(st, sst, apid):
     """
 
     :param st:
@@ -3128,13 +3138,14 @@ def get_sid(st, sst, apid):
     :return:
     """
     if (st, sst, apid) in SID_LUT:
-        return SID_LUT[(st, sst, apid)]
+        sid_loc = SID_LUT[(st, sst, apid)]
+    elif (st, sst, None) in SID_LUT:
+        sid_loc = SID_LUT[(st, sst, None)]
+        logger.warning('Using APID agnostic definition of discriminant offset/size')
     else:
-        try:
-            logger.warning('APID {} not known'.format(apid))
-            return SID_LUT[(st, sst, None)]
-        except KeyError:
-            return
+        raise ValueError('Failed to get SID - discriminant location not defined for {}-{}-{}'.format(st, sst, apid))
+
+    return sid_loc
 
 
 ##
