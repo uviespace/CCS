@@ -4191,10 +4191,11 @@ def srec_to_s6(fname, memid, memaddr, segid, tcname=None, linesperpack=50, max_p
         return pckts
 
 
-def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
-                max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
+def upload_srec_segmented(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
+                          max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
     """
-    Upload data from an SREC file to _memid_ via S6,2
+    Upload data from an SREC file to _memid_ via S6,2. Data is loaded into segments (IWF DBS layout) whose size is determined by the payload of one S6 packet.
+    For unsegmented format, use the upload_srec function.
 
     :param fname:
     :param memid:
@@ -4296,7 +4297,7 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
         return len(upload_bytes), crc(upload_bytes)
 
 
-def segment_data(data, segid, addr, seglen=480):
+def segment_data(data, segid, addr, seglen=464):
     """
     Split data into segments (as defined in IWF DPU HW SW ICD) with segment header and CRC.
     Segment data has to be two-word aligned.
@@ -4533,6 +4534,29 @@ def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname
     if image_crc:
         # return total length of uploaded data (without termination segment) and CRC over entire image, including segment headers
         return len(upload_bytes), crc(upload_bytes)
+
+
+def upload_srec(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname=None, sleep=0.125, progress=True,
+                image_crc=True, byte_align=2, ack=0b1001, dryrun=False):
+    """
+    Upload data from SREC file directly into memory *memid*.
+
+    :param fname:
+    :param memid:
+    :param pool_name:
+    :param max_pkt_size:
+    :param tcname:
+    :param sleep:
+    :param progress:
+    :param image_crc:
+    :param byte_align:
+    :param ack:
+    :param dryrun:
+    :return:
+    """
+
+    return srec_direct(fname, memid, pool_name=pool_name, max_pkt_size=max_pkt_size, tcname=tcname, sleep=sleep, progress=progress,
+                       image_crc=image_crc, byte_align=byte_align, ack=ack, dryrun=dryrun)
 
 
 def _get_upload_service_info(tcname=None):
