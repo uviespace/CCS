@@ -1330,11 +1330,17 @@ def cuc_time_str(head, logger=logger):
     """
     try:
         if head.PKT_TYPE == 0 and head.SEC_HEAD_FLAG == 1:
-            if head.TIMESYNC in tsync_flag:
-                return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], tsync_flag[head.TIMESYNC])
+
+            if hasattr(head, 'TIMESYNC'):
+
+                if head.TIMESYNC in tsync_flag:
+                    return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], tsync_flag[head.TIMESYNC])
+                else:
+                    logger.info('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.PKT_SEQ_CNT))
+                    return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], 'U')
             else:
-                logger.warning('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.PKT_SEQ_CNT))
                 return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], 'U')
+
         else:
             return ''
     except Exception as err:
@@ -3288,7 +3294,7 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
 #  @param sdid    source/destination ID
 #  @param data    application data
 def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1, gflags=0b11, sc=None,
-           tmv=PUS_VERSION, ack=0b1001, pktl=None, chksm=None, **kwargs):
+           tmv=PUS_VERSION, ack=0b1001, pktl=None, chksm=None, pktid=None, **kwargs):
     """
     Create TC packet conforming to PUS
 
@@ -3318,7 +3324,7 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
             sc += 1
             counters[int(str(apid))] += 1  # 0 is not allowed for seq cnt
     tc = PUSpack(version=version, typ=typ, dhead=dhead, apid=int(str(apid), 0), gflags=int(str(gflags), 0),
-                 sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, **kwargs)
+                 sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, pktid=pktid, **kwargs)
 
     if chksm is None:
         chksm = crc(tc)
