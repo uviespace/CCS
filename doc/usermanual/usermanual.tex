@@ -151,12 +151,22 @@
 \end{versionhistory}
 
 
-\chapter{Introduction} 
-CCS intro bla. \\
+\chapter{Introduction}
+\section{Purpose and Scope} 
+This user manual is intended to introduce the UVIE Central Checkout System (\textit{ccs}) and Test Specification Tool (\textit{tst}) to new users and give an overview of its core functions and capabilities.
 
-It is assumed that the software has already been successfully installed and set up as described at \url{https://github.com/uviespace/CCS/tree/release}. 
-Furthermore, this manual assumes that an application is running on the target machine and accessible via port XXXX. 
-Finally, it is also assumed that a Mission Information Base (MIB) compatible with the application has already been imported.
+The \textit{ccs} and \textit{tst} were created as part of the EGSE at the University of Vienna with the aim to support development and testing of on-board instrument application software.
+The principal function is to provide a user friendly and flexible TM/TC interface to applications which implement the Packet Utilisation Standard (PUS).
+Written in Python, the program is easily customisable and also offers comprehensive scripting capabilities.
+
+The two components of the software suite - \textit{ccs} and \textit{tst} - serve two distinct purposes: \textit{ccs} primarily facilitates interaction with PUS applications,
+i.e., sending of telecommands, as well as visualisation and monitoring of the telemetry stream on a packet and parameter level. \textit{tst} on the other hand intends to
+simplify and harmonise the workflow of test specification, execution, and reporting.
+
+\paragraph{Disclaimer}
+This software is still under active development - functionality may be expanded and/or change in the future. This manual is applicable to SW version 2.0 as of November 2025.
+For questions not answered in this document, contact the developers on GitHub\footnote{\href{https://github.com/uviespace/CCS}{\url{https://github.com/uviespace/CCS}}}
+or via email\footnote{\href{mailto:marko.mecina@univie.ac.at}{\url{marko.mecina@univie.ac.at}}}.
 
 
 %###########################################################################################
@@ -164,60 +174,92 @@ Finally, it is also assumed that a Mission Information Base (MIB) compatible wit
 \begin{description}
 \item [ccs] - Central Checkout System
 \item [tst] - Test Specification Tool
+\item [EGSE] - Electrical Ground Support Equipment
+\item [PUS] - Packet Utilisation Standard
 \item [MIB] - Mission Information Base
 \end{description}
 
 %###########################################################################################
+\chapter{Installation}
+
+The software is maintained in a Git repository and is hosted on both GitHub\footnote{\href{https://github.com/uviespace/CCS}{\url{https://github.com/uviespace/CCS}}}
+and Gitlab\footnote{\href{https://gitlab.phaidra.org/mecinam2/ccs}{\url{https://gitlab.phaidra.org/mecinam2/ccs}}}. The latest version is available on the \texttt{release} branch.
+
+An installation guide can be found in the README\footnote{\href{https://github.com/uviespace/CCS/blob/release/README}{\url{https://github.com/uviespace/CCS/blob/release/README}}}.
+The supported operating system is Linux. While the installation instructions target Arch Linux and derivatives, the process should be fairly similar on other distributions. A guide for Ubuntu
+can be found on the \texttt{CoCa} branch, together with additional troubleshooting tips. The software has been reported to have also been successfully run on Windows (with WSL) and MacOS platforms.
+
+\section{Prerequisites}
+For the remainder of this manual it is assumed that the software has already been successfully set up as described in the installation instructions, i.e., a project specific packet
+configuration file exists. Furthermore, \textit{ccs} requires that the PUS application to be connected is reachable on a TCP/IP socket.
+Finally, it is also necessary that a Mission Information Base (MIB) conforming to the SCOS2000 database schema and compatible with the application under test has already been imported.
+
+
 \chapter{Central Checkout System}
 \section{Quick Start}
-In the following section, a concise set of instructions is described for launching \textit{ccs} and establishing a basic connection. 
-Only the essential steps required to start \textit{ccs}, connect it via the designated port, and verify the initial interfaces are running are outlined below. 
-Upon startup, several windows appear. These are briefly introduced, while detailed explanations are provided in later chapters.
+
+In the following section a concise set of instructions is described for launching \textit{ccs} and establishing a basic connection to an application.
+This requires that the application under test provides a TCP/IP socket interface to which the \textit{ccs} can connect.
+The essential steps required to start \textit{ccs}, connect via the designated port, and verify that the initial interfaces are running as expected, are outlined below.
+Upon startup, several windows will appear. These are briefly introduced, while detailed explanations are provided in later chapters.
 
 \begin{itemize}
 
-\item Navigate to the \texttt{CCS} directory. \footnote{Within \texttt{CCS} there is also a directory called \texttt{Ccs}. Therefore "\textit{ccs}" will mean the software itself, "\texttt{CCS}" and "\texttt{Ccs}" the respective directories} From here the tst and \textit{ccs} tools can be started. Seeing as one can still be started within the menu of the other, opening only one is sufficient for now.
+\item Navigate to the \texttt{CCS} root directory\footnote{Within \texttt{CCS} there is also a directory called \texttt{Ccs}. Therefore "\textit{ccs}" will refer to the software itself, "\texttt{CCS}" and "\texttt{Ccs}" the respective directories}.
+From here the tst and \textit{ccs} tools can be started. %Seeing as one can still be started within the menu of the other, opening only one is sufficient for now.
 
 \item Run \texttt{./start\_ccs} to start the software.
 
-\item The \textit{ccs} Editor should open. Before running the \texttt{connection\_setup.py} script a few things have to be configured.
+\item The \textit{ccs} Editor opens with the \texttt{connection\_setup.py} script loaded. Before running the commands, a few things have to be configured.
 
 \begin{itemize}
   \renewcommand\labelitemi{--} 
-  \item Configure a POOLNAME, "LIVE" is set per default.
+  \item Configure a POOLNAME, 'LIVE' is set per default. This is the reference name for the data storage (a.k.a. pool) to which the TM/TC traffic from the connected ports is saved.
   
-  \item Configure the \texttt{cfl.connect} and \texttt{cfl.connect\_tc} commands which connect the Pool to the socket: 
-  
-  \item \texttt{cfl.connect(pool\_name, host, port, protocol)} 
-  pool\_name = POOLNAME per default, host = "" local host, port XXXX needs to be configured according to the applications port.
+  \item Configure the \texttt{cfl.connect} (for incoming telemetry) and \texttt{cfl.connect\_tc} (for outgoing TCs) commands which will connect the pool to the socket(s).
+  TM and TC can use different sockets, but can also share the same port (bidirectional link):
+  \begin{itemize}
+      \item \texttt{pool\_name}: POOLNAME per default
+      \item \texttt{host}: '' (empty string) for local host, can be any address reachable on the network
+      \item \texttt{port}: as configured on the application
+  \end{itemize}
 \end{itemize}
 
-\item For initial use, the code should be executed line by line using the upper left arrow. This approach makes it easier to follow the individual steps and to verify that each part of the process behaves as expected. Next to the line numbers, a little blue arrow indicates the current position in the script.
+\item Now, starting from the top, the code can be executed in line-by-line mode using the big blue right-pointing arrow (\textbf{1} in Fig.~\ref{editor_top}).
+      Next to the line numbers, a little blue arrow indicates the line to be executed (i.e. fed to the IPython interpreter below).
+      This approach allows it to follow the individual steps and to verify that each part of the process behaves as expected.
 
-\item \texttt{cfl.start\_pmgr()} will open the Pool Manager.
+\item \texttt{cfl.start\_pmgr()} will open the Pool Manager - it manages the connections to the test application(s).
 
-\item After running \texttt{cfl.connect} and \texttt{cfl.connect\_tc} the connections should show up in the Pool Manager.
+\item After running \texttt{cfl.connect} and \texttt{cfl.connect\_tc}, the established connections should show up in the Pool Manager. Check the log panel for potential errors if this fails.
 
-\item \texttt{\texttt{cfl.start\_pv()}} will open the Pool Viewer. If the application is sending continuous Housekeeping reports, these will already show up in the Pool Viewer.
+\item \texttt{\texttt{cfl.start\_pv()}} will open the Pool Viewer - it visualises the packet stream (up and downlink).
+If the application is already sending packets (e.g., housekeeping reports), these will already show up in the list.
 
-\item \texttt{cfl.start\_monitor(POOLNAME)} will open the Parameter Monitor with which chosen sets of parameters can be monitored individually. 
+\item optionally, \texttt{cfl.start\_monitor(POOLNAME)} will open the Parameter Monitor with which chosen sets of parameters can be monitored individually.
 \end{itemize}
 
-
-In order to send a singular command to the application, the function \texttt{cfl.Tcsend\_DB()} may be used. This and other functions defined in section \ref{scripts} 
-allow users to execute \textit{ccs} operations directly from the console of the editor or from within a Python script. For instance, the simple command (with the appropriate mib entry)
+At this point we can start interacting with the test application.
+In order to send a single TC, the function \texttt{cfl.Tcsend\_DB()} is used. This and other functions described in section \ref{scripts}
+allow users to execute \textit{ccs} operations directly from the console of the editor or from within a Python script.
+For instance, the basic command
 
 \begin{verbatim}
 cfl.Tcsend_DB('AreYouAliveCmd', pool_name=POOLNAME)
 \end{verbatim}
 
-sends a TC(17,1) via the connected pool and returns the APID, Sequence count and internal time stamp of the sent TC as confirmation. 
+sends a TC(17,1) \emph{AreYouAliveCmd} via the socket that is connected to the pool \texttt{POOLNAME} -- given such a command
+is defined in the configured MIB. The TC to be sent is selected by its descriptive name, i.e., as defined in the corresponding
+MIB CCF\_DESCR field. Available TC names can be looked up using the \textit{tst}, see Fig.~\ref{fig:tst_mib}.
+The \texttt{Tcsend\_DB} function returns the APID, sequence counter and local send time of the issued TC as confirmation.
 
 
 
 
 %###########################################################################################
 \section{Modules}
+This section describes the individual modules constituting the \textit{ccs} and their usage in detail.
+
 \subsection{Editor}
 The software is controlled via the main widow: the Editor, which opens upon program start. 
 As can be seen in Figure \ref{editor}, it is split into distinct halves.
@@ -237,7 +279,7 @@ For setting permanent breakpoints, in the desired number line, press \texttt{Ctr
 Frequently used functions or script fragments can be assigned to one of the ten available “action” buttons.
 To do so, either right-click on the desired button and select \textit{Set action script file}, or drag and drop the relevant script section onto the button. 
 Action assignments can also be modified directly in the configuration file by editing the entries action 1–10 in \texttt{ccs\_main\_config.cfg}. 
-A detailed overview of configuration files and user preferences is provided in Chapter~\ref{...}.
+A detailed overview of configuration files and user preferences is provided in Chapter~\ref{config}.
 Furthermore, by right clicking on the action button, the script itself can be opened as well as edited and the button icon can be set.\\
 
 The UniVieSpace logo functions as a menu button, providing access to the other modules. 
@@ -412,7 +454,7 @@ As shown in Figure~\ref{top_viewer}, the controls at the top right of the Pool V
   \iconsvg{open}{Open folder / Load pool}{fig:icon-open}
   \iconsvg{save}{Save pool}{fig:icon-save}
   \iconsvg{clear}{Clear current pool}{fig:icon-clear}
-  \caption{Icons visible on top of the Pool Viewer}
+  \caption{Icons visible on top of the Pool Viewer. Note that the look of some icons depends on the host environment and can thus vary from system to system.}
   \label{fig:pool-icons}
 \end{figure}
 \endgroup
@@ -427,7 +469,7 @@ Conversely, the contents of the active pool can be exported using the \emph{Save
 The export may include the entire pool or only selected packets, and can be written in binary, hexadecimal, or decoded CSV format.\\
 
 The \emph{Clear} button \ref{fig:icon-clear} will clear the currently selected pool.
-Caution: This function is irreversibly and all data in the respective pool is lost!\\
+%Caution: This function is irreversible and all data in the respective pool is deleted!\\
 
 In addition to these functions, two further buttons are available in the toolbar: \emph{Parameter Plotter} \ref{fig:icon-plotter} and \emph{Monitor} \ref{fig:icon-monitor}. 
 These provide extended analysis and monitoring capabilities. A detailed description of both will be given in the subsequent chapters.
@@ -489,9 +531,9 @@ The upper toolbar provides several checkboxes and control buttons that adjust th
 
 \item Limits: Displays parameter limits (if defined in the MIB) as horizontal lines across the plot.
 
-\item Cal: Plots calibrated (engineering) values instead of raw data. The calibration is applied only to the next time step or to the next parameter added.
+\item Cal: Plots calibrated (engineering) values instead of raw data. The calibration is applied only to the next parameter added.
 
-\item MIN / MAX: Define the visible range of the x-axis, allowing users to constrain the plotted interval.
+\item MIN / MAX: Limits the range of packets from which the parameters should be extracted, identified by the pool index (\textbf{\#} column).
 
 \end{itemize}
 
@@ -503,7 +545,7 @@ The upper toolbar provides several checkboxes and control buttons that adjust th
 
 
 The Parameter Monitor module facilitates real-time supervision of selected parameters. 
-It can be opened directly from the Pool Viewer via the \emph{Monitor} button (see Figure~\ref{fig:monitor_0}). \\
+It can be opened directly from the Pool Viewer via the \emph{Monitor} button (see Figure~\ref{fig:icon-monitor}). \\
 
 The main window displays three counters (\emph{Error LOW}, \emph{Error MEDIUM}, and \emph{Error HIGH}) that indicate the number of parameters currently exceeding their respective soft or hard limits (corresponding to TM(5,2), TM(5,3), TM(5,4)). The \emph{Reset} button clears these alerts, returning the indicators to their default state. 
 The \emph{Calibrated} option behaves as in other modules, displaying engineering values when enabled.\\
@@ -542,6 +584,7 @@ Hovering the cursor over a parameter displays its defined hard and soft limits w
 
 %###########################################################################################
 \chapter{Configuration Editor}
+\label{config}
 The Configuration Editor provides a graphical interface for viewing and modifying the various configuration files (.cfg) used by \textit{ccs}.
 It serves a similar purpose to a preferences window, allowing the user to inspect and adjust system parameters without manually editing configuration files. 
 It can be launched in two ways:
@@ -701,7 +744,7 @@ The preparation script can be executed beforehand, while the run file sequential
 This method is not generally recommended, as the generated files may be overwritten.
 Compact Script: Generates a complete and organized Python script, which can be saved under a custom name and location. 
 When the optional \emph{Reporting} checkbox is enabled, a dialogue appears for entering test comments and metadata while executing the test. 
-The reporting workflow is described in detail in Section~\ref{...}. \\
+The reporting workflow is described in detail in Section~\ref{sec:exectest}. \\
 
 The upper section of the main window contains the general metadata fields for each test specification, such as the \emph{Name of the test}, \emph{Short description}, \emph{Specification version}, \emph{IASW version}, and associated \emph{Requirements}. 
 These fields serve primarily for documentation purposes. \\
@@ -772,6 +815,7 @@ The accompanying \emph{Verification Description} provides a brief textual summar
 
 %###########################################################################################
 \section{Executing a test}
+\label{sec:exectest}
 Before using the Test Specification Tool and performing drag-and-drop operations involving telemetry packets during test verification, one configuration parameter in the \textit{ccs} setup must be checked.
 
 \begin{enumerate}
@@ -834,7 +878,7 @@ When confirmed, the corresponding telecommand \texttt{TC(17,1)} is sent, and the
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.5\linewidth]{test_editor.png}
+    \includegraphics[width=0.8\linewidth]{test_editor.png}
     \caption{Generated test script displayed in \textit{ccs} editor}
     \label{fig:test_editor}
 \end{figure}
@@ -849,7 +893,7 @@ When confirmed, the corresponding telecommand \texttt{TC(17,1)} is sent, and the
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.5\linewidth]{test_viewer.png}
+    \includegraphics[width=0.8\linewidth]{test_viewer.png}
     \caption{Pool viewer displaying a command which was sent from the test script}
     \label{fig:test_viewer}
 \end{figure}
@@ -922,7 +966,7 @@ For example when typing \texttt{Tcsend\_DB?} the Signature and Docstring are dis
 
     \item ack: acknowledgment flag in the PUS header - which service 1 TM packets are expected in response, for example ack=0b1011 will give TM(1,1), TM(1,3) and TM(1,7)
 
-    \item pool\_name: data pool name through which the packet is sent, for example "LIVE"
+    \item pool\_name: data pool name through which the packet is sent, for example 'LIVE'
 
     \item sleep: pauses execution after sending a TC, for example, sleep=1.0 blocks subsequent commands for one second
 
@@ -936,13 +980,14 @@ For example when typing \texttt{Tcsend\_DB?} the Signature and Docstring are dis
 
 %###########################################################################################
 \section{Ccs Function Library}
-The object cfl (short for \textit{ccs} Function Library) provides access to the internal command interface of the \textit{ccs} system. 
-It serves as the main entry point for sending and receiving packets, handling telemetry, and interacting with the connected instruments.
+The \texttt{cfl} module (short for \textit{ccs} function library) is a collection of useful functions which are also used internally by the \textit{ccs} system.
+It is the main library for common tasks such as sending and receiving packets, handling telemetry, and interacting with the connected instruments.
 
-Commonly used functions include, for example: \texttt{cfl.Tcsend\_DB()} – sends a TC packet defined in the MIB or \texttt{cfl.Tcbuild()} – builds a TC packet without sending it immediately. 
+Functions include, for example: \texttt{cfl.Tcsend\_DB()} – sends a TC packet defined in the MIB or \texttt{cfl.Tcbuild()} – builds a TC packet without sending it immediately.
 These functions allow users to execute \textit{ccs} operations directly from the console or from within a Python script executed in the editor. 
-A command which sends a TC to the application, will return the APID, Sequence count and internal time stamp of the sent TC as confirmation. 
-A command can directly be dragged and dropped from the test tool into the upper section of the \textit{ccs} editor.\\
+An overview of useful functions is given in Sec.~\ref{functions}.
+%A command which sends a TC to the application, will return the APID, Sequence count and internal time stamp of the sent TC as confirmation.
+%A command can directly be dragged and dropped from the test tool into the upper section of the \textit{ccs} editor.\\
 
 %###########################################################################################
 \subsection{Control modules via editor}
