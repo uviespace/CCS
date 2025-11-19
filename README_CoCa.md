@@ -1,7 +1,7 @@
 # CcsUvie
 UVIE CCS configured for CoCa
 
-Find the original repository here: https://gitlab.phaidra.org/mecinam2/CCS.git
+Find the original repository here: https://gitlab.phaidra.org/mecinam2/CCS.git. The CCS has since migrated to GitHub.
 
 ## Installation
 Please check the original installation steps.
