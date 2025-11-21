@@ -13,6 +13,6 @@ xelatex ccs_um.tex
 
 xelatex ccs_um.tex
 
-mv ccs_um.pdf "UVIE-CCS-UM-r1.pdf"
+mv ccs_um.pdf "HB-UVIE-EGSE-UM-001_i1.0.pdf"
 
 
