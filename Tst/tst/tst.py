@@ -955,9 +955,9 @@ class TstAppWindow(Gtk.ApplicationWindow):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             report = dialog.report.get_active()
-            spec = dialog.csvspec.get_filename()
+            # spec = dialog.csvspec.get_filename()
 
-            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename(), reportfunc=report, specfile=spec)
+            json_to_barescript.run(current_model.encode_to_json(), dialog.get_filename(), reportfunc=report)#, specfile=spec)
             cfg.save_option_to_file('tst-history', 'last-folder', dialog.get_current_folder())
 
         dialog.destroy()
@@ -1331,15 +1331,16 @@ class ScriptExportDialog(Gtk.FileChooserDialog):
         hbox.set_border_width(10)
 
         self.report = Gtk.CheckButton.new_with_label('Reporting')
-        self.report.set_tooltip_text('Add interactive reporting')
-        self.report.connect('toggled', self.check_report)
+        self.report.set_tooltip_text('Add interactive reporting to test script')
+        self.report.set_active(True)
+        # self.report.connect('toggled', self.check_report)
 
-        self.csvspec = Gtk.FileChooserButton()
-        self.csvspec.set_tooltip_text('Select corresponding CSV spec file')
-        self.csvspec.set_sensitive(False)
+        # self.csvspec = Gtk.FileChooserButton()
+        # self.csvspec.set_tooltip_text('Select corresponding CSV spec file')
+        # self.csvspec.set_sensitive(False)
 
-        hbox.pack_start(self.report, 0, 0, 0)
-        hbox.pack_start(self.csvspec, 1, 1, 0)
+        hbox.pack_end(self.report, 0, 0, 0)
+        # hbox.pack_start(self.csvspec, 1, 1, 0)
         area.add(hbox)
 
         self.show_all()

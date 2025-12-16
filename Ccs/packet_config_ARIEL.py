@@ -29,11 +29,16 @@ RMAP_PEC_LEN = 1
 # PUS packet structure definition
 
 PUS_PKT_VERS_NUM = 0  # 0 for space packets
-PUS_VERSION = 2
-MAX_PKT_LEN = 1024  # 886 for TMs [EID-1298], 504 for TCs [EID-1361]
+PUS_VERSION = 2  # PUS-C
+MAX_PKT_LEN = 4096  # 1024 for TC
 
 TMTC = {0: 'TM', 1: 'TC'}
 TSYNC_FLAG = {1: 'U', 8: 'S'}
+
+# names of dynamically set TC header parameters, required if header structure from MIB is used instead of the definitions in this file
+SEQCNT_TAGS = ["SeqCnt"]
+PKTLEN_TAGS = ["PktLen"]
+SRCID_TAGS = ["SrcId"]
 
 PRIMARY_HEADER = [
     ("PKT_VERS_NUM", ctypes.c_uint16, 3),

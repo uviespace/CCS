@@ -11,8 +11,6 @@ sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 
-tc_type = None
-
 dictionary_of_commands = cfl.get_tc_list()
 read_in_list_of_commands = list(dictionary_of_commands.keys())
 list_of_commands = []
@@ -22,10 +20,11 @@ subtype_list = []
 descr_list = []
 calibrations_list = []
 
+myorder = [3, 4, 1, 2, 0]
 for command in read_in_list_of_commands:
     command = list(command)
-    del command[0]
-    myorder = [2, 3, 0, 1]
+    # del command[0]
+    # myorder = [2, 3, 0, 1]
     command = [command[i] for i in myorder]
     command[0] = int(command[0])
     command[1] = int(command[1])
@@ -40,7 +39,6 @@ dictionary_of_variables = cfl.get_tc_calibration_and_parameters()
 
 
 def reload_tc_data():
-    global tc_type
     global dictionary_of_commands
     global read_in_list_of_commands
     global list_of_commands
@@ -50,7 +48,6 @@ def reload_tc_data():
     global calibrations_list
     global dictionary_of_variables
 
-    tc_type = None
 
     dictionary_of_commands = cfl.get_tc_list()
     read_in_list_of_commands = list(dictionary_of_commands.keys())
@@ -61,10 +58,11 @@ def reload_tc_data():
     descr_list = []
     calibrations_list = []
 
+    myorder = [3, 4, 1, 2, 0]
     for command in read_in_list_of_commands:
         command = list(command)
-        del command[0]
-        myorder = [2, 3, 0, 1]
+        # del command[0]
+        # myorder = [2, 3, 0, 1]
         command = [command[i] for i in myorder]
         command[0] = int(command[0])
         command[1] = int(command[1])
@@ -78,12 +76,12 @@ def reload_tc_data():
     dictionary_of_variables = cfl.get_tc_calibration_and_parameters()
 
 
-def get_cpc_descr(tc_type):
+def get_cpc_descr(cname):
 
     cpc_descr = []
 
     for key in dictionary_of_variables:
-        if tc_type in key:
+        if cname == key[0]:
             ptc, pfc = dictionary_of_variables[key][0][:2]
 
             # check if parameter is editable, fixed, or spare
@@ -100,15 +98,15 @@ def get_cpc_descr(tc_type):
     return cpc_descr
 
 
-def get_calibrations(tc_type, cpc_descr):
+def get_calibrations(cpc_descr):
     treeview_tuple_list = []
     alvals = []
     for key in dictionary_of_variables:
-        if tc_type in key and cpc_descr in key:
+        if cpc_descr == key[6]:
             for counter in dictionary_of_variables[key]:
 
-                cpc_ptc = counter[0]
-                cpc_pfc = counter[1]
+                # cpc_ptc = counter[0]
+                # cpc_pfc = counter[1]
                 prv_minval = counter[2]
                 prv_maxval = counter[3]
                 pas_altxt = counter[4]
@@ -123,26 +121,27 @@ def get_calibrations(tc_type, cpc_descr):
                     prv_minval = pas_altxt
                     alvals.append(pas_alval)
 
-                if cpc_ptc is None:
-                    cpc_ptc = "None"
-                if cpc_pfc is None:
-                    cpc_pfc = "None"
+                # if cpc_ptc is None:
+                #     cpc_ptc = "None"
+                # if cpc_pfc is None:
+                #     cpc_pfc = "None"
                 if prv_minval is None:
-                    prv_minval = "None"
+                    prv_minval = "-"
                 if prv_maxval is None:
-                    prv_maxval = "None"
+                    prv_maxval = "-"
                 if pas_altxt is None:
-                    pas_altxt = "None"
+                    pas_altxt = "-"
                 if pas_alval is None:
-                    pas_alval = "None"
+                    pas_alval = "-"
 
-                if cpc_ptc == "None":
-                    data_type = "None"
-                else:
-                    data_type = s2k.ptt(cpc_ptc, cpc_pfc)
+                # if cpc_ptc == "None":
+                #     data_type = "None"
+                # else:
+                #     data_type = s2k.ptt(cpc_ptc, cpc_pfc)
 
                 treeview_tuple = tuple([prv_minval, prv_maxval, pas_altxt, pas_alval])
                 treeview_tuple_list.append(treeview_tuple)
+
     return treeview_tuple_list
 
 
@@ -154,7 +153,7 @@ class TcTable(Gtk.Grid):
         # self.set_orientation(Gtk.Orientation.VERTICAL)
         self.set_row_spacing(5)
 
-        self.telecommand_liststore = Gtk.ListStore(int, int, str, str)
+        self.telecommand_liststore = Gtk.ListStore(int, int, str, str, str)
         for telecommand_ref in list_of_commands:
             self.telecommand_liststore.append(list(telecommand_ref))
         self.current_filter_telecommand = None
@@ -184,11 +183,14 @@ class TcTable(Gtk.Grid):
 
         # creating the treeview, making it use the filter a model, adding columns
         self.treeview = Gtk.TreeView.new_with_model(Gtk.TreeModelSort(self.telecommand_filter))
-        for i, column_title in enumerate(["TYPE", "SUBTYPE", "DESCR", "LONGDESCR"]):
+        for i, column_title in enumerate(["TYPE", "SUBTYPE", "DESCR", "LONGDESCR", "CNAME"]):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+            if column_title == "CNAME":
+                column.set_visible(False)
             column.set_sort_column_id(i)
             self.treeview.append_column(column)
+        self.treeview.set_tooltip_column(4)
 
         # Handle selection
         self.selected_row = self.treeview.get_selection()
@@ -249,18 +251,15 @@ class TcTable(Gtk.Grid):
         if row is not None:
             global descr
             descr = model[row][2]
-            self.command_entry.set_text(cfl.make_tc_template(descr, comment=False))
-            global tc_type
-            tc_type = descr
-            cpc_descr = get_cpc_descr(tc_type)
+            cname = model[row][4]
+            self.command_entry.set_text(cfl.make_tc_template(descr, comment=False, cname=cname))
+            cpc_descr = get_cpc_descr(cname)
             global descr_list
             descr_list.clear()
             descr_list = cpc_descr
             self.variable_box.refresh_descr_treeview()
             calibrations_list.clear()
             self.variable_box.refresh_cal_treeview()
-        else:
-            pass
 
     def telecommand_filter_func(self, model, iter, data):
 
@@ -272,7 +271,8 @@ class TcTable(Gtk.Grid):
     def on_drag_data_get(self, treeview, drag_context, selection_data, info, time, *args):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
-        selection_data.set_text(cfl.make_tc_template(descr, comment=False, add_parcfg=True), -1)
+        st, sst, descr, desc2, cname = model[my_iter]
+        selection_data.set_text(cfl.make_tc_template(descr, comment=True, add_parcfg=True, cname=cname), -1)
 
     def on_drag_begin(self, *args):
         pass
@@ -359,11 +359,12 @@ class CommandDescriptionBox(Gtk.Box):
 
     def item_selected(self, selection):
         model, row = selection.get_selected()
+
         if row is not None:
             calibrations_list.clear()
-
-            if model[row][1] != '':
-                calibrations_list.append(get_calibrations(tc_type, model[row][1]))
+            cpc_name = model[row][1]
+            if cpc_name != '':
+                calibrations_list.append(get_calibrations(cpc_name))
             self.refresh_cal_treeview()
 
     def refresh_descr_treeview(self):

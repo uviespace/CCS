@@ -356,7 +356,14 @@ class Board(Gtk.Box):
         self.test_meta_data_iasw_version.set_text(self.model.iasw_version)
         # set the Requirements of the test specification from the data model
         self.test_meta_data_req.set_text(self.model.requirements)
-        # set the pre-condition name
+
+        # load pre/post condition data from file into DB
+        db_interaction.write_into_pre_post_con(code_type=None, name=self.model.precon_name, description=self.model.precon_descr, code_block=self.model.precon_code)
+        db_interaction.write_into_pre_post_con(code_type=None, name=self.model.postcon_name, description=self.model.postcon_descr, code_block=self.model.postcon_code)
+
+        # # set the pre-condition name
+        # self.set_precon_model(active_name=self.model.precon_name)
+        # self.precon_selection.clear()
         if self.model.precon_name:
             found = False
             #self.set_precon_model()
@@ -373,6 +380,7 @@ class Board(Gtk.Box):
                 msg = f'Pre-Condition "{self.model.precon_name}" added to db'
                 self.logger.info(msg)
 
+        # self.set_postcon_model(active_name=self.model.postcon_name)
         # set the post-condition name
         if self.model.postcon_name:
             found = False

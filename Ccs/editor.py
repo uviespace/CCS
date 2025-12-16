@@ -899,6 +899,10 @@ class CcsEditor(Gtk.Window):
         tt = x.get_text(y)
 
         bpcode = '#! CCS.BREAKPOINT'
+
+        if tt.startswith(bpcode):
+            return
+
         if not tt.startswith('\n'):
             bpcode += '\n'
 

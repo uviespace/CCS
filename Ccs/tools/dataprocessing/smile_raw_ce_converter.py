@@ -10,9 +10,11 @@ import os
 import sys
 # import struct
 
+from collections import Counter
 import numpy as np
 from astropy.io import fits
 from numpy.lib import recfunctions as rf
+from .sci_metadata import _meta_group_fmt, _meta_frame_fmt, STRUCT_CE_HEADER
 
 # expected CE sizes in bytes
 NROWS_FF = 4511
@@ -25,7 +27,7 @@ SIZE_FF = NROWS_FF * NCOLS_FF * 2
 SIZE_FT = NROWS_FT * NCOLS_FT * 2  # 1 node
 SIZE_UV = NROWS_UV * NCOLS_UV * 2  # 1 node
 SIZE_ED = 64  # 1 event
-NODE_NUM = 1  # total number of nodes TODO: set to 4 for proper data
+NODE_NUM = 4  # total number of nodes
 
 SCI_PRODUCTS = {0: 'ED', 1: 'UNKNOWN', 2: 'FT', 3: 'UV', 4: 'FF', 5: 'ED_WP'}
 
@@ -41,7 +43,7 @@ ED_PKT_DTYPE = np.dtype([('spw', '>u2'), ('dlen', '>u2'), ('mode', '>u1'), ('dty
 ID_ED = 1
 ID_WP = 3
 
-WP_PER_FRAME = 1
+WP_PER_FRAME = 4
 
 
 def convert_ce(cefile, fitsfile=None, guess=False):
@@ -134,8 +136,8 @@ def mk_ff(data, asfits=True):
 
 def mk_ft(data, asfits=True):
 
-    # check if stacking ('2') was applied and use correct pixel bit size
-    if '2' in hex(data.header.items.ce_key):
+    # check if stacking ('2') and/or pack16 ('a') was applied and use correct pixel data type
+    if '2' in hex(data.header.items.ce_key) and 'a' not in hex(data.header.items.ce_key):
         pixbits = '>I'
     else:
         pixbits = '>H'
@@ -146,25 +148,30 @@ def mk_ft(data, asfits=True):
         hdl = _mk_hdl('FT', data.header)
         n_nodes = arr.shape[0]
 
-        if n_nodes % NODE_NUM:
-            print('Total number of nodes ({}) is not a multiple of 4!'.format(n_nodes))
-
-            for n in range(arr.shape[0]):
-                node = fits.ImageHDU(data=arr[n, :, :], name='FT_CCD_NODE_{}'.format(n))
-                node.add_checksum()
-                hdl.append(node)
-        else:
-            for n in range(NODE_NUM):
-                node = fits.ImageHDU(data=arr[n::NODE_NUM, :, :], name='FT_CCD_NODE_{}'.format(n))
-                node.add_checksum()
-                hdl.append(node)
+        # if n_nodes % NODE_NUM:
+        #     print('Total number of nodes ({}) is not a multiple of 4!'.format(n_nodes))
+        #
+        #     for n in range(arr.shape[0]):
+        #         node = fits.ImageHDU(data=arr[n, :, :], name='FT_CCD_NODE_{}'.format(n))
+        #         node.add_checksum()
+        #         hdl.append(node)
+        # else:
+        #     for n in range(NODE_NUM):
+        #         node = fits.ImageHDU(data=arr[n::NODE_NUM, :, :], name='FT_CCD_NODE_{}'.format(n))
+        #         node.add_checksum()
+        #         hdl.append(node)
 
         # arrange all nodes to full CCD
-        if n_nodes % 4 == 0:
+        # if n_nodes % 4 == 0:
+        #
+        #     nn = _assemble_ft_frames_to_fp_view(arr)
+        #
+        #     hdl.append(fits.ImageHDU(data=nn, name='FULLARRAY'))
 
-            nn = _assemble_ft_frames_to_fp_view(arr)
-
-            hdl.append(fits.ImageHDU(data=nn, name='FULLARRAY'))
+        for n in range(NODE_NUM):
+            node = fits.ImageHDU(data=arr[:, n, :, :], name='FT_CCD_NODE_{}'.format(n))
+            node.add_checksum()
+            hdl.append(node)
 
         group_table = fits.BinTableHDU(data=data.meta_group, name='GROUP_HK')
         frame_table = fits.BinTableHDU(data=data.meta_frame, name='FRAME_HK')
@@ -182,8 +189,8 @@ def mk_ft(data, asfits=True):
 
 def mk_uv(data, asfits=True):
 
-    # check if stacking ('2') was applied and use correct pixel bit size
-    if '2' in hex(data.header.items.ce_key):
+    # check if stacking ('2') and/or pack16 ('a') was applied and use correct pixel data type
+    if '2' in hex(data.header.items.ce_key) and 'a' not in hex(data.header.items.ce_key):
         pixbits = '>I'
     else:
         pixbits = '>H'
@@ -239,10 +246,9 @@ def mk_ed(data, asfits=True, edmap=False):
 
     hdl = _mk_hdl('ED', data.header)
     ts = data.meta_frame['sdpProductStarttimeCrs'] + data.meta_frame['sdpProductStarttimeFine'] / 1e6
-    # ts_ext = ts.repeat(frmevtcnt)
 
     # bindata = np.array([_mk_bin_entry(evt, t, wpm_raise=True) for evt, t in zip(arr, ts_ext)], dtype=ED_BIN_DTYPE)
-    bindata, wpmdata = _mk_bin_arrays(arr, ts, frmevtcnt)
+    bindata, wpmdata = _mk_bin_arrays(arr, ts)
 
     if asfits:
         if edmap:
@@ -283,17 +289,17 @@ def mk_ed(data, asfits=True, edmap=False):
     return 'ED', (bindata, wpmdata), data.meta_group, data.meta_frame
 
 
-def _mk_bin_entry(data, timestamp, wpm_raise=False):
-    spw, dlen, dtyp, fc, sc, col, row, *evts = data
-
-    ccdnr = (dtyp >> 4) & 1
-    node = (dtyp >> 5) & 0b11
-
-    if wpm_raise:
-        if (dtyp & 0b11) == 3:
-            raise ValueError('WPM detected')
-
-    return timestamp, fc, ccdnr, col, row, node, evts
+# def _mk_bin_entry(data, timestamp, wpm_raise=False):
+#     spw, dlen, dtyp, fc, sc, col, row, *evts = data
+#
+#     ccdnr = (dtyp >> 4) & 1
+#     node = (dtyp >> 5) & 0b11
+#
+#     if wpm_raise:
+#         if (dtyp & 0b11) == 3:
+#             raise ValueError('WPM detected')
+#
+#     return timestamp, fc, ccdnr, col, row, node, evts
 
 
 def _fmt_bin_data(data, ts):
@@ -304,17 +310,25 @@ def _fmt_bin_data(data, ts):
     return np.array(list(zip(ts, data['fc'], ccdnr, data['col'], data['row'], node, data['evts'])), dtype=ED_BIN_DTYPE)
 
 
-def _mk_bin_arrays(pkts, ts, frmevtcnt):
+def _mk_bin_arrays(pkts, ts):
 
     evt_pkts = pkts[pkts['dtyp'] & 0b11 == ID_ED]
     wp_pkts = pkts[pkts['dtyp'] & 0b11 == ID_WP]
 
-    # if (len(wp_pkts) != 0) and (len(wp_pkts) != WP_PER_FRAME * len(frmevtcnt)):
-    if (len(wp_pkts) != 0) and (len(wp_pkts) % WP_PER_FRAME):
+    if len(wp_pkts) % WP_PER_FRAME:
         print('Unexpected number of WP packets ({})'.format(len(wp_pkts)))
 
-    evts = _fmt_bin_data(evt_pkts, np.repeat(ts, frmevtcnt))
-    wpm = _fmt_bin_data(wp_pkts, np.repeat(ts, WP_PER_FRAME))
+    evts_per_frame = Counter(evt_pkts['fc'])
+    ts_repeat = list(evts_per_frame.values())
+
+    if len(ts_repeat) == 0:
+        ts_repeat = 0
+
+    try:
+        evts = _fmt_bin_data(evt_pkts, np.repeat(ts, ts_repeat))
+        wpm = _fmt_bin_data(wp_pkts, np.repeat(ts, WP_PER_FRAME))
+    except ValueError as err:
+        raise ValueError("Frame counter mismatch detected. [{}]".format(err))
 
     return evts, wpm
 
@@ -368,7 +382,7 @@ def _mk_hdl(dmode, dhead):
     phdu.header['BUILD'] = dhead.items.build_number
     phdu.header['SDPVER'] = dhead.items.sdp_version
     phdu.header['CREATOR'] = "SXITLM2FITS"
-    phdu.header['TLM2FITS'] = "0.2b"
+    phdu.header['TLM2FITS'] = "1.1"
     phdu.header['DATE'] = datetime.datetime.isoformat(datetime.datetime.now(datetime.UTC))
 
     hdl.append(phdu)
@@ -382,163 +396,6 @@ def _mk_ts(cefile=None):
         return datetime.datetime.utcnow().strftime('%j_%H%M%S%f')[:-3]
     else:
         return cefile.split('_')[-1]
-
-
-FMT_LUT = {'UINT8': '>u1',
-           'B': '>u1',
-           'uint1': '>u1',
-           'uint2': '>u1',
-           'uint3': '>u1',
-           'uint4': '>u1',
-           'uint5': '>u1',
-           'uint6': '>u1',
-           'uint7': '>u1',
-           'UINT16': '>u2',
-           'H': '>u2',
-           'UINT32': '>u4',
-           'I': '>u4',
-           'INT8': '>i1',
-           'b': '>i1',
-           'INT16': '>i2',
-           'h': '>i2',
-           'INT32': '>i4',
-           'i': '>i4',
-           'FLOAT': '>f8',
-           'f': '>f8',
-           'd': '>f8',
-           'CUC918': '>f8',
-           'S10': '|S10'}
-
-STRUCT_CE_HEADER = [
-    ("version_number", ctypes.c_uint16),
-    ("build_number", ctypes.c_uint16),
-    ("sdp_version", ctypes.c_uint16),
-    ("coarse", ctypes.c_uint32),
-    ("fine", ctypes.c_uint16),
-    ("obsid", ctypes.c_uint32),
-    ("ce_counter", ctypes.c_uint16),
-    ("sdp_group_members", ctypes.c_uint16),
-    ("ce_size", ctypes.c_uint32),
-    ("ce_key", ctypes.c_uint32),
-    ("product", ctypes.c_uint8),
-    ("ce_integrity", ctypes.c_uint8),
-    ("group_meta_size", ctypes.c_uint16),
-    ("frame_meta_size", ctypes.c_uint16),
-    ("compressed_meta_size", ctypes.c_uint16),
-    ("data_size", ctypes.c_uint32),
-    ("compressed_data_size", ctypes.c_uint32)
-]
-
-META_GROUP_ITEMS = [('FRMccd2EPixThreshold', 'H'),
-                    ('FRMccd2FPixThreshold', 'H'),
-                    ('FRMccd2Readout', 'B'),
-                    ('FRMccd4EPixThreshold', 'H'),
-                    ('FRMccd4FPixThreshold', 'H'),
-                    ('FRMccd4Readout', 'B'),
-                    ('FRMccdMode2Config', 'B'),
-                    ('FRMccdModeConfig', 'B'),
-                    ('FRMchargeInjectionEn', 'B'),
-                    ('FRMchargeInjectionGap', 'H'),
-                    ('FRMchargeInjectionWidth', 'H'),
-                    ('FRMcorrectionBypass', 'B'),
-                    ('FRMcorrectionType', 'B'),
-                    ('FRMeduWanderingMaskEn', 'B'),
-                    ('FRMeventDetection', 'B'),
-                    ('FRMimgClkDir', 'B'),
-                    ('FRMintSyncPeriod', 'I'),
-                    ('FRMpixOffset', 'B'),
-                    ('FRMreadoutNodeSel', 'B'),
-                    ('sdpDiffAxis', 'B'),
-                    ('sdpDiffMethod', 'B'),
-                    ('EvtBadPixelCount', 'I'),
-                    ('EvtFilterCount1', 'I'),
-                    ('EvtFilterCount2', 'I'),
-                    ('EvtFilterCount3', 'I'),
-                    ('EvtFilterN', 'H'),
-                    ('EvtFilterThr1', 'H'),
-                    ('EvtFilterThr2', 'H'),
-                    ('EvtFilterThr3', 'H'),
-                    ('FeeBadPixelFilter', 'B'),
-                    ('FeeEventFilterEnable', 'B'),
-                    ('sdpAriPar1', 'I'),
-                    ('sdpAriPar2', 'I'),
-                    ('sdpBinX', 'H'),
-                    ('sdpBinY', 'H'),
-                    ('sdpCropB', 'H'),
-                    ('sdpCropT', 'H'),
-                    ('sdpCropX', 'H'),
-                    ('sdpCropY', 'H'),
-                    ('sdpDecimN', 'I'),
-                    ('sdpEvtCeil', 'H'),
-                    ('sdpEvtCtr', 'I'),
-                    ('sdpEvtFloor', 'H'),
-                    ('sdpGolombPar1', 'I'),
-                    ('sdpGolombPar2', 'I'),
-                    ('sdpOffsetSignal', 'h'),
-                    ('NOfEvtDet', 'H')]
-
-META_FRAME_ITEMS = [('AdcTempCcd', 'H'),
-                    ('FrameDiscardCount', 'I'),
-                    ('LastFrameEvtCount', 'I'),
-                    ('FRMHK1v2dMon', 'H'),
-                    ('FRMHK2v5aMon', 'H'),
-                    ('FRMHK2v5dMon', 'H'),
-                    ('FRMHK3v3bMon', 'H'),
-                    ('FRMHK3v3dMon', 'H'),
-                    ('FRMHK5vbNegMon', 'H'),
-                    ('FRMHK5vbPosMon', 'H'),
-                    ('FRMHK5vrefMon', 'H'),
-                    ('FRMHKboardId', 'B'),
-                    ('FRMHKccd2EPixFullSun', 'H'),
-                    ('FRMHKccd2FPixFullSun', 'H'),
-                    ('FRMHKccd2TsA', 'H'),
-                    ('FRMHKccd2VddMon', 'H'),
-                    ('FRMHKccd2VgdMon', 'H'),
-                    ('FRMHKccd2VodMonE', 'H'),
-                    ('FRMHKccd2VodMonF', 'H'),
-                    ('FRMHKccd2VogMon', 'H'),
-                    ('FRMHKccd2VrdMonE', 'H'),
-                    ('FRMHKccd2VrdMonF', 'H'),
-                    ('FRMHKccd4EPixFullSun', 'H'),
-                    ('FRMHKccd4FPixFullSun', 'H'),
-                    ('FRMHKccd4TsB', 'H'),
-                    ('FRMHKccd4VddMon', 'H'),
-                    ('FRMHKccd4VgdMon', 'H'),
-                    ('FRMHKccd4VodMonE', 'H'),
-                    ('FRMHKccd4VodMonF', 'H'),
-                    ('FRMHKccd4VogMon', 'H'),
-                    ('FRMHKccd4VrdMonE', 'H'),
-                    ('FRMHKccd4VrdMonF', 'H'),
-                    ('FRMHKcmicCorr', 'H'),
-                    ('FRMHKerrorFlags', 'I'),
-                    ('FRMHKfpgaMajorVersion', 'B'),
-                    ('FRMHKfpgaMinorVersion', 'B'),
-                    ('FRMHKfpgaOpMode', 'B'),
-                    ('FRMHKframeCounter', 'H'),
-                    ('FRMHKigHiMon', 'H'),
-                    ('FRMHKprt1', 'H'),
-                    ('FRMHKprt2', 'H'),
-                    ('FRMHKprt3', 'H'),
-                    ('FRMHKprt4', 'H'),
-                    ('FRMHKprt5', 'H'),
-                    ('FRMHKspwStatus', 'I'),
-                    ('FRMHKvan1PosRaw', 'H'),
-                    ('FRMHKvan2PosRaw', 'H'),
-                    ('FRMHKvan3NegMon', 'H'),
-                    ('FRMHKvccd', 'H'),
-                    ('FRMHKvccdPosRaw', 'H'),
-                    ('FRMHKvclkPosRaw', 'H'),
-                    ('FRMHKvdigRaw', 'H'),
-                    ('FRMHKviclk', 'H'),
-                    ('FRMHKvrclkMon', 'H'),
-                    ('sdpProductStarttimeCrs', 'I'),
-                    ('sdpProductStarttimeFine', 'I'),
-                    ('RseShutSts', 'B')]
-
-# _meta_group_fmt = '>' + ''.join([x[1] for x in META_GROUP_ITEMS])
-# _meta_frame_fmt = '>' + ''.join([x[1] for x in META_FRAME_ITEMS])
-_meta_group_fmt = [(x[0], FMT_LUT[x[1]]) for x in META_GROUP_ITEMS]
-_meta_frame_fmt = [(x[0], FMT_LUT[x[1]]) for x in META_FRAME_ITEMS]
 
 
 class CeHeaderStruct(ctypes.BigEndianStructure):
@@ -582,11 +439,15 @@ class CompressionEntity:
 
         self.cedata = data[CE_HEADER_LEN:]
 
+        if hex(self.header.items.ce_key).count('2'):
+            pass
+
     @property
     def scidata(self):
         data = self.cedata[self.header.items.compressed_meta_size:]
-        if len(data) != self.header.items.compressed_data_size:
-            print('Inconsistent data length')
+        if len(data) != self.header.items.compressed_data_size and len(data) != self.header.items.data_size:
+            if not hex(self.header.items.ce_key).count('c'):
+                print('Inconsistent data length')
         return data
 
     @property
