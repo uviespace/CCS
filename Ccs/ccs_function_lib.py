@@ -3824,7 +3824,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None, **kwargs):
 
 
 def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
-                   progress=True, calc_crc=True, byte_align=4, dryrun=False):
+                   progress=True, calc_crc=True, byte_align=4, dryrun=False, fmt_override=None):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_bytes_ function until
@@ -3860,6 +3860,8 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
 
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
+    if fmt_override is not None:
+        fmt = fmt_override
     pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + len(endspares) + PEC_LEN
     payload_len = max_pkt_size - pkt_overhead
 
