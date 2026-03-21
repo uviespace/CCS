@@ -1,4 +1,5 @@
 import json
+import logging
 import os.path
 from packaging import version
 # import struct
@@ -92,6 +93,10 @@ class PlotViewer(Gtk.Window):
         if not self.cfg.has_section(cfl.CFG_SECT_PLOT_PARAMETERS):
             self.cfg.add_section(cfl.CFG_SECT_PLOT_PARAMETERS)
         self.user_parameters = self.cfg[cfl.CFG_SECT_PLOT_PARAMETERS]
+
+        if not self.cfg.has_section(cfl.CFG_SECT_PLOT_PARAMETER_SETS):
+            self.cfg.add_section(cfl.CFG_SECT_PLOT_PARAMETER_SETS)
+        self.presets = self.cfg[cfl.CFG_SECT_PLOT_PARAMETER_SETS]
 
         self.session_factory_idb = scoped_session_maker('idb')
         self.session_factory_storage = scoped_session_maker('storage')
@@ -343,8 +348,41 @@ class PlotViewer(Gtk.Window):
         box.pack_start(edit_userpar_butt, 0, 0, 0)
         box.pack_start(rm_userpar_butt, 0, 0, 0)
 
+        # parameter preset widget
+        preset_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        presets = Gtk.ComboBoxText.new_with_entry()
+        presets.set_model(Gtk.ListStore(str))
+        presets.set_active(-1)
+        presets.set_tooltip_text('Select predefined set of parameters, or name a new set of parameters')
+        presets.get_child().set_placeholder_text('<parameter set>')
+
+        preset_model = presets.get_model()
+        for parset in self.presets:
+            preset_model.append([parset])
+
+        presets.connect('changed', self._on_presets_changed)
+
+        plot_presets_but = Gtk.Button()
+        plot_presets_but.set_image(Gtk.Image.new_from_icon_name("document-page-setup", Gtk.IconSize.BUTTON))
+        plot_presets_but.set_tooltip_text('Plot preset parameters')
+        plot_presets_but.connect('clicked', self._plot_preset, presets)
+        save_presets_but = Gtk.Button()
+        save_presets_but.set_image(Gtk.Image.new_from_icon_name("bookmark-new", Gtk.IconSize.BUTTON))
+        save_presets_but.set_tooltip_text('Save currently plotted parameters as preset')
+        save_presets_but.connect('clicked', self._save_preset, presets)
+        edit_presets_but = Gtk.Button()
+        edit_presets_but.set_image(Gtk.Image.new_from_icon_name("view-more", Gtk.IconSize.BUTTON))
+        edit_presets_but.set_tooltip_text('Edit presets')
+        edit_presets_but.connect('clicked', self._edit_presets, presets)
+
+        preset_box.pack_start(presets, 1, 1, 0)
+        preset_box.pack_start(plot_presets_but, 0, 0, 0)
+        preset_box.pack_start(save_presets_but, 0, 0, 0)
+        preset_box.pack_start(edit_presets_but, 0, 0, 0)
+
         vbox = Gtk.VBox()
         vbox.pack_start(box, 0, 0, 0)
+        vbox.pack_start(preset_box, 0, 0, 0)
         vbox.pack_start(sw, 1, 1, 0)
         vbox.pack_start(bbox, 0, 0, 0)
         vbox.pack_start(hbox, 0, 0, 0)
@@ -555,6 +593,57 @@ class PlotViewer(Gtk.Window):
         # sid_search += b'%'
 
         return sid_offset, sid_bitlen // 8
+
+    def _on_presets_changed(self, widget):
+        pass
+
+    def _plot_preset(self, widget, presetsel):
+        label = presetsel.get_active_text()
+        preset = self.presets.get(label)
+
+        if preset is None:
+            return
+        else:
+            preset = json.loads(preset)
+
+        for hkpar in preset:
+            try:
+                hk, param = hkpar.split(':')
+                self.plot_parameter(parameter=(hk, param))
+            except Exception as e:
+                logging.warning(f"Plotting {param} failed: {e}")
+
+    def _save_preset(self, widget, presetsel):
+        params = list(self.data_dict_info.keys())
+        label = presetsel.get_active_text()
+        if not params or not label:
+            return
+
+        model = presetsel.get_model()
+        if not any([item[0]==label for item in model]):
+            model.append([label])
+        self.presets[label] = json.dumps(params)
+        cfg.save_option_to_file(cfl.CFG_SECT_PLOT_PARAMETER_SETS, label, self.presets[label])
+
+    def _edit_presets(self, widget, presetsel):
+        dia = ListDialog(self)
+        resp = dia.run()
+
+        if resp == Gtk.ResponseType.OK:
+            presetmodel = presetsel.get_model()
+            presetmodel.clear()
+            for row in self.presets:
+                cfg.remove_option_from_file(cfl.CFG_SECT_PLOT_PARAMETER_SETS, row)
+            _tmp = dict(self.presets)
+            self.presets.clear()
+            for row in dia.store:
+                presetmodel.append([row[0]])
+                self.presets[row[0]] = _tmp[row[0]]
+                cfg.save_option_to_file(cfl.CFG_SECT_PLOT_PARAMETER_SETS, row[0], _tmp[row[0]])
+
+            presetsel.get_child().set_text('')
+
+        dia.destroy()
 
     def plot_parameter(self, widget=None, parameter=None):
 
@@ -1206,6 +1295,67 @@ class DataWindow(Gtk.Window):
 
         self.textview = Gtk.TextView(cursor_visible=False, editable=False)
         sv.add(self.textview)
+
+
+class ListDialog(Gtk.Dialog):
+    def __init__(self, parent=None):
+        super().__init__(title="Manage Presets", transient_for=parent, flags=0)
+
+        self.set_default_size(-1, 300)
+
+        self.add_buttons(Gtk.STOCK_SAVE, Gtk.ResponseType.OK, Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+
+        # Content area
+        box = self.get_content_area()
+
+        # ListStore (single column of strings)
+        self.store = Gtk.ListStore(str)
+
+        for item in parent.presets:
+            self.store.append([item])
+
+        # TreeView
+        self.treeview = Gtk.TreeView(model=self.store)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Presets", renderer, text=0)
+        self.treeview.append_column(column)
+        self.treeview.set_reorderable(True)
+
+        # Selection
+        self.selection = self.treeview.get_selection()
+        self.selection.set_mode(Gtk.SelectionMode.SINGLE)
+
+        # Scrollable container
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.add(self.treeview)
+
+        # Buttons
+        button_box = Gtk.Box(spacing=0)
+
+        self.btn_remove = Gtk.Button(label="Remove")
+        # self.btn_remove = Gtk.Button()
+        self.btn_remove.set_image(Gtk.Image.new_from_icon_name("edit-delete", Gtk.IconSize.BUTTON))
+
+        self.btn_remove.connect("clicked", self.on_remove)
+
+        button_box.pack_start(self.btn_remove, True, True, 0)
+
+        # Layout
+        box.add(scrolled)
+        box.add(button_box)
+        box.set_spacing(4)
+
+        self.show_all()
+
+    def get_selected_iter(self):
+        model, treeiter = self.selection.get_selected()
+        return model, treeiter
+
+    def on_remove(self, button):
+        model, treeiter = self.get_selected_iter()
+        if treeiter:
+            model.remove(treeiter)
 
 
 if __name__ == "__main__":

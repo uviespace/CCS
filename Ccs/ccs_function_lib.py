@@ -41,6 +41,7 @@ cfg = confignator.get_config(check_interpolation=False)
 
 PCPREFIX = 'packet_config_'
 CFG_SECT_PLOT_PARAMETERS = 'ccs-plot_parameters'
+CFG_SECT_PLOT_PARAMETER_SETS = 'ccs-plot_parameter_sets'
 CFG_SECT_DECODE_PARAMETERS = 'ccs-decode_parameters'
 
 # Set up logger
