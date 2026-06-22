@@ -312,17 +312,6 @@ def start_plotter(pool_name, console=False, **kwargs):
     start_app(file_path, directory, pool_name, console=console, **kwargs)
 
 
-def start_tst(console=False, **kwargs):
-    """
-
-    :param console:
-    :param kwargs:
-    """
-    directory = cfg.get('paths', 'tst')
-    file_path = os.path.join(directory, 'tst/main.py')
-    start_app(file_path, directory, console=console, **kwargs)
-
-
 def start_progress_view(console=False, **kwargs):
     """
 
@@ -727,7 +716,7 @@ def Tmformatted(tm, separator='\n', sort_by_name=False, textmode=True, udef=Fals
 
     if nocal:
         # check if packet size is variable (because of different returned data structure)
-        if not isinstance(sourcedata[0][-1], tuple):
+        if sourcedata and not isinstance(sourcedata[0][-1], tuple):
             def _get_val_func(x):
                 try:
                     return [str(x[2]), str(x[4]), '']
@@ -1340,11 +1329,17 @@ def cuc_time_str(head, logger=logger):
     """
     try:
         if head.PKT_TYPE == 0 and head.SEC_HEAD_FLAG == 1:
-            if head.TIMESYNC in tsync_flag:
-                return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], tsync_flag[head.TIMESYNC])
+
+            if hasattr(head, 'TIMESYNC'):
+
+                if head.TIMESYNC in tsync_flag:
+                    return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], tsync_flag[head.TIMESYNC])
+                else:
+                    logger.info('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.PKT_SEQ_CNT))
+                    return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], 'U')
             else:
-                logger.warning('Unknown timesync flag value {} in packet {}'.format(head.TIMESYNC, head.PKT_SEQ_CNT))
                 return '{:.6f}{}'.format(head.CTIME + head.FTIME / timepack[2], 'U')
+
         else:
             return ''
     except Exception as err:
@@ -1952,7 +1947,7 @@ def Tmdump(filename, tmlist, mode='hex', st_filter=None, check_crc=False):
 
 def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None):
     """
-    From tmlist return list of packets that match the specified criteria
+    From a list of binary PUS packets return packets that match the specified criteria
 
     :param tmlist:
     :param st:
@@ -1976,9 +1971,9 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
 
     if sid:
         if st is None or sst is None or apid is None:
-            raise ValueError('Must provide st, sst and apid if filtering by sid')
+            raise ValueError('Must provide ST, SST, and APID if filtering by SID')
 
-        sid_offset, sid_bitlen = get_sid(st, sst, apid)
+        sid_offset, sid_bitlen = get_sid_loc(st, sst, apid)
         tobyte = sid_offset + sid_bitlen // 8
         tmlist = [tm for tm in list(tmlist) if int.from_bytes(tm[sid_offset:tobyte], 'big') == sid]
 
@@ -1992,7 +1987,7 @@ def Tm_filter_st(tmlist, st=None, sst=None, apid=None, sid=None, time_from=None,
 
 
 def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, time_to=None, idx_from=None, idx_to=None,
-                tmtc=None, get_last=False):
+                tmtc=None, get_last=False, sid_lu_apid=None):
     """
     Filter SQL query object by any of the given arguments, return filtered query.
 
@@ -2009,6 +2004,9 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
     :param get_last:
     """
 
+    if sid_lu_apid is None:
+        sid_lu_apid = apid
+
     if st is not None:
         rows = rows.filter(DbTelemetry.stc == st)
 
@@ -2019,17 +2017,16 @@ def filter_rows(rows, st=None, sst=None, apid=None, sid=None, time_from=None, ti
         rows = rows.filter(DbTelemetry.apid == apid)
 
     if sid:
-        #TODO apid
-        #if st is None or sst is None or apid is None:
-        #    raise ValueError('Must provide st, sst and apid if filtering by sid')
+        if st is None or sst is None or sid_lu_apid is None:
+            raise ValueError('Must provide ST, SST, and APID if filtering by SID')
 
-        sid_offset, sid_bitlen = get_sid(st, sst, apid)
+        sid_offset, sid_bitlen = get_sid_loc(st, sst, sid_lu_apid)
         if sid_offset != -1:
             sid_size = sid_bitlen // 8
             rows = rows.filter(
                 func.mid(DbTelemetry.data, sid_offset - TM_HEADER_LEN + 1, sid_size) == sid.to_bytes(sid_size, 'big'))
         else:
-            logger.error('SID ({}) not applicable for {}-{}-{}'.format(sid, st, sst, apid))
+            logger.error('SID ({}) not applicable for {}-{}-{}'.format(sid, st, sst, sid_lu_apid))
 
     if time_from is not None:
         rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) >= time_from)
@@ -2153,7 +2150,7 @@ def get_pool_rows(pool_name, check_existence=False):
     return rows
 
 
-def get_hk_val(pool_name, sid, par_id, apid=None):
+def get_hk_val(pool_name, sid, par_id, apid=None, strict_apid=True):
 
     assert isinstance(sid, int)
 
@@ -2171,11 +2168,11 @@ def get_hk_val(pool_name, sid, par_id, apid=None):
     if isinstance(par_id, int):
         pass  # TODO
 
-    return get_param_values(pool_name=pool_name, hk=hk, param=par_id, last=1, mk_array=False)
+    return get_param_values(pool_name=pool_name, hk=hk, param=par_id, last=1, mk_array=False, strict_apid=strict_apid)
 
 
 # get values of parameter from HK packets
-def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True, nocal=False):
+def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, tmfilter=True, pool_name=None, mk_array=True, nocal=False, strict_apid=True):
     """
 
     :param tmlist:
@@ -2204,7 +2201,11 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
         dbres = dbcon.execute(que)
         name, spid, offby, offbi, ptc, pfc, unit, descr, apid, st, sst, hk, sid = dbres.fetchall()[0]
         if not isinstance(tmlist, list):
-            tmlist_rows = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)
+            if strict_apid:
+                tmlist_rows = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)
+            else:
+                tmlist_rows = filter_rows(tmlist, st=st, sst=sst, sid_lu_apid=apid, sid=sid)
+
             if tmlist_rows is not None:
                 if last > 1:
                     tmlist = [tm.raw for tm in tmlist_rows.yield_per(1000)[-last:]]
@@ -2264,7 +2265,11 @@ def get_param_values(tmlist=None, hk=None, param=None, last=0, numerical=False, 
     if isinstance(tmlist, list):
         tmlist_filt = Tm_filter_st(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
     else:
-        tmlist_filt = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        if strict_apid:
+            tmlist_filt = filter_rows(tmlist, st=st, sst=sst, apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+        else:
+            tmlist_filt = filter_rows(tmlist, st=st, sst=sst, sid_lu_apid=apid, sid=sid)[-last:] if tmfilter else tmlist[-last:]
+
         tmlist_filt = [x.raw for x in tmlist_filt]
 
     if name is not None:
@@ -3129,7 +3134,7 @@ def get_pid(parnames):
     return pids if len(pids) > 1 else pids[0]
 
 
-def get_sid(st, sst, apid):
+def get_sid_loc(st, sst, apid):
     """
 
     :param st:
@@ -3138,13 +3143,14 @@ def get_sid(st, sst, apid):
     :return:
     """
     if (st, sst, apid) in SID_LUT:
-        return SID_LUT[(st, sst, apid)]
+        sid_loc = SID_LUT[(st, sst, apid)]
+    elif (st, sst, None) in SID_LUT:
+        sid_loc = SID_LUT[(st, sst, None)]
+        logger.warning('Using APID agnostic definition of discriminant offset/size')
     else:
-        try:
-            logger.warning('APID {} not known'.format(apid))
-            return SID_LUT[(st, sst, None)]
-        except KeyError:
-            return
+        raise ValueError('Failed to get SID - discriminant location not defined for {}-{}-{}'.format(st, sst, apid))
+
+    return sid_loc
 
 
 ##
@@ -3287,7 +3293,7 @@ def Tmpack(data=b'', apid=321, st=1, sst=1, destid=0, version=0, typ=0, timestam
 #  @param sdid    source/destination ID
 #  @param data    application data
 def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1, gflags=0b11, sc=None,
-           tmv=PUS_VERSION, ack=0b1001, pktl=None, chksm=None, **kwargs):
+           tmv=PUS_VERSION, ack=0b1001, pktl=None, chksm=None, pktid=None, **kwargs):
     """
     Create TC packet conforming to PUS
 
@@ -3317,7 +3323,7 @@ def Tcpack(data=b'', apid=0x14c, st=1, sst=1, sdid=0, version=0, typ=1, dhead=1,
             sc += 1
             counters[int(str(apid))] += 1  # 0 is not allowed for seq cnt
     tc = PUSpack(version=version, typ=typ, dhead=dhead, apid=int(str(apid), 0), gflags=int(str(gflags), 0),
-                 sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, **kwargs)
+                 sc=sc, pktl=pktl, tmv=tmv, ack=int(str(ack), 0), st=st, sst=sst, sdid=sdid, data=data, pktid=pktid, **kwargs)
 
     if chksm is None:
         chksm = crc(tc)
@@ -3817,7 +3823,7 @@ def calc_param_crc(cmd, *args, no_check=False, hack_value=None, **kwargs):
 
 
 def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, ack=0b1001, pool_name='LIVE', tcname=None,
-                   progress=True, calc_crc=True, byte_align=4, dryrun=False):
+                   progress=True, calc_crc=True, byte_align=4, dryrun=False, fmt_override=None):
     """
     Function for loading data to DPU memory. Splits the input _data_ into slices and sequentially sends them
     to the specified location _memid_, _mempos_ by repeatedly calling the _Tcsend_bytes_ function until
@@ -3853,6 +3859,8 @@ def load_to_memory(data, memid, memaddr, max_pkt_size=MAX_PKT_LEN, sleep=0.125, 
 
     # get service 6,2 info from MIB
     apid, memid_ref, fmt, endspares = _get_upload_service_info(tcname)
+    if fmt_override is not None:
+        fmt = fmt_override
     pkt_overhead = TC_HEADER_LEN + struct.calcsize(fmt) + len(endspares) + PEC_LEN
     payload_len = max_pkt_size - pkt_overhead
 
@@ -4190,10 +4198,11 @@ def srec_to_s6(fname, memid, memaddr, segid, tcname=None, linesperpack=50, max_p
         return pckts
 
 
-def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
-                max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
+def upload_srec_segmented(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, linesperpack=50, sleep=0.125,
+                          max_pkt_size=MAX_PKT_LEN, progress=True, image_crc=True):
     """
-    Upload data from an SREC file to _memid_ via S6,2
+    Upload data from an SREC file to _memid_ via S6,2. Data is loaded into segments (IWF DBS layout) whose size is determined by the payload of one S6 packet.
+    For unsegmented format, use the upload_srec function.
 
     :param fname:
     :param memid:
@@ -4295,7 +4304,7 @@ def upload_srec(fname, memid, memaddr, segid, pool_name='LIVE', tcname=None, lin
         return len(upload_bytes), crc(upload_bytes)
 
 
-def segment_data(data, segid, addr, seglen=480):
+def segment_data(data, segid, addr, seglen=464):
     """
     Split data into segments (as defined in IWF DPU HW SW ICD) with segment header and CRC.
     Segment data has to be two-word aligned.
@@ -4532,6 +4541,29 @@ def srec_direct(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname
     if image_crc:
         # return total length of uploaded data (without termination segment) and CRC over entire image, including segment headers
         return len(upload_bytes), crc(upload_bytes)
+
+
+def upload_srec(fname, memid, pool_name='LIVE', max_pkt_size=MAX_PKT_LEN, tcname=None, sleep=0.125, progress=True,
+                image_crc=True, byte_align=2, ack=0b1001, dryrun=False):
+    """
+    Upload data from SREC file directly into memory *memid*.
+
+    :param fname:
+    :param memid:
+    :param pool_name:
+    :param max_pkt_size:
+    :param tcname:
+    :param sleep:
+    :param progress:
+    :param image_crc:
+    :param byte_align:
+    :param ack:
+    :param dryrun:
+    :return:
+    """
+
+    return srec_direct(fname, memid, pool_name=pool_name, max_pkt_size=max_pkt_size, tcname=tcname, sleep=sleep, progress=progress,
+                       image_crc=image_crc, byte_align=byte_align, ack=ack, dryrun=dryrun)
 
 
 def _get_upload_service_info(tcname=None):
@@ -5260,15 +5292,29 @@ def create_hk_decoder(sid, *dp_ids, apid=None):
 
     if apid is None:
         que = 'SELECT pic_apid FROM pic WHERE pic_type=3 AND pic_stype=25'
-        res = scoped_session_idb.execute(que).fetchall()
-        apid = int(res[0][0])
+        res, = scoped_session_idb.execute(que).fetchall()[0]
+        lut_apid = int(res) if res is not None else res
+    else:
+        lut_apid = apid
 
+    try:
+        sid_off, sid_width = SID_LUT[(3, 25, lut_apid)]
+    except KeyError:
+        # try APID agnostic definition
+        logger.info('Using APID agnostic definition in PIC')
+        sid_off, sid_width = SID_LUT[(3, 25, None)]
 
-    sid_off, sid_width = SID_LUT[(3, 25, apid)]
+    if apid is None:
+        que = 'SELECT plf_name, pcf_descr, pid_apid FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
+              'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and plf_offby={}'.format(sid_off)
+    else:
+        que = 'SELECT plf_name, pcf_descr, pid_apid FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
+              'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and PID_APID={} and plf_offby={}'.format(apid, sid_off)
 
-    que = 'SELECT plf_name, pcf_descr FROM pid left join plf on PLF_SPID=PID_SPID left join pcf on ' \
-                'PCF_NAME=PLF_NAME where PID_TYPE=3 and PID_STYPE=25 and PID_APID={} and plf_offby={}'.format(apid, sid_off)
-    sid_name, sid_descr = scoped_session_idb.execute(que).fetchall()[0]
+    try:
+        sid_name, sid_descr, apid = scoped_session_idb.execute(que).fetchall()[0]
+    except IndexError:
+        raise ValueError('APID {} not supported'.format(apid))
 
     if sid_off != TM_HEADER_LEN:
         logger.warning('Inconsistent definition of SID parameter')

@@ -27,7 +27,7 @@ class ParameterMonitor(Gtk.Window):
                     'green': Gdk.RGBA(0.913725, 0.913725, 0.913725, 1.)}
     # parameter_types = {"S": "s", "N": ".3G"}
 
-    def __init__(self, pool_name=None, parameter_set=None, interval=INTERVAL, max_age=MAX_AGE, user_limits=None):
+    def __init__(self, pool_name=None, parameter_set=None, interval=INTERVAL, max_age=MAX_AGE, user_limits=None, strict_apid=False):
         super(ParameterMonitor, self).__init__(title="Parameter Monitor - {} - {}".format(pool_name, parameter_set))
         # Gtk.Window.__init__(self, title="Parameter Monitor - {} - {}".format(pool_name, parameter_set))
         self.set_border_width(10)
@@ -55,6 +55,8 @@ class ParameterMonitor(Gtk.Window):
         self.events = {'Error LOW': [(5, 2), 0], 'Error MEDIUM': [(5, 3), 0], 'Error HIGH': [(5, 4), 0]}
         self.evt_reset_values = {'Error LOW': 0, 'Error MEDIUM': 0, 'Error HIGH': 0}
         self.evt_pkt_idx_last = 0  # last packet idx up to which the evts were counted
+
+        self.strict_apid = strict_apid  # do not tolerate APID mismatch when fetching TM parameters
 
         self.grid = Gtk.Grid()
         self.grid.set_column_homogeneous(True)
@@ -397,7 +399,7 @@ class ParameterMonitor(Gtk.Window):
 
                 if isinstance(pktid[0], tuple):
                     pname = self.pname_from_pktid[pktid]
-                    xy, par = cfl.get_param_values(tmlist=[pkt], hk='User defined', param=pname, last=1, tmfilter=False, mk_array=False)
+                    xy, par = cfl.get_param_values(tmlist=[pkt], hk='User defined', param=pname, last=1, tmfilter=False, mk_array=False, strict_apid=self.strict_apid)
                     udtype = 'user_defined'
                     self.monitored_pkts[pktid]['data'] = {'{}:{}'.format(udtype, par[0]): (xy[0][1], xy[0][1])}
                 else:
@@ -500,7 +502,10 @@ class ParameterMonitor(Gtk.Window):
     def get_last_pkt_with_id(rows, pktid, pidx=0):
         spid, st, sst, apid, pi1, pi1off, pi1wid = pktid
         if pi1off != -1:  # and (pi1off is not None):
-            rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=pi1, idx_from=pidx).order_by(DbTelemetry.idx.desc()).first()
+            if self.strict_apid:
+                rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=pi1, idx_from=pidx).order_by(DbTelemetry.idx.desc()).first()
+            else:
+                rows = cfl.filter_rows(rows, st=st, sst=sst, sid_lu_apid=apid, sid=pi1, idx_from=pidx).order_by(DbTelemetry.idx.desc()).first()
         else:
             rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, idx_from=pidx).order_by(DbTelemetry.idx.desc()).first()
         if rows is None:
@@ -1008,15 +1013,22 @@ class MonitorSetupDialog(Gtk.Dialog):
         # UDEF packets
         udpkts = self.monitor.cfg['ccs-user_defined_packets']
         self.useriter = parameter_model.append(None, ['UDEF packets', None])
+
         for userpacket in udpkts:
             st, sst, apid, sid = map(cfl.str_to_int, userpacket.split('-'))
-            sidinfo = cfl.get_sid(st, sst, apid)
+            try:
+                sidinfo = cfl.get_sid_loc(st, sst, apid)
+            except ValueError:
+                sidinfo = None
+
             if sidinfo is None:
                 self.logger.error('UDEF packet {} not compatible with SID definitions'.format(userpacket))
                 continue
+
             sid_off, sid_bitlen = sidinfo
             pktdef = json.loads(udpkts[userpacket])
             pktiter = parameter_model.append(self.useriter, [pktdef[0], None])
+
             for userpar in pktdef[1]:
                 name = 'UDEF:{}:{}'.format(userpar[1], userpar[0])
                 parameter_model.append(pktiter, [userpar[1], str([name, None, st, sst, apid, sid, sid_off, sid_bitlen])])

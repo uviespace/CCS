@@ -286,7 +286,7 @@ class TestReport:
 
             self.report.update(self._meta)
 
-            self.report['_report_success'] = 'OK'  # OK, NOT_OK, PARTIAL TODO
+            self.report['_report_success'] = 'TBC'  # OK, NOT_OK, PARTIAL TODO
             self.report['_report_remarks'] = ''
             self.report['_report_version'] = self.version
             self.report['_report_mib_version'] = '{}'.format(self.idb_version)
@@ -495,14 +495,20 @@ class TestReportGUI(Gtk.MessageDialog):
 
     def fmt_hdr(self, name, hdr):
 
-        apid, seq, len7, st, sst, cuc = hdr.split('|')
-
-        seq = seq.split(':')[1]
-        st = st.split(':')[1]
-        sst = sst.split(':')[1]
-        cuc = cuc.split(':')[1]
-
-        desc = 'TM({},{}) {} @ {} [{}]'.format(st, sst, name, cuc, seq)
+        try:
+            apid, seq, len7, st, sst, cuc = hdr.split('|')
+            seq = seq.split(':')[1]
+            st = st.split(':')[1]
+            sst = sst.split(':')[1]
+            cuc = cuc.split(':')[1]
+            desc = 'TM({},{}) {} @ {} [{}]'.format(st, sst, name, cuc, seq)
+        except ValueError:
+            # try for TC header
+            apid, seq, len7, st, sst = hdr.split('|')
+            seq = seq.split(':')[1]
+            st = st.split(':')[1]
+            sst = sst.split(':')[1]
+            desc = 'TC({},{}) {} [{}]'.format(st, sst, name, seq)
 
         return desc
 

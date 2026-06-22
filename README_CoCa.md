@@ -1,7 +1,7 @@
 # CcsUvie
 UVIE CCS configured for CoCa
 
-Find the original repository here: https://gitlab.phaidra.org/mecinam2/CCS.git
+Find the original repository here: https://gitlab.phaidra.org/mecinam2/CCS.git. The CCS has since migrated to GitHub.
 
 ## Installation
 Please check the original installation steps.
@@ -20,7 +20,7 @@ Following you can find the steps used to install CCS on **Ubuntu**.
 - sudo apt install python-dbus-dev
 - in contrast to the readme, I use my already installed mysql version (instead of using mariadb)
   * login to mysql (e.g. sudo mysql -u root)
-  * CREATE USER 'ccs'@'localhost' IDENTIFIED BY 'Aik4eeya';
+  * CREATE USER 'ccs'@'localhost' IDENTIFIED BY 'YourPassword';
   * GRANT ALL PRIVILEGES ON * . * TO 'ccs'@'localhost';
   * FLUSH PRIVILEGES;
   * exit;
@@ -29,7 +29,7 @@ Following you can find the steps used to install CCS on **Ubuntu**.
 - pip install -r requirements.txt
 - configure database section in egse.cfg file:
   * line 14: user = ccs
-  * line 16: password = Aik4eeya
+  * line 16: password = YourPassword
   * also have a look into the paths, especially line 5 obsw
   * change line 11: COMETINTERCEPTOR
 - make confignator

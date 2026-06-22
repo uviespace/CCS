@@ -59,7 +59,7 @@ REFRESH_RATE = 1
 
 class PlotViewer(Gtk.Window):
 
-    def __init__(self, loaded_pool, refresh_rate=REFRESH_RATE, parameters=None, start_live=False, **kwargs):
+    def __init__(self, loaded_pool, refresh_rate=REFRESH_RATE, parameters=None, start_live=False, strict_apid=False, **kwargs):
         Gtk.Window.__init__(self)
 
         assert isinstance(loaded_pool, str)
@@ -79,6 +79,8 @@ class PlotViewer(Gtk.Window):
         self.pi1_lut = {}
 
         self._pkt_buffer = {}  # local store for TM packets extracted from SQL DB, for speedup
+
+        self.strict_apid = strict_apid  # do not tolerate APID mismatch when plotting TM parameters
 
         self.cfg = confignator.get_config()
 
@@ -529,7 +531,11 @@ class PlotViewer(Gtk.Window):
             # dbres = dbcon.execute(que)
             # sid_offset, sid_bitlen = dbres.fetchall()[0]
             # dbcon.close()
-            sidinfo = cfl.get_sid(st, sst, apid)
+            try:
+                sidinfo = cfl.get_sid_loc(st, sst, apid)
+            except ValueError:
+                sidinfo = None
+
             if sidinfo:
                 sid_offset, sid_bitlen = sidinfo
                 self.pi1_lut[(st, sst, apid)] = (sid_offset, sid_bitlen)
@@ -615,17 +621,16 @@ class PlotViewer(Gtk.Window):
 
             sid = None
 
-        # Pass the apid parameter to filter_rows - this was the missing piece!
-        self.logger.debug(f"Calling filter_rows with st={st}, sst={sst}, apid={apid}, sid={sid}")
-        rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
-        # Note: Don't set apid = 0 here as it was overriding the correct value
+        if self.strict_apid:
+            rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
+        else:
+            rows = cfl.filter_rows(rows, st=st, sst=sst, sid=sid, sid_lu_apid=apid)
 
         if not self.filter_tl2.get_active():
             rows = cfl.filter_rows(rows, time_from=2.)
             # rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > 2.)
 
         try:
-            # TODO: speedup?
             if hk in self._pkt_buffer:
                 bufidx, pkts = self._pkt_buffer[hk]
 
@@ -642,7 +647,7 @@ class PlotViewer(Gtk.Window):
                     self._pkt_buffer[hk] = (bufidx, pkts)
 
             xy, (descr, unit) = cfl.get_param_values(tmlist=pkts, hk=hk, param=parameter,
-                                                     numerical=True, tmfilter=False, nocal=nocal)
+                                                     numerical=True, tmfilter=False, nocal=nocal, strict_apid=self.strict_apid)
 
             if len(xy) == 0:
                 return
@@ -840,14 +845,15 @@ class PlotViewer(Gtk.Window):
                 # time_last = round(float(xold[-1]), 6)  # np.float64 not properly understood in sql comparison below
                 # new_rows = rows.filter(func.left(DbTelemetry.timestamp, func.length(DbTelemetry.timestamp) - 1) > time_last)
                 pinfo = self.data_dict_info[hk + ':' + parameter]
-                #TODO apid
-                #new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], apid=pinfo['apid'],
-                #                           sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
-                new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
+
+                if self.strict_apid:
+                    new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], apid=pinfo['apid'], sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
+                else:
+                    new_rows = cfl.filter_rows(rows, st=pinfo['st'], sst=pinfo['sst'], sid_lu_apid=pinfo['apid'], sid=pinfo['sid'], idx_from=pinfo['idx_last'] + 1)
 
                 try:
                     # xnew, ynew = cfl.get_param_values([row.raw for row in new_rows], hk, parameter, numerical=True)[0]
-                    xnew, ynew = cfl.get_param_values(tmlist=[row.raw for row in new_rows], hk=hk, param=parameter, numerical=True, tmfilter=False, nocal=nocal)[0]
+                    xnew, ynew = cfl.get_param_values(tmlist=[row.raw for row in new_rows], hk=hk, param=parameter, numerical=True, tmfilter=False, nocal=nocal, strict_apid=self.strict_apid)[0]
                     idx_new = new_rows.order_by(DbTelemetry.idx.desc()).first().idx
                 except ValueError:
                     continue
