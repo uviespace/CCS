@@ -551,7 +551,6 @@ class PlotViewer(Gtk.Window):
         return sid_offset, sid_bitlen // 8
 
     def plot_parameter(self, widget=None, parameter=None):
-
         nocal = not self.calibrate.get_active()
 
         if parameter is not None:
@@ -561,14 +560,18 @@ class PlotViewer(Gtk.Window):
             model, treepath = selection.get_selected()
 
             if treepath is None:
+                self.logger.warning("No parameter selected for plotting")
                 return
 
             parameter = model[treepath][0]
 
             if model[treepath].parent is None:
+                self.logger.warning("Cannot plot service category, please select a specific parameter")
                 return
 
             hk = model[treepath].parent[0]
+
+        self.logger.info(f"Plotting parameter '{parameter}' from HK '{hk}'")
 
         rows = cfl.get_pool_rows(self.loaded_pool.filename)
         rows = self.set_plot_range(rows)
@@ -612,10 +615,10 @@ class PlotViewer(Gtk.Window):
 
             sid = None
 
-        #TODO how to handle different apids?
-        # rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
-        rows = cfl.filter_rows(rows, st=st, sst=sst, sid=sid)
-        apid = 0
+        # Pass the apid parameter to filter_rows - this was the missing piece!
+        self.logger.debug(f"Calling filter_rows with st={st}, sst={sst}, apid={apid}, sid={sid}")
+        rows = cfl.filter_rows(rows, st=st, sst=sst, apid=apid, sid=sid)
+        # Note: Don't set apid = 0 here as it was overriding the correct value
 
         if not self.filter_tl2.get_active():
             rows = cfl.filter_rows(rows, time_from=2.)
@@ -720,6 +723,7 @@ class PlotViewer(Gtk.Window):
 
         self.subplot.set_ylabel('[{}]'.format(unit))
         self.canvas.draw()
+        self.logger.info(f"Successfully plotted parameter '{parameter}'")
 
     def set_plot_range(self, rows):
         try:
