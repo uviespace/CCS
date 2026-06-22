@@ -6220,6 +6220,63 @@ class DbTools:
     """
 
     @staticmethod
+    def db_bulk_insert(filename, processor, bulk_insert_size=1000, brute=False, checkcrc=True, protocol='PUS', pecmode='warn'):
+
+        with open(filename, 'rb') as buf:
+
+            pcktcount = 0
+
+            new_session = scoped_session_storage()
+            new_session.execute('set unique_checks=0,foreign_key_checks=0')
+
+            if protocol == 'PUS':
+                buf = buf.read()
+                if brute:
+                    pckts = extract_pus_brute_search(buf, filename=filename)
+                    checkcrc = False  # CRC already performed during brute_search
+
+                else:
+                    pckts = extract_pus(buf)
+
+                pcktdicts = []
+                for pckt in pckts:
+                    if checkcrc:
+                        if crc_check(pckt):
+                            if pecmode == 'warn':
+                                if len(pckt) > 7:
+                                    logger.info('db_bulk_insert: [CRC error]: packet with seq nr ' + str(
+                                        int(pckt[5:7].hex(), 16)) + '\n')
+                                else:
+                                    logger.info('INVALID packet -- too short' + '\n')
+                            elif pecmode == 'discard':
+                                if len(pckt) > 7:
+                                    logger.info(
+                                        '[CRC error]: packet with seq nr ' + str(
+                                            int(pckt[5:7].hex(), 16)) + ' (discarded)\n')
+                                else:
+                                    logger.info('INVALID packet -- too short' + '\n')
+                                continue
+
+                    tmd = unpack_pus(pckt)
+                    if tmd[0] is None or not hasattr(tmd[0], 'SERV_TYPE'):
+                        logger.warning('db_bulk_insert: skipping undecodable packet #{} ({} bytes)'.format(pcktcount, len(pckt)))
+                        pcktcount += 1
+                        continue
+
+                    pcktdicts.append(processor(tmd, pckt))
+                    pcktcount += 1
+                    if pcktcount % bulk_insert_size == 0:
+                        try:
+                            new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
+                            # new_session.bulk_insert_mappings(DbTelemetry, pcktdicts)
+                            pcktdicts = []
+                        except Exception as err:
+                            new_session.rollback()
+                            new_session.close()
+                            logger.error(err)
+                            raise err
+
+                new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
     def recover_from_db(pool_name=None, iid=None, dump=False):
         """
         Recover TMTC packets not stored on disk from DB
