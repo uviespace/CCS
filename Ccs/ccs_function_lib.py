@@ -6528,9 +6528,9 @@ class DbTools:
             new_session.rollback()
             new_session.close()
             logger.info("Protocol '{}' not supported".format(protocol))
-            loadinfo.log.set_text("Protocol '{}' not supported".format(protocol))
-            loadinfo.spinner.stop()
-            loadinfo.ok_button.set_sensitive(True)
+            GLib.idle_add(loadinfo.log.set_text, "Protocol '{}' not supported".format(protocol))
+            GLib.idle_add(loadinfo.spinner.stop)
+            GLib.idle_add(loadinfo.ok_button.set_sensitive, True)
             return
 
         loadinfo.log.set_text("Parsing file...")
@@ -6540,9 +6540,9 @@ class DbTools:
         # self.pool.decode_tmdump_and_process_packets(pool_info.filename, process_tm, brute=brute)
         new_session.commit()
         logger.info("Loaded %d rows." % (state[0] - 1))
-        loadinfo.log.set_text("Loaded %d rows." % (state[0] - 1))
-        loadinfo.spinner.stop()
-        loadinfo.ok_button.set_sensitive(True)
+        GLib.idle_add(loadinfo.log.set_text, "Loaded %d rows." % (state[0] - 1))
+        GLib.idle_add(loadinfo.spinner.stop)
+        GLib.idle_add(loadinfo.ok_button.set_sensitive, True)
         # Ignore Reply is allowed here, since the instance is passed along
         # pv.Functions('_set_list_and_display_Glib_idle_add', self.active_pool_info, int(self.my_bus_name[-1]), ignore_reply=True)
         # GLib.idle_add(self._set_pool_list_and_display)
@@ -6555,6 +6555,7 @@ class DbTools:
         with open(filename, 'rb') as buf:
 
             pcktcount = 0
+            inv_pktcnt = 0
 
             new_session = scoped_session_storage()
             new_session.execute('set unique_checks=0,foreign_key_checks=0')
@@ -6587,7 +6588,13 @@ class DbTools:
                                     logger.info('INVALID packet -- too short' + '\n')
                                 continue
 
-                    pcktdicts.append(processor(unpack_pus(pckt), pckt))
+                    tmd = unpack_pus(pckt)
+                    if tmd[0] is None or not hasattr(tmd[0], 'SERV_TYPE'):
+                        logger.warning('db_bulk_insert: skipping undecodable packet {}... ({} bytes)'.format(pckt.hex()[:6], len(pckt)))
+                        inv_pktcnt += 1
+                        continue
+
+                    pcktdicts.append(processor(tmd, pckt))
                     pcktcount += 1
                     if pcktcount % bulk_insert_size == 0:
                         try:
@@ -6601,6 +6608,8 @@ class DbTools:
                             raise err
 
                 new_session.execute(DbTelemetry.__table__.insert(), pcktdicts)
+                if inv_pktcnt > 0:
+                    logger.warning('db_bulk_insert: discarded {} corrupted packets'.format(inv_pktcnt))
 
             elif protocol == 'SPW':
                 headers, pckts, remainder = extract_spw(buf)
@@ -6610,10 +6619,15 @@ class DbTools:
 
                 for head, pckt in zip(headers, pckts):
 
-                    if SPW_PROTOCOL_IDS_R[head.bits.PROTOCOL_ID] == 'RMAP':
-                        pcktdicts_rmap.append(processor(head, pckt))
-                    elif SPW_PROTOCOL_IDS_R[head.bits.PROTOCOL_ID] == 'FEEDATA':
-                        pcktdicts_feedata.append(processor(head, pckt))
+                    try:
+                        if SPW_PROTOCOL_IDS_R[head.bits.PROTOCOL_ID] == 'RMAP':
+                            pcktdicts_rmap.append(processor(head, pckt))
+                        elif SPW_PROTOCOL_IDS_R[head.bits.PROTOCOL_ID] == 'FEEDATA':
+                            pcktdicts_feedata.append(processor(head, pckt))
+                    except Exception as err:
+                        logger.warning('Error in processing SpW packet')
+                        logger.debug(err)
+                        continue
 
                     pcktcount += 1
                     if pcktcount % bulk_insert_size == 0:
