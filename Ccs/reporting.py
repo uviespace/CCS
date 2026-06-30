@@ -28,7 +28,7 @@ class TestReport:
     """
     Provides functions for interactive test reporting
     """
-    def __init__(self, specfile, version, idb_version, gui=False, delimiter='|', comments=False, as_json=True, show_code=False):
+    def __init__(self, specfile, version, idb_version, gui=False, delimiter='|', comments=False, as_json=True, flush=False, show_code=False):
         super(TestReport, self).__init__()
         self.specfile = specfile
         self.delimiter = delimiter
@@ -40,6 +40,8 @@ class TestReport:
 
         self.as_json = as_json
         self._show_code = show_code
+
+        self.flush = flush
 
         # column positions in spec file
         self._idx_item = 0
@@ -203,6 +205,8 @@ class TestReport:
 
         if self.as_json:
             self._verify_step_json(step)
+            if self.flush:
+                self.export()
         else:
             self._verify_step_csv(step)
 
@@ -269,7 +273,7 @@ class TestReport:
         else:
             return input(msg + ':\n>')
 
-    def export(self, reportdir=None, reportfile=None, as_json=True):
+    def export(self, reportdir=None, reportfile=None, as_json=True, remarks=""):
         """
 
         :param reportdir:
@@ -287,10 +291,10 @@ class TestReport:
             self.report.update(self._meta)
 
             self.report['_report_success'] = 'TBC'  # OK, NOT_OK, PARTIAL TODO
-            self.report['_report_remarks'] = ''
+            self.report['_report_remarks'] = remarks
             self.report['_report_version'] = self.version
             self.report['_report_mib_version'] = '{}'.format(self.idb_version)
-            self.report['_report_date'] = get_utc()
+            self.report['_report_date'] = get_utc(timespec='seconds')
 
             Path(os.path.dirname(reportfile)).mkdir(parents=True, exist_ok=True)  # create directory if it does not exist
 
@@ -544,5 +548,5 @@ class TestExecGUI(Gtk.MessageDialog):
         self.show_all()
 
 
-def get_utc():
-    return datetime.datetime.isoformat(datetime.datetime.now(datetime.UTC))
+def get_utc(timespec='milliseconds'):
+    return datetime.datetime.isoformat(datetime.datetime.now(datetime.UTC), timespec=timespec)
