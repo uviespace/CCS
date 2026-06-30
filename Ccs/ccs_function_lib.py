@@ -1016,8 +1016,8 @@ def unpack_pus(pckt, use_pktlen=False, logger=logger):
         data = None
         crc = None
 
-    finally:
-        return head_pars, data, crc
+    # finally:
+    return head_pars, data, crc
 
 
 def decode_pus(tm_data, parameters, decode_tc=False):
