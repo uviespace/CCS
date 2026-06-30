@@ -33,7 +33,7 @@ PUS_VERSION = 2  # PUS-C
 MAX_PKT_LEN = 4096  # 1024 for TC
 
 TMTC = {0: 'TM', 1: 'TC'}
-TSYNC_FLAG = {1: 'U', 8: 'S'}
+TSYNC_FLAG = {0: 'U', 2: 'S'}
 
 # names of dynamically set TC header parameters, required if header structure from MIB is used instead of the definitions in this file
 SEQCNT_TAGS = ["SeqCnt"]
