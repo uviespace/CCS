@@ -1147,6 +1147,7 @@ class CcsEditor(Gtk.Window):
         filter_py = Gtk.FileFilter()
         filter_py.set_name("Python Files")
         filter_py.add_mime_type("text/x-python")
+        filter_py.add_pattern("*.py")
         dialog.add_filter(filter_py)
 
         filter_any = Gtk.FileFilter()
