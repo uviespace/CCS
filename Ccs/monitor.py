@@ -498,8 +498,7 @@ class ParameterMonitor(Gtk.Window):
 
                 buf.insert_markup(buf.get_start_iter(), txt, -1)
 
-    @staticmethod
-    def get_last_pkt_with_id(rows, pktid, pidx=0):
+    def get_last_pkt_with_id(self, rows, pktid, pidx=0):
         spid, st, sst, apid, pi1, pi1off, pi1wid = pktid
         if pi1off != -1:  # and (pi1off is not None):
             if self.strict_apid:
