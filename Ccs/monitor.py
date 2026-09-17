@@ -1014,14 +1014,20 @@ class MonitorSetupDialog(Gtk.Dialog):
         self.useriter = parameter_model.append(None, ['UDEF packets', None])
 
         for userpacket in udpkts:
-            st, sst, apid, sid = map(cfl.str_to_int, userpacket.split('-'))
+
+            try:
+                st, sst, apid, sid = map(cfl.str_to_int, userpacket.split('-'))
+            except Exception as e:
+                self.logger.warning('UDEF packet: invalid key {}'.format(userpacket))
+                continue
+
             try:
                 sidinfo = cfl.get_sid_loc(st, sst, apid)
             except ValueError:
                 sidinfo = None
 
             if sidinfo is None:
-                self.logger.error('UDEF packet {} not compatible with SID definitions'.format(userpacket))
+                self.logger.warning('UDEF packet {} not compatible with SID definitions'.format(userpacket))
                 continue
 
             sid_off, sid_bitlen = sidinfo
