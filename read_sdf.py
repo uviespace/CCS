@@ -7,12 +7,24 @@ from pathlib import Path
 # Configuration
 # ============================================================
 
-WIDTH = 1280
-HEIGHT = 1028
-BITS_PER_PIXEL = 12
+# CHANCES SDF wrapper before the CASPEX camera frame header
+CHANCES_HEADER_BYTES = 25
 
-N_PIXELS = WIDTH * HEIGHT
-IMAGE_BYTES = N_PIXELS * BITS_PER_PIXEL // 8
+# CASPEX camera frame header, Table 25 of the camera manual
+CASPEX_HEADER_BYTES = 36
+
+# First byte of packed image data
+PIXEL_DATA_OFFSET = (
+    CHANCES_HEADER_BYTES + CASPEX_HEADER_BYTES
+)
+
+# Detected automatically from the camera header
+WIDTH = None
+HEIGHT = None
+BITS_PER_PIXEL = None
+
+N_PIXELS = None
+IMAGE_BYTES = None
 
 
 # ============================================================
@@ -32,23 +44,30 @@ IMAGE_BYTES = N_PIXELS * BITS_PER_PIXEL // 8
 
 # Grid images
 # filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-10-15-13:24:46/Image_0x0_0x40000000.sdf'
-filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-10-15-13:52:57/Image_0x0_0x40000000.sdf'
+# filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-10-15-13:52:57/Image_0x0_0x40000000.sdf'
 
-# Current image
-# filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-10-16-12:10:20/Image_0x0_0x40000000.sdf'
+# Recent images
+#filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:00:45/Image_0x0_0x40000000.sdf'
+# filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:19:28/Image_0x0_0x40000000.sdf'
+# filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:25:24/Image_0x0_0x40000000.sdf'
+#
+filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:31:33/Image_0x0_0x40000000.sdf'
 
+# filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:38:13/Image_0x0_0x40000000.sdf'
+# filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:45:46/Image_0x0_0x40000000.sdf'
+filename = '/Volumes/Space/Projects/CHANCES/03_Engineering/04_Optical engineering/EM_images/2026-11-06-17:53:24/Image_0x0_0x40000000.sdf'
 
 # ============================================================
-# Read SDF
+# Read SDF and camera header
 # ============================================================
 
 def read_sdf(filename):
-    """
-    Read the complete downloaded SDF file.
 
-    SaveImgsToFile() has already removed the PUS service-168
-    telemetry packet headers before writing this file.
-    """
+    global WIDTH
+    global HEIGHT
+    global BITS_PER_PIXEL
+    global N_PIXELS
+    global IMAGE_BYTES
 
     path = Path(filename)
 
@@ -59,21 +78,149 @@ def read_sdf(filename):
 
     raw = path.read_bytes()
 
-    extra_bytes = len(raw) - IMAGE_BYTES
+    if len(raw) < PIXEL_DATA_OFFSET:
+        raise ValueError(
+            "File is too small to contain the CASPEX header."
+        )
 
+    # --------------------------------------------------------
+    # Extract CASPEX frame header
+    # --------------------------------------------------------
+
+    header = raw[
+        CHANCES_HEADER_BYTES:
+        PIXEL_DATA_OFFSET
+    ]
+
+    # CASPEX Table 25 uses 1-based byte numbering.
+    #
+    # Bytes 1-4:  Frame length
+    # Byte 5:     Data format
+    # Bytes 22-23: Frame width
+    # Bytes 24-25: Frame height
+
+    frame_length = int.from_bytes(
+        header[0:4],
+        byteorder="little"
+    )
+
+    data_format = header[4] & 0x03
+
+    WIDTH = int.from_bytes(
+        header[21:23],
+        byteorder="little"
+    ) & 0x1FFF
+
+    HEIGHT = int.from_bytes(
+        header[23:25],
+        byteorder="little"
+    ) & 0x0FFF
+
+    # CASPEX Table 26:
+    # 1 = 12-bit
+    # 2 = 8-bit
+    # 3 = 24-bit
+
+    format_to_bits = {
+        1: 12,
+        2: 8,
+        3: 24
+    }
+
+    if data_format not in format_to_bits:
+        raise ValueError(
+            f"Unsupported CASPEX data format: {data_format}"
+        )
+
+    BITS_PER_PIXEL = format_to_bits[data_format]
+
+    if WIDTH <= 0 or HEIGHT <= 0:
+        raise ValueError(
+            f"Invalid image dimensions: {WIDTH} x {HEIGHT}"
+        )
+
+    N_PIXELS = WIDTH * HEIGHT
+
+    IMAGE_BYTES = (
+        N_PIXELS * BITS_PER_PIXEL + 7
+    ) // 8
+
+    # --------------------------------------------------------
+    # Check image length
+    # --------------------------------------------------------
+
+    available_bytes = (
+        len(raw) - PIXEL_DATA_OFFSET
+    )
+
+    missing_bytes = (
+        IMAGE_BYTES - available_bytes
+    )
+
+    print()
     print("=" * 70)
     print("FILE")
     print("=" * 70)
 
     print(f"File:                  {path.name}")
     print(f"File size:             {len(raw):,} bytes")
-    print(f"Expected image bytes:  {IMAGE_BYTES:,} bytes")
-    print(f"Extra bytes:           {extra_bytes:,} bytes")
 
-    if len(raw) < IMAGE_BYTES:
+    print()
+    print("=" * 70)
+    print("CASPEX FRAME HEADER")
+    print("=" * 70)
+
+    print(f"Frame length:          {frame_length:,} bytes")
+    print(f"Data format:           {data_format}")
+    print(f"Width:                 {WIDTH} pixels")
+    print(f"Height:                {HEIGHT} pixels")
+    print(f"Bits per pixel:        {BITS_PER_PIXEL}")
+
+    print()
+    print("=" * 70)
+    print("IMAGE DATA")
+    print("=" * 70)
+
+    print(f"Pixel data offset:     {PIXEL_DATA_OFFSET} bytes")
+    print(f"Expected image bytes:  {IMAGE_BYTES:,}")
+    print(f"Available image bytes: {available_bytes:,}")
+    print(f"Missing image bytes:   {max(0, missing_bytes):,}")
+
+    # The frame-length field should describe the camera
+    # header plus its image payload.
+
+    expected_frame_length = (
+        CASPEX_HEADER_BYTES + IMAGE_BYTES
+    )
+
+    if frame_length != expected_frame_length:
         raise ValueError(
-            f"File is too small for a "
-            f"{WIDTH} x {HEIGHT} x {BITS_PER_PIXEL}-bit image."
+            "CASPEX frame length does not match "
+            "the dimensions and pixel format.\n"
+            f"Header declares: {frame_length:,} bytes\n"
+            f"Expected:        {expected_frame_length:,} bytes"
+        )
+
+    if missing_bytes > 1:
+        raise ValueError(
+            f"Image is missing {missing_bytes:,} bytes. "
+            "Refusing to decode a potentially incomplete image."
+        )
+
+    if missing_bytes == 1:
+        print()
+        print(
+            "WARNING: The image is missing its final byte."
+        )
+        print(
+            "The affected final pixel will be marked invalid."
+        )
+
+    if missing_bytes < 0:
+        print()
+        print(
+            f"NOTE: {abs(missing_bytes)} trailing byte(s) "
+            "exist after the expected image data."
         )
 
     return raw
@@ -85,34 +232,36 @@ def read_sdf(filename):
 
 def decode_12bit(data):
     """
-    Decode CASPEX-SWIR packed 12-bit image data.
+    Decode the packed 12-bit format specified in
+    CASPEX Table 26.
 
-    According to the CASPEX camera manual:
+    Three bytes encode two pixels.
 
-        Byte 0 = Pixel_n[7:0]
-
-        Byte 1:
-            bits 3..0 = Pixel_n[11:8]
-            bits 7..4 = Pixel_n+1[3:0]
-
-        Byte 2 = Pixel_n+1[11:4]
-
-    Therefore:
-
-        Pixel_n =
-            byte0 | ((byte1 & 0x0F) << 8)
-
-        Pixel_n+1 =
-            (byte2 << 4) | (byte1 >> 4)
-
-    3 input bytes -> 2 x 12-bit pixels.
+    An incomplete final group is handled explicitly.
     """
 
-    if len(data) != IMAGE_BYTES:
+    if BITS_PER_PIXEL != 12:
         raise ValueError(
-            f"Decoder received {len(data):,} bytes, "
-            f"expected {IMAGE_BYTES:,}."
+            f"This decoder supports 12-bit data, "
+            f"but the header specifies {BITS_PER_PIXEL} bits."
         )
+
+    if len(data) > IMAGE_BYTES:
+        data = data[:IMAGE_BYTES]
+
+    missing = IMAGE_BYTES - len(data)
+
+    if missing < 0 or missing > 1:
+        raise ValueError(
+            f"Unexpected image-data length: {len(data):,}"
+        )
+
+    # Pad one missing final byte only to allow decoding.
+    # The pixel affected by the missing byte is then
+    # explicitly marked NaN.
+
+    if missing == 1:
+        data = data + b"\x00"
 
     groups = np.frombuffer(
         data,
@@ -141,157 +290,16 @@ def decode_12bit(data):
     pixels[0::2] = p0
     pixels[1::2] = p1
 
-    return pixels.reshape(
+    image = pixels.reshape(
         HEIGHT,
         WIDTH
     )
 
+    if missing == 1:
+        image = image.astype(np.float32)
+        image[-1, -1] = np.nan
 
-# ============================================================
-# Evaluate candidate image
-# ============================================================
-
-def evaluate_image(image):
-    """
-    Measure spatial continuity of a decoded image.
-
-    This is used only to compare possible starting offsets.
-
-    Lower score means neighboring pixels are, on average,
-    more similar.
-    """
-
-    x = image.astype(np.int32)
-
-    dx = np.diff(x, axis=1)
-    dy = np.diff(x, axis=0)
-
-    median_dx = np.median(
-        np.abs(dx)
-    )
-
-    median_dy = np.median(
-        np.abs(dy)
-    )
-
-    mean_dx = np.mean(
-        np.abs(dx)
-    )
-
-    mean_dy = np.mean(
-        np.abs(dy)
-    )
-
-    score = median_dx + median_dy
-
-    return {
-        "score": score,
-        "median_dx": median_dx,
-        "median_dy": median_dy,
-        "mean_dx": mean_dx,
-        "mean_dy": mean_dy,
-        "mean": image.mean(),
-        "std": image.std(),
-    }
-
-
-# ============================================================
-# Search image-data offset
-# ============================================================
-
-def find_image_offset(raw):
-    """
-    Search every possible contiguous image start.
-
-    The current SDF files contain 60 bytes more than the
-    expected packed image size.
-
-    We do NOT assume those 60 bytes are all a header.
-
-    Instead, every possible offset is tested with the
-    specified CASPEX 12-bit decoder.
-
-    The candidate with the best spatial continuity is returned.
-
-    NOTE:
-    This is a diagnostic heuristic, not proof of the SDF format.
-    """
-
-    max_offset = len(raw) - IMAGE_BYTES
-
-    print()
-    print("=" * 95)
-    print("PIXEL DATA OFFSET SEARCH")
-    print("=" * 95)
-
-    print(
-        f"Testing offsets 0 .. {max_offset}"
-    )
-
-    results = []
-
-    for offset in range(max_offset + 1):
-
-        end = offset + IMAGE_BYTES
-
-        data = raw[offset:end]
-
-        if len(data) != IMAGE_BYTES:
-            continue
-
-        image = decode_12bit(data)
-
-        metrics = evaluate_image(image)
-
-        results.append({
-            "offset": offset,
-            **metrics,
-        })
-
-    results.sort(
-        key=lambda r: r["score"]
-    )
-
-    print()
-    print(
-        "rank  offset   score   med_dx   med_dy"
-        "   mean_dx   mean_dy    mean      std"
-    )
-
-    print("-" * 95)
-
-    # Show the 20 best candidates
-    for rank, result in enumerate(
-        results[:20],
-        start=1
-    ):
-        print(
-            f"{rank:4d}"
-            f"{result['offset']:8d}"
-            f"{result['score']:8.1f}"
-            f"{result['median_dx']:9.1f}"
-            f"{result['median_dy']:9.1f}"
-            f"{result['mean_dx']:10.1f}"
-            f"{result['mean_dy']:10.1f}"
-            f"{result['mean']:9.1f}"
-            f"{result['std']:9.1f}"
-        )
-
-    best = results[0]
-
-    print()
-    print("=" * 70)
-    print("BEST OFFSET CANDIDATE")
-    print("=" * 70)
-
-    print(f"Offset:       {best['offset']} bytes")
-    print(f"Score:        {best['score']:.1f}")
-    print(f"Median |dx|:  {best['median_dx']:.1f}")
-    print(f"Median |dy|:  {best['median_dy']:.1f}")
-    print(f"Mean |dx|:    {best['mean_dx']:.1f}")
-    print(f"Mean |dy|:    {best['mean_dy']:.1f}")
-
-    return best["offset"], results
+    return image
 
 
 # ============================================================
@@ -299,17 +307,27 @@ def find_image_offset(raw):
 # ============================================================
 
 def print_image_statistics(image):
-    """
-    Print basic statistics for the decoded image.
-    """
 
-    mean = np.mean(image)
-    median = np.median(image)
-    std = np.std(image)
+    valid = image[np.isfinite(image)]
+
+    if valid.size == 0:
+        raise ValueError(
+            "Image contains no valid pixels."
+        )
+
+    mean = np.mean(valid)
+    median = np.median(valid)
+    std = np.std(valid)
+
+    minimum = np.min(valid)
+    maximum = np.max(valid)
 
     saturated = (
-        100.0
-        * np.mean(image == 4095)
+        100.0 * np.mean(valid == 4095)
+    )
+
+    invalid = np.count_nonzero(
+        ~np.isfinite(image)
     )
 
     print()
@@ -318,12 +336,13 @@ def print_image_statistics(image):
     print("=" * 70)
 
     print("Shape:       ", image.shape)
-    print("Minimum:     ", image.min())
-    print("Maximum:     ", image.max())
+    print("Minimum:     ", minimum)
+    print("Maximum:     ", maximum)
     print("Mean:        ", mean)
     print("Median:      ", median)
     print("Std:         ", std)
     print("Saturated:   ", f"{saturated:.4f} %")
+    print("Invalid:     ", invalid)
 
     return mean, median, std, saturated
 
@@ -341,12 +360,11 @@ def plot_image(
     std,
     saturated
 ):
-    """
-    Display the decoded image and its histogram.
-    """
+
+    valid = image[np.isfinite(image)]
 
     vmin, vmax = np.percentile(
-        image,
+        valid,
         [1, 99]
     )
 
@@ -374,7 +392,9 @@ def plot_image(
         cmap="gray",
         vmin=vmin,
         vmax=vmax,
-        origin="upper"
+        origin="upper",
+        interpolation="nearest",
+        aspect="equal"
     )
 
     fig.colorbar(
@@ -385,23 +405,20 @@ def plot_image(
 
     ax_img.set_title(
         f"CHANCES SDF\n"
-        f"CASPEX 12-bit decoder, offset {offset}"
+        f"{WIDTH} x {HEIGHT}, "
+        f"{BITS_PER_PIXEL}-bit, "
+        f"offset {offset}"
     )
 
-    ax_img.set_xlabel(
-        "X pixel"
-    )
-
-    ax_img.set_ylabel(
-        "Y pixel"
-    )
+    ax_img.set_xlabel("X pixel")
+    ax_img.set_ylabel("Y pixel")
 
     # --------------------------------------------------------
     # Histogram
     # --------------------------------------------------------
 
     ax_hist.hist(
-        image.ravel(),
+        valid,
         bins=256,
         range=(0, 4096)
     )
@@ -418,23 +435,11 @@ def plot_image(
         label=f"Mean = {mean:.1f}"
     )
 
-    ax_hist.set_xlim(
-        0,
-        4096
-    )
+    ax_hist.set_xlim(0, 4096)
 
-    ax_hist.set_xlabel(
-        "12-bit DN"
-    )
-
-    ax_hist.set_ylabel(
-        "Number of pixels"
-    )
-
-    ax_hist.set_title(
-        "Pixel histogram"
-    )
-
+    ax_hist.set_xlabel("12-bit DN")
+    ax_hist.set_ylabel("Number of pixels")
+    ax_hist.set_title("Pixel histogram")
     ax_hist.legend()
 
     # --------------------------------------------------------
@@ -442,9 +447,11 @@ def plot_image(
     # --------------------------------------------------------
 
     stats = (
+        f"Dimensions: {WIDTH} x {HEIGHT}\n"
+        f"Bit depth: {BITS_PER_PIXEL}\n"
         f"Offset: {offset} bytes\n"
-        f"Min: {image.min()}\n"
-        f"Max: {image.max()}\n"
+        f"Min: {np.min(valid):.0f}\n"
+        f"Max: {np.max(valid):.0f}\n"
         f"Mean: {mean:.1f}\n"
         f"Median: {median:.1f}\n"
         f"Std: {std:.1f}\n"
@@ -482,41 +489,35 @@ def plot_image(
     plt.show()
 
 
-
 # ============================================================
 # Entry point
 # ============================================================
 
 if __name__ == "__main__":
+
     # --------------------------------------------------------
-    # Read file
+    # Read SDF and detect image configuration
     # --------------------------------------------------------
 
     raw = read_sdf(filename)
 
     # --------------------------------------------------------
-    # Find candidate start of packed pixels
-    # --------------------------------------------------------
-
-    offset, results = find_image_offset(raw)
-
-    # --------------------------------------------------------
-    # Extract image bytes
+    # Extract packed image data
     # --------------------------------------------------------
 
     data = raw[
-        offset:
-        offset + IMAGE_BYTES
+        PIXEL_DATA_OFFSET:
+        PIXEL_DATA_OFFSET + IMAGE_BYTES
     ]
 
     # --------------------------------------------------------
-    # Decode using CASPEX specified 12-bit packing
+    # Decode image
     # --------------------------------------------------------
 
     image = decode_12bit(data)
 
     # --------------------------------------------------------
-    # Statistics
+    # Image statistics
     # --------------------------------------------------------
 
     mean, median, std, saturated = (
@@ -524,13 +525,13 @@ if __name__ == "__main__":
     )
 
     # --------------------------------------------------------
-    # Plot
+    # Plot image
     # --------------------------------------------------------
 
     plot_image(
         image=image,
         filename=filename,
-        offset=offset,
+        offset=PIXEL_DATA_OFFSET,
         mean=mean,
         median=median,
         std=std,
