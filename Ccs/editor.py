@@ -186,6 +186,9 @@ class IPythonTerminal(Vte.Terminal):
 
     def __init__(self, scrollback_lines, *args, **kwds):
         super(IPythonTerminal, self).__init__(*args, **kwds)
+        self.connect('key-press-event', self._on_terminal_key_press)
+        self.connect('button-press-event', self._on_terminal_button_press)
+        self.connect('popup-menu', self._on_terminal_popup_menu)
         self.spawn_async(
             Vte.PtyFlags.DEFAULT,  # Pty Flags
             None,  # Working DIR
@@ -197,6 +200,53 @@ class IPythonTerminal(Vte.Terminal):
             None,  # Cancellable
             None,  # Callback
             None)  # User Data
+
+    def _on_terminal_key_press(self, widget, event):
+        modifiers = event.state & Gtk.accelerator_get_default_mod_mask()
+        control = Gdk.ModifierType.CONTROL_MASK
+        shift = Gdk.ModifierType.SHIFT_MASK
+        key = Gdk.keyval_to_lower(event.keyval)
+        if modifiers == control | shift and key == Gdk.KEY_c:
+            self.copy_clipboard()
+            return True
+        if modifiers == control and key == Gdk.KEY_a:
+            self.select_all()
+            return True
+        if modifiers == control and key == Gdk.KEY_c:
+            # Preserve terminal interrupt even when the editor's Copy accelerator
+            # would otherwise consume Ctrl+C before VTE receives it.
+            self.feed_child_compat('\x03')
+            return True
+        return False
+
+    def _show_terminal_menu(self, event=None):
+        menu = Gtk.Menu()
+        copy = Gtk.MenuItem.new_with_label('Copy')
+        copy.set_sensitive(self.get_has_selection())
+        copy.connect('activate', lambda item: self.copy_clipboard())
+        menu.append(copy)
+        select_all = Gtk.MenuItem.new_with_label('Select All')
+        select_all.connect('activate', lambda item: self.select_all())
+        menu.append(select_all)
+        menu.attach_to_widget(self, None)
+        menu.connect('selection-done', lambda widget: widget.destroy())
+        menu.show_all()
+        if event is None:
+            menu.popup_at_widget(self, Gdk.Gravity.CENTER, Gdk.Gravity.CENTER, None)
+        else:
+            menu.popup_at_pointer(event)
+
+    def _on_terminal_button_press(self, widget, event):
+        if event.button == 3:
+            # Consume the event so right-click keeps the existing selection.
+            self.grab_focus()
+            self._show_terminal_menu(event)
+            return True
+        return False
+
+    def _on_terminal_popup_menu(self, widget):
+        self._show_terminal_menu()
+        return True
 
     def feed_child_compat(self, msg, msglen=None):
         """
@@ -520,6 +570,14 @@ class CcsEditor(Gtk.Window):
 
     def tcpserver_shutdown(self, widget=None, event=None):
         self.tcpserver.shutdown()
+
+    def do_key_press_event(self, event):
+        # Window accelerators run before child key handlers. Route terminal
+        # shortcuts first, so Copy acts on logs and Ctrl+C still interrupts.
+        if self.get_focus() == self.ipython_view:
+            if self.ipython_view._on_terminal_key_press(self.ipython_view, event):
+                return True
+        return Gtk.Window.do_key_press_event(self, event)
 
     def key_pressed(self, widget=None, event=None):
         if event.state & Gdk.ModifierType.CONTROL_MASK == Gdk.ModifierType.CONTROL_MASK:
