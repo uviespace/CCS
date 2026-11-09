@@ -1,0 +1,27 @@
+{
+  "name": "CCS",
+  "dockerComposeFile": "compose.yaml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "ubuntu",
+  "updateRemoteUserUID": true,
+  "overrideCommand": false,
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "jetbrains": {
+      "plugins": [
+        "com.intellij.ml.llm"
+      ]
+    },
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true,
+        "python.defaultInterpreterPath": "/opt/venv/bin/python"
+      },
+      "extensions": [
+        "openai.chatgpt",
+        "ms-python.python"
+      ]
+    }
+  }
+}
