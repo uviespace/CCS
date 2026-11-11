@@ -26,7 +26,7 @@ def run():
         init_script = cfg.get('ccs-init', 'init_script')
         if init_script != '':
             init_cmd = 'exec(open("{}","r").read())\n'.format(init_script)
-            win.ipython_view.feed_child(init_cmd, len(init_cmd))
+            win.ipython_view.feed_child_compat(init_cmd)
 
     DBusGMainLoop(set_as_default=True)
     if files_to_open:

@@ -24,6 +24,7 @@ if not config.read(source):
     raise SystemExit(f"Could not read {source}")
 
 config.set("database", "password", password)
+config.set("database", "mib-schema", "mib_schema_coca")
 destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
 with destination.open("w") as stream:
     config.write(stream)
