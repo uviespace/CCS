@@ -14,6 +14,8 @@ import threading
 import pickle
 import confignator
 import os
+from editor_sidebar import EditorSidebar
+from editor_file_watch import OpenFileWatcher
 
 import dbus
 import dbus.service
@@ -312,7 +314,13 @@ class CcsEditor(Gtk.Window):
         self.sourcemarks = {}
         self.create_mark_attributes()
 
-        self.grid.attach(self.editor_notebook, 0, 3, 3, 1)
+        self.editor_sidebar = EditorSidebar(self)
+        self.file_watcher = OpenFileWatcher(self)
+        editor_paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        editor_paned.pack1(self.editor_sidebar, resize=False, shrink=False)
+        editor_paned.pack2(self.editor_notebook, resize=True, shrink=False)
+        editor_paned.set_position(280)
+        self.grid.attach(editor_paned, 0, 3, 3, 1)
 
         if self.cfg.has_option('ccs-editor', 'color_scheme'):
             self._update_style_schemes(self.cfg.get('ccs-editor', 'color_scheme'))
@@ -755,7 +763,6 @@ class CcsEditor(Gtk.Window):
         action = Gtk.Action(name="FileSaveAs", label="_Save As", tooltip=None, stock_id=Gtk.STOCK_SAVE_AS)
         action.connect("activate", self.on_menu_file_saveas)
         action_group.add_action_with_accel(action, "<control><shift>S")
-        action_group.add_action(action)
 
         action = Gtk.Action(name="FileQuit", label="_Quit", tooltip=None, stock_id=Gtk.STOCK_QUIT)
         action.connect("activate", self.on_menu_file_quit)
@@ -771,7 +778,7 @@ class CcsEditor(Gtk.Window):
 
         action = Gtk.Action(name="EditRedo", label="Red_o", tooltip=None, stock_id=Gtk.STOCK_REDO)
         action.connect("activate", self._on_redo)
-        action_group.add_action_with_accel(action, "<control>Y")
+        action_group.add_action_with_accel(action, "<control><shift>Z")
 
         action = Gtk.Action(name="EditCut", label="Cu_t", tooltip=None, stock_id=Gtk.STOCK_CUT)
         action.connect("activate", self._on_cut)
@@ -1136,6 +1143,7 @@ class CcsEditor(Gtk.Window):
         with open(filename, 'w') as fdesc:
             fdesc.write(text)
             fdesc.close()
+        self.file_watcher.track(nb_page, filename)
 
     """
     It would be nicer to extract the child by type rather than explicitly by its
@@ -1408,6 +1416,8 @@ class CcsEditor(Gtk.Window):
                 label = self._notebookt_current_get_label()
                 label.set_text(label.get_text().strip('*'))
                 buf.connect('changed', self._notebook_buffer_modified, None, label)
+
+                self.file_watcher.track(sourceview.get_parent(), filename)
 
                 self._parse_editor_commands(buf)
                 view = self._get_active_view()

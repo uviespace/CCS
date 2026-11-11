@@ -31,6 +31,13 @@ To check GTK forwarding from a terminal in the container:
 python .devcontainer/gtk_smoke_test.py
 ```
 
+The container's preconfigured Python environment is `/opt/venv`. If a terminal
+activates a repository-local `.venv` instead, use `source /opt/venv/bin/activate`
+before running `./start_ccs`. A separate environment must be created with
+`/usr/bin/python3 -m venv --system-site-packages .venv` so it can import the
+container's system-installed GTK (`gi`) and D-Bus bindings. For an existing
+`.venv`, set `include-system-site-packages = true` in `.venv/pyvenv.cfg`.
+
 ## Codex app server
 
 Codex listens on container port 4500 and is published only on the host loopback
