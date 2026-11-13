@@ -11,7 +11,7 @@ import json
 import gi
 gi.require_version('Gtk', '3.0')
 
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GLib
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -257,7 +257,7 @@ class TestReport:
             elif response == Gtk.ResponseType.NO:
                 result = 'NOT_OK'
             else:
-                comment = ''
+                # comment = ''
                 result = ''
 
             if self.as_json:
@@ -273,7 +273,7 @@ class TestReport:
         else:
             return input(msg + ':\n>')
 
-    def export(self, reportdir=None, reportfile=None, as_json=True, remarks=""):
+    def export(self, reportdir=None, reportfile=None, as_json=True, remarks="", summary_dialog=True):
         """
 
         :param reportdir:
@@ -290,8 +290,23 @@ class TestReport:
 
             self.report.update(self._meta)
 
-            self.report['_report_success'] = 'TBC'  # OK, NOT_OK, PARTIAL TODO
-            self.report['_report_remarks'] = remarks
+            if not self._confirm_overwrite(reportfile):
+                return
+
+            if summary_dialog:
+                dialog = TestSummaryGUI(self.testname, reportfile)
+                response = dialog.run()
+                outcome = dialog.get_outcome()
+                remarks = dialog.get_remarks()
+                dialog.destroy()
+
+                if response != Gtk.ResponseType.OK:
+                    return
+            else:
+                outcome = "TBC"
+
+            self.report['_report_success'] = outcome.strip()  # PASS, PART, FAIL
+            self.report['_report_remarks'] = remarks.strip()
             self.report['_report_version'] = self.version
             self.report['_report_mib_version'] = '{}'.format(self.idb_version)
             self.report['_report_date'] = get_utc(timespec='seconds')
@@ -308,6 +323,9 @@ class TestReport:
                 else:
                     reportfile = os.path.join(reportdir, os.path.basename(self.specfile).replace('.csv_PIPE', '-TR-{:03d}.csv_PIPE'.format(self.version)))
 
+            if not self._confirm_overwrite(reportfile):
+                return
+
             self.report[1][3] += ' TR-{:03d}, MIB v{}'.format(self.version, self.idb_version)
             self.report[2][3] = time.strftime('%Y-%m-%d')
 
@@ -320,6 +338,39 @@ class TestReport:
 
         logger.info('Report written to {}.'.format(reportfile))
         print('Report written to {}.'.format(reportfile))
+
+    def _confirm_overwrite(self, reportfile):
+        """
+        Ask for confirmation before overwriting an existing report file.
+
+        :param reportfile: path of the report file that is about to be written
+        :return: True if the report may be written, False otherwise
+        """
+        if not os.path.exists(reportfile):
+            return True
+
+        if self.gui:
+            dialog = Gtk.MessageDialog(
+                title='{} - Overwrite report?'.format(self.testname),
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                         Gtk.STOCK_YES, Gtk.ResponseType.YES),
+            )
+            dialog.set_markup('<b>Report file already exists</b>')
+            dialog.format_secondary_markup(
+                'Do you want to overwrite:\n<tt>{}</tt>?'.format(
+                    GLib.markup_escape_text(str(reportfile))
+                )
+            )
+            dialog.set_default_response(Gtk.ResponseType.CANCEL)
+            response = dialog.run()
+            dialog.destroy()
+            return response == Gtk.ResponseType.YES
+
+        answer = input('Report file {} already exists. Overwrite? (y/n)? > '.format(reportfile))
+        while answer.strip().lower() not in ('y', 'yes', 'n', 'no'):
+            answer = input('Overwrite? (y/n)? > ')
+        return answer.strip().lower() in ('y', 'yes')
 
 
 class TestReportGUINoTm(Gtk.MessageDialog):
@@ -546,6 +597,92 @@ class TestExecGUI(Gtk.MessageDialog):
         exe.grab_focus()
 
         self.show_all()
+
+
+class TestSummaryGUI(Gtk.MessageDialog):
+    """
+    Dialog window to capture test summary
+    """
+
+    def __init__(self, testlabel, reportfile):
+        super().__init__(title='{} - Test Summary'.format(testlabel), skip_taskbar_hint=False)
+
+        self.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+
+        self.set_markup(
+            '\n<span size="large">End of test <b>{}</b></span>'.format(
+                GLib.markup_escape_text(str(testlabel))
+            )
+        )
+        if reportfile:
+            self.format_secondary_markup(
+                '<span foreground="#808080">This report will be saved as: {}</span>'.format(
+                    GLib.markup_escape_text(str(reportfile))
+                )
+            )
+
+        self.set_resizable(True)
+        self.set_default_size(520, 320)
+        self.set_border_width(5)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+        outcome_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        outcome_row.set_halign(Gtk.Align.CENTER)
+
+        pass_btn = Gtk.RadioButton.new_with_label_from_widget(None, 'PASS')
+        part_btn = Gtk.RadioButton.new_with_label_from_widget(pass_btn, 'PART')
+        fail_btn = Gtk.RadioButton.new_with_label_from_widget(pass_btn, 'FAIL')
+        fail_btn.set_active(True)
+
+        self.outcome_buttons = {
+            'PASS': pass_btn,
+            'PART': part_btn,
+            'FAIL': fail_btn,
+        }
+
+        outcome_colors = {
+            'PASS': '#2e7d32',
+            'PART': '#e65100',
+            'FAIL': '#c62828',
+        }
+
+        for label, button in self.outcome_buttons.items():
+            button.get_child().set_markup(
+                '<span foreground="{}" size="large" weight="bold">{}</span>'.format(
+                    outcome_colors[label], label
+                )
+            )
+            outcome_row.pack_start(button, False, False, 0)
+
+        box.pack_start(outcome_row, False, False, 0)
+
+        box.pack_start(Gtk.Label(label='Remarks', xalign=0), False, False, 0)
+
+        self.remarks_view = Gtk.TextView()
+        self.remarks_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self.remarks_view.set_accepts_tab(False)
+
+        self.remarks_scroll = Gtk.ScrolledWindow()
+        self.remarks_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.remarks_scroll.set_min_content_height(80)
+        self.remarks_scroll.add(self.remarks_view)
+
+        box.pack_start(self.remarks_scroll, True, True, 0)
+        self.get_content_area().pack_start(box, True, True, 0)
+
+        self.show_all()
+        fail_btn.grab_focus()
+
+    def get_outcome(self):
+        for label, button in self.outcome_buttons.items():
+            if button.get_active():
+                return label
+        return ''
+
+    def get_remarks(self):
+        buf = self.remarks_view.get_buffer()
+        return buf.get_text(buf.get_start_iter(), buf.get_end_iter(), True)
 
 
 def get_utc(timespec='milliseconds'):
