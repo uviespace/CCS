@@ -4609,30 +4609,37 @@ def _get_upload_service_info(tcname=None):
 
 
 def get_tc_list(ccf_descr=None, ccf_cname=None):
+def get_tc_list(ccf_descr=None, ccf_cname=None, varflag=False):
     """
 
     :param ccf_descr:
     :return:
     """
+
+    if varflag:
+        varstr = ", cdf_grpsize"
+    else:
+        varstr = ""
+
     if ccf_cname is not None:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
-                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'cpc_radix{} FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
-                                          'WHERE ccf_cname="{}"'.format(ccf_cname)).fetchall()
+                                          'WHERE ccf_cname="{}"'.format(varstr, ccf_cname)).fetchall()
 
     elif ccf_descr is None:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
-                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'cpc_radix{} FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
-                                          'ORDER BY SUBSTRING(ccf_cname, 1, 2), ccf_type, ccf_stype, ccf_cname').fetchall()
+                                          'ORDER BY SUBSTRING(ccf_cname, 1, 2), ccf_type, ccf_stype, ccf_cname'.format(varstr)).fetchall()
     else:
         cmds = scoped_session_idb.execute('SELECT ccf_cname, ccf_descr, ccf_descr2, ccf_type, ccf_stype, ccf_npars, '
                                           'cpc_descr, cpc_dispfmt, cdf_eltype, cpc_pname, cdf_value, cpc_inter, '
-                                          'cpc_radix FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
+                                          'cpc_radix{} FROM ccf LEFT JOIN cdf ON cdf.cdf_cname=ccf.ccf_cname '
                                           'LEFT JOIN cpc ON cpc.cpc_pname=cdf.cdf_pname '
-                                          'WHERE ccf_descr="{}"'.format(ccf_descr)).fetchall()
+                                          'WHERE ccf_descr="{}"'.format(varstr, ccf_descr)).fetchall()
 
     scoped_session_idb.close()
 
@@ -4917,7 +4924,7 @@ def get_dp_fmt_info(dp_name):
 #         raise NotImplementedError
 
 
-def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None):
+def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None, varflag=False):
     """
 
     :param ccf_descr:
@@ -4933,21 +4940,21 @@ def make_tc_template(ccf_descr, pool_name=None, preamble='cfl.Tcsend_DB', option
         try:
             ncmds = len(list(get_tc_list(ccf_descr=ccf_descr).items()))
             if ncmds > 1:
-                cmd, pars = list(get_tc_list(ccf_cname=cname).items())[0]
+                cmd, pars = list(get_tc_list(ccf_cname=cname, varflag=varflag).items())[0]
                 return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment,
-                                   add_parcfg=add_parcfg, cname=cname)
+                                   add_parcfg=add_parcfg, cname=cname, varflag=varflag)
         except IndexError:
             raise IndexError('"{}" not found in IDB.'.format(cname))
 
     try:
-        cmd, pars = list(get_tc_list(ccf_descr).items())[0]
+        cmd, pars = list(get_tc_list(ccf_descr, varflag=varflag).items())[0]
     except IndexError:
         raise IndexError('"{}" not found in IDB.'.format(ccf_descr))
     # print(tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=True))
-    return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment, add_parcfg=add_parcfg)
+    return tc_template(cmd, pars, pool_name=pool_name, preamble=preamble, options=options, comment=comment, add_parcfg=add_parcfg, varflag=varflag)
 
 
-def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None):
+def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='', comment=True, add_parcfg=False, cname=None, varflag=False):
     """
 
     :param cmd:
@@ -4971,8 +4978,14 @@ def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='',
         pool_name = 'POOLNAME'
 
     parcfg = ''
+    itlv = []
+    nested = 0
     if add_parcfg:
         for par in pars:
+            if varflag and par[7] is not None and par[7] > 0:
+                # is variable length TC, use "interleave" template
+                itlv.append(par[7])
+                nested += 1
             if par[2] == 'E':
                 if par[4] is not None:
                     if par[5] == 'E':
@@ -4983,6 +4996,14 @@ def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='',
                         parval = par[4]
                 else:
                     parval = par[4]
+
+                if varflag and par[7] is not None and nested > 0:
+                    nbrac = nested - 1 if par[7] > 0 else nested
+                    parval = nbrac*"[" + f"{parval}" + nbrac*"]"
+                    if itlv[nested-1] == 0:
+                        nested -= 1
+                    itlv[nested-1] -= 1
+
                 line = '{} = {}  # {}\n'.format(par[0], parval, par[3])
             elif par[2] == 'F':
                 line = '# {} = {}  # {} [NOT EDITABLE]\n'.format(par[0], par[4], par[3])
@@ -4990,7 +5011,7 @@ def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='',
                 line = ''
             parcfg += line
 
-    parstr = ', '.join(parsinfo_to_str(pars))
+    parstr = ', '.join(parsinfo_to_str(pars, varflag=varflag))
     if len(parstr) > 0:
         parstr = ', ' + parstr
     if cname is not None:
@@ -5001,7 +5022,7 @@ def tc_template(cmd, pars, pool_name=None, preamble='cfl.Tcsend_DB', options='',
     return commentstr + parcfg + exe + newline
 
 
-def parsinfo_to_str(pars, separator=None):
+def parsinfo_to_str(pars, separator=None, varflag=False):
     """
     Return list of editable parameter names based on get_tc_list info
 
@@ -5009,10 +5030,58 @@ def parsinfo_to_str(pars, separator=None):
     :param separator:
     :return:
     """
-    if separator is None:
-        return [par[0] for par in pars if par[2] not in ['A', 'F', None]]  # != (None, None)]
+
+    ITLVSTR = "*cfl.interleave_lists({})"
+
+    def sublist(i, npars, parsdone, nested=0):
+
+        tmppars = []
+        nread = 0
+
+        while nread < npars and i < len(pars):
+
+            par = pars[i]
+
+            if par[2] not in ['A', 'F', None]:
+                if par[7] is not None and par[7] > 0:
+                    tmppars.append(par[0])
+                    i += 1
+                    tmppars, i = sublist(i, par[7], tmppars, nested=nested+1)
+                else:
+                    tmppars.append(par[0])
+                    i += 1
+                    nread += 1
+            else:
+                nread += 1
+                i += 1
+
+        if nested:
+            if npars > 1:
+                tmppars = ITLVSTR.format(", ".join(tmppars))
+            else:
+                if nested == 1:
+                    tmppars = f"*{tmppars[0]}"
+                else:
+                    tmppars = f"{tmppars[0]}"
+            parsdone.append(tmppars)
+        else:
+            parsdone.extend(tmppars)
+
+        return parsdone, i
+
+    if varflag:
+        parstr = []
+        NPARS = len(pars)
+        i = 0
+        parstr, _ = sublist(i, NPARS, parstr)
+
+        return parstr
+
     else:
-        return [separator.join(par) for par in pars if par[2] not in ['A', 'F', None]]  # != (None, None)]
+        if separator is None:
+            return [par[0] for par in pars if par[2] not in ['A', 'F', None]]  # != (None, None)]
+        else:
+            return [separator.join(par) for par in pars if par[2] not in ['A', 'F', None]]  # != (None, None)]
 
 
 def on_open_univie_clicked(button):
@@ -5918,7 +5987,7 @@ def add_tst_import_paths():
     sys.path.insert(0, cfg.get('paths', 'tst') + '/tst')
 
 
-def interleave_lists(*args):
+def interleave_lists(*args, flatten=True):
     """
 
     :param args:
@@ -5926,7 +5995,20 @@ def interleave_lists(*args):
     """
     if len({len(x) for x in args}) > 1:
         logger.warning('Iterables are not of the same length, result will be truncated to the shortest input!')
-    return [i for j in zip(*args) for i in j]
+    if flatten:
+        return flatten_list([i for j in zip(*args) for i in j])
+    else:
+        return [i for j in zip(*args) for i in j]
+
+
+def flatten_list(nested_list):
+    flat = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flat.extend(flatten_list(item))
+        else:
+            flat.append(item)
+    return flat
 
 
 def create_format_model():

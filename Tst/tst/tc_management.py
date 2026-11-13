@@ -11,6 +11,13 @@ sys.path.append(confignator.get_option('paths', 'ccs'))
 import ccs_function_lib as cfl
 import s2k_partypes as s2k
 
+cfg = confignator.get_config(check_interpolation=False)
+if cfg.has_option('tst-preferences', 'tc-template-interleaved'):
+    TC_TEMPLATE_INTERLEAVE = confignator.get_bool_option('tst-preferences', 'tc-template-interleaved')
+else:
+    TC_TEMPLATE_INTERLEAVE = True
+    cfg.save_option_to_file('tst-preferences', 'tc-template-interleaved', str(TC_TEMPLATE_INTERLEAVE))
+
 dictionary_of_commands = cfl.get_tc_list()
 read_in_list_of_commands = list(dictionary_of_commands.keys())
 list_of_commands = []
@@ -272,7 +279,7 @@ class TcTable(Gtk.Grid):
         treeselection = treeview.get_selection()
         model, my_iter = treeselection.get_selected()
         st, sst, descr, desc2, cname = model[my_iter]
-        selection_data.set_text(cfl.make_tc_template(descr, comment=True, add_parcfg=True, cname=cname), -1)
+        selection_data.set_text(cfl.make_tc_template(descr, comment=True, add_parcfg=True, cname=cname, varflag=TC_TEMPLATE_INTERLEAVE), -1)
 
     def on_drag_begin(self, *args):
         pass
