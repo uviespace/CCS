@@ -113,6 +113,12 @@ if __name__ == '__main__':
     if '--ignore' in sys.argv:
         sys.argv.remove('--ignore')
         ignore_errors = True
+        
+    if '--scos72' in sys.argv:
+        sys.argv.remove('--scos72')
+        FNAME = os.path.join(sdir, 'scos2000db_7.2.json')
+        ssd = json.load(open(FNAME, 'r'))
+        print("USING SCOS2000 v7.2 schema (scos2000db_7.2.json)")
 
     if '-c' in sys.argv:
         MIBDIR = '/home/user/space/mib'  # directory containing the SCOS2000 *.dat files
@@ -135,7 +141,8 @@ if __name__ == '__main__':
         print('USAGE: ./import_mib.py <MIBDIR> <DBSCHEMA> <DBUSERNAME> [-c]\n'
               'Options:\n\t-c\t\tUse configuration in script, any command line arguments will be ignored.\n'
               '\t--dummy\t\tCreate empty MIB structure only. Omit <MIBDIR> argument.\n'
-              '\t--ignore\tContinue if a table import fails.')
+              '\t--ignore\tContinue if a table import fails.\n'
+              '\t--scos72\tUse SCOS2000 v7.2 schema instead of v6.9.')
 
         sys.exit()
 
