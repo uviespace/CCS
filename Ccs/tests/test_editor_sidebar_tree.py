@@ -88,5 +88,42 @@ class FileTreeTests(unittest.TestCase):
         self.assertEqual(self.tree.files[ref.get_path()][0], 'child')
 
 
+class GitCheckboxTests(unittest.TestCase):
+    def test_checkbox_click_toggles_without_diff_or_file_open(self):
+        sidebar = SimpleNamespace(busy=False, rows=[[False, ' M', 'file.txt', '']],
+                                  repo=Mock(), show_diff=Mock(), open_path=Mock())
+        view = Mock()
+        checkbox = object()
+        view.get_column.return_value = checkbox
+        view.get_path_at_pos.return_value = ('0', checkbox, 2, 2)
+        event = SimpleNamespace(button=1, x=5, y=5)
+        EditorSidebar.toggle(sidebar, None, 0)
+        self.assertTrue(sidebar.rows[0][0])
+        self.assertFalse(EditorSidebar.git_button_released(sidebar, view, event))
+        EditorSidebar.open_change(sidebar, view, 0, checkbox)
+        sidebar.show_diff.assert_not_called()
+        sidebar.open_path.assert_not_called()
+        EditorSidebar.toggle(sidebar, None, 0)
+        self.assertFalse(sidebar.rows[0][0])
+
+    def test_filename_click_still_previews_diff(self):
+        sidebar = SimpleNamespace(show_diff=Mock())
+        view = Mock()
+        view.get_column.return_value = object()
+        view.get_path_at_pos.return_value = ('0', object(), 2, 2)
+        event = SimpleNamespace(button=1, x=80, y=5)
+        self.assertFalse(EditorSidebar.git_button_released(sidebar, view, event))
+        sidebar.show_diff.assert_called_once_with(view.get_selection())
+
+    def test_blank_space_and_right_click_do_not_open_diff(self):
+        sidebar = SimpleNamespace(show_diff=Mock())
+        view = Mock()
+        view.get_path_at_pos.return_value = None
+        for button in (1, 3):
+            event = SimpleNamespace(button=button, x=80, y=500)
+            self.assertFalse(EditorSidebar.git_button_released(sidebar, view, event))
+        sidebar.show_diff.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

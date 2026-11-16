@@ -1,5 +1,6 @@
 """File and Git sidebar for the CCS GTK editor."""
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from gi.repository import Gtk, Gdk, GLib, Pango
@@ -17,6 +18,10 @@ class EditorSidebar(Gtk.Notebook):
         self.busy = False
         self.closed = False
         self.executor = ThreadPoolExecutor(max_workers=1)
+        self.remote_executor = ThreadPoolExecutor(max_workers=1)
+        self.remote_busy = False
+        self._remote_checked_at = 0
+        self._remote_target = None
         self.set_size_request(240, -1)
         files = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.append_page(files, Gtk.Label(label='Files'))
@@ -49,7 +54,11 @@ class EditorSidebar(Gtk.Notebook):
         self.button(branch_bar, 'New branch…', self.create_branch)
         bar = Gtk.Box(spacing=4)
         git.pack_start(bar, False, False, 0)
-        self.button(bar, 'Pull', lambda *_: self.operation(lambda: self.repo.run('pull', '--ff-only')))
+        self.pull_button = self.button(bar, 'Pull', lambda *_: self.operation(lambda: self.repo.run('pull', '--ff-only')))
+        provider = Gtk.CssProvider()
+        provider.load_from_data(b'button.incoming { background-image: none; background-color: #add8e6; color: #172b36; }')
+        self.pull_button.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.pull_button.set_tooltip_text('Pull changes from the tracking branch')
         self.button(bar, 'Push', lambda *_: self.operation(lambda: self.repo.run('push')))
         self.button(bar, 'Refresh', lambda *_: self.refresh())
         self.status = Gtk.Label(label='Loading…', xalign=0)
@@ -62,7 +71,7 @@ class EditorSidebar(Gtk.Notebook):
         view.append_column(Gtk.TreeViewColumn('Include', toggle, active=0))
         view.append_column(Gtk.TreeViewColumn('State', Gtk.CellRendererText(), text=1))
         view.append_column(Gtk.TreeViewColumn('File', Gtk.CellRendererText(), text=2, foreground=3))
-        view.get_selection().connect('changed', self.show_diff)
+        view.connect('button-release-event', self.git_button_released)
         view.connect('row-activated', self.open_change)
         self.scroll(git, view)
         self.message = Gtk.Entry()
@@ -109,6 +118,7 @@ class EditorSidebar(Gtk.Notebook):
         if self.diff_window:
             self.diff_window.destroy()
         self.executor.shutdown(wait=False)
+        self.remote_executor.shutdown(wait=False)
 
     def submit(self, work, done):
         if self.busy:
@@ -154,14 +164,14 @@ class EditorSidebar(Gtk.Notebook):
                 repo = Repository(directory)
             except RuntimeError as error:
                 if 'not a git repository' in str(error):
-                    return None, [], 'This folder is not a Git repository.', [], ''
+                    return None, [], 'This folder is not a Git repository.', [], '', 0
                 raise
             return (repo, repo.changes(), repo.run('status', '--short', '--branch').splitlines()[0],
-                    repo.branches(), repo.current_branch())
+                    repo.branches(), repo.current_branch(), repo.incoming_count())
         self.submit(load, self.loaded)
 
     def loaded(self, result):
-        self.repo, self.changes, status, branches, current = result
+        self.repo, self.changes, status, branches, current, incoming = result
         self._current_branch = current
         self._updating_branches = True
         try:
@@ -178,6 +188,45 @@ class EditorSidebar(Gtk.Notebook):
             self.rows.append([change.path in selected, change.status, change.path, change.color])
         self.status.set_text(status)
         self.populate_files()
+        self.update_pull_indicator(incoming)
+        self.check_remote()
+
+    def update_pull_indicator(self, incoming, error=None):
+        context = self.pull_button.get_style_context()
+        if incoming:
+            context.add_class('incoming')
+            tooltip = f'{incoming} incoming commit(s) on the tracking branch'
+        else:
+            context.remove_class('incoming')
+            tooltip = 'No incoming commits on the tracking branch'
+        if error:
+            tooltip += '\nRemote check failed; showing last fetched state: ' + str(error)
+        self.pull_button.set_tooltip_text(tooltip)
+
+    def check_remote(self):
+        # Fetch separately so network latency never blocks checkbox/Git actions.
+        if not self.repo or self.remote_busy or self.closed:
+            return
+        target = (self.repo.root, self._current_branch)
+        now = time.monotonic()
+        if target == self._remote_target and now - self._remote_checked_at < 60:
+            return
+        self._remote_target, self._remote_checked_at = target, now
+        self.remote_busy = True
+        repo = self.repo
+        future = self.remote_executor.submit(repo.fetch_incoming)
+        def complete():
+            self.remote_busy = False
+            if self.closed or not self.repo or (self.repo.root, self._current_branch) != target:
+                return False
+            try:
+                incoming = future.result()
+            except Exception as error:
+                self.update_pull_indicator(repo.incoming_count(), error)
+            else:
+                self.update_pull_indicator(incoming)
+            return False
+        future.add_done_callback(lambda _: GLib.idle_add(complete))
 
     def populate_files(self):
         # Update existing rows instead of rebuilding the model: GTK then retains
@@ -262,8 +311,20 @@ class EditorSidebar(Gtk.Notebook):
             view.expand_row(path, False)
 
     def open_change(self, view, path, column):
+        if column == view.get_column(0):
+            return
         if self.repo:
             self.open_path(os.path.join(self.repo.root, self.rows[path][2]))
+
+    def git_button_released(self, view, event):
+        # Selecting a row also happens when its inclusion checkbox is clicked.
+        # Preview only a deliberate click outside that column, after GTK has
+        # handled the toggle; otherwise the async diff makes the sidebar busy.
+        if event.button == 1:
+            hit = view.get_path_at_pos(int(event.x), int(event.y))
+            if hit is not None and hit[1] != view.get_column(0):
+                self.show_diff(view.get_selection())
+        return False
 
     def toggle(self, renderer, path):
         if not self.busy:
