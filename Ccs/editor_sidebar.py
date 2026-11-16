@@ -60,7 +60,7 @@ class EditorSidebar(Gtk.Notebook):
         self.pull_button.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.pull_button.set_tooltip_text('Pull changes from the tracking branch')
         self.button(bar, 'Push', lambda *_: self.operation(lambda: self.repo.run('push')))
-        self.button(bar, 'Refresh', lambda *_: self.refresh())
+        self.button(bar, 'Refresh', lambda *_: self.refresh(check_remote=True))
         self.status = Gtk.Label(label='Loading…', xalign=0)
         self.status.set_line_wrap(True)
         git.pack_start(self.status, False, False, 0)
@@ -157,7 +157,9 @@ class EditorSidebar(Gtk.Notebook):
             self.refresh()
         return not self.closed
 
-    def refresh(self):
+    def refresh(self, check_remote=False):
+        if check_remote:
+            self._remote_checked_at = 0
         directory = self.directory
         def load():
             try:

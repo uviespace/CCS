@@ -82,6 +82,39 @@ class RepositoryTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.repo.switch_branch('invalid branch', create=True)
 
+    def test_no_upstream_and_detached_head_have_no_incoming_commits(self):
+        self.assertEqual(self.repo.fetch_incoming(), 0)
+        self.git('checkout', '--detach')
+        self.assertEqual(self.repo.fetch_incoming(), 0)
+
+    def test_remote_fetch_detects_incoming_without_changing_worktree(self):
+        remote = self.root / 'remote.git'
+        peer = self.root / 'peer'
+        self.git('init', '--bare', str(remote))
+        self.git('remote', 'add', 'origin', str(remote))
+        branch = self.repo.current_branch()
+        self.git('push', '-u', 'origin', branch)
+        self.git('clone', str(remote), str(peer))
+        def other(*args):
+            return subprocess.check_output(['git', '-C', str(peer), *args], stderr=subprocess.PIPE)
+        other('config', 'user.name', 'Peer')
+        other('config', 'user.email', 'peer@example.com')
+        self.assertEqual(self.repo.fetch_incoming(), 0)
+        (peer / 'one').write_text('remote version\n')
+        other('add', 'one')
+        other('commit', '-m', 'remote edit')
+        other('push')
+        head = self.git('rev-parse', 'HEAD')
+        self.assertEqual(self.repo.incoming_count(), 0)  # cached remote state
+        self.assertEqual(self.repo.fetch_incoming(), 1)
+        self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+        self.assertEqual((self.root / 'one').read_text(), 'original\n')
+        self.git('merge', '--ff-only', '@{upstream}')
+        self.assertEqual(self.repo.incoming_count(), 0)
+        self.write('one', 'local ahead\n')
+        self.repo.commit([c for c in self.repo.changes() if c.path == 'one'], 'local edit')
+        self.assertEqual(self.repo.incoming_count(), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

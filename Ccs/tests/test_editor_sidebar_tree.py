@@ -125,5 +125,24 @@ class GitCheckboxTests(unittest.TestCase):
         sidebar.show_diff.assert_not_called()
 
 
+class PullIndicatorTests(unittest.TestCase):
+    def test_incoming_commits_highlight_and_up_to_date_clears(self):
+        sidebar = SimpleNamespace(pull_button=Mock())
+        context = sidebar.pull_button.get_style_context.return_value
+        EditorSidebar.update_pull_indicator(sidebar, 2)
+        context.add_class.assert_called_once_with('incoming')
+        self.assertIn('2 incoming', sidebar.pull_button.set_tooltip_text.call_args.args[0])
+        EditorSidebar.update_pull_indicator(sidebar, 0)
+        context.remove_class.assert_called_once_with('incoming')
+
+    def test_failed_fetch_keeps_cached_indicator_and_explains_status(self):
+        sidebar = SimpleNamespace(pull_button=Mock())
+        EditorSidebar.update_pull_indicator(sidebar, 1, RuntimeError('offline'))
+        sidebar.pull_button.get_style_context.return_value.add_class.assert_called_once_with('incoming')
+        tooltip = sidebar.pull_button.set_tooltip_text.call_args.args[0]
+        self.assertIn('last fetched state', tooltip)
+        self.assertIn('offline', tooltip)
+
+
 if __name__ == '__main__':
     unittest.main()
