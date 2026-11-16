@@ -24,17 +24,17 @@ class Repository:
         self.root = self.run_at(directory, 'rev-parse', '--show-toplevel').strip()
 
     @staticmethod
-    def run_at(directory, *args):
+    def run_at(directory, *args, timeout=120):
         env = dict(os.environ, GIT_TERMINAL_PROMPT='0', GIT_LITERAL_PATHSPECS='1')
         result = subprocess.run(['git', '-C', directory, *args], env=env,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                timeout=120)
+                                timeout=timeout)
         if result.returncode:
             raise RuntimeError(os.fsdecode(result.stderr).strip() or 'Git command failed')
         return os.fsdecode(result.stdout)
 
-    def run(self, *args):
-        return self.run_at(self.root, *args)
+    def run(self, *args, timeout=120):
+        return self.run_at(self.root, *args, timeout=timeout)
 
     def changes(self):
         fields = self.run('status', '--porcelain=v1', '-z', '--untracked-files=all').split('\0')
@@ -55,6 +55,28 @@ class Repository:
 
     def current_branch(self):
         return self.run('branch', '--show-current').strip()
+
+    def upstream_remote(self):
+        branch = self.current_branch()
+        if not branch:
+            return ''
+        return self.run('for-each-ref', '--format=%(upstream:remotename)',
+                        'refs/heads/' + branch).strip()
+
+    def incoming_count(self):
+        if not self.upstream_remote():
+            return 0
+        try:
+            self.run('rev-parse', '--verify', '--quiet', '@{upstream}')
+        except RuntimeError:
+            return 0  # Tracking branch configured but not fetched/available yet.
+        return int(self.run('rev-list', '--count', 'HEAD..@{upstream}').strip())
+
+    def fetch_incoming(self):
+        remote = self.upstream_remote()
+        if remote and remote != '.':
+            self.run('fetch', '--quiet', '--no-tags', '--', remote, timeout=15)
+        return self.incoming_count()
 
     def switch_branch(self, name, create=False):
         if not name or name.startswith('-'):
