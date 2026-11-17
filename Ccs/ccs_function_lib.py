@@ -4608,7 +4608,6 @@ def _get_upload_service_info(tcname=None):
     return apid, memid_ref, fmt, endspares
 
 
-def get_tc_list(ccf_descr=None, ccf_cname=None):
 def get_tc_list(ccf_descr=None, ccf_cname=None, varflag=False):
     """
 
