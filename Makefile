@@ -74,8 +74,10 @@ startmenu-entries:
 	@echo "| creating application menu entries |"
 	@echo "+-----------------------------------+"
 	    ./gen_desktop_files.sh $(CURDIR)
+	    mkdir -p $(HOME)/.local/share/applications
 	    mv ccs.desktop $(HOME)/.local/share/applications/
 	    mv tst.desktop $(HOME)/.local/share/applications/
+	    update-desktop-database $(HOME)/.local/share/applications
 	@echo "+----------------------------------+"
 	@echo "| created application menu entries |"
 	@echo "+----------------------------------+"
