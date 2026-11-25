@@ -170,3 +170,10 @@ dmypy.json
 cython_debug/
 
 /Tst/confignator/doc/source/_apidocfiles/
+
+
+# DS_Store files
+.DS_Store
+/.devcontainer/codex-ws-token
+/PFM_HotOp3_04Aug26.tmpool
+/mib_dat_exports_v3.2__rc15/

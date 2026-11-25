@@ -14,6 +14,8 @@ import threading
 import pickle
 import confignator
 import os
+from editor_sidebar import EditorSidebar
+from editor_file_watch import OpenFileWatcher
 
 import dbus
 import dbus.service
@@ -186,6 +188,9 @@ class IPythonTerminal(Vte.Terminal):
 
     def __init__(self, scrollback_lines, *args, **kwds):
         super(IPythonTerminal, self).__init__(*args, **kwds)
+        self.connect('key-press-event', self._on_terminal_key_press)
+        self.connect('button-press-event', self._on_terminal_button_press)
+        self.connect('popup-menu', self._on_terminal_popup_menu)
         self.spawn_async(
             Vte.PtyFlags.DEFAULT,  # Pty Flags
             None,  # Working DIR
@@ -197,6 +202,53 @@ class IPythonTerminal(Vte.Terminal):
             None,  # Cancellable
             None,  # Callback
             None)  # User Data
+
+    def _on_terminal_key_press(self, widget, event):
+        modifiers = event.state & Gtk.accelerator_get_default_mod_mask()
+        control = Gdk.ModifierType.CONTROL_MASK
+        shift = Gdk.ModifierType.SHIFT_MASK
+        key = Gdk.keyval_to_lower(event.keyval)
+        if modifiers == control | shift and key == Gdk.KEY_c:
+            self.copy_clipboard()
+            return True
+        if modifiers == control and key == Gdk.KEY_a:
+            self.select_all()
+            return True
+        if modifiers == control and key == Gdk.KEY_c:
+            # Preserve terminal interrupt even when the editor's Copy accelerator
+            # would otherwise consume Ctrl+C before VTE receives it.
+            self.feed_child_compat('\x03')
+            return True
+        return False
+
+    def _show_terminal_menu(self, event=None):
+        menu = Gtk.Menu()
+        copy = Gtk.MenuItem.new_with_label('Copy')
+        copy.set_sensitive(self.get_has_selection())
+        copy.connect('activate', lambda item: self.copy_clipboard())
+        menu.append(copy)
+        select_all = Gtk.MenuItem.new_with_label('Select All')
+        select_all.connect('activate', lambda item: self.select_all())
+        menu.append(select_all)
+        menu.attach_to_widget(self, None)
+        menu.connect('selection-done', lambda widget: widget.destroy())
+        menu.show_all()
+        if event is None:
+            menu.popup_at_widget(self, Gdk.Gravity.CENTER, Gdk.Gravity.CENTER, None)
+        else:
+            menu.popup_at_pointer(event)
+
+    def _on_terminal_button_press(self, widget, event):
+        if event.button == 3:
+            # Consume the event so right-click keeps the existing selection.
+            self.grab_focus()
+            self._show_terminal_menu(event)
+            return True
+        return False
+
+    def _on_terminal_popup_menu(self, widget):
+        self._show_terminal_menu()
+        return True
 
     def feed_child_compat(self, msg, msglen=None):
         """
@@ -262,7 +314,13 @@ class CcsEditor(Gtk.Window):
         self.sourcemarks = {}
         self.create_mark_attributes()
 
-        self.grid.attach(self.editor_notebook, 0, 3, 3, 1)
+        self.editor_sidebar = EditorSidebar(self)
+        self.file_watcher = OpenFileWatcher(self)
+        editor_paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        editor_paned.pack1(self.editor_sidebar, resize=False, shrink=False)
+        editor_paned.pack2(self.editor_notebook, resize=True, shrink=False)
+        editor_paned.set_position(280)
+        self.grid.attach(editor_paned, 0, 3, 3, 1)
 
         if self.cfg.has_option('ccs-editor', 'color_scheme'):
             self._update_style_schemes(self.cfg.get('ccs-editor', 'color_scheme'))
@@ -521,6 +579,14 @@ class CcsEditor(Gtk.Window):
     def tcpserver_shutdown(self, widget=None, event=None):
         self.tcpserver.shutdown()
 
+    def do_key_press_event(self, event):
+        # Window accelerators run before child key handlers. Route terminal
+        # shortcuts first, so Copy acts on logs and Ctrl+C still interrupts.
+        if self.get_focus() == self.ipython_view:
+            if self.ipython_view._on_terminal_key_press(self.ipython_view, event):
+                return True
+        return Gtk.Window.do_key_press_event(self, event)
+
     def key_pressed(self, widget=None, event=None):
         if event.state & Gdk.ModifierType.CONTROL_MASK == Gdk.ModifierType.CONTROL_MASK:
             print(event.keyval, event.hardware_keycode)
@@ -697,7 +763,6 @@ class CcsEditor(Gtk.Window):
         action = Gtk.Action(name="FileSaveAs", label="_Save As", tooltip=None, stock_id=Gtk.STOCK_SAVE_AS)
         action.connect("activate", self.on_menu_file_saveas)
         action_group.add_action_with_accel(action, "<control><shift>S")
-        action_group.add_action(action)
 
         action = Gtk.Action(name="FileQuit", label="_Quit", tooltip=None, stock_id=Gtk.STOCK_QUIT)
         action.connect("activate", self.on_menu_file_quit)
@@ -713,7 +778,7 @@ class CcsEditor(Gtk.Window):
 
         action = Gtk.Action(name="EditRedo", label="Red_o", tooltip=None, stock_id=Gtk.STOCK_REDO)
         action.connect("activate", self._on_redo)
-        action_group.add_action_with_accel(action, "<control>Y")
+        action_group.add_action_with_accel(action, "<control><shift>Z")
 
         action = Gtk.Action(name="EditCut", label="Cu_t", tooltip=None, stock_id=Gtk.STOCK_CUT)
         action.connect("activate", self._on_cut)
@@ -1078,6 +1143,7 @@ class CcsEditor(Gtk.Window):
         with open(filename, 'w') as fdesc:
             fdesc.write(text)
             fdesc.close()
+        self.file_watcher.track(nb_page, filename)
 
     """
     It would be nicer to extract the child by type rather than explicitly by its
@@ -1350,6 +1416,8 @@ class CcsEditor(Gtk.Window):
                 label = self._notebookt_current_get_label()
                 label.set_text(label.get_text().strip('*'))
                 buf.connect('changed', self._notebook_buffer_modified, None, label)
+
+                self.file_watcher.track(sourceview.get_parent(), filename)
 
                 self._parse_editor_commands(buf)
                 view = self._get_active_view()

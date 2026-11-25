@@ -1,0 +1,57 @@
+services:
+  database:
+    image: mysql:8.4
+    env_file:
+      - .env
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+    ports:
+      # app shares this service's network namespace, so publish Codex here.
+      - "127.0.0.1:4501:4500"
+    volumes:
+      - ccs-mysql-data:/var/lib/mysql
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/10-ccs-grants.sql:ro
+
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    depends_on:
+      database:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DISPLAY: host.docker.internal:0
+      DBUS_SESSION_BUS_ADDRESS: unix:path=/tmp/ccs-session-bus
+      GDK_BACKEND: x11
+      LIBGL_ALWAYS_INDIRECT: "1"
+      NO_AT_BRIDGE: "1"
+      PYTHONPATH: /workspace/Ccs:/workspace/Tst
+
+      # Codex app-server listens on container port 4500.
+      CODEX_APP_SERVER_PORT: "4500"
+
+    init: true
+
+    # Keep MySQL reachable at 127.0.0.1 from the app container.
+    network_mode: service:database
+
+    volumes:
+      - ..:/workspace:cached
+
+      # Persists Codex login state and the generated capability token.
+      - ccs-codex-data:/home/ubuntu/.codex
+    working_dir: /workspace
+    command: start-codex-server
+
+volumes:
+  ccs-mysql-data:
+  ccs-codex-data:
